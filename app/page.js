@@ -20,8 +20,17 @@ export default function HomePage() {
   const redrawTimeoutRef = useRef(null);
 
   const [seaLevel, setSeaLevel] = useState(0);
-  const [viewMode, setViewMode] = useState("globe");
+  const [viewMode, setViewMode] = useState("map");
   const [engineReady, setEngineReady] = useState(false);
+  const [floodedCells, setFloodedCells] = useState(0);
+
+  const clearOverlay = () => {
+    const canvas = overlayCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setFloodedCells(0);
+  };
 
   const configureTerrain = (map) => {
     if (!map.getSource("mapbox-dem")) {
@@ -45,13 +54,6 @@ export default function HomePage() {
     setEngineReady(true);
   };
 
-  const clearOverlay = () => {
-    const canvas = overlayCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  };
-
   const drawFloodOverlay = () => {
     const map = mapRef.current;
     const canvas = overlayCanvasRef.current;
@@ -65,16 +67,20 @@ export default function HomePage() {
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (seaLevel <= 0) return;
+    if (seaLevel <= 0) {
+      setFloodedCells(0);
+      return;
+    }
 
     const width = canvas.width;
     const height = canvas.height;
 
-    const columns = width > 1400 ? 90 : width > 1000 ? 72 : 56;
-    const rows = height > 900 ? 60 : height > 700 ? 48 : 38;
-
+    const columns = 120;
+    const rows = 80;
     const cellW = width / columns;
     const cellH = height / rows;
+
+    let floodedCount = 0;
 
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < columns; col++) {
@@ -91,17 +97,20 @@ export default function HomePage() {
         if (elevation > seaLevel) continue;
 
         const depth = seaLevel - elevation;
+        floodedCount += 1;
 
-        let fill = "rgba(56, 189, 248, 0.20)";
-        if (depth > 5) fill = "rgba(59, 130, 246, 0.28)";
-        if (depth > 25) fill = "rgba(37, 99, 235, 0.34)";
-        if (depth > 100) fill = "rgba(29, 78, 216, 0.40)";
-        if (depth > 500) fill = "rgba(30, 64, 175, 0.48)";
+        let fill = "rgba(56, 189, 248, 0.55)";
+        if (depth > 5) fill = "rgba(59, 130, 246, 0.62)";
+        if (depth > 20) fill = "rgba(37, 99, 235, 0.7)";
+        if (depth > 100) fill = "rgba(29, 78, 216, 0.78)";
+        if (depth > 500) fill = "rgba(30, 64, 175, 0.84)";
 
         ctx.fillStyle = fill;
         ctx.fillRect(x, y, cellW + 1, cellH + 1);
       }
     }
+
+    setFloodedCells(floodedCount);
   };
 
   const scheduleFloodRedraw = () => {
@@ -111,7 +120,7 @@ export default function HomePage() {
 
     redrawTimeoutRef.current = window.setTimeout(() => {
       drawFloodOverlay();
-    }, 80);
+    }, 120);
   };
 
   useEffect(() => {
@@ -120,21 +129,25 @@ export default function HomePage() {
     const map = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/streets-v12",
-      center: [-70, 28],
-      zoom: 2.6,
-      projection: "globe",
+      center: [-80.19, 25.76],
+      zoom: 6.2,
+      projection: "mercator",
     });
 
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
 
     map.on("load", () => {
       configureTerrain(map);
-      scheduleFloodRedraw();
+      map.once("idle", () => {
+        scheduleFloodRedraw();
+      });
     });
 
     map.on("style.load", () => {
       configureTerrain(map);
-      scheduleFloodRedraw();
+      map.once("idle", () => {
+        scheduleFloodRedraw();
+      });
     });
 
     map.on("moveend", scheduleFloodRedraw);
@@ -152,7 +165,7 @@ export default function HomePage() {
       map.remove();
       mapRef.current = null;
     };
-  }, [engineReady]);
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -160,11 +173,15 @@ export default function HomePage() {
 
     if (viewMode === "globe") {
       map.setProjection("globe");
+      map.flyTo({ center: [-70, 28], zoom: 2.6, essential: true });
     } else {
       map.setProjection("mercator");
+      map.flyTo({ center: [-80.19, 25.76], zoom: 6.2, essential: true });
     }
 
-    scheduleFloodRedraw();
+    map.once("idle", () => {
+      scheduleFloodRedraw();
+    });
   }, [viewMode]);
 
   useEffect(() => {
@@ -196,7 +213,6 @@ export default function HomePage() {
           width: "100%",
           height: "100%",
           pointerEvents: "none",
-          mixBlendMode: "multiply",
         }}
       />
 
@@ -262,7 +278,7 @@ export default function HomePage() {
           </div>
 
           <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280", lineHeight: 1.4 }}>
-            Positive levels flood visible terrain. Negative values are accepted now and can be upgraded later into a full ocean-drain mode.
+            Positive values flood visible terrain. Start with +10m, +70m, or +200m.
           </div>
         </div>
 
@@ -317,7 +333,7 @@ export default function HomePage() {
               }}
             >
               Standard Map
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>Free</div>
+              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>Best for flood overlay</div>
             </button>
 
             <button
@@ -350,7 +366,7 @@ export default function HomePage() {
               }}
             >
               Globe View
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>Preview</div>
+              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>Preview only</div>
             </button>
           </div>
         </div>
@@ -394,6 +410,7 @@ export default function HomePage() {
         </div>
         <div>Mode: {viewMode === "globe" ? "Globe" : "Standard Map"}</div>
         <div>Flood engine: {engineReady ? "On" : "Loading"}</div>
+        <div>Flooded cells: {floodedCells}</div>
       </div>
     </div>
   );
