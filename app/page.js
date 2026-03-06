@@ -36,12 +36,21 @@ export default function HomePage() {
     };
   }, []);
 
+  const handleSeaLevelChange = (value) => {
+    const parsed = parseInt(value, 10);
+
+    if (Number.isNaN(parsed)) {
+      setSeaLevel(0);
+      return;
+    }
+
+    const clamped = Math.max(-5000, Math.min(5000, parsed));
+    setSeaLevel(clamped);
+  };
+
   return (
     <div style={{ width: "100%", height: "100vh", position: "relative" }}>
-      <div
-        ref={mapContainer}
-        style={{ width: "100%", height: "100%" }}
-      />
+      <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
 
       <div
         style={{
@@ -52,7 +61,7 @@ export default function HomePage() {
           padding: 16,
           borderRadius: 12,
           boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-          minWidth: 280,
+          minWidth: 300,
           fontFamily: "Arial, sans-serif",
         }}
       >
@@ -60,33 +69,43 @@ export default function HomePage() {
           Floodmap V1
         </div>
 
-        <div style={{ fontSize: 14, marginBottom: 12, color: "#444" }}>
+        <div style={{ fontSize: 14, marginBottom: 10, color: "#444" }}>
           Sea Level: {seaLevel > 0 ? "+" : ""}
           {seaLevel} m
         </div>
 
+        <label
+          htmlFor="seaLevelInput"
+          style={{ display: "block", fontSize: 13, marginBottom: 6, color: "#555" }}
+        >
+          Enter sea level in meters
+        </label>
+
         <input
-          type="range"
+          id="seaLevelInput"
+          type="number"
           min="-5000"
           max="5000"
           step="10"
           value={seaLevel}
-          onChange={(e) => setSeaLevel(parseInt(e.target.value, 10))}
-          style={{ width: "100%" }}
+          onChange={(e) => handleSeaLevelChange(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            borderRadius: 8,
+            border: "1px solid #ccc",
+            fontSize: 16,
+          }}
         />
 
         <div
           style={{
-            display: "flex",
-            justifyContent: "space-between",
+            marginTop: 8,
             fontSize: 12,
             color: "#666",
-            marginTop: 6,
           }}
         >
-          <span>-5000m</span>
-          <span>0m</span>
-          <span>+5000m</span>
+          Allowed range: -5000m to +5000m
         </div>
       </div>
     </div>
