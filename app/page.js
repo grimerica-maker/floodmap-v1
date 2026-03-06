@@ -60,13 +60,14 @@ export default function HomePage() {
 
         <div>Sea Level: {seaLevel} m</div>
 
-        <input
-          type="range"
-          min="0"
-          max="100"
-          value={seaLevel}
-          onChange={(e)=>setSeaLevel(e.target.value)}
-        />
+<input
+  type="range"
+  min="-5000"
+  max="5000"
+  step="10"
+  value={seaLevel}
+  onChange={(e)=>setSeaLevel(parseInt(e.target.value))}
+/>
 
       </div>
 
