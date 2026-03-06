@@ -1,8 +1,27 @@
+"use client"
+
+import { useEffect, useRef } from "react"
+import mapboxgl from "mapbox-gl"
+
+mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+
 export default function HomePage() {
+  const mapContainer = useRef(null)
+
+  useEffect(() => {
+    const map = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: "mapbox://styles/mapbox/streets-v12",
+      center: [-95.3698, 29.7604],
+      zoom: 5
+    })
+
+    return () => map.remove()
+  }, [])
+
   return (
-    <main style={{ padding: "40px", fontFamily: "Arial, sans-serif" }}>
-      <h1>Floodmap V1</h1>
-      <p>Your flood simulation app is starting.</p>
-    </main>
-  );
+    <div style={{ width: "100%", height: "100vh" }}>
+      <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
+    </div>
+  )
 }
