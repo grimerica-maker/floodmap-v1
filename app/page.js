@@ -16,9 +16,103 @@ const PRESETS = [
 export default function HomePage() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
+  const overlayCanvasRef = useRef(null);
+  const redrawTimeoutRef = useRef(null);
 
   const [seaLevel, setSeaLevel] = useState(0);
   const [viewMode, setViewMode] = useState("globe");
+  const [engineReady, setEngineReady] = useState(false);
+
+  const configureTerrain = (map) => {
+    if (!map.getSource("mapbox-dem")) {
+      map.addSource("mapbox-dem", {
+        type: "raster-dem",
+        url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+        tileSize: 512,
+        maxzoom: 14,
+      });
+    }
+
+    map.setTerrain({
+      source: "mapbox-dem",
+      exaggeration: 1,
+    });
+
+    if (map.getProjection()?.name === "globe") {
+      map.setFog({});
+    }
+
+    setEngineReady(true);
+  };
+
+  const clearOverlay = () => {
+    const canvas = overlayCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const drawFloodOverlay = () => {
+    const map = mapRef.current;
+    const canvas = overlayCanvasRef.current;
+
+    if (!map || !canvas || !engineReady) return;
+
+    const rect = map.getContainer().getBoundingClientRect();
+    canvas.width = Math.max(1, Math.floor(rect.width));
+    canvas.height = Math.max(1, Math.floor(rect.height));
+
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (seaLevel <= 0) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    const columns = width > 1400 ? 90 : width > 1000 ? 72 : 56;
+    const rows = height > 900 ? 60 : height > 700 ? 48 : 38;
+
+    const cellW = width / columns;
+    const cellH = height / rows;
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < columns; col++) {
+        const x = col * cellW;
+        const y = row * cellH;
+
+        const sampleX = x + cellW / 2;
+        const sampleY = y + cellH / 2;
+
+        const lngLat = map.unproject([sampleX, sampleY]);
+        const elevation = map.queryTerrainElevation(lngLat, { exaggerated: false });
+
+        if (elevation === null || Number.isNaN(elevation)) continue;
+        if (elevation > seaLevel) continue;
+
+        const depth = seaLevel - elevation;
+
+        let fill = "rgba(56, 189, 248, 0.20)";
+        if (depth > 5) fill = "rgba(59, 130, 246, 0.28)";
+        if (depth > 25) fill = "rgba(37, 99, 235, 0.34)";
+        if (depth > 100) fill = "rgba(29, 78, 216, 0.40)";
+        if (depth > 500) fill = "rgba(30, 64, 175, 0.48)";
+
+        ctx.fillStyle = fill;
+        ctx.fillRect(x, y, cellW + 1, cellH + 1);
+      }
+    }
+  };
+
+  const scheduleFloodRedraw = () => {
+    if (redrawTimeoutRef.current) {
+      window.clearTimeout(redrawTimeoutRef.current);
+    }
+
+    redrawTimeoutRef.current = window.setTimeout(() => {
+      drawFloodOverlay();
+    }, 80);
+  };
 
   useEffect(() => {
     if (mapRef.current) return;
@@ -33,17 +127,32 @@ export default function HomePage() {
 
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
 
-    map.on("style.load", () => {
-      map.setFog({});
+    map.on("load", () => {
+      configureTerrain(map);
+      scheduleFloodRedraw();
     });
+
+    map.on("style.load", () => {
+      configureTerrain(map);
+      scheduleFloodRedraw();
+    });
+
+    map.on("moveend", scheduleFloodRedraw);
+    map.on("zoomend", scheduleFloodRedraw);
+    map.on("rotateend", scheduleFloodRedraw);
+    map.on("pitchend", scheduleFloodRedraw);
+    map.on("resize", scheduleFloodRedraw);
 
     mapRef.current = map;
 
     return () => {
+      if (redrawTimeoutRef.current) {
+        window.clearTimeout(redrawTimeoutRef.current);
+      }
       map.remove();
       mapRef.current = null;
     };
-  }, []);
+  }, [engineReady]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -51,12 +160,16 @@ export default function HomePage() {
 
     if (viewMode === "globe") {
       map.setProjection("globe");
-      map.setStyle("mapbox://styles/mapbox/streets-v12");
     } else {
       map.setProjection("mercator");
-      map.setStyle("mapbox://styles/mapbox/streets-v12");
     }
+
+    scheduleFloodRedraw();
   }, [viewMode]);
+
+  useEffect(() => {
+    scheduleFloodRedraw();
+  }, [seaLevel, engineReady]);
 
   const handleSeaLevelChange = (value) => {
     if (value === "") {
@@ -65,10 +178,7 @@ export default function HomePage() {
     }
 
     const parsed = parseInt(value, 10);
-
-    if (Number.isNaN(parsed)) {
-      return;
-    }
+    if (Number.isNaN(parsed)) return;
 
     const clamped = Math.max(-5000, Math.min(5000, parsed));
     setSeaLevel(clamped);
@@ -77,6 +187,18 @@ export default function HomePage() {
   return (
     <div style={{ width: "100%", height: "100vh", position: "relative", overflow: "hidden" }}>
       <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
+
+      <canvas
+        ref={overlayCanvasRef}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+          mixBlendMode: "multiply",
+        }}
+      />
 
       <div
         style={{
@@ -137,6 +259,10 @@ export default function HomePage() {
 
           <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280" }}>
             Range: -5000m to +5000m
+          </div>
+
+          <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280", lineHeight: 1.4 }}>
+            Positive levels flood visible terrain. Negative values are accepted now and can be upgraded later into a full ocean-drain mode.
           </div>
         </div>
 
@@ -241,7 +367,7 @@ export default function HomePage() {
             Pro Version Later
           </div>
           <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
-            Satellite view, real flood overlays, 3D globe, impact events, and spin-speed scenarios.
+            Satellite view, stronger flood rendering, 3D globe, impact events, and spin-speed scenarios.
           </div>
         </div>
       </div>
@@ -267,6 +393,7 @@ export default function HomePage() {
           {seaLevel}m
         </div>
         <div>Mode: {viewMode === "globe" ? "Globe" : "Standard Map"}</div>
+        <div>Flood engine: {engineReady ? "On" : "Loading"}</div>
       </div>
     </div>
   );
