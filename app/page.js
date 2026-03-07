@@ -35,23 +35,12 @@ export default function HomePage() {
     return Math.max(-5000, Math.min(5000, parsed));
   };
 
-  const getStyleUrl = () => {
-    if (viewMode === "satellite") {
-      return "mapbox://styles/mapbox/satellite-streets-v12";
-    }
-    return "mapbox://styles/mapbox/streets-v12";
-  };
-
   const removeFloodLayer = () => {
     const map = mapRef.current;
     if (!map) return;
 
-    if (map.getLayer(FLOOD_LAYER_ID)) {
-      map.removeLayer(FLOOD_LAYER_ID);
-    }
-    if (map.getSource(FLOOD_SOURCE_ID)) {
-      map.removeSource(FLOOD_SOURCE_ID);
-    }
+    if (map.getLayer(FLOOD_LAYER_ID)) map.removeLayer(FLOOD_LAYER_ID);
+    if (map.getSource(FLOOD_SOURCE_ID)) map.removeSource(FLOOD_SOURCE_ID);
   };
 
   const ensureTerrain = () => {
@@ -80,8 +69,7 @@ export default function HomePage() {
     if (!map) return;
 
     if (map.getSource(FLOOD_SOURCE_ID)) {
-      const source = map.getSource(FLOOD_SOURCE_ID);
-      source.updateImage({
+      map.getSource(FLOOD_SOURCE_ID).updateImage({
         url: dataUrl,
         coordinates,
       });
@@ -97,8 +85,9 @@ export default function HomePage() {
         type: "raster",
         source: FLOOD_SOURCE_ID,
         paint: {
-          "raster-opacity": 0.8,
+          "raster-opacity": 0.82,
           "raster-fade-duration": 0,
+          "raster-resampling": "linear",
         },
       });
     }
@@ -109,6 +98,33 @@ export default function HomePage() {
     setFloodedCells(0);
     setSeaLevel(0);
     setStatus("Flood cleared");
+  };
+
+  const smoothMask = (mask, rows, cols) => {
+    const next = Array.from({ length: rows }, () => Array(cols).fill(false));
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        let neighbors = 0;
+
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            const rr = r + dr;
+            const cc = c + dc;
+            if (rr < 0 || rr >= rows || cc < 0 || cc >= cols) continue;
+            if (mask[rr][cc]) neighbors += 1;
+          }
+        }
+
+        if (mask[r][c]) {
+          next[r][c] = neighbors >= 3;
+        } else {
+          next[r][c] = neighbors >= 5;
+        }
+      }
+    }
+
+    return next;
   };
 
   const renderFlood = () => {
@@ -128,20 +144,20 @@ export default function HomePage() {
     }
 
     const canvas = document.createElement("canvas");
-    const width = 900;
-    const height = 700;
+    const width = 1400;
+    const height = 1000;
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext("2d");
 
-    const cols = 120;
-    const rows = 90;
+    const cols = 180;
+    const rows = 128;
     const cellW = width / cols;
     const cellH = height / rows;
 
     const elev = Array.from({ length: rows }, () => Array(cols).fill(null));
     const lowEnough = Array.from({ length: rows }, () => Array(cols).fill(false));
-    const flooded = Array.from({ length: rows }, () => Array(cols).fill(false));
+    let flooded = Array.from({ length: rows }, () => Array(cols).fill(false));
 
     const tl = map.unproject([0, 0]);
     const tr = map.unproject([width, 0]);
@@ -165,7 +181,6 @@ export default function HomePage() {
         const e = map.queryTerrainElevation(lngLat, { exaggerated: false });
 
         elev[r][c] = e;
-
         if (typeof e === "number" && !Number.isNaN(e) && e <= seaLevel) {
           lowEnough[r][c] = true;
         }
@@ -199,12 +214,13 @@ export default function HomePage() {
       push(r + 1, c);
       push(r, c - 1);
       push(r, c + 1);
-
       push(r - 1, c - 1);
       push(r - 1, c + 1);
       push(r + 1, c - 1);
       push(r + 1, c + 1);
     }
+
+    flooded = smoothMask(flooded, rows, cols);
 
     let count = 0;
     ctx.clearRect(0, 0, width, height);
@@ -215,14 +231,15 @@ export default function HomePage() {
 
         count += 1;
         const depth = seaLevel - elev[r][c];
-        let fill = "rgba(56, 189, 248, 0.45)";
-        if (depth > 5) fill = "rgba(59, 130, 246, 0.55)";
-        if (depth > 20) fill = "rgba(37, 99, 235, 0.68)";
-        if (depth > 100) fill = "rgba(29, 78, 216, 0.78)";
-        if (depth > 500) fill = "rgba(30, 64, 175, 0.86)";
+
+        let fill = "rgba(56, 189, 248, 0.40)";
+        if (depth > 5) fill = "rgba(59, 130, 246, 0.50)";
+        if (depth > 20) fill = "rgba(37, 99, 235, 0.60)";
+        if (depth > 100) fill = "rgba(29, 78, 216, 0.70)";
+        if (depth > 500) fill = "rgba(30, 64, 175, 0.78)";
 
         ctx.fillStyle = fill;
-        ctx.fillRect(c * cellW, r * cellH, cellW + 1, cellH + 1);
+        ctx.fillRect(c * cellW, r * cellH, cellW + 1.5, cellH + 1.5);
       }
     }
 
@@ -236,9 +253,7 @@ export default function HomePage() {
   };
 
   const scheduleRender = () => {
-    if (drawTimerRef.current) {
-      window.clearTimeout(drawTimerRef.current);
-    }
+    if (drawTimerRef.current) window.clearTimeout(drawTimerRef.current);
     drawTimerRef.current = window.setTimeout(() => {
       renderFlood();
     }, 150);
@@ -249,7 +264,7 @@ export default function HomePage() {
 
     const map = new mapboxgl.Map({
       container: mapContainer.current,
-      style: getStyleUrl(),
+      style: "mapbox://styles/mapbox/streets-v12",
       center: [-80.19, 25.76],
       zoom: 6.2,
       projection: "mercator",
@@ -265,9 +280,7 @@ export default function HomePage() {
 
     map.on("style.load", () => {
       ensureTerrain();
-      if (seaLevel > 0 && viewMode === "map") {
-        scheduleRender();
-      }
+      if (seaLevel > 0 && viewMode === "map") scheduleRender();
     });
 
     map.on("moveend", () => {
@@ -285,9 +298,7 @@ export default function HomePage() {
     mapRef.current = map;
 
     return () => {
-      if (drawTimerRef.current) {
-        window.clearTimeout(drawTimerRef.current);
-      }
+      if (drawTimerRef.current) window.clearTimeout(drawTimerRef.current);
       map.remove();
       mapRef.current = null;
     };
@@ -302,11 +313,7 @@ export default function HomePage() {
       setFloodedCells(0);
       map.setProjection("globe");
       map.setStyle("mapbox://styles/mapbox/streets-v12");
-      map.flyTo({
-        center: [-70, 28],
-        zoom: 2.6,
-        essential: true,
-      });
+      map.flyTo({ center: [-70, 28], zoom: 2.6, essential: true });
       setStatus("Globe preview mode");
       return;
     }
@@ -316,22 +323,14 @@ export default function HomePage() {
       setFloodedCells(0);
       map.setProjection("mercator");
       map.setStyle("mapbox://styles/mapbox/satellite-streets-v12");
-      map.flyTo({
-        center: [-80.19, 25.76],
-        zoom: 6.2,
-        essential: true,
-      });
+      map.flyTo({ center: [-80.19, 25.76], zoom: 6.2, essential: true });
       setStatus("Satellite is placeholder for Pro");
       return;
     }
 
     map.setProjection("mercator");
     map.setStyle("mapbox://styles/mapbox/streets-v12");
-    map.flyTo({
-      center: [-80.19, 25.76],
-      zoom: 6.2,
-      essential: true,
-    });
+    map.flyTo({ center: [-80.19, 25.76], zoom: 6.2, essential: true });
     setStatus("Standard Map ready");
   }, [viewMode]);
 
@@ -382,7 +381,7 @@ export default function HomePage() {
         </div>
 
         <div style={{ fontSize: 13, color: "#666", marginBottom: 20 }}>
-          Real 2D Mapbox flood pass
+          Smoother 2D flood rendering
         </div>
 
         <div style={{ marginBottom: 24 }}>
@@ -514,7 +513,6 @@ export default function HomePage() {
               }}
             >
               Standard Map
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>Flood engine runs here</div>
             </button>
 
             <button
@@ -531,7 +529,6 @@ export default function HomePage() {
               }}
             >
               Satellite View 🔒
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>Pro placeholder</div>
             </button>
 
             <button
@@ -548,24 +545,7 @@ export default function HomePage() {
               }}
             >
               Globe View
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>Preview only</div>
             </button>
-          </div>
-        </div>
-
-        <div
-          style={{
-            padding: 14,
-            borderRadius: 12,
-            background: "#eff6ff",
-            border: "1px solid #bfdbfe",
-          }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#1d4ed8", marginBottom: 6 }}>
-            What to test
-          </div>
-          <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
-            Stay in Standard Map, zoom around Florida or Bangladesh, try +10m, +70m, then Execute Flood.
           </div>
         </div>
       </div>
@@ -591,7 +571,7 @@ export default function HomePage() {
           Sea level: {seaLevel > 0 ? "+" : ""}
           {seaLevel}m
         </div>
-        <div>Mode: {viewMode === "globe" ? "Globe" : viewMode === "satellite" ? "Satellite" : "Standard Map"}</div>
+        <div>Mode: {viewMode}</div>
         <div>Status: {status}</div>
         <div>Flooded cells: {floodedCells}</div>
       </div>
