@@ -8,7 +8,6 @@ mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 const TILE_SERVER = "https://flood-engine.onrender.com";
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
-const DEM_SOURCE_ID = "mapbox-dem";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -22,6 +21,9 @@ export default function HomePage() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const seaLevelRef = useRef(0);
+  const hoverTimerRef = useRef(null);
+  const hoverAbortRef = useRef(null);
+  const lastHoverKeyRef = useRef("");
 
   const [inputLevel, setInputLevel] = useState(70);
   const [seaLevel, setSeaLevel] = useState(0);
@@ -30,7 +32,7 @@ export default function HomePage() {
 
   const [cursorLngLat, setCursorLngLat] = useState(null);
   const [cursorElevation, setCursorElevation] = useState(null);
-  const [cursorDifference, setCursorDifference] = useState(null);
+  const [cursorLoading, setCursorLoading] = useState(false);
 
   useEffect(() => {
     seaLevelRef.current = seaLevel;
@@ -50,20 +52,6 @@ export default function HomePage() {
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
 
     map.on("load", () => {
-      if (!map.getSource(DEM_SOURCE_ID)) {
-        map.addSource(DEM_SOURCE_ID, {
-          type: "raster-dem",
-          url: "mapbox://mapbox.mapbox-terrain-dem-v1",
-          tileSize: 512,
-          maxzoom: 14,
-        });
-      }
-
-      map.setTerrain({
-        source: DEM_SOURCE_ID,
-        exaggeration: 1,
-      });
-
       setStatus("Map ready");
     });
 
@@ -76,29 +64,68 @@ export default function HomePage() {
         lat: lat.toFixed(4),
       });
 
-      const elevation = map.queryTerrainElevation(e.lngLat, {
-        exaggerated: false,
-      });
+      const hoverKey = `${lat.toFixed(2)},${lng.toFixed(2)}`;
+      if (hoverKey === lastHoverKeyRef.current) return;
+      lastHoverKeyRef.current = hoverKey;
 
-      if (typeof elevation === "number" && !Number.isNaN(elevation)) {
-        const roundedElevation = Math.round(elevation);
-        setCursorElevation(roundedElevation);
-        setCursorDifference(seaLevelRef.current - roundedElevation);
-      } else {
-        setCursorElevation(null);
-        setCursorDifference(null);
+      if (hoverTimerRef.current) {
+        window.clearTimeout(hoverTimerRef.current);
       }
+
+      hoverTimerRef.current = window.setTimeout(async () => {
+        try {
+          if (hoverAbortRef.current) {
+            hoverAbortRef.current.abort();
+          }
+
+          const controller = new AbortController();
+          hoverAbortRef.current = controller;
+          setCursorLoading(true);
+
+          const res = await fetch(
+            `${TILE_SERVER}/elevation?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`,
+            { signal: controller.signal }
+          );
+
+          if (!res.ok) return;
+
+          const data = await res.json();
+          if (typeof data.elevation_m === "number") {
+            setCursorElevation(Math.round(data.elevation_m));
+          }
+        } catch (err) {
+          if (err?.name !== "AbortError") {
+            // ignore
+          }
+        } finally {
+          setCursorLoading(false);
+        }
+      }, 120);
     });
 
     map.on("mouseleave", () => {
       setCursorLngLat(null);
       setCursorElevation(null);
-      setCursorDifference(null);
+      setCursorLoading(false);
+      lastHoverKeyRef.current = "";
+
+      if (hoverTimerRef.current) {
+        window.clearTimeout(hoverTimerRef.current);
+      }
+      if (hoverAbortRef.current) {
+        hoverAbortRef.current.abort();
+      }
     });
 
     mapRef.current = map;
 
     return () => {
+      if (hoverTimerRef.current) {
+        window.clearTimeout(hoverTimerRef.current);
+      }
+      if (hoverAbortRef.current) {
+        hoverAbortRef.current.abort();
+      }
       map.remove();
       mapRef.current = null;
     };
@@ -159,14 +186,6 @@ export default function HomePage() {
     const level = clampLevel(inputLevel);
     setSeaLevel(level);
 
-    if (level > 0) {
-      setStatus(`Loading ocean rise tiles for +${level}m...`);
-    } else if (level < 0) {
-      setStatus(`Loading lowered sea tiles for ${level}m...`);
-    } else {
-      setStatus("Loading present-day sea level tiles...");
-    }
-
     try {
       addFloodLayer(level);
 
@@ -177,7 +196,7 @@ export default function HomePage() {
       } else {
         setStatus("Present-day sea level loaded");
       }
-    } catch (error) {
+    } catch {
       setStatus("Could not load flood tiles");
     }
   };
@@ -199,22 +218,7 @@ export default function HomePage() {
     map.setStyle("mapbox://styles/mapbox/streets-v12");
 
     map.once("style.load", () => {
-      if (!map.getSource(DEM_SOURCE_ID)) {
-        map.addSource(DEM_SOURCE_ID, {
-          type: "raster-dem",
-          url: "mapbox://mapbox.mapbox-terrain-dem-v1",
-          tileSize: 512,
-          maxzoom: 14,
-        });
-      }
-
-      map.setTerrain({
-        source: DEM_SOURCE_ID,
-        exaggeration: 1,
-      });
-
       setStatus("Standard Map ready");
-
       if (seaLevelRef.current !== 0) {
         addFloodLayer(seaLevelRef.current);
       }
@@ -236,12 +240,20 @@ export default function HomePage() {
   };
 
   const surfaceLabel = () => {
-    if (cursorDifference === null || cursorElevation === null) return "--";
+    if (cursorLoading) return "Loading...";
+    if (cursorElevation === null) return "--";
 
     if (seaLevel > 0) {
-      if (cursorDifference > 0) return `${Math.round(cursorDifference)} m underwater`;
-      if (cursorDifference === 0) return "At sea surface";
-      return `${Math.abs(Math.round(cursorDifference))} m above water`;
+      if (cursorElevation >= 0) {
+        const floodDepth = seaLevel - cursorElevation;
+        if (floodDepth > 0) return `${Math.round(floodDepth)} m flooded`;
+        if (floodDepth === 0) return "At sea surface";
+        return `${Math.abs(Math.round(floodDepth))} m above water`;
+      }
+
+      const presentDepth = Math.abs(Math.round(cursorElevation));
+      const totalDepth = Math.round(seaLevel - cursorElevation);
+      return `Present depth ${presentDepth} m · After rise ${totalDepth} m`;
     }
 
     if (seaLevel < 0) {
@@ -251,11 +263,16 @@ export default function HomePage() {
       if (cursorElevation < seaLevel) {
         return `${Math.round(seaLevel - cursorElevation)} m below new sea`;
       }
-      return `${Math.abs(Math.round(cursorDifference))} m above new sea`;
+      return `${Math.round(cursorElevation - seaLevel)} m above new sea`;
     }
 
-    if (cursorElevation <= 0) return `${Math.abs(cursorElevation)} m below present sea`;
-    return `${cursorElevation} m above present sea`;
+    if (cursorElevation < 0) {
+      return `${Math.abs(Math.round(cursorElevation))} m below present sea`;
+    }
+    if (cursorElevation === 0) {
+      return "At present sea level";
+    }
+    return `${Math.round(cursorElevation)} m above present sea`;
   };
 
   return (
@@ -467,7 +484,7 @@ export default function HomePage() {
           fontSize: 13,
           lineHeight: 1.6,
           boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
-          minWidth: 280,
+          minWidth: 320,
         }}
       >
         <div style={{ fontWeight: 700, marginBottom: 6 }}>Current Scenario</div>
