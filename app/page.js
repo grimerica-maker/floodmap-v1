@@ -5,118 +5,101 @@ import mapboxgl from "mapbox-gl";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-const PRESETS = [
-  { label: "Ice Age", value: -120 },
-  { label: "Modern", value: 0 },
-  { label: "Holocene", value: 6 },
-  { label: "Eocene", value: 70 },
-  { label: "Total Flood", value: 5000 },
-];
+const FLOOD_ENGINE = "https://flood-engine.onrender.com";
 
-const FLOOD_SOURCE_ID = "flood-source";
-const FLOOD_LAYER_ID = "flood-layer";
-const FLOOD_ENGINE_URL = "https://flood-engine.onrender.com";
-
-export default function HomePage() {
+export default function Home() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
 
   const [inputLevel, setInputLevel] = useState(0);
   const [seaLevel, setSeaLevel] = useState(0);
-  const [viewMode, setViewMode] = useState("map");
   const [status, setStatus] = useState("Loading map...");
+  const [viewMode, setViewMode] = useState("map");
 
-  const clampLevel = (value) => {
-    const parsed = parseInt(value, 10);
-    if (Number.isNaN(parsed)) return 0;
-    return Math.max(-5000, Math.min(5000, parsed));
-  };
+  const FLOOD_LAYER = "flood-layer";
+  const FLOOD_SOURCE = "flood-source";
 
-  const removeFloodLayer = () => {
+  function setCursorHandlers(map) {
+    const canvas = map.getCanvas();
+
+    canvas.style.cursor = "grab";
+
+    map.on("mousedown", () => {
+      canvas.style.cursor = "grabbing";
+    });
+
+    map.on("mouseup", () => {
+      canvas.style.cursor = "grab";
+    });
+
+    map.on("dragstart", () => {
+      canvas.style.cursor = "grabbing";
+    });
+
+    map.on("dragend", () => {
+      canvas.style.cursor = "grab";
+    });
+
+    map.on("mouseleave", () => {
+      canvas.style.cursor = "grab";
+    });
+  }
+
+  function removeFloodLayer() {
     const map = mapRef.current;
     if (!map) return;
 
-    if (map.getLayer(FLOOD_LAYER_ID)) {
-      map.removeLayer(FLOOD_LAYER_ID);
+    if (map.getLayer(FLOOD_LAYER)) {
+      map.removeLayer(FLOOD_LAYER);
     }
 
-    if (map.getSource(FLOOD_SOURCE_ID)) {
-      map.removeSource(FLOOD_SOURCE_ID);
+    if (map.getSource(FLOOD_SOURCE)) {
+      map.removeSource(FLOOD_SOURCE);
     }
-  };
+  }
 
-  const addFloodLayer = (level) => {
+  function addFloodLayer(level) {
     const map = mapRef.current;
     if (!map) return;
 
     removeFloodLayer();
 
-    map.addSource(FLOOD_SOURCE_ID, {
+    map.addSource(FLOOD_SOURCE, {
       type: "raster",
-      tiles: [`${FLOOD_ENGINE_URL}/flood/${level}/{z}/{x}/{y}.png`],
-      tileSize: 256,
+      tiles: [
+        `${FLOOD_ENGINE}/flood/${level}/{z}/{x}/{y}.png`
+      ],
+      tileSize: 256
     });
 
     map.addLayer({
-      id: FLOOD_LAYER_ID,
+      id: FLOOD_LAYER,
       type: "raster",
-      source: FLOOD_SOURCE_ID,
+      source: FLOOD_SOURCE,
       paint: {
-        "raster-opacity": 0.82,
-        "raster-fade-duration": 0,
-      },
-    });
-  };
-
-  const applyStyleAndProjection = (mode) => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    if (mode === "globe") {
-      removeFloodLayer();
-      map.setProjection("globe");
-      map.setStyle("mapbox://styles/mapbox/streets-v12");
-      map.once("style.load", () => {
-        map.setFog({});
-      });
-      map.flyTo({
-        center: [-70, 28],
-        zoom: 2.6,
-        essential: true,
-      });
-      setStatus("Globe preview mode");
-      return;
-    }
-
-    if (mode === "satellite") {
-      removeFloodLayer();
-      map.setProjection("mercator");
-      map.setStyle("mapbox://styles/mapbox/satellite-streets-v12");
-      map.flyTo({
-        center: [-80.19, 25.76],
-        zoom: 6.2,
-        essential: true,
-      });
-      setStatus("Satellite placeholder");
-      return;
-    }
-
-    map.setProjection("mercator");
-    map.setStyle("mapbox://styles/mapbox/streets-v12");
-    map.flyTo({
-      center: [-80.19, 25.76],
-      zoom: 6.2,
-      essential: true,
-    });
-
-    map.once("style.load", () => {
-      if (seaLevel !== 0) {
-        addFloodLayer(seaLevel);
+        "raster-opacity": 0.85,
+        "raster-fade-duration": 0
       }
     });
+  }
 
-    setStatus("Standard Map ready");
-  };
+  function executeFlood() {
+    const level = parseInt(inputLevel);
+
+    if (isNaN(level)) return;
+
+    setSeaLevel(level);
+    addFloodLayer(level);
+
+    setStatus(`Flood tiles loaded at ${level > 0 ? "+" : ""}${level}m`);
+  }
+
+  function clearFlood() {
+    removeFloodLayer();
+    setSeaLevel(0);
+    setInputLevel(0);
+    setStatus("Flood cleared");
+  }
 
   useEffect(() => {
     if (mapRef.current) return;
@@ -124,32 +107,14 @@ export default function HomePage() {
     const map = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/streets-v12",
-      center: [-80.19, 25.76],
-      zoom: 6.2,
-      projection: "mercator",
-      dragPan: true,
-      scrollZoom: true,
-      boxZoom: true,
-      dragRotate: true,
-      keyboard: true,
-      touchZoomRotate: true,
+      center: [2.9, 37.2],
+      zoom: 7,
+      projection: "mercator"
     });
 
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
 
-    map.getCanvas().style.cursor = "grab";
-
-    map.on("mousedown", () => {
-      map.getCanvas().style.cursor = "grabbing";
-    });
-
-    map.on("mouseup", () => {
-      map.getCanvas().style.cursor = "grab";
-    });
-
-    map.on("mouseout", () => {
-      map.getCanvas().style.cursor = "grab";
-    });
+    setCursorHandlers(map);
 
     map.on("load", () => {
       setStatus("Map ready");
@@ -159,251 +124,164 @@ export default function HomePage() {
 
     return () => {
       map.remove();
-      mapRef.current = null;
     };
   }, []);
 
-  useEffect(() => {
-    if (!mapRef.current) return;
-    applyStyleAndProjection(viewMode);
-  }, [viewMode]);
+  function switchView(mode) {
+    const map = mapRef.current;
+    if (!map) return;
 
-  const executeFlood = () => {
-    const level = clampLevel(inputLevel);
-    setSeaLevel(level);
+    setViewMode(mode);
 
-    if (viewMode !== "map") {
-      setStatus("Switch to Standard Map to run flood layer");
-      return;
+    removeFloodLayer();
+
+    if (mode === "satellite") {
+      map.setStyle("mapbox://styles/mapbox/satellite-streets-v12");
+    } else if (mode === "globe") {
+      map.setProjection("globe");
+      map.setStyle("mapbox://styles/mapbox/streets-v12");
+    } else {
+      map.setProjection("mercator");
+      map.setStyle("mapbox://styles/mapbox/streets-v12");
     }
 
-    addFloodLayer(level);
+    map.once("style.load", () => {
+      setCursorHandlers(map);
 
-    setStatus(
-      level === 0
-        ? "Flood cleared"
-        : `Flood tiles loaded at ${level > 0 ? "+" : ""}${level}m`
-    );
-  };
-
-  const clearFlood = () => {
-    setInputLevel(0);
-    setSeaLevel(0);
-    removeFloodLayer();
-    setStatus("Flood cleared");
-  };
+      if (seaLevel !== 0 && mode === "map") {
+        addFloodLayer(seaLevel);
+      }
+    });
+  }
 
   return (
-    <div style={{ width: "100%", height: "100vh", position: "relative", overflow: "hidden" }}>
-      <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
+    <div style={{ width: "100%", height: "100vh", position: "relative" }}>
+
+      <div
+        ref={mapContainer}
+        style={{ width: "100%", height: "100%" }}
+      />
 
       <div
         style={{
           position: "absolute",
-          top: 0,
           left: 0,
+          top: 0,
           width: 320,
           height: "100%",
-          background: "rgba(255,255,255,0.96)",
+          background: "#f9fafb",
           borderRight: "1px solid #e5e7eb",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
           padding: 20,
-          fontFamily: "Arial, sans-serif",
-          overflowY: "auto",
-          zIndex: 10,
+          fontFamily: "Arial"
         }}
       >
-        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
-          Floodmap V1
-        </div>
 
-        <div style={{ fontSize: 13, color: "#666", marginBottom: 20 }}>
+        <h2>Floodmap V1</h2>
+        <div style={{ fontSize: 12, color: "#666", marginBottom: 20 }}>
           Python tile flood engine
         </div>
 
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#555", marginBottom: 8 }}>
-            SEA LEVEL
-          </div>
+        <div style={{ fontWeight: 700 }}>SEA LEVEL</div>
 
-          <div
+        <div style={{ fontSize: 22, marginBottom: 10 }}>
+          {seaLevel > 0 ? "+" : ""}
+          {seaLevel} m
+        </div>
+
+        <input
+          type="number"
+          value={inputLevel}
+          min="-5000"
+          max="5000"
+          onChange={(e) => setInputLevel(e.target.value)}
+          style={{
+            width: "100%",
+            padding: 10,
+            marginBottom: 10
+          }}
+        />
+
+        <div style={{ display: "flex", gap: 10 }}>
+
+          <button
+            onClick={executeFlood}
             style={{
-              fontSize: 22,
-              fontWeight: 700,
-              marginBottom: 10,
-              color: seaLevel > 0 ? "#0f62fe" : seaLevel < 0 ? "#b45309" : "#111827",
+              flex: 1,
+              padding: 10,
+              background: "#111827",
+              color: "white",
+              border: "none",
+              cursor: "pointer"
             }}
           >
-            {seaLevel > 0 ? "+" : ""}
-            {seaLevel} m
-          </div>
+            Execute Flood
+          </button>
 
-          <input
-            type="number"
-            min="-5000"
-            max="5000"
-            step="10"
-            value={inputLevel}
-            onChange={(e) => setInputLevel(clampLevel(e.target.value))}
+          <button
+            onClick={clearFlood}
             style={{
-              width: "100%",
-              padding: "12px 14px",
-              borderRadius: 10,
-              border: "1px solid #d1d5db",
-              fontSize: 16,
-              outline: "none",
-              marginBottom: 10,
+              flex: 1,
+              padding: 10,
+              border: "1px solid #ccc",
+              background: "white",
+              cursor: "pointer"
             }}
-          />
+          >
+            Clear
+          </button>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <button
-              onClick={executeFlood}
-              style={{
-                padding: "12px 14px",
-                borderRadius: 10,
-                border: "none",
-                background: "#111827",
-                color: "#fff",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Execute Flood
-            </button>
-
-            <button
-              onClick={clearFlood}
-              style={{
-                padding: "12px 14px",
-                borderRadius: 10,
-                border: "1px solid #d1d5db",
-                background: "#fff",
-                color: "#111827",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Clear
-            </button>
-          </div>
-
-          <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280" }}>
-            Range: -5000m to +5000m
-          </div>
         </div>
 
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#555", marginBottom: 10 }}>
-            PRESETS
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            {PRESETS.map((preset) => (
-              <button
-                key={preset.label}
-                onClick={() => setInputLevel(preset.value)}
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: "1px solid #d1d5db",
-                  background: inputLevel === preset.value ? "#111827" : "#fff",
-                  color: inputLevel === preset.value ? "#fff" : "#111827",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {preset.label}
-                <div style={{ fontSize: 11, opacity: 0.8, marginTop: 3 }}>
-                  {preset.value > 0 ? "+" : ""}
-                  {preset.value}m
-                </div>
-              </button>
-            ))}
-          </div>
+        <div style={{ marginTop: 8, fontSize: 12 }}>
+          Range: -5000m to +5000m
         </div>
 
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#555", marginBottom: 10 }}>
-            VIEW MODE
-          </div>
+        <hr style={{ margin: "20px 0" }} />
 
-          <div style={{ display: "grid", gap: 8 }}>
-            <button
-              onClick={() => setViewMode("map")}
-              style={{
-                padding: "12px 14px",
-                borderRadius: 10,
-                border: "1px solid #d1d5db",
-                background: viewMode === "map" ? "#111827" : "#fff",
-                color: viewMode === "map" ? "#fff" : "#111827",
-                textAlign: "left",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
-            >
-              Standard Map
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>
-                Flood tiles active
-              </div>
-            </button>
-
-            <button
-              onClick={() => setViewMode("satellite")}
-              style={{
-                padding: "12px 14px",
-                borderRadius: 10,
-                border: "1px solid #d1d5db",
-                background: viewMode === "satellite" ? "#111827" : "#f9fafb",
-                color: viewMode === "satellite" ? "#fff" : "#9ca3af",
-                textAlign: "left",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
-            >
-              Satellite View
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>
-                Pro placeholder
-              </div>
-            </button>
-
-            <button
-              onClick={() => setViewMode("globe")}
-              style={{
-                padding: "12px 14px",
-                borderRadius: 10,
-                border: "1px solid #d1d5db",
-                background: viewMode === "globe" ? "#111827" : "#fff",
-                color: viewMode === "globe" ? "#fff" : "#111827",
-                textAlign: "left",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
-            >
-              Globe View
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>
-                Preview
-              </div>
-            </button>
-          </div>
+        <div style={{ fontWeight: 700, marginBottom: 10 }}>
+          VIEW MODE
         </div>
 
-        <div
+        <button
+          onClick={() => switchView("map")}
           style={{
-            padding: 14,
-            borderRadius: 12,
-            background: "#eff6ff",
-            border: "1px solid #bfdbfe",
+            width: "100%",
+            padding: 10,
+            marginBottom: 8,
+            background: viewMode === "map" ? "#111827" : "white",
+            color: viewMode === "map" ? "white" : "black",
+            border: "1px solid #ccc",
+            cursor: "pointer"
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#1d4ed8", marginBottom: 6 }}>
-            Next upgrades
-          </div>
-          <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
-            Ocean connectivity, better negative sea levels, satellite Pro mode, and globe visualization.
-          </div>
-        </div>
+          Standard Map
+        </button>
+
+        <button
+          onClick={() => switchView("satellite")}
+          style={{
+            width: "100%",
+            padding: 10,
+            marginBottom: 8,
+            border: "1px solid #ccc",
+            cursor: "pointer"
+          }}
+        >
+          Satellite View
+        </button>
+
+        <button
+          onClick={() => switchView("globe")}
+          style={{
+            width: "100%",
+            padding: 10,
+            border: "1px solid #ccc",
+            cursor: "pointer"
+          }}
+        >
+          Globe View
+        </button>
+
       </div>
 
       <div
@@ -411,33 +289,29 @@ export default function HomePage() {
           position: "absolute",
           right: 20,
           top: 20,
-          background: "rgba(17,24,39,0.85)",
+          background: "#1e293b",
           color: "white",
-          padding: "12px 14px",
-          borderRadius: 12,
-          fontFamily: "Arial, sans-serif",
-          fontSize: 13,
-          lineHeight: 1.5,
-          boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
-          minWidth: 230,
-          zIndex: 10,
+          padding: 12,
+          borderRadius: 8,
+          fontSize: 13
         }}
       >
-        <div style={{ fontWeight: 700, marginBottom: 4 }}>Current Scenario</div>
+
+        <b>Current Scenario</b>
+
         <div>
           Sea level: {seaLevel > 0 ? "+" : ""}
           {seaLevel}m
         </div>
+
         <div>
-          Mode:{" "}
-          {viewMode === "globe"
-            ? "Globe"
-            : viewMode === "satellite"
-              ? "Satellite"
-              : "Standard Map"}
+          Mode: {viewMode === "map" ? "Standard Map" : viewMode}
         </div>
+
         <div>Status: {status}</div>
+
       </div>
+
     </div>
   );
 }
