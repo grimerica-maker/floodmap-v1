@@ -20,23 +20,15 @@ const PRESETS = [
 export default function HomePage() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
-  const seaLevelRef = useRef(0);
   const hoverTimerRef = useRef(null);
-  const hoverAbortRef = useRef(null);
-  const lastHoverKeyRef = useRef("");
+  const abortRef = useRef(null);
 
   const [inputLevel, setInputLevel] = useState(70);
   const [seaLevel, setSeaLevel] = useState(0);
   const [status, setStatus] = useState("Map loading...");
-  const [viewMode, setViewMode] = useState("map");
-
   const [cursorLngLat, setCursorLngLat] = useState(null);
   const [cursorElevation, setCursorElevation] = useState(null);
   const [cursorLoading, setCursorLoading] = useState(false);
-
-  useEffect(() => {
-    seaLevelRef.current = seaLevel;
-  }, [seaLevel]);
 
   useEffect(() => {
     if (mapRef.current) return;
@@ -56,43 +48,31 @@ export default function HomePage() {
     });
 
     map.on("mousemove", (e) => {
-      const lng = e.lngLat.lng;
       const lat = e.lngLat.lat;
+      const lng = e.lngLat.lng;
 
       setCursorLngLat({
-        lng: lng.toFixed(4),
         lat: lat.toFixed(4),
+        lng: lng.toFixed(4),
       });
 
-      const hoverKey = `${lat.toFixed(2)},${lng.toFixed(2)}`;
-      if (hoverKey === lastHoverKeyRef.current) return;
-      lastHoverKeyRef.current = hoverKey;
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
 
-      if (hoverTimerRef.current) {
-        window.clearTimeout(hoverTimerRef.current);
-      }
-
-      hoverTimerRef.current = window.setTimeout(async () => {
+      hoverTimerRef.current = setTimeout(async () => {
         try {
-          if (hoverAbortRef.current) {
-            hoverAbortRef.current.abort();
-          }
+          if (abortRef.current) abortRef.current.abort();
+          abortRef.current = new AbortController();
 
-          const controller = new AbortController();
-          hoverAbortRef.current = controller;
           setCursorLoading(true);
 
           const res = await fetch(
             `${TILE_SERVER}/elevation?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`,
-            { signal: controller.signal }
+            { signal: abortRef.current.signal }
           );
 
           if (!res.ok) return;
-
           const data = await res.json();
-          if (typeof data.elevation_m === "number") {
-            setCursorElevation(Math.round(data.elevation_m));
-          }
+          setCursorElevation(Math.round(data.elevation_m));
         } catch (err) {
           if (err?.name !== "AbortError") {
             // ignore
@@ -107,25 +87,15 @@ export default function HomePage() {
       setCursorLngLat(null);
       setCursorElevation(null);
       setCursorLoading(false);
-      lastHoverKeyRef.current = "";
-
-      if (hoverTimerRef.current) {
-        window.clearTimeout(hoverTimerRef.current);
-      }
-      if (hoverAbortRef.current) {
-        hoverAbortRef.current.abort();
-      }
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      if (abortRef.current) abortRef.current.abort();
     });
 
     mapRef.current = map;
 
     return () => {
-      if (hoverTimerRef.current) {
-        window.clearTimeout(hoverTimerRef.current);
-      }
-      if (hoverAbortRef.current) {
-        hoverAbortRef.current.abort();
-      }
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      if (abortRef.current) abortRef.current.abort();
       map.remove();
       mapRef.current = null;
     };
@@ -140,14 +110,8 @@ export default function HomePage() {
   const removeFloodLayer = () => {
     const map = mapRef.current;
     if (!map) return;
-
-    if (map.getLayer(FLOOD_LAYER_ID)) {
-      map.removeLayer(FLOOD_LAYER_ID);
-    }
-
-    if (map.getSource(FLOOD_SOURCE_ID)) {
-      map.removeSource(FLOOD_SOURCE_ID);
-    }
+    if (map.getLayer(FLOOD_LAYER_ID)) map.removeLayer(FLOOD_LAYER_ID);
+    if (map.getSource(FLOOD_SOURCE_ID)) map.removeSource(FLOOD_SOURCE_ID);
   };
 
   const addFloodLayer = (level) => {
@@ -178,27 +142,13 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map) return;
 
-    if (viewMode !== "map") {
-      setStatus("Switch to Standard Map to run flood tiles");
-      return;
-    }
-
     const level = clampLevel(inputLevel);
     setSeaLevel(level);
+    addFloodLayer(level);
 
-    try {
-      addFloodLayer(level);
-
-      if (level > 0) {
-        setStatus(`Flood tiles loaded for +${level}m`);
-      } else if (level < 0) {
-        setStatus(`Drain tiles loaded for ${level}m`);
-      } else {
-        setStatus("Present-day sea level loaded");
-      }
-    } catch {
-      setStatus("Could not load flood tiles");
-    }
+    if (level > 0) setStatus(`Flood tiles loaded for +${level}m`);
+    else if (level < 0) setStatus(`Drain tiles loaded for ${level}m`);
+    else setStatus("Present-day sea level loaded");
   };
 
   const clearFlood = () => {
@@ -208,52 +158,20 @@ export default function HomePage() {
     setStatus("Flood cleared");
   };
 
-  const switchToMap = () => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    setViewMode("map");
-    removeFloodLayer();
-    map.setProjection("mercator");
-    map.setStyle("mapbox://styles/mapbox/streets-v12");
-
-    map.once("style.load", () => {
-      setStatus("Standard Map ready");
-      if (seaLevelRef.current !== 0) {
-        addFloodLayer(seaLevelRef.current);
-      }
-    });
-  };
-
-  const switchToSatelliteLocked = () => {
-    setStatus("Satellite is a Pro feature");
-  };
-
-  const switchToGlobeLocked = () => {
-    setStatus("Globe comes back after 2D flood is stable");
-  };
-
-  const scenarioLabel = () => {
-    if (seaLevel > 0) return `+${seaLevel}m rise`;
-    if (seaLevel < 0) return `${seaLevel}m lowered sea`;
-    return "0m present-day";
-  };
-
   const surfaceLabel = () => {
     if (cursorLoading) return "Loading...";
     if (cursorElevation === null) return "--";
 
     if (seaLevel > 0) {
       if (cursorElevation >= 0) {
-        const floodDepth = seaLevel - cursorElevation;
-        if (floodDepth > 0) return `${Math.round(floodDepth)} m flooded`;
-        if (floodDepth === 0) return "At sea surface";
-        return `${Math.abs(Math.round(floodDepth))} m above water`;
+        const flooded = seaLevel - cursorElevation;
+        if (flooded > 0) return `${Math.round(flooded)} m flooded`;
+        if (flooded === 0) return "At sea surface";
+        return `${Math.abs(Math.round(flooded))} m above water`;
       }
-
-      const presentDepth = Math.abs(Math.round(cursorElevation));
-      const totalDepth = Math.round(seaLevel - cursorElevation);
-      return `Present depth ${presentDepth} m · After rise ${totalDepth} m`;
+      const presentDepth = Math.abs(cursorElevation);
+      const afterDepth = seaLevel - cursorElevation;
+      return `Present depth ${presentDepth} m · After rise ${Math.round(afterDepth)} m`;
     }
 
     if (seaLevel < 0) {
@@ -266,13 +184,9 @@ export default function HomePage() {
       return `${Math.round(cursorElevation - seaLevel)} m above new sea`;
     }
 
-    if (cursorElevation < 0) {
-      return `${Math.abs(Math.round(cursorElevation))} m below present sea`;
-    }
-    if (cursorElevation === 0) {
-      return "At present sea level";
-    }
-    return `${Math.round(cursorElevation)} m above present sea`;
+    if (cursorElevation < 0) return `${Math.abs(cursorElevation)} m below present sea`;
+    if (cursorElevation === 0) return "At present sea level";
+    return `${cursorElevation} m above present sea`;
   };
 
   return (
@@ -299,7 +213,7 @@ export default function HomePage() {
         </div>
 
         <div style={{ fontSize: 13, color: "#666", marginBottom: 20 }}>
-          Ocean-connected rise and negative sea levels
+          Positive rise + negative drain
         </div>
 
         <div style={{ marginBottom: 24 }}>
@@ -350,7 +264,7 @@ export default function HomePage() {
                 cursor: "pointer",
               }}
             >
-              Execute Flood
+              Execute
             </button>
 
             <button
@@ -404,71 +318,6 @@ export default function HomePage() {
             ))}
           </div>
         </div>
-
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#555", marginBottom: 10 }}>
-            VIEW MODE
-          </div>
-
-          <div style={{ display: "grid", gap: 8 }}>
-            <button
-              onClick={switchToMap}
-              style={{
-                padding: "12px 14px",
-                borderRadius: 10,
-                border: "1px solid #d1d5db",
-                background: viewMode === "map" ? "#111827" : "#fff",
-                color: viewMode === "map" ? "#fff" : "#111827",
-                textAlign: "left",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
-            >
-              Standard Map
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>
-                Flood tiles run here
-              </div>
-            </button>
-
-            <button
-              onClick={switchToSatelliteLocked}
-              style={{
-                padding: "12px 14px",
-                borderRadius: 10,
-                border: "1px solid #d1d5db",
-                background: "#f9fafb",
-                color: "#9ca3af",
-                textAlign: "left",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
-            >
-              Satellite View 🔒
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>
-                Pro later
-              </div>
-            </button>
-
-            <button
-              onClick={switchToGlobeLocked}
-              style={{
-                padding: "12px 14px",
-                borderRadius: 10,
-                border: "1px solid #d1d5db",
-                background: "#f9fafb",
-                color: "#9ca3af",
-                textAlign: "left",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
-            >
-              Globe View 🔒
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>
-                Later
-              </div>
-            </button>
-          </div>
-        </div>
       </div>
 
       <div
@@ -489,8 +338,6 @@ export default function HomePage() {
       >
         <div style={{ fontWeight: 700, marginBottom: 6 }}>Current Scenario</div>
         <div>Sea level: {seaLevel > 0 ? "+" : ""}{seaLevel}m</div>
-        <div>Scenario: {scenarioLabel()}</div>
-        <div>Mode: {viewMode}</div>
         <div>Status: {status}</div>
 
         <div style={{ marginTop: 10, fontWeight: 700 }}>Cursor</div>
