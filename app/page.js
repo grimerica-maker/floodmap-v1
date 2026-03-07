@@ -8,6 +8,7 @@ mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 const TILE_SERVER = "https://flood-engine.onrender.com";
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
+const DEM_SOURCE_ID = "mapbox-dem";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -21,10 +22,14 @@ export default function HomePage() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
 
-  const [inputLevel, setInputLevel] = useState(50);
+  const [inputLevel, setInputLevel] = useState(70);
   const [seaLevel, setSeaLevel] = useState(0);
   const [status, setStatus] = useState("Map loading...");
   const [viewMode, setViewMode] = useState("map");
+
+  const [cursorLngLat, setCursorLngLat] = useState(null);
+  const [cursorElevation, setCursorElevation] = useState(null);
+  const [cursorDepth, setCursorDepth] = useState(null);
 
   useEffect(() => {
     if (mapRef.current) return;
@@ -32,15 +37,60 @@ export default function HomePage() {
     const map = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/streets-v12",
-      center: [-80.19, 25.76],
-      zoom: 5,
+      center: [-81.5, 27.8],
+      zoom: 6,
       projection: "mercator",
     });
 
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
 
     map.on("load", () => {
+      if (!map.getSource(DEM_SOURCE_ID)) {
+        map.addSource(DEM_SOURCE_ID, {
+          type: "raster-dem",
+          url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+          tileSize: 512,
+          maxzoom: 14,
+        });
+      }
+
+      map.setTerrain({
+        source: DEM_SOURCE_ID,
+        exaggeration: 1,
+      });
+
       setStatus("Map ready");
+    });
+
+    map.on("mousemove", (e) => {
+      const lng = e.lngLat.lng;
+      const lat = e.lngLat.lat;
+
+      setCursorLngLat({
+        lng: lng.toFixed(4),
+        lat: lat.toFixed(4),
+      });
+
+      const elevation = map.queryTerrainElevation(e.lngLat, {
+        exaggerated: false,
+      });
+
+      if (typeof elevation === "number" && !Number.isNaN(elevation)) {
+        const roundedElevation = Math.round(elevation);
+        setCursorElevation(roundedElevation);
+
+        const depth = seaLevel - roundedElevation;
+        setCursorDepth(depth);
+      } else {
+        setCursorElevation(null);
+        setCursorDepth(null);
+      }
+    });
+
+    map.on("mouseleave", () => {
+      setCursorLngLat(null);
+      setCursorElevation(null);
+      setCursorDepth(null);
     });
 
     mapRef.current = map;
@@ -49,7 +99,7 @@ export default function HomePage() {
       map.remove();
       mapRef.current = null;
     };
-  }, []);
+  }, [seaLevel]);
 
   const clampLevel = (value) => {
     const parsed = parseInt(value, 10);
@@ -88,7 +138,7 @@ export default function HomePage() {
       type: "raster",
       source: FLOOD_SOURCE_ID,
       paint: {
-        "raster-opacity": 0.65,
+        "raster-opacity": 0.85,
         "raster-fade-duration": 0,
       },
     });
@@ -130,7 +180,22 @@ export default function HomePage() {
     removeFloodLayer();
     map.setProjection("mercator");
     map.setStyle("mapbox://styles/mapbox/streets-v12");
+
     map.once("style.load", () => {
+      if (!map.getSource(DEM_SOURCE_ID)) {
+        map.addSource(DEM_SOURCE_ID, {
+          type: "raster-dem",
+          url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+          tileSize: 512,
+          maxzoom: 14,
+        });
+      }
+
+      map.setTerrain({
+        source: DEM_SOURCE_ID,
+        exaggeration: 1,
+      });
+
       setStatus("Standard Map ready");
     });
   };
@@ -141,6 +206,20 @@ export default function HomePage() {
 
   const switchToGlobeLocked = () => {
     setStatus("Globe comes back after 2D flood is stable");
+  };
+
+  const depthLabel = () => {
+    if (cursorDepth === null || cursorElevation === null) return "--";
+
+    if (cursorDepth > 0) {
+      return `${Math.round(cursorDepth)} m underwater`;
+    }
+
+    if (cursorDepth === 0) {
+      return "At sea level";
+    }
+
+    return `${Math.abs(Math.round(cursorDepth))} m above water`;
   };
 
   return (
@@ -337,22 +416,6 @@ export default function HomePage() {
             </button>
           </div>
         </div>
-
-        <div
-          style={{
-            padding: 14,
-            borderRadius: 12,
-            background: "#eff6ff",
-            border: "1px solid #bfdbfe",
-          }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#1d4ed8", marginBottom: 6 }}>
-            Current Goal
-          </div>
-          <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
-            Get stable terrain flood tiles working first. Then add ocean-connected flooding.
-          </div>
-        </div>
       </div>
 
       <div
@@ -360,25 +423,31 @@ export default function HomePage() {
           position: "absolute",
           right: 20,
           top: 20,
-          background: "rgba(17,24,39,0.85)",
+          background: "rgba(17,24,39,0.88)",
           color: "white",
-          padding: "12px 14px",
+          padding: "14px 16px",
           borderRadius: 12,
           fontFamily: "Arial, sans-serif",
           fontSize: 13,
-          lineHeight: 1.5,
+          lineHeight: 1.6,
           boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
-          minWidth: 240,
+          minWidth: 260,
         }}
       >
-        <div style={{ fontWeight: 700, marginBottom: 4 }}>Current Scenario</div>
-        <div>
-          Sea level: {seaLevel > 0 ? "+" : ""}
-          {seaLevel}m
-        </div>
+        <div style={{ fontWeight: 700, marginBottom: 6 }}>Current Scenario</div>
+        <div>Sea level: {seaLevel > 0 ? "+" : ""}{seaLevel}m</div>
         <div>Mode: {viewMode}</div>
         <div>Status: {status}</div>
-        <div>Tile server: connected</div>
+        <div style={{ marginTop: 8, fontWeight: 700 }}>Cursor</div>
+        <div>
+          Coords: {cursorLngLat ? `${cursorLngLat.lat}, ${cursorLngLat.lng}` : "--"}
+        </div>
+        <div>
+          Elevation: {cursorElevation !== null ? `${cursorElevation} m` : "--"}
+        </div>
+        <div>
+          Water depth: {depthLabel()}
+        </div>
       </div>
     </div>
   );
