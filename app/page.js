@@ -29,7 +29,7 @@ export default function HomePage() {
 
   const [cursorLngLat, setCursorLngLat] = useState(null);
   const [cursorElevation, setCursorElevation] = useState(null);
-  const [cursorDepth, setCursorDepth] = useState(null);
+  const [cursorDifference, setCursorDifference] = useState(null);
 
   useEffect(() => {
     if (mapRef.current) return;
@@ -78,19 +78,17 @@ export default function HomePage() {
       if (typeof elevation === "number" && !Number.isNaN(elevation)) {
         const roundedElevation = Math.round(elevation);
         setCursorElevation(roundedElevation);
-
-        const depth = seaLevel - roundedElevation;
-        setCursorDepth(depth);
+        setCursorDifference(seaLevel - roundedElevation);
       } else {
         setCursorElevation(null);
-        setCursorDepth(null);
+        setCursorDifference(null);
       }
     });
 
     map.on("mouseleave", () => {
       setCursorLngLat(null);
       setCursorElevation(null);
-      setCursorDepth(null);
+      setCursorDifference(null);
     });
 
     mapRef.current = map;
@@ -155,11 +153,25 @@ export default function HomePage() {
 
     const level = clampLevel(inputLevel);
     setSeaLevel(level);
-    setStatus(`Loading terrain flood tiles for ${level > 0 ? "+" : ""}${level}m...`);
+
+    if (level > 0) {
+      setStatus(`Loading ocean rise tiles for +${level}m...`);
+    } else if (level < 0) {
+      setStatus(`Loading lowered sea tiles for ${level}m...`);
+    } else {
+      setStatus("Loading present-day sea level tiles...");
+    }
 
     try {
       addFloodLayer(level);
-      setStatus(`Flood tiles loaded for ${level > 0 ? "+" : ""}${level}m`);
+
+      if (level > 0) {
+        setStatus(`Flood tiles loaded for +${level}m`);
+      } else if (level < 0) {
+        setStatus(`Drain tiles loaded for ${level}m`);
+      } else {
+        setStatus("Present-day sea level loaded");
+      }
     } catch (error) {
       setStatus("Could not load flood tiles");
     }
@@ -208,18 +220,33 @@ export default function HomePage() {
     setStatus("Globe comes back after 2D flood is stable");
   };
 
-  const depthLabel = () => {
-    if (cursorDepth === null || cursorElevation === null) return "--";
+  const scenarioLabel = () => {
+    if (seaLevel > 0) return `+${seaLevel}m rise`;
+    if (seaLevel < 0) return `${seaLevel}m lowered sea`;
+    return "0m present-day";
+  };
 
-    if (cursorDepth > 0) {
-      return `${Math.round(cursorDepth)} m underwater`;
+  const surfaceLabel = () => {
+    if (cursorDifference === null || cursorElevation === null) return "--";
+
+    if (seaLevel > 0) {
+      if (cursorDifference > 0) return `${Math.round(cursorDifference)} m underwater`;
+      if (cursorDifference === 0) return "At sea surface";
+      return `${Math.abs(Math.round(cursorDifference))} m above water`;
     }
 
-    if (cursorDepth === 0) {
-      return "At sea level";
+    if (seaLevel < 0) {
+      if (cursorElevation <= 0 && cursorElevation >= seaLevel) {
+        return `${Math.round(cursorElevation - seaLevel)} m above new sea`;
+      }
+      if (cursorElevation < seaLevel) {
+        return `${Math.round(seaLevel - cursorElevation)} m below new sea`;
+      }
+      return `${Math.abs(Math.round(cursorDifference))} m above new sea`;
     }
 
-    return `${Math.abs(Math.round(cursorDepth))} m above water`;
+    if (cursorElevation <= 0) return `${Math.abs(cursorElevation)} m below present sea`;
+    return `${cursorElevation} m above present sea`;
   };
 
   return (
@@ -246,7 +273,7 @@ export default function HomePage() {
         </div>
 
         <div style={{ fontSize: 13, color: "#666", marginBottom: 20 }}>
-          Terrain flood tiles
+          Ocean-connected rise and negative sea levels
         </div>
 
         <div style={{ marginBottom: 24 }}>
@@ -431,14 +458,16 @@ export default function HomePage() {
           fontSize: 13,
           lineHeight: 1.6,
           boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
-          minWidth: 260,
+          minWidth: 280,
         }}
       >
         <div style={{ fontWeight: 700, marginBottom: 6 }}>Current Scenario</div>
         <div>Sea level: {seaLevel > 0 ? "+" : ""}{seaLevel}m</div>
+        <div>Scenario: {scenarioLabel()}</div>
         <div>Mode: {viewMode}</div>
         <div>Status: {status}</div>
-        <div style={{ marginTop: 8, fontWeight: 700 }}>Cursor</div>
+
+        <div style={{ marginTop: 10, fontWeight: 700 }}>Cursor</div>
         <div>
           Coords: {cursorLngLat ? `${cursorLngLat.lat}, ${cursorLngLat.lng}` : "--"}
         </div>
@@ -446,7 +475,7 @@ export default function HomePage() {
           Elevation: {cursorElevation !== null ? `${cursorElevation} m` : "--"}
         </div>
         <div>
-          Water depth: {depthLabel()}
+          Surface relation: {surfaceLabel()}
         </div>
       </div>
     </div>
