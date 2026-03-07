@@ -21,6 +21,7 @@ const PRESETS = [
 export default function HomePage() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
+  const seaLevelRef = useRef(0);
 
   const [inputLevel, setInputLevel] = useState(70);
   const [seaLevel, setSeaLevel] = useState(0);
@@ -30,6 +31,10 @@ export default function HomePage() {
   const [cursorLngLat, setCursorLngLat] = useState(null);
   const [cursorElevation, setCursorElevation] = useState(null);
   const [cursorDifference, setCursorDifference] = useState(null);
+
+  useEffect(() => {
+    seaLevelRef.current = seaLevel;
+  }, [seaLevel]);
 
   useEffect(() => {
     if (mapRef.current) return;
@@ -78,7 +83,7 @@ export default function HomePage() {
       if (typeof elevation === "number" && !Number.isNaN(elevation)) {
         const roundedElevation = Math.round(elevation);
         setCursorElevation(roundedElevation);
-        setCursorDifference(seaLevel - roundedElevation);
+        setCursorDifference(seaLevelRef.current - roundedElevation);
       } else {
         setCursorElevation(null);
         setCursorDifference(null);
@@ -97,7 +102,7 @@ export default function HomePage() {
       map.remove();
       mapRef.current = null;
     };
-  }, [seaLevel]);
+  }, []);
 
   const clampLevel = (value) => {
     const parsed = parseInt(value, 10);
