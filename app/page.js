@@ -31,6 +31,11 @@ export default function HomePage() {
   const [hoverLng, setHoverLng] = useState(null);
   const [hoverElevation, setHoverElevation] = useState(null);
 
+  const waterDifference =
+    hoverElevation !== null
+      ? Number((hoverElevation - seaLevel).toFixed(2))
+      : null;
+
   const clampLevel = (value) => {
     const parsed = parseInt(value, 10);
     if (Number.isNaN(parsed)) return 0;
@@ -419,7 +424,7 @@ export default function HomePage() {
           fontSize: 14,
           lineHeight: 1.45,
           zIndex: 10,
-          minWidth: 230,
+          minWidth: 260,
         }}
       >
         <div style={{ fontWeight: 700, marginBottom: 8 }}>Current Scenario</div>
@@ -442,7 +447,20 @@ export default function HomePage() {
         <div style={{ fontWeight: 700, marginBottom: 6 }}>Cursor</div>
         <div>Lat: {hoverLat ?? "--"}</div>
         <div>Lng: {hoverLng ?? "--"}</div>
-        <div>Elevation: {hoverElevation !== null ? `${hoverElevation} m` : "--"}</div>
+        <div>
+          Original Elevation: {hoverElevation !== null ? `${hoverElevation} m` : "--"}
+        </div>
+        <div>
+          Sea Level: {seaLevel > 0 ? "+" : ""}
+          {seaLevel} m
+        </div>
+        <div>
+          {waterDifference !== null
+            ? waterDifference >= 0
+              ? `Above water by ${waterDifference} m`
+              : `Underwater by ${Math.abs(waterDifference)} m`
+            : "--"}
+        </div>
       </div>
     </div>
   );
