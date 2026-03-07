@@ -141,7 +141,7 @@ export default function HomePage() {
       type: "raster",
       source: FLOOD_SOURCE_ID,
       paint: {
-        "raster-opacity": 0.85,
+        "raster-opacity": 0.9,
         "raster-fade-duration": 0,
       },
     });
@@ -214,6 +214,10 @@ export default function HomePage() {
       });
 
       setStatus("Standard Map ready");
+
+      if (seaLevelRef.current !== 0) {
+        addFloodLayer(seaLevelRef.current);
+      }
     });
   };
 
