@@ -20,41 +20,21 @@ const PRESETS = [
 export default function HomePage() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
-  const cursorHandlersAttachedRef = useRef(false);
+  const hoverTimerRef = useRef(null);
 
   const [inputLevel, setInputLevel] = useState(0);
   const [seaLevel, setSeaLevel] = useState(0);
   const [viewMode, setViewMode] = useState("map");
   const [status, setStatus] = useState("Loading map...");
 
+  const [hoverLat, setHoverLat] = useState(null);
+  const [hoverLng, setHoverLng] = useState(null);
+  const [hoverElevation, setHoverElevation] = useState(null);
+
   const clampLevel = (value) => {
     const parsed = parseInt(value, 10);
     if (Number.isNaN(parsed)) return 0;
     return Math.max(-5000, Math.min(5000, parsed));
-  };
-
-  const attachCursorHandlersOnce = () => {
-    const map = mapRef.current;
-    if (!map || cursorHandlersAttachedRef.current) return;
-
-    const canvas = map.getCanvas();
-    canvas.style.cursor = "grab";
-
-    canvas.onpointerdown = () => {
-      canvas.style.cursor = "grabbing";
-    };
-
-    canvas.onpointerleave = () => {
-      canvas.style.cursor = "grab";
-    };
-
-    window.onpointerup = () => {
-      if (mapRef.current) {
-        mapRef.current.getCanvas().style.cursor = "grab";
-      }
-    };
-
-    cursorHandlersAttachedRef.current = true;
   };
 
   const removeFloodLayer = () => {
@@ -91,6 +71,21 @@ export default function HomePage() {
         "raster-fade-duration": 0,
       },
     });
+  };
+
+  const fetchElevation = async (lat, lng) => {
+    try {
+      const res = await fetch(
+        `${FLOOD_ENGINE}/elevation?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`
+      );
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      setHoverElevation(data.elevation_m);
+    } catch (err) {
+      setHoverElevation(null);
+    }
   };
 
   const setMapStyleForMode = (mode) => {
@@ -191,20 +186,42 @@ export default function HomePage() {
 
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
 
+    map.getCanvas().style.cursor = "crosshair";
+
     map.on("load", () => {
       setStatus("Map ready");
-      attachCursorHandlersOnce();
+    });
+
+    map.on("mousemove", (e) => {
+      const lat = Number(e.lngLat.lat.toFixed(5));
+      const lng = Number(e.lngLat.lng.toFixed(5));
+
+      setHoverLat(lat);
+      setHoverLng(lng);
+
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+      }
+
+      hoverTimerRef.current = setTimeout(() => {
+        fetchElevation(lat, lng);
+      }, 120);
+    });
+
+    map.on("mouseleave", () => {
+      setHoverLat(null);
+      setHoverLng(null);
+      setHoverElevation(null);
     });
 
     mapRef.current = map;
 
     return () => {
-      if (window.onpointerup) {
-        window.onpointerup = null;
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
       }
       map.remove();
       mapRef.current = null;
-      cursorHandlersAttachedRef.current = false;
     };
   }, []);
 
@@ -388,20 +405,6 @@ export default function HomePage() {
             <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>Preview</div>
           </button>
         </div>
-
-        <div
-          style={{
-            padding: 14,
-            borderRadius: 12,
-            background: "#eff6ff",
-            border: "1px solid #bfdbfe",
-            color: "#1f2937",
-            lineHeight: 1.5,
-          }}
-        >
-          <div style={{ fontWeight: 700, color: "#1d4ed8", marginBottom: 6 }}>Next upgrades</div>
-          Ocean connectivity, better negative sea levels, satellite Pro mode, and globe visualization.
-        </div>
       </div>
 
       <div
@@ -416,7 +419,7 @@ export default function HomePage() {
           fontSize: 14,
           lineHeight: 1.45,
           zIndex: 10,
-          minWidth: 200,
+          minWidth: 230,
         }}
       >
         <div style={{ fontWeight: 700, marginBottom: 8 }}>Current Scenario</div>
@@ -433,6 +436,13 @@ export default function HomePage() {
               : "Globe"}
         </div>
         <div>Status: {status}</div>
+
+        <hr style={{ margin: "10px 0", opacity: 0.25 }} />
+
+        <div style={{ fontWeight: 700, marginBottom: 6 }}>Cursor</div>
+        <div>Lat: {hoverLat ?? "--"}</div>
+        <div>Lng: {hoverLng ?? "--"}</div>
+        <div>Elevation: {hoverElevation !== null ? `${hoverElevation} m` : "--"}</div>
       </div>
     </div>
   );
