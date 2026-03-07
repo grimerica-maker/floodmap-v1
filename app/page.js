@@ -5,10 +5,6 @@ import mapboxgl from "mapbox-gl";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-const TILE_SERVER = "https://flood-engine.onrender.com";
-const FLOOD_SOURCE_ID = "flood-source";
-const FLOOD_LAYER_ID = "flood-layer";
-
 const PRESETS = [
   { label: "Ice Age", value: -120 },
   { label: "Modern", value: 0 },
@@ -17,89 +13,23 @@ const PRESETS = [
   { label: "Total Flood", value: 5000 },
 ];
 
+const FLOOD_SOURCE_ID = "flood-overlay-source";
+const FLOOD_LAYER_ID = "flood-overlay-layer";
+const DEM_SOURCE_ID = "mapbox-dem";
+
 export default function HomePage() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
-  const hoverTimerRef = useRef(null);
-  const abortRef = useRef(null);
+  const renderTimerRef = useRef(null);
+  const renderJobRef = useRef({ id: 0, cancelled: false });
 
-  const [inputLevel, setInputLevel] = useState(70);
+  const [inputLevel, setInputLevel] = useState(0);
   const [seaLevel, setSeaLevel] = useState(0);
-  const [status, setStatus] = useState("Map loading...");
-  const [cursorLngLat, setCursorLngLat] = useState(null);
-  const [cursorElevation, setCursorElevation] = useState(null);
-  const [cursorLoading, setCursorLoading] = useState(false);
-
-  useEffect(() => {
-    if (mapRef.current) return;
-
-    const map = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: "mapbox://styles/mapbox/streets-v12",
-      center: [-81.5, 27.8],
-      zoom: 6,
-      projection: "mercator",
-    });
-
-    map.addControl(new mapboxgl.NavigationControl(), "top-right");
-
-    map.on("load", () => {
-      setStatus("Map ready");
-    });
-
-    map.on("mousemove", (e) => {
-      const lat = e.lngLat.lat;
-      const lng = e.lngLat.lng;
-
-      setCursorLngLat({
-        lat: lat.toFixed(4),
-        lng: lng.toFixed(4),
-      });
-
-      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-
-      hoverTimerRef.current = setTimeout(async () => {
-        try {
-          if (abortRef.current) abortRef.current.abort();
-          abortRef.current = new AbortController();
-
-          setCursorLoading(true);
-
-          const res = await fetch(
-            `${TILE_SERVER}/elevation?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`,
-            { signal: abortRef.current.signal }
-          );
-
-          if (!res.ok) return;
-          const data = await res.json();
-          setCursorElevation(Math.round(data.elevation_m));
-        } catch (err) {
-          if (err?.name !== "AbortError") {
-            // ignore
-          }
-        } finally {
-          setCursorLoading(false);
-        }
-      }, 120);
-    });
-
-    map.on("mouseleave", () => {
-      setCursorLngLat(null);
-      setCursorElevation(null);
-      setCursorLoading(false);
-      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-      if (abortRef.current) abortRef.current.abort();
-    });
-
-    mapRef.current = map;
-
-    return () => {
-      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-      if (abortRef.current) abortRef.current.abort();
-      map.remove();
-      mapRef.current = null;
-    };
-  }, []);
+  const [viewMode, setViewMode] = useState("map");
+  const [status, setStatus] = useState("Loading map...");
+  const [floodedCells, setFloodedCells] = useState(0);
+  const [engineReady, setEngineReady] = useState(false);
+  const [isRendering, setIsRendering] = useState(false);
 
   const clampLevel = (value) => {
     const parsed = parseInt(value, 10);
@@ -107,86 +37,405 @@ export default function HomePage() {
     return Math.max(-5000, Math.min(5000, parsed));
   };
 
+  const cancelRender = () => {
+    renderJobRef.current.cancelled = true;
+    setIsRendering(false);
+  };
+
   const removeFloodLayer = () => {
     const map = mapRef.current;
     if (!map) return;
-    if (map.getLayer(FLOOD_LAYER_ID)) map.removeLayer(FLOOD_LAYER_ID);
-    if (map.getSource(FLOOD_SOURCE_ID)) map.removeSource(FLOOD_SOURCE_ID);
+
+    if (map.getLayer(FLOOD_LAYER_ID)) {
+      map.removeLayer(FLOOD_LAYER_ID);
+    }
+    if (map.getSource(FLOOD_SOURCE_ID)) {
+      map.removeSource(FLOOD_SOURCE_ID);
+    }
   };
 
-  const addFloodLayer = (level) => {
+  const ensureTerrain = () => {
     const map = mapRef.current;
     if (!map) return;
 
-    removeFloodLayer();
+    if (!map.getSource(DEM_SOURCE_ID)) {
+      map.addSource(DEM_SOURCE_ID, {
+        type: "raster-dem",
+        url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+        tileSize: 512,
+        maxzoom: 14,
+      });
+    }
 
-    map.addSource(FLOOD_SOURCE_ID, {
-      type: "raster",
-      tiles: [`${TILE_SERVER}/flood/${level}/{z}/{x}/{y}.png?v=${Date.now()}`],
-      tileSize: 256,
-      scheme: "xyz",
+    map.setTerrain({
+      source: DEM_SOURCE_ID,
+      exaggeration: 1,
     });
 
-    map.addLayer({
-      id: FLOOD_LAYER_ID,
-      type: "raster",
-      source: FLOOD_SOURCE_ID,
-      paint: {
-        "raster-opacity": 0.9,
-        "raster-fade-duration": 0,
-      },
-    });
+    setEngineReady(true);
   };
 
-  const executeFlood = () => {
+  const addOrUpdateFloodOverlay = (dataUrl, coordinates) => {
     const map = mapRef.current;
     if (!map) return;
 
-    const level = clampLevel(inputLevel);
-    setSeaLevel(level);
-    addFloodLayer(level);
+    if (map.getSource(FLOOD_SOURCE_ID)) {
+      map.getSource(FLOOD_SOURCE_ID).updateImage({
+        url: dataUrl,
+        coordinates,
+      });
+    } else {
+      map.addSource(FLOOD_SOURCE_ID, {
+        type: "image",
+        url: dataUrl,
+        coordinates,
+      });
 
-    if (level > 0) setStatus(`Flood tiles loaded for +${level}m`);
-    else if (level < 0) setStatus(`Drain tiles loaded for ${level}m`);
-    else setStatus("Present-day sea level loaded");
+      map.addLayer({
+        id: FLOOD_LAYER_ID,
+        type: "raster",
+        source: FLOOD_SOURCE_ID,
+        paint: {
+          "raster-opacity": 0.78,
+          "raster-fade-duration": 0,
+        },
+      });
+    }
   };
 
   const clearFlood = () => {
+    cancelRender();
     removeFloodLayer();
     setSeaLevel(0);
-    setInputLevel(0);
+    setFloodedCells(0);
     setStatus("Flood cleared");
   };
 
-  const surfaceLabel = () => {
-    if (cursorLoading) return "Loading...";
-    if (cursorElevation === null) return "--";
+  const getGridSize = (zoom) => {
+    if (zoom >= 10) return { cols: 120, rows: 90 };
+    if (zoom >= 8) return { cols: 96, rows: 72 };
+    if (zoom >= 6) return { cols: 76, rows: 56 };
+    if (zoom >= 4) return { cols: 60, rows: 44 };
+    return { cols: 48, rows: 36 };
+  };
 
-    if (seaLevel > 0) {
-      if (cursorElevation >= 0) {
-        const flooded = seaLevel - cursorElevation;
-        if (flooded > 0) return `${Math.round(flooded)} m flooded`;
-        if (flooded === 0) return "At sea surface";
-        return `${Math.abs(Math.round(flooded))} m above water`;
-      }
-      const presentDepth = Math.abs(cursorElevation);
-      const afterDepth = seaLevel - cursorElevation;
-      return `Present depth ${presentDepth} m · After rise ${Math.round(afterDepth)} m`;
+  const renderFlood = async () => {
+    const map = mapRef.current;
+    if (!map || !engineReady) return;
+
+    if (viewMode !== "map") {
+      setStatus("Flood engine runs in Standard Map mode only");
+      return;
     }
 
-    if (seaLevel < 0) {
-      if (cursorElevation <= 0 && cursorElevation >= seaLevel) {
-        return `${Math.round(cursorElevation - seaLevel)} m above new sea`;
-      }
-      if (cursorElevation < seaLevel) {
-        return `${Math.round(seaLevel - cursorElevation)} m below new sea`;
-      }
-      return `${Math.round(cursorElevation - seaLevel)} m above new sea`;
+    if (seaLevel <= 0) {
+      removeFloodLayer();
+      setFloodedCells(0);
+      setStatus("Sea level is 0 or below. No ocean rise shown.");
+      return;
     }
 
-    if (cursorElevation < 0) return `${Math.abs(cursorElevation)} m below present sea`;
-    if (cursorElevation === 0) return "At present sea level";
-    return `${cursorElevation} m above present sea`;
+    cancelRender();
+    const nextId = renderJobRef.current.id + 1;
+    renderJobRef.current = { id: nextId, cancelled: false };
+    const job = renderJobRef.current;
+
+    setIsRendering(true);
+    setStatus("Sampling terrain...");
+
+    const canvas = document.createElement("canvas");
+    const width = 900;
+    const height = 680;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+
+    const { cols, rows } = getGridSize(map.getZoom());
+    const cellW = width / cols;
+    const cellH = height / rows;
+
+    const tl = map.unproject([0, 0]);
+    const tr = map.unproject([width, 0]);
+    const br = map.unproject([width, height]);
+    const bl = map.unproject([0, height]);
+
+    const coordinates = [
+      [tl.lng, tl.lat],
+      [tr.lng, tr.lat],
+      [br.lng, br.lat],
+      [bl.lng, bl.lat],
+    ];
+
+    const elev = Array.from({ length: rows }, () => Array(cols).fill(null));
+    const lowEnough = Array.from({ length: rows }, () => Array(cols).fill(false));
+    const flooded = Array.from({ length: rows }, () => Array(cols).fill(false));
+
+    const rowsPerChunk = 5;
+
+    for (let startRow = 0; startRow < rows; startRow += rowsPerChunk) {
+      if (job.cancelled) return;
+
+      const endRow = Math.min(rows, startRow + rowsPerChunk);
+
+      for (let r = startRow; r < endRow; r++) {
+        for (let c = 0; c < cols; c++) {
+          const px = c * cellW + cellW / 2;
+          const py = r * cellH + cellH / 2;
+          const lngLat = map.unproject([px, py]);
+          const elevation = map.queryTerrainElevation(lngLat, { exaggerated: false });
+
+          elev[r][c] = elevation;
+
+          if (
+            typeof elevation === "number" &&
+            !Number.isNaN(elevation) &&
+            elevation <= seaLevel
+          ) {
+            lowEnough[r][c] = true;
+          }
+        }
+      }
+
+      setStatus(`Sampling terrain... ${Math.round((endRow / rows) * 100)}%`);
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+
+    if (job.cancelled) return;
+
+    setStatus("Tracing coastline-connected water...");
+
+    const queue = [];
+    const push = (r, c) => {
+      if (r < 0 || r >= rows || c < 0 || c >= cols) return;
+      if (!lowEnough[r][c]) return;
+      if (flooded[r][c]) return;
+      flooded[r][c] = true;
+      queue.push([r, c]);
+    };
+
+    for (let c = 0; c < cols; c++) {
+      push(0, c);
+      push(rows - 1, c);
+    }
+    for (let r = 0; r < rows; r++) {
+      push(r, 0);
+      push(r, cols - 1);
+    }
+
+    while (queue.length > 0) {
+      if (job.cancelled) return;
+
+      const batch = Math.min(queue.length, 1400);
+      for (let i = 0; i < batch; i++) {
+        const [r, c] = queue.shift();
+
+        push(r - 1, c);
+        push(r + 1, c);
+        push(r, c - 1);
+        push(r, c + 1);
+
+        push(r - 1, c - 1);
+        push(r - 1, c + 1);
+        push(r + 1, c - 1);
+        push(r + 1, c + 1);
+      }
+
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+
+    if (job.cancelled) return;
+
+    setStatus("Painting overlay...");
+
+    let count = 0;
+    ctx.clearRect(0, 0, width, height);
+
+    for (let startRow = 0; startRow < rows; startRow += rowsPerChunk) {
+      if (job.cancelled) return;
+
+      const endRow = Math.min(rows, startRow + rowsPerChunk);
+
+      for (let r = startRow; r < endRow; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (!flooded[r][c]) continue;
+
+          count += 1;
+          const depth = seaLevel - elev[r][c];
+
+          let fill = "rgba(56, 189, 248, 0.40)";
+          if (depth > 5) fill = "rgba(59, 130, 246, 0.50)";
+          if (depth > 20) fill = "rgba(37, 99, 235, 0.60)";
+          if (depth > 100) fill = "rgba(29, 78, 216, 0.72)";
+          if (depth > 500) fill = "rgba(30, 64, 175, 0.82)";
+
+          ctx.fillStyle = fill;
+          ctx.fillRect(c * cellW, r * cellH, cellW + 1, cellH + 1);
+        }
+      }
+
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+
+    if (job.cancelled) return;
+
+    addOrUpdateFloodOverlay(canvas.toDataURL("image/png"), coordinates);
+    setFloodedCells(count);
+    setStatus(
+      count > 0
+        ? `Flood rendered at ${seaLevel > 0 ? "+" : ""}${seaLevel}m`
+        : "No ocean-connected flooded cells found in this view"
+    );
+    setIsRendering(false);
+  };
+
+  const scheduleRender = () => {
+    if (renderTimerRef.current) {
+      window.clearTimeout(renderTimerRef.current);
+    }
+
+    renderTimerRef.current = window.setTimeout(() => {
+      renderFlood();
+    }, 250);
+  };
+
+  useEffect(() => {
+    if (mapRef.current) return;
+
+    const map = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: "mapbox://styles/mapbox/streets-v12",
+      center: [-80.19, 25.76],
+      zoom: 6.2,
+      projection: "mercator",
+      dragPan: true,
+      scrollZoom: true,
+      boxZoom: true,
+      dragRotate: true,
+      keyboard: true,
+      touchZoomRotate: true,
+      preserveDrawingBuffer: true,
+    });
+
+    map.addControl(new mapboxgl.NavigationControl(), "top-right");
+
+    map.getCanvas().style.cursor = "grab";
+
+    map.on("mousedown", () => {
+      map.getCanvas().style.cursor = "grabbing";
+    });
+
+    map.on("mouseup", () => {
+      map.getCanvas().style.cursor = "grab";
+    });
+
+    map.on("mouseout", () => {
+      map.getCanvas().style.cursor = "grab";
+    });
+
+    map.on("load", () => {
+      ensureTerrain();
+      setStatus("Map ready");
+    });
+
+    map.on("style.load", () => {
+      ensureTerrain();
+      if (seaLevel > 0 && viewMode === "map") {
+        scheduleRender();
+      }
+    });
+
+    map.on("movestart", () => {
+      cancelRender();
+    });
+
+    map.on("moveend", () => {
+      if (seaLevel > 0 && viewMode === "map") {
+        setStatus("View changed. Re-rendering...");
+        scheduleRender();
+      }
+    });
+
+    map.on("zoomend", () => {
+      if (seaLevel > 0 && viewMode === "map") {
+        setStatus("Zoom changed. Re-rendering...");
+        scheduleRender();
+      }
+    });
+
+    map.on("resize", () => {
+      if (seaLevel > 0 && viewMode === "map") {
+        scheduleRender();
+      }
+    });
+
+    mapRef.current = map;
+
+    return () => {
+      if (renderTimerRef.current) {
+        window.clearTimeout(renderTimerRef.current);
+      }
+      cancelRender();
+      map.remove();
+      mapRef.current = null;
+    };
+  }, [seaLevel, viewMode, engineReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    cancelRender();
+
+    if (viewMode === "globe") {
+      removeFloodLayer();
+      setFloodedCells(0);
+      map.setProjection("globe");
+      map.setStyle("mapbox://styles/mapbox/streets-v12");
+      map.flyTo({
+        center: [-70, 28],
+        zoom: 2.6,
+        essential: true,
+      });
+      setStatus("Globe preview mode");
+      return;
+    }
+
+    if (viewMode === "satellite") {
+      removeFloodLayer();
+      setFloodedCells(0);
+      map.setProjection("mercator");
+      map.setStyle("mapbox://styles/mapbox/satellite-streets-v12");
+      map.flyTo({
+        center: [-80.19, 25.76],
+        zoom: 6.2,
+        essential: true,
+      });
+      setStatus("Satellite placeholder");
+      return;
+    }
+
+    map.setProjection("mercator");
+    map.setStyle("mapbox://styles/mapbox/streets-v12");
+    map.flyTo({
+      center: [-80.19, 25.76],
+      zoom: 6.2,
+      essential: true,
+    });
+    setStatus("Standard Map ready");
+  }, [viewMode]);
+
+  const executeFlood = () => {
+    const applied = clampLevel(inputLevel);
+    setSeaLevel(applied);
+
+    if (viewMode !== "map") {
+      setStatus("Switch to Standard Map to run flood engine");
+      return;
+    }
+
+    setTimeout(() => {
+      renderFlood();
+    }, 50);
   };
 
   return (
@@ -200,20 +449,21 @@ export default function HomePage() {
           left: 0,
           width: 320,
           height: "100%",
-          background: "rgba(255,255,255,0.97)",
+          background: "rgba(255,255,255,0.96)",
           borderRight: "1px solid #e5e7eb",
           boxShadow: "0 10px 30px rgba(0,0,0,0.12)",
           padding: 20,
           fontFamily: "Arial, sans-serif",
           overflowY: "auto",
+          zIndex: 10,
         }}
       >
         <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
-          Floodmap
+          Floodmap V1
         </div>
 
         <div style={{ fontSize: 13, color: "#666", marginBottom: 20 }}>
-          Positive rise + negative drain
+          Coastline-connected flood engine
         </div>
 
         <div style={{ marginBottom: 24 }}>
@@ -254,21 +504,25 @@ export default function HomePage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <button
               onClick={executeFlood}
+              disabled={isRendering}
               style={{
                 padding: "12px 14px",
                 borderRadius: 10,
                 border: "none",
-                background: "#111827",
+                background: isRendering ? "#9ca3af" : "#111827",
                 color: "#fff",
                 fontWeight: 700,
-                cursor: "pointer",
+                cursor: isRendering ? "not-allowed" : "pointer",
               }}
             >
-              Execute
+              {isRendering ? "Rendering..." : "Execute Flood"}
             </button>
 
             <button
-              onClick={clearFlood}
+              onClick={() => {
+                setInputLevel(0);
+                clearFlood();
+              }}
               style={{
                 padding: "12px 14px",
                 borderRadius: 10,
@@ -318,6 +572,71 @@ export default function HomePage() {
             ))}
           </div>
         </div>
+
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#555", marginBottom: 10 }}>
+            VIEW MODE
+          </div>
+
+          <div style={{ display: "grid", gap: 8 }}>
+            <button
+              onClick={() => setViewMode("map")}
+              style={{
+                padding: "12px 14px",
+                borderRadius: 10,
+                border: "1px solid #d1d5db",
+                background: viewMode === "map" ? "#111827" : "#fff",
+                color: viewMode === "map" ? "#fff" : "#111827",
+                textAlign: "left",
+                cursor: "pointer",
+                fontWeight: 600,
+              }}
+            >
+              Standard Map
+              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>
+                Flood engine active
+              </div>
+            </button>
+
+            <button
+              onClick={() => setViewMode("satellite")}
+              style={{
+                padding: "12px 14px",
+                borderRadius: 10,
+                border: "1px solid #d1d5db",
+                background: viewMode === "satellite" ? "#111827" : "#f9fafb",
+                color: viewMode === "satellite" ? "#fff" : "#9ca3af",
+                textAlign: "left",
+                cursor: "pointer",
+                fontWeight: 600,
+              }}
+            >
+              Satellite View
+              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>
+                Placeholder
+              </div>
+            </button>
+
+            <button
+              onClick={() => setViewMode("globe")}
+              style={{
+                padding: "12px 14px",
+                borderRadius: 10,
+                border: "1px solid #d1d5db",
+                background: viewMode === "globe" ? "#111827" : "#fff",
+                color: viewMode === "globe" ? "#fff" : "#111827",
+                textAlign: "left",
+                cursor: "pointer",
+                fontWeight: 600,
+              }}
+            >
+              Globe View
+              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>
+                Preview
+              </div>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div
@@ -325,31 +644,28 @@ export default function HomePage() {
           position: "absolute",
           right: 20,
           top: 20,
-          background: "rgba(17,24,39,0.88)",
+          background: "rgba(17,24,39,0.85)",
           color: "white",
-          padding: "14px 16px",
+          padding: "12px 14px",
           borderRadius: 12,
           fontFamily: "Arial, sans-serif",
           fontSize: 13,
-          lineHeight: 1.6,
+          lineHeight: 1.5,
           boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
-          minWidth: 320,
+          minWidth: 230,
+          zIndex: 10,
         }}
       >
-        <div style={{ fontWeight: 700, marginBottom: 6 }}>Current Scenario</div>
-        <div>Sea level: {seaLevel > 0 ? "+" : ""}{seaLevel}m</div>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>Current Scenario</div>
+        <div>
+          Sea level: {seaLevel > 0 ? "+" : ""}
+          {seaLevel}m
+        </div>
+        <div>
+          Mode: {viewMode === "globe" ? "Globe" : viewMode === "satellite" ? "Satellite" : "Standard Map"}
+        </div>
         <div>Status: {status}</div>
-
-        <div style={{ marginTop: 10, fontWeight: 700 }}>Cursor</div>
-        <div>
-          Coords: {cursorLngLat ? `${cursorLngLat.lat}, ${cursorLngLat.lng}` : "--"}
-        </div>
-        <div>
-          Elevation: {cursorElevation !== null ? `${cursorElevation} m` : "--"}
-        </div>
-        <div>
-          Surface relation: {surfaceLabel()}
-        </div>
+        <div>Flooded cells: {floodedCells}</div>
       </div>
     </div>
   );
