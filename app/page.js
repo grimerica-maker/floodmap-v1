@@ -17,12 +17,182 @@ export default function HomePage() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const overlayCanvasRef = useRef(null);
+  const redrawTimeoutRef = useRef(null);
 
   const [inputLevel, setInputLevel] = useState(0);
   const [seaLevel, setSeaLevel] = useState(0);
   const [viewMode, setViewMode] = useState("map");
-  const [status, setStatus] = useState("Ready");
+  const [status, setStatus] = useState("Loading map...");
   const [floodedCells, setFloodedCells] = useState(0);
+  const [engineReady, setEngineReady] = useState(false);
+
+  const clampLevel = (value) => {
+    const parsed = parseInt(value, 10);
+    if (Number.isNaN(parsed)) return 0;
+    return Math.max(-5000, Math.min(5000, parsed));
+  };
+
+  const clearOverlay = () => {
+    const canvas = overlayCanvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.floor(rect.width));
+    canvas.height = Math.max(1, Math.floor(rect.height));
+
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    setFloodedCells(0);
+  };
+
+  const configureTerrain = (map) => {
+    if (!map.getSource("mapbox-dem")) {
+      map.addSource("mapbox-dem", {
+        type: "raster-dem",
+        url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+        tileSize: 512,
+        maxzoom: 14,
+      });
+    }
+
+    map.setTerrain({
+      source: "mapbox-dem",
+      exaggeration: 1,
+    });
+
+    if (map.getProjection()?.name === "globe") {
+      map.setFog({});
+    }
+
+    setEngineReady(true);
+  };
+
+  const scheduleFloodRender = () => {
+    if (redrawTimeoutRef.current) {
+      window.clearTimeout(redrawTimeoutRef.current);
+    }
+
+    redrawTimeoutRef.current = window.setTimeout(() => {
+      renderFlood();
+    }, 120);
+  };
+
+  const renderFlood = () => {
+    const map = mapRef.current;
+    const canvas = overlayCanvasRef.current;
+
+    if (!map || !canvas || !engineReady) return;
+
+    const rect = map.getContainer().getBoundingClientRect();
+    canvas.width = Math.max(1, Math.floor(rect.width));
+    canvas.height = Math.max(1, Math.floor(rect.height));
+
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (seaLevel <= 0) {
+      setFloodedCells(0);
+      setStatus("Sea level is 0 or below. No ocean rise shown.");
+      return;
+    }
+
+    setStatus("Sampling terrain...");
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    const cols = 110;
+    const rows = 78;
+    const cellW = width / cols;
+    const cellH = height / rows;
+
+    const elev = Array.from({ length: rows }, () => Array(cols).fill(null));
+    const passable = Array.from({ length: rows }, () => Array(cols).fill(false));
+    const flooded = Array.from({ length: rows }, () => Array(cols).fill(false));
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const x = c * cellW + cellW / 2;
+        const y = r * cellH + cellH / 2;
+
+        const lngLat = map.unproject([x, y]);
+        const e = map.queryTerrainElevation(lngLat, { exaggerated: false });
+
+        elev[r][c] = e;
+
+        if (typeof e === "number" && !Number.isNaN(e) && e <= seaLevel) {
+          passable[r][c] = true;
+        }
+      }
+    }
+
+    setStatus("Tracing new coastline...");
+
+    const queue = [];
+    const pushIfPassable = (r, c) => {
+      if (r < 0 || r >= rows || c < 0 || c >= cols) return;
+      if (!passable[r][c]) return;
+      if (flooded[r][c]) return;
+      flooded[r][c] = true;
+      queue.push([r, c]);
+    };
+
+    // Seed from all map edges: treat them as ocean-connected boundaries
+    for (let c = 0; c < cols; c++) {
+      pushIfPassable(0, c);
+      pushIfPassable(rows - 1, c);
+    }
+    for (let r = 0; r < rows; r++) {
+      pushIfPassable(r, 0);
+      pushIfPassable(r, cols - 1);
+    }
+
+    // Flood fill through connected low-elevation cells
+    while (queue.length > 0) {
+      const [r, c] = queue.shift();
+
+      pushIfPassable(r - 1, c);
+      pushIfPassable(r + 1, c);
+      pushIfPassable(r, c - 1);
+      pushIfPassable(r, c + 1);
+
+      // Diagonals help smooth coastlines visually
+      pushIfPassable(r - 1, c - 1);
+      pushIfPassable(r - 1, c + 1);
+      pushIfPassable(r + 1, c - 1);
+      pushIfPassable(r + 1, c + 1);
+    }
+
+    let count = 0;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (!flooded[r][c]) continue;
+
+        count += 1;
+        const x = c * cellW;
+        const y = r * cellH;
+        const depth = seaLevel - elev[r][c];
+
+        let fill = "rgba(56, 189, 248, 0.45)";
+        if (depth > 5) fill = "rgba(59, 130, 246, 0.55)";
+        if (depth > 20) fill = "rgba(37, 99, 235, 0.66)";
+        if (depth > 100) fill = "rgba(29, 78, 216, 0.74)";
+        if (depth > 500) fill = "rgba(30, 64, 175, 0.82)";
+
+        ctx.fillStyle = fill;
+        ctx.fillRect(x, y, cellW + 1, cellH + 1);
+      }
+    }
+
+    setFloodedCells(count);
+    setStatus(
+      count > 0
+        ? `Flood rendered at ${seaLevel > 0 ? "+" : ""}${seaLevel}m`
+        : "No ocean-connected flooded cells found in this view"
+    );
+  };
 
   useEffect(() => {
     if (mapRef.current) return;
@@ -37,15 +207,27 @@ export default function HomePage() {
 
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
 
-    map.on("style.load", () => {
-      if (map.getProjection()?.name === "globe") {
-        map.setFog({});
-      }
+    map.on("load", () => {
+      configureTerrain(map);
+      setStatus("Map ready");
     });
+
+    map.on("style.load", () => {
+      configureTerrain(map);
+    });
+
+    map.on("moveend", scheduleFloodRender);
+    map.on("zoomend", scheduleFloodRender);
+    map.on("rotateend", scheduleFloodRender);
+    map.on("pitchend", scheduleFloodRender);
+    map.on("resize", scheduleFloodRender);
 
     mapRef.current = map;
 
     return () => {
+      if (redrawTimeoutRef.current) {
+        window.clearTimeout(redrawTimeoutRef.current);
+      }
       map.remove();
       mapRef.current = null;
     };
@@ -63,103 +245,25 @@ export default function HomePage() {
       map.flyTo({ center: [-80.19, 25.76], zoom: 6.2, essential: true });
     }
 
-    clearFloodOverlay();
+    clearOverlay();
     setStatus("View changed. Click Execute Flood.");
   }, [viewMode]);
 
-  const clampLevel = (value) => {
-    const parsed = parseInt(value, 10);
-    if (Number.isNaN(parsed)) return 0;
-    return Math.max(-5000, Math.min(5000, parsed));
-  };
-
-  const clearFloodOverlay = () => {
-    const canvas = overlayCanvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = Math.max(1, Math.floor(rect.width));
-    canvas.height = Math.max(1, Math.floor(rect.height));
-
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    setFloodedCells(0);
-  };
-
   const executeFlood = () => {
+    const applied = clampLevel(inputLevel);
+    setSeaLevel(applied);
+
     const map = mapRef.current;
-    const canvas = overlayCanvasRef.current;
+    if (!map) return;
 
-    if (!map || !canvas) return;
+    map.once("idle", () => {
+      renderFlood();
+    });
 
-    const appliedLevel = clampLevel(inputLevel);
-    setSeaLevel(appliedLevel);
-
-    const rect = map.getContainer().getBoundingClientRect();
-    canvas.width = Math.max(1, Math.floor(rect.width));
-    canvas.height = Math.max(1, Math.floor(rect.height));
-
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (appliedLevel <= 0) {
-      setFloodedCells(0);
-      setStatus("Sea level is 0 or below. No flood drawn.");
-      return;
-    }
-
-    setStatus("Calculating flood...");
-
-    const width = canvas.width;
-    const height = canvas.height;
-
-    const columns = 140;
-    const rows = 90;
-    const cellW = width / columns;
-    const cellH = height / rows;
-
-    let floodedCount = 0;
-
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < columns; col++) {
-        const x = col * cellW;
-        const y = row * cellH;
-
-        const lngLat = map.unproject([x + cellW / 2, y + cellH / 2]);
-
-        const lat = lngLat.lat;
-        const lng = lngLat.lng;
-
-        // Fake elevation model for strong visible viral demo effect
-        const elevation =
-          120 +
-          Math.sin(lat / 8) * 80 +
-          Math.cos(lng / 10) * 70 +
-          Math.sin((lat + lng) / 7) * 30;
-
-        if (elevation > appliedLevel) continue;
-
-        const depth = appliedLevel - elevation;
-        floodedCount += 1;
-
-        let fill = "rgba(56, 189, 248, 0.55)";
-        if (depth > 20) fill = "rgba(59, 130, 246, 0.68)";
-        if (depth > 80) fill = "rgba(37, 99, 235, 0.78)";
-        if (depth > 200) fill = "rgba(29, 78, 216, 0.86)";
-        if (depth > 1000) fill = "rgba(30, 64, 175, 0.92)";
-
-        ctx.fillStyle = fill;
-        ctx.fillRect(x, y, cellW + 1, cellH + 1);
-      }
-    }
-
-    setFloodedCells(floodedCount);
-    setStatus(
-      floodedCount > 0
-        ? `Flood rendered at ${appliedLevel > 0 ? "+" : ""}${appliedLevel}m`
-        : "No flooded cells found at this level in the current view"
-    );
+    // backup trigger
+    setTimeout(() => {
+      renderFlood();
+    }, 250);
   };
 
   return (
@@ -197,7 +301,7 @@ export default function HomePage() {
         </div>
 
         <div style={{ fontSize: 13, color: "#666", marginBottom: 20 }}>
-          Viral sea-level simulator
+          Coastline-connected sea-level simulator
         </div>
 
         <div style={{ marginBottom: 24 }}>
@@ -255,7 +359,7 @@ export default function HomePage() {
               onClick={() => {
                 setInputLevel(0);
                 setSeaLevel(0);
-                clearFloodOverlay();
+                clearOverlay();
                 setStatus("Flood cleared");
               }}
               style={{
@@ -331,7 +435,7 @@ export default function HomePage() {
               }}
             >
               Standard Map
-              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>Best for flood overlay</div>
+              <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>Best for flood rendering</div>
             </button>
 
             <button
@@ -381,7 +485,7 @@ export default function HomePage() {
             Pro Version Later
           </div>
           <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
-            Satellite view, stronger flood rendering, 3D globe, impact events, and spin-speed scenarios.
+            Satellite view, higher-res flood rendering, 3D globe, impact events, and spin-speed scenarios.
           </div>
         </div>
       </div>
