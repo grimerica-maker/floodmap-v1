@@ -22,6 +22,7 @@ export default function HomePage() {
   const mapRef = useRef(null);
   const hoverTimerRef = useRef(null);
   const impactMarkerRef = useRef(null);
+  const scenarioModeRef = useRef("flood");
 
   const [inputLevel, setInputLevel] = useState(0);
   const [seaLevel, setSeaLevel] = useState(0);
@@ -35,6 +36,10 @@ export default function HomePage() {
   const [hoverLat, setHoverLat] = useState(null);
   const [hoverLng, setHoverLng] = useState(null);
   const [hoverElevation, setHoverElevation] = useState(null);
+
+  useEffect(() => {
+    scenarioModeRef.current = scenarioMode;
+  }, [scenarioMode]);
 
   const waterDifference =
     hoverElevation !== null
@@ -265,7 +270,7 @@ export default function HomePage() {
     });
 
     map.on("click", (e) => {
-      if (scenarioMode !== "impact") return;
+      if (scenarioModeRef.current !== "impact") return;
 
       const point = {
         lng: e.lngLat.lng,
@@ -287,7 +292,7 @@ export default function HomePage() {
       map.remove();
       mapRef.current = null;
     };
-  }, [scenarioMode]);
+  }, []);
 
   useEffect(() => {
     if (!mapRef.current) return;
