@@ -357,6 +357,29 @@ export default function HomePage() {
           })}
         </div>
 
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>SCENARIO MODE</div>
+
+        <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
+          <button
+            onClick={() => setScenarioMode("flood")}
+            style={{
+              width: "100%",
+              padding: 14,
+              border: "1px solid #d1d5db",
+              background: scenarioMode === "flood" ? "#0f172a" : "white",
+              color: scenarioMode === "flood" ? "white" : "#111827",
+              cursor: "pointer",
+              borderRadius: 12,
+              fontWeight: 700,
+            }}
+          >
+            <div>Flood</div>
+            <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
+              Sea level up / down
+            </div>
+          </button>
+        </div>
+
         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>VIEW MODE</div>
 
         <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
