@@ -28,6 +28,9 @@ export default function HomePage() {
   const [status, setStatus] = useState("Loading map...");
   const [scenarioMode, setScenarioMode] = useState("flood");
 
+  const [impactSize, setImpactSize] = useState(10);
+  const [impactPoint, setImpactPoint] = useState(null);
+
   const [hoverLat, setHoverLat] = useState(null);
   const [hoverLng, setHoverLng] = useState(null);
   const [hoverElevation, setHoverElevation] = useState(null);
@@ -485,6 +488,11 @@ export default function HomePage() {
         </div>
         <div>Status: {status}</div>
         <div>Scenario Mode: {scenarioMode}</div>
+        <div>Impact Size: {impactSize}</div>
+        <div>
+          Impact Point:{" "}
+          {impactPoint ? `${impactPoint.lng.toFixed(3)}, ${impactPoint.lat.toFixed(3)}` : "--"}
+        </div>
 
         <hr style={{ margin: "10px 0", opacity: 0.25 }} />
 
