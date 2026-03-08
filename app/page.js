@@ -223,6 +223,17 @@ export default function HomePage() {
       setHoverElevation(null);
     });
 
+    map.on("click", (e) => {
+      if (scenarioMode !== "impact") return;
+
+      setImpactPoint({
+        lng: e.lngLat.lng,
+        lat: e.lngLat.lat,
+      });
+
+      setStatus("Impact point selected");
+    });
+
     mapRef.current = map;
 
     return () => {
@@ -232,7 +243,7 @@ export default function HomePage() {
       map.remove();
       mapRef.current = null;
     };
-  }, []);
+  }, [scenarioMode]);
 
   useEffect(() => {
     if (!mapRef.current) return;
