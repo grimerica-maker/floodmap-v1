@@ -41,7 +41,7 @@ const createGeodesicCircle = (lng, lat, radiusMeters, steps = 96) => {
 
     const newLat = Math.asin(
       Math.sin(latRad) * Math.cos(angularDistance) +
-        Math.cos(latRad) * mathSin(angularDistance) * Math.cos(bearing)
+        Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearing)
     );
 
     const newLng =
@@ -64,10 +64,6 @@ const createGeodesicCircle = (lng, lat, radiusMeters, steps = 96) => {
   };
 };
 
-function mathSin(value) {
-  return Math.sin(value);
-}
-
 export default function HomePage() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
@@ -75,6 +71,7 @@ export default function HomePage() {
 
   const scenarioModeRef = useRef("flood");
   const impactPointRef = useRef(null);
+  const executedImpactRef = useRef(null);
   const seaLevelRef = useRef(0);
   const viewModeRef = useRef("map");
   const impactDiameterRef = useRef(100);
@@ -87,6 +84,7 @@ export default function HomePage() {
 
   const [impactDiameter, setImpactDiameter] = useState(100);
   const [impactPoint, setImpactPoint] = useState(null);
+  const [executedImpact, setExecutedImpact] = useState(null);
 
   const [hoverLat, setHoverLat] = useState(null);
   const [hoverLng, setHoverLng] = useState(null);
@@ -99,6 +97,10 @@ export default function HomePage() {
   useEffect(() => {
     impactPointRef.current = impactPoint;
   }, [impactPoint]);
+
+  useEffect(() => {
+    executedImpactRef.current = executedImpact;
+  }, [executedImpact]);
 
   useEffect(() => {
     seaLevelRef.current = seaLevel;
@@ -178,7 +180,7 @@ export default function HomePage() {
     }
   };
 
-  const addImpactFloodLayer = ({ lat, lng, diameter }) => {
+  const addImpactFloodLayer = ({ lat, lng, diameter, runId }) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
@@ -187,7 +189,7 @@ export default function HomePage() {
     map.addSource(IMPACT_FLOOD_SOURCE_ID, {
       type: "raster",
       tiles: [
-        `${FLOOD_ENGINE}/impact-flood/${lat}/${lng}/${diameter}/{z}/{x}/{y}.png`,
+        `${FLOOD_ENGINE}/impact-flood/${lat}/${lng}/${diameter}/{z}/{x}/{y}.png?run=${runId}`,
       ],
       tileSize: 256,
     });
@@ -334,16 +336,16 @@ export default function HomePage() {
 
     radiusSource.setData({
       type: "FeatureCollection",
-      features: [createGeodesicCircle(point.lng, point.lat, craterRadiusMeters)],
+      features: [
+        createGeodesicCircle(point.lng, point.lat, craterRadiusMeters),
+      ],
     });
   };
 
   const fetchElevation = async (lat, lng) => {
     try {
       const res = await fetch(
-        `${FLOOD_ENGINE}/elevation?lat=${encodeURIComponent(
-          lat
-        )}&lng=${encodeURIComponent(lng)}`
+        `${FLOOD_ENGINE}/elevation?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`
       );
 
       if (!res.ok) {
@@ -372,22 +374,21 @@ export default function HomePage() {
 
     if (
       scenarioModeRef.current === "impact" &&
-      impactPointRef.current &&
-      viewModeRef.current === "map"
+      impactPointRef.current
     ) {
-      addImpactFloodLayer({
-        lat: impactPointRef.current.lat,
-        lng: impactPointRef.current.lng,
-        diameter: impactDiameterRef.current,
-      });
-    } else {
-      removeImpactFloodLayer();
-    }
-
-    if (scenarioModeRef.current === "impact" && impactPointRef.current) {
       setImpactPointOnMap(impactPointRef.current, impactDiameterRef.current);
     } else {
       clearImpactPointOnMap();
+    }
+
+    if (
+      scenarioModeRef.current === "impact" &&
+      executedImpactRef.current &&
+      viewModeRef.current === "map"
+    ) {
+      addImpactFloodLayer(executedImpactRef.current);
+    } else {
+      removeImpactFloodLayer();
     }
   };
 
@@ -409,7 +410,9 @@ export default function HomePage() {
       });
       setStatus(
         scenarioModeRef.current === "impact"
-          ? "Click ocean to simulate asteroid impact"
+          ? executedImpactRef.current
+            ? "Impact result loaded"
+            : "Click map to place impact point"
           : "Globe preview mode"
       );
       return;
@@ -428,7 +431,9 @@ export default function HomePage() {
       });
       setStatus(
         scenarioModeRef.current === "impact"
-          ? "Click ocean to simulate asteroid impact"
+          ? executedImpactRef.current
+            ? "Impact result loaded"
+            : "Click map to place impact point"
           : "Satellite placeholder"
       );
       return;
@@ -446,7 +451,9 @@ export default function HomePage() {
     });
     setStatus(
       scenarioModeRef.current === "impact"
-        ? "Click ocean to simulate asteroid impact"
+        ? executedImpactRef.current
+          ? "Impact result loaded"
+          : "Click map to place impact point"
         : "Standard Map ready"
     );
   };
@@ -471,6 +478,30 @@ export default function HomePage() {
     setStatus(`Flood tiles loaded at ${level > 0 ? "+" : ""}${level}m`);
   };
 
+  const executeImpact = () => {
+    if (!impactPointRef.current) {
+      setStatus("Click map to place impact point first");
+      return;
+    }
+
+    const run = {
+      lat: impactPointRef.current.lat,
+      lng: impactPointRef.current.lng,
+      diameter: impactDiameterRef.current,
+      runId: Date.now(),
+    };
+
+    setExecutedImpact(run);
+    executedImpactRef.current = run;
+
+    if (viewModeRef.current === "map") {
+      addImpactFloodLayer(run);
+      setStatus("Impact flood simulated");
+    } else {
+      setStatus("Impact saved — switch to Standard Map to view flood extent");
+    }
+  };
+
   const clearFlood = () => {
     setInputLevel(0);
     setSeaLevel(0);
@@ -478,6 +509,9 @@ export default function HomePage() {
 
     setImpactPoint(null);
     impactPointRef.current = null;
+
+    setExecutedImpact(null);
+    executedImpactRef.current = null;
 
     removeFloodLayer();
     removeImpactFloodLayer();
@@ -545,18 +579,7 @@ export default function HomePage() {
       impactPointRef.current = point;
       setImpactPoint(point);
       setImpactPointOnMap(point, impactDiameterRef.current);
-
-      if (viewModeRef.current === "map") {
-        addImpactFloodLayer({
-          lat: point.lat,
-          lng: point.lng,
-          diameter: impactDiameterRef.current,
-        });
-        setStatus("Impact flood simulated");
-      } else {
-        removeImpactFloodLayer();
-        setStatus("Impact point selected");
-      }
+      setStatus("Impact point selected");
     };
 
     map.on("load", handleLoad);
@@ -594,20 +617,23 @@ export default function HomePage() {
       return;
     }
 
-    setStatus("Click ocean to simulate asteroid impact");
-
     if (impactPointRef.current) {
       setImpactPointOnMap(impactPointRef.current, impactDiameter);
+    }
 
-      if (viewMode === "map") {
-        addImpactFloodLayer({
-          lat: impactPointRef.current.lat,
-          lng: impactPointRef.current.lng,
-          diameter: impactDiameter,
-        });
-      } else {
-        removeImpactFloodLayer();
-      }
+    if (executedImpactRef.current && viewMode === "map") {
+      addImpactFloodLayer(executedImpactRef.current);
+      setStatus("Impact result loaded");
+    } else if (executedImpactRef.current) {
+      removeImpactFloodLayer();
+      setStatus("Impact saved — switch to Standard Map to view flood extent");
+    } else {
+      removeImpactFloodLayer();
+      setStatus(
+        impactPointRef.current
+          ? "Impact point selected — click Execute Impact"
+          : "Click map to place impact point"
+      );
     }
   }, [scenarioMode, impactDiameter, viewMode]);
 
@@ -841,9 +867,26 @@ export default function HomePage() {
               }}
             />
 
-            <div style={{ fontSize: 14, marginBottom: 24 }}>
+            <div style={{ fontSize: 14, marginBottom: 12 }}>
               Diameter: {impactDiameter} m across
             </div>
+
+            <button
+              onClick={executeImpact}
+              style={{
+                width: "100%",
+                padding: 14,
+                background: "#7f1d1d",
+                color: "white",
+                border: "none",
+                fontWeight: 700,
+                cursor: "pointer",
+                borderRadius: 12,
+                marginBottom: 24,
+              }}
+            >
+              Execute Impact
+            </button>
           </>
         )}
 
@@ -948,6 +991,12 @@ export default function HomePage() {
           Impact Point:{" "}
           {impactPoint
             ? `${impactPoint.lng.toFixed(3)}, ${impactPoint.lat.toFixed(3)}`
+            : "--"}
+        </div>
+        <div>
+          Executed Impact:{" "}
+          {executedImpact
+            ? `${executedImpact.lng.toFixed(3)}, ${executedImpact.lat.toFixed(3)} @ ${executedImpact.diameter}m`
             : "--"}
         </div>
 
