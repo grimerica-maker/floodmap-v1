@@ -41,7 +41,7 @@ const createGeodesicCircle = (lng, lat, radiusMeters, steps = 96) => {
 
     const newLat = Math.asin(
       Math.sin(latRad) * Math.cos(angularDistance) +
-        Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearing)
+        Math.cos(latRad) * mathSin(angularDistance) * Math.cos(bearing)
     );
 
     const newLng =
@@ -63,6 +63,10 @@ const createGeodesicCircle = (lng, lat, radiusMeters, steps = 96) => {
     },
   };
 };
+
+function mathSin(value) {
+  return Math.sin(value);
+}
 
 export default function HomePage() {
   const mapContainer = useRef(null);
@@ -193,7 +197,7 @@ export default function HomePage() {
       type: "raster",
       source: IMPACT_FLOOD_SOURCE_ID,
       paint: {
-        "raster-opacity": 0.78,
+        "raster-opacity": 0.82,
         "raster-fade-duration": 0,
       },
     });
@@ -230,7 +234,7 @@ export default function HomePage() {
         source: IMPACT_RADIUS_SOURCE_ID,
         paint: {
           "fill-color": "#ef4444",
-          "fill-opacity": 0.12,
+          "fill-opacity": 0.22,
         },
       });
     }
@@ -241,8 +245,8 @@ export default function HomePage() {
         type: "line",
         source: IMPACT_RADIUS_SOURCE_ID,
         paint: {
-          "line-color": "rgba(239,68,68,0.6)",
-          "line-width": 2,
+          "line-color": "#b91c1c",
+          "line-width": 3,
         },
       });
     }
@@ -253,8 +257,8 @@ export default function HomePage() {
         type: "circle",
         source: IMPACT_SOURCE_ID,
         paint: {
-          "circle-radius": 14,
-          "circle-color": "rgba(239,68,68,0.22)",
+          "circle-radius": 16,
+          "circle-color": "rgba(239,68,68,0.25)",
           "circle-stroke-width": 0,
         },
       });
@@ -266,7 +270,7 @@ export default function HomePage() {
         type: "circle",
         source: IMPACT_SOURCE_ID,
         paint: {
-          "circle-radius": 7,
+          "circle-radius": 8,
           "circle-color": "#ef4444",
           "circle-stroke-width": 3,
           "circle-stroke-color": "#ffffff",
@@ -326,13 +330,11 @@ export default function HomePage() {
       ],
     });
 
-    const previewRadiusMeters = diameterValue * 20;
+    const craterRadiusMeters = Math.max(500, diameterValue * 40);
 
     radiusSource.setData({
       type: "FeatureCollection",
-      features: [
-        createGeodesicCircle(point.lng, point.lat, previewRadiusMeters),
-      ],
+      features: [createGeodesicCircle(point.lng, point.lat, craterRadiusMeters)],
     });
   };
 
@@ -364,6 +366,8 @@ export default function HomePage() {
 
     if (viewModeRef.current === "map" && seaLevelRef.current !== 0) {
       addFloodLayer(seaLevelRef.current);
+    } else {
+      removeFloodLayer();
     }
 
     if (
@@ -403,7 +407,11 @@ export default function HomePage() {
         zoom: 2.6,
         essential: true,
       });
-      setStatus("Globe preview mode");
+      setStatus(
+        scenarioModeRef.current === "impact"
+          ? "Click ocean to simulate asteroid impact"
+          : "Globe preview mode"
+      );
       return;
     }
 
@@ -418,7 +426,11 @@ export default function HomePage() {
         zoom: 6.2,
         essential: true,
       });
-      setStatus("Satellite placeholder");
+      setStatus(
+        scenarioModeRef.current === "impact"
+          ? "Click ocean to simulate asteroid impact"
+          : "Satellite placeholder"
+      );
       return;
     }
 
@@ -432,7 +444,11 @@ export default function HomePage() {
       zoom: 6.2,
       essential: true,
     });
-    setStatus("Standard Map ready");
+    setStatus(
+      scenarioModeRef.current === "impact"
+        ? "Click ocean to simulate asteroid impact"
+        : "Standard Map ready"
+    );
   };
 
   const executeFlood = () => {
@@ -578,6 +594,8 @@ export default function HomePage() {
       return;
     }
 
+    setStatus("Click ocean to simulate asteroid impact");
+
     if (impactPointRef.current) {
       setImpactPointOnMap(impactPointRef.current, impactDiameter);
 
@@ -619,9 +637,7 @@ export default function HomePage() {
           overflowY: "auto",
         }}
       >
-        <h1 style={{ margin: "8px 0 24px 0", fontSize: 22 }}>
-          Floodmap V1
-        </h1>
+        <h1 style={{ margin: "8px 0 24px 0", fontSize: 22 }}>Floodmap V1</h1>
 
         <div style={{ fontSize: 14, color: "#666", marginBottom: 24 }}>
           Python tile flood engine
