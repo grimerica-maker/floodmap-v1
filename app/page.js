@@ -10,6 +10,9 @@ const FLOOD_ENGINE = "https://flood-engine.onrender.com";
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
 
+const IMPACT_FLOOD_SOURCE_ID = "impact-flood-source";
+const IMPACT_FLOOD_LAYER_ID = "impact-flood-layer";
+
 const IMPACT_SOURCE_ID = "impact-point-source";
 const IMPACT_RADIUS_SOURCE_ID = "impact-radius-source";
 const IMPACT_RADIUS_FILL_ID = "impact-radius-fill";
@@ -158,6 +161,44 @@ export default function HomePage() {
     });
   };
 
+  const removeImpactFloodLayer = () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) {
+      map.removeLayer(IMPACT_FLOOD_LAYER_ID);
+    }
+
+    if (map.getSource(IMPACT_FLOOD_SOURCE_ID)) {
+      map.removeSource(IMPACT_FLOOD_SOURCE_ID);
+    }
+  };
+
+  const addImpactFloodLayer = ({ lat, lng, diameter }) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    removeImpactFloodLayer();
+
+    map.addSource(IMPACT_FLOOD_SOURCE_ID, {
+      type: "raster",
+      tiles: [
+        `${FLOOD_ENGINE}/impact-flood/${lat}/${lng}/${diameter}/{z}/{x}/{y}.png`,
+      ],
+      tileSize: 256,
+    });
+
+    map.addLayer({
+      id: IMPACT_FLOOD_LAYER_ID,
+      type: "raster",
+      source: IMPACT_FLOOD_SOURCE_ID,
+      paint: {
+        "raster-opacity": 0.78,
+        "raster-fade-duration": 0,
+      },
+    });
+  };
+
   const ensureImpactLayers = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
@@ -290,11 +331,7 @@ export default function HomePage() {
     radiusSource.setData({
       type: "FeatureCollection",
       features: [
-        createGeodesicCircle(
-          point.lng,
-          point.lat,
-          previewRadiusMeters
-        ),
+        createGeodesicCircle(point.lng, point.lat, previewRadiusMeters),
       ],
     });
   };
@@ -329,11 +366,22 @@ export default function HomePage() {
       addFloodLayer(seaLevelRef.current);
     }
 
+    if (
+      scenarioModeRef.current === "impact" &&
+      impactPointRef.current &&
+      viewModeRef.current === "map"
+    ) {
+      addImpactFloodLayer({
+        lat: impactPointRef.current.lat,
+        lng: impactPointRef.current.lng,
+        diameter: impactDiameterRef.current,
+      });
+    } else {
+      removeImpactFloodLayer();
+    }
+
     if (scenarioModeRef.current === "impact" && impactPointRef.current) {
-      setImpactPointOnMap(
-        impactPointRef.current,
-        impactDiameterRef.current
-      );
+      setImpactPointOnMap(impactPointRef.current, impactDiameterRef.current);
     } else {
       clearImpactPointOnMap();
     }
@@ -416,6 +464,7 @@ export default function HomePage() {
     impactPointRef.current = null;
 
     removeFloodLayer();
+    removeImpactFloodLayer();
     clearImpactPointOnMap();
     setStatus("Flood cleared");
   };
@@ -480,7 +529,18 @@ export default function HomePage() {
       impactPointRef.current = point;
       setImpactPoint(point);
       setImpactPointOnMap(point, impactDiameterRef.current);
-      setStatus("Impact point selected");
+
+      if (viewModeRef.current === "map") {
+        addImpactFloodLayer({
+          lat: point.lat,
+          lng: point.lng,
+          diameter: impactDiameterRef.current,
+        });
+        setStatus("Impact flood simulated");
+      } else {
+        removeImpactFloodLayer();
+        setStatus("Impact point selected");
+      }
     };
 
     map.on("load", handleLoad);
@@ -513,14 +573,25 @@ export default function HomePage() {
     if (!map || !map.isStyleLoaded()) return;
 
     if (scenarioMode !== "impact") {
+      removeImpactFloodLayer();
       clearImpactPointOnMap();
       return;
     }
 
     if (impactPointRef.current) {
       setImpactPointOnMap(impactPointRef.current, impactDiameter);
+
+      if (viewMode === "map") {
+        addImpactFloodLayer({
+          lat: impactPointRef.current.lat,
+          lng: impactPointRef.current.lng,
+          diameter: impactDiameter,
+        });
+      } else {
+        removeImpactFloodLayer();
+      }
     }
-  }, [scenarioMode, impactDiameter]);
+  }, [scenarioMode, impactDiameter, viewMode]);
 
   return (
     <div
