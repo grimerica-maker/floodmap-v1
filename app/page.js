@@ -378,6 +378,25 @@ export default function HomePage() {
               Sea level up / down
             </div>
           </button>
+
+          <button
+            onClick={() => setScenarioMode("impact")}
+            style={{
+              width: "100%",
+              padding: 14,
+              border: "1px solid #d1d5db",
+              background: scenarioMode === "impact" ? "#0f172a" : "white",
+              color: scenarioMode === "impact" ? "white" : "#111827",
+              cursor: "pointer",
+              borderRadius: 12,
+              fontWeight: 700,
+            }}
+          >
+            <div>Impact</div>
+            <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
+              Asteroid impact simulation
+            </div>
+          </button>
         </div>
 
         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>VIEW MODE</div>
