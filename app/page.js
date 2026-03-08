@@ -26,6 +26,7 @@ export default function HomePage() {
   const [seaLevel, setSeaLevel] = useState(0);
   const [viewMode, setViewMode] = useState("map");
   const [status, setStatus] = useState("Loading map...");
+  const [scenarioMode, setScenarioMode] = useState("flood");
 
   const [hoverLat, setHoverLat] = useState(null);
   const [hoverLng, setHoverLng] = useState(null);
@@ -441,6 +442,7 @@ export default function HomePage() {
               : "Globe"}
         </div>
         <div>Status: {status}</div>
+        <div>Scenario Mode: {scenarioMode}</div>
 
         <hr style={{ margin: "10px 0", opacity: 0.25 }} />
 
