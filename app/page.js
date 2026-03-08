@@ -11,6 +11,7 @@ const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
 
 const IMPACT_SOURCE_ID = "impact-point-source";
+const IMPACT_RADIUS_LAYER_ID = "impact-radius-layer";
 const IMPACT_RING_LAYER_ID = "impact-point-ring-layer";
 const IMPACT_LAYER_ID = "impact-point-layer";
 
@@ -122,6 +123,32 @@ export default function HomePage() {
       });
     }
 
+    if (!map.getLayer(IMPACT_RADIUS_LAYER_ID)) {
+      map.addLayer({
+        id: IMPACT_RADIUS_LAYER_ID,
+        type: "circle",
+        source: IMPACT_SOURCE_ID,
+        paint: {
+          "circle-radius": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            0,
+            ["*", ["get", "size"], 1.2],
+            4,
+            ["*", ["get", "size"], 3],
+            8,
+            ["*", ["get", "size"], 8],
+            12,
+            ["*", ["get", "size"], 18],
+          ],
+          "circle-color": "rgba(239,68,68,0.10)",
+          "circle-stroke-color": "rgba(239,68,68,0.55)",
+          "circle-stroke-width": 2,
+        },
+      });
+    }
+
     if (!map.getLayer(IMPACT_RING_LAYER_ID)) {
       map.addLayer({
         id: IMPACT_RING_LAYER_ID,
@@ -163,7 +190,7 @@ export default function HomePage() {
     });
   };
 
-  const setImpactPointOnMap = (point) => {
+  const setImpactPointOnMap = (point, sizeValue = impactSize) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded() || !point) return;
 
@@ -181,7 +208,9 @@ export default function HomePage() {
             type: "Point",
             coordinates: [point.lng, point.lat],
           },
-          properties: {},
+          properties: {
+            size: sizeValue,
+          },
         },
       ],
     });
@@ -216,7 +245,7 @@ export default function HomePage() {
     }
 
     if (scenarioModeRef.current === "impact" && impactPointRef.current) {
-      setImpactPointOnMap(impactPointRef.current);
+      setImpactPointOnMap(impactPointRef.current, impactSize);
     } else {
       clearImpactPointOnMap();
     }
@@ -362,7 +391,7 @@ export default function HomePage() {
 
       impactPointRef.current = point;
       setImpactPoint(point);
-      setImpactPointOnMap(point);
+      setImpactPointOnMap(point, impactSize);
       setStatus("Impact point selected");
     };
 
@@ -384,7 +413,7 @@ export default function HomePage() {
       map.remove();
       mapRef.current = null;
     };
-  }, []);
+  }, [impactSize]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -401,9 +430,9 @@ export default function HomePage() {
     }
 
     if (impactPointRef.current) {
-      setImpactPointOnMap(impactPointRef.current);
+      setImpactPointOnMap(impactPointRef.current, impactSize);
     }
-  }, [scenarioMode]);
+  }, [scenarioMode, impactSize]);
 
   return (
     <div
