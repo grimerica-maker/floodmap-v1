@@ -21,6 +21,7 @@ export default function HomePage() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const hoverTimerRef = useRef(null);
+  const impactMarkerRef = useRef(null);
 
   const [inputLevel, setInputLevel] = useState(0);
   const [seaLevel, setSeaLevel] = useState(0);
@@ -82,6 +83,32 @@ export default function HomePage() {
     });
   };
 
+  const removeImpactMarker = () => {
+    if (impactMarkerRef.current) {
+      impactMarkerRef.current.remove();
+      impactMarkerRef.current = null;
+    }
+  };
+
+  const addOrUpdateImpactMarker = (point) => {
+    const map = mapRef.current;
+    if (!map || !point) return;
+
+    removeImpactMarker();
+
+    const el = document.createElement("div");
+    el.style.width = "18px";
+    el.style.height = "18px";
+    el.style.borderRadius = "50%";
+    el.style.background = "#ef4444";
+    el.style.border = "3px solid white";
+    el.style.boxShadow = "0 0 0 6px rgba(239,68,68,0.25)";
+
+    impactMarkerRef.current = new mapboxgl.Marker(el)
+      .setLngLat([point.lng, point.lat])
+      .addTo(map);
+  };
+
   const fetchElevation = async (lat, lng) => {
     try {
       const res = await fetch(
@@ -114,6 +141,9 @@ export default function HomePage() {
 
       map.once("style.load", () => {
         map.setFog({});
+        if (impactPoint && scenarioMode === "impact") {
+          addOrUpdateImpactMarker(impactPoint);
+        }
       });
 
       setStatus("Globe preview mode");
@@ -127,6 +157,12 @@ export default function HomePage() {
         center: [-80.19, 25.76],
         zoom: 6.2,
         essential: true,
+      });
+
+      map.once("style.load", () => {
+        if (impactPoint && scenarioMode === "impact") {
+          addOrUpdateImpactMarker(impactPoint);
+        }
       });
 
       setStatus("Satellite placeholder");
@@ -144,6 +180,9 @@ export default function HomePage() {
     map.once("style.load", () => {
       if (seaLevel !== 0) {
         addFloodLayer(seaLevel);
+      }
+      if (impactPoint && scenarioMode === "impact") {
+        addOrUpdateImpactMarker(impactPoint);
       }
     });
 
@@ -173,6 +212,8 @@ export default function HomePage() {
     setInputLevel(0);
     setSeaLevel(0);
     removeFloodLayer();
+    setImpactPoint(null);
+    removeImpactMarker();
     setStatus("Flood cleared");
   };
 
@@ -226,11 +267,13 @@ export default function HomePage() {
     map.on("click", (e) => {
       if (scenarioMode !== "impact") return;
 
-      setImpactPoint({
+      const point = {
         lng: e.lngLat.lng,
         lat: e.lngLat.lat,
-      });
+      };
 
+      setImpactPoint(point);
+      addOrUpdateImpactMarker(point);
       setStatus("Impact point selected");
     });
 
@@ -240,6 +283,7 @@ export default function HomePage() {
       if (hoverTimerRef.current) {
         clearTimeout(hoverTimerRef.current);
       }
+      removeImpactMarker();
       map.remove();
       mapRef.current = null;
     };
@@ -249,6 +293,17 @@ export default function HomePage() {
     if (!mapRef.current) return;
     setMapStyleForMode(viewMode);
   }, [viewMode]);
+
+  useEffect(() => {
+    if (scenarioMode !== "impact") {
+      removeImpactMarker();
+      return;
+    }
+
+    if (impactPoint) {
+      addOrUpdateImpactMarker(impactPoint);
+    }
+  }, [scenarioMode, impactPoint]);
 
   return (
     <div style={{ width: "100%", height: "100vh", position: "relative", overflow: "hidden" }}>
