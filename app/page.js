@@ -11,7 +11,9 @@ const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
 
 const IMPACT_SOURCE_ID = "impact-point-source";
-const IMPACT_RADIUS_LAYER_ID = "impact-radius-layer";
+const IMPACT_RADIUS_SOURCE_ID = "impact-radius-source";
+const IMPACT_RADIUS_FILL_ID = "impact-radius-fill";
+const IMPACT_RADIUS_LINE_ID = "impact-radius-line";
 const IMPACT_RING_LAYER_ID = "impact-point-ring-layer";
 const IMPACT_LAYER_ID = "impact-point-layer";
 
@@ -22,6 +24,42 @@ const PRESETS = [
   { label: "Eocene", value: 70 },
   { label: "Total Flood", value: 5000 },
 ];
+
+const createGeodesicCircle = (lng, lat, radiusMeters, steps = 96) => {
+  const coords = [];
+  const earthRadius = 6371008.8;
+  const angularDistance = radiusMeters / earthRadius;
+
+  const latRad = (lat * Math.PI) / 180;
+  const lngRad = (lng * Math.PI) / 180;
+
+  for (let i = 0; i <= steps; i += 1) {
+    const bearing = (2 * Math.PI * i) / steps;
+
+    const newLat = Math.asin(
+      Math.sin(latRad) * Math.cos(angularDistance) +
+        Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearing)
+    );
+
+    const newLng =
+      lngRad +
+      Math.atan2(
+        Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(latRad),
+        Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(newLat)
+      );
+
+    coords.push([(newLng * 180) / Math.PI, (newLat * 180) / Math.PI]);
+  }
+
+  return {
+    type: "Feature",
+    properties: {},
+    geometry: {
+      type: "Polygon",
+      coordinates: [coords],
+    },
+  };
+};
 
 export default function HomePage() {
   const mapContainer = useRef(null);
@@ -124,6 +162,16 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
+    if (!map.getSource(IMPACT_RADIUS_SOURCE_ID)) {
+      map.addSource(IMPACT_RADIUS_SOURCE_ID, {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features: [],
+        },
+      });
+    }
+
     if (!map.getSource(IMPACT_SOURCE_ID)) {
       map.addSource(IMPACT_SOURCE_ID, {
         type: "geojson",
@@ -134,28 +182,26 @@ export default function HomePage() {
       });
     }
 
-    if (!map.getLayer(IMPACT_RADIUS_LAYER_ID)) {
+    if (!map.getLayer(IMPACT_RADIUS_FILL_ID)) {
       map.addLayer({
-        id: IMPACT_RADIUS_LAYER_ID,
-        type: "circle",
-        source: IMPACT_SOURCE_ID,
+        id: IMPACT_RADIUS_FILL_ID,
+        type: "fill",
+        source: IMPACT_RADIUS_SOURCE_ID,
         paint: {
-          "circle-radius": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            0,
-            ["*", ["get", "diameter"], 0.08],
-            4,
-            ["*", ["get", "diameter"], 0.2],
-            8,
-            ["*", ["get", "diameter"], 0.6],
-            12,
-            ["*", ["get", "diameter"], 1.5],
-          ],
-          "circle-color": "rgba(239,68,68,0.10)",
-          "circle-stroke-color": "rgba(239,68,68,0.55)",
-          "circle-stroke-width": 2,
+          "fill-color": "#ef4444",
+          "fill-opacity": 0.12,
+        },
+      });
+    }
+
+    if (!map.getLayer(IMPACT_RADIUS_LINE_ID)) {
+      map.addLayer({
+        id: IMPACT_RADIUS_LINE_ID,
+        type: "line",
+        source: IMPACT_RADIUS_SOURCE_ID,
+        paint: {
+          "line-color": "rgba(239,68,68,0.6)",
+          "line-width": 2,
         },
       });
     }
@@ -192,25 +238,38 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
-    const source = map.getSource(IMPACT_SOURCE_ID);
-    if (!source) return;
+    const pointSource = map.getSource(IMPACT_SOURCE_ID);
+    if (pointSource) {
+      pointSource.setData({
+        type: "FeatureCollection",
+        features: [],
+      });
+    }
 
-    source.setData({
-      type: "FeatureCollection",
-      features: [],
-    });
+    const radiusSource = map.getSource(IMPACT_RADIUS_SOURCE_ID);
+    if (radiusSource) {
+      radiusSource.setData({
+        type: "FeatureCollection",
+        features: [],
+      });
+    }
   };
 
-  const setImpactPointOnMap = (point, diameterValue = impactDiameterRef.current) => {
+  const setImpactPointOnMap = (
+    point,
+    diameterValue = impactDiameterRef.current
+  ) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded() || !point) return;
 
     ensureImpactLayers();
 
-    const source = map.getSource(IMPACT_SOURCE_ID);
-    if (!source) return;
+    const pointSource = map.getSource(IMPACT_SOURCE_ID);
+    const radiusSource = map.getSource(IMPACT_RADIUS_SOURCE_ID);
 
-    source.setData({
+    if (!pointSource || !radiusSource) return;
+
+    pointSource.setData({
       type: "FeatureCollection",
       features: [
         {
@@ -225,12 +284,27 @@ export default function HomePage() {
         },
       ],
     });
+
+    const previewRadiusMeters = diameterValue * 20;
+
+    radiusSource.setData({
+      type: "FeatureCollection",
+      features: [
+        createGeodesicCircle(
+          point.lng,
+          point.lat,
+          previewRadiusMeters
+        ),
+      ],
+    });
   };
 
   const fetchElevation = async (lat, lng) => {
     try {
       const res = await fetch(
-        `${FLOOD_ENGINE}/elevation?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`
+        `${FLOOD_ENGINE}/elevation?lat=${encodeURIComponent(
+          lat
+        )}&lng=${encodeURIComponent(lng)}`
       );
 
       if (!res.ok) {
@@ -256,7 +330,10 @@ export default function HomePage() {
     }
 
     if (scenarioModeRef.current === "impact" && impactPointRef.current) {
-      setImpactPointOnMap(impactPointRef.current, impactDiameterRef.current);
+      setImpactPointOnMap(
+        impactPointRef.current,
+        impactDiameterRef.current
+      );
     } else {
       clearImpactPointOnMap();
     }
@@ -471,7 +548,9 @@ export default function HomePage() {
           overflowY: "auto",
         }}
       >
-        <h1 style={{ margin: "8px 0 24px 0", fontSize: 22 }}>Floodmap V1</h1>
+        <h1 style={{ margin: "8px 0 24px 0", fontSize: 22 }}>
+          Floodmap V1
+        </h1>
 
         <div style={{ fontSize: 14, color: "#666", marginBottom: 24 }}>
           Python tile flood engine
@@ -647,7 +726,9 @@ export default function HomePage() {
               max="1000"
               step="10"
               value={impactDiameter}
-              onChange={(e) => setImpactDiameter(clampImpactDiameter(e.target.value))}
+              onChange={(e) =>
+                setImpactDiameter(clampImpactDiameter(e.target.value))
+              }
               style={{
                 width: "100%",
                 marginBottom: 10,
@@ -660,7 +741,9 @@ export default function HomePage() {
               max="1000"
               step="10"
               value={impactDiameter}
-              onChange={(e) => setImpactDiameter(clampImpactDiameter(e.target.value))}
+              onChange={(e) =>
+                setImpactDiameter(clampImpactDiameter(e.target.value))
+              }
               style={{
                 width: "100%",
                 padding: 10,
