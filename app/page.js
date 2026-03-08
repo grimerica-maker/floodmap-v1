@@ -6,8 +6,13 @@ import mapboxgl from "mapbox-gl";
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
 const FLOOD_ENGINE = "https://flood-engine.onrender.com";
+
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
+
+const IMPACT_SOURCE_ID = "impact-point-source";
+const IMPACT_RING_LAYER_ID = "impact-point-ring-layer";
+const IMPACT_LAYER_ID = "impact-point-layer";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -21,10 +26,11 @@ export default function HomePage() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const hoverTimerRef = useRef(null);
-  const impactMarkerRef = useRef(null);
+
   const scenarioModeRef = useRef("flood");
   const impactPointRef = useRef(null);
   const seaLevelRef = useRef(0);
+  const viewModeRef = useRef("map");
 
   const [inputLevel, setInputLevel] = useState(0);
   const [seaLevel, setSeaLevel] = useState(0);
@@ -51,6 +57,10 @@ export default function HomePage() {
     seaLevelRef.current = seaLevel;
   }, [seaLevel]);
 
+  useEffect(() => {
+    viewModeRef.current = viewMode;
+  }, [viewMode]);
+
   const waterDifference =
     hoverElevation !== null
       ? Number((hoverElevation - seaLevel).toFixed(2))
@@ -64,7 +74,7 @@ export default function HomePage() {
 
   const removeFloodLayer = () => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !map.isStyleLoaded()) return;
 
     if (map.getLayer(FLOOD_LAYER_ID)) {
       map.removeLayer(FLOOD_LAYER_ID);
@@ -77,8 +87,7 @@ export default function HomePage() {
 
   const addFloodLayer = (level) => {
     const map = mapRef.current;
-    if (!map) return;
-    if (!map.isStyleLoaded()) return;
+    if (!map || !map.isStyleLoaded()) return;
 
     removeFloodLayer();
 
@@ -99,42 +108,89 @@ export default function HomePage() {
     });
   };
 
-  const removeImpactMarker = () => {
-    if (impactMarkerRef.current) {
-      impactMarkerRef.current.remove();
-      impactMarkerRef.current = null;
+  const ensureImpactLayers = () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (!map.getSource(IMPACT_SOURCE_ID)) {
+      map.addSource(IMPACT_SOURCE_ID, {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features: [],
+        },
+      });
+    }
+
+    if (!map.getLayer(IMPACT_RING_LAYER_ID)) {
+      map.addLayer({
+        id: IMPACT_RING_LAYER_ID,
+        type: "circle",
+        source: IMPACT_SOURCE_ID,
+        paint: {
+          "circle-radius": 14,
+          "circle-color": "rgba(239,68,68,0.22)",
+          "circle-stroke-width": 0,
+        },
+      });
+    }
+
+    if (!map.getLayer(IMPACT_LAYER_ID)) {
+      map.addLayer({
+        id: IMPACT_LAYER_ID,
+        type: "circle",
+        source: IMPACT_SOURCE_ID,
+        paint: {
+          "circle-radius": 7,
+          "circle-color": "#ef4444",
+          "circle-stroke-width": 3,
+          "circle-stroke-color": "#ffffff",
+        },
+      });
     }
   };
 
-  const addOrUpdateImpactMarker = (point) => {
+  const clearImpactPointOnMap = () => {
     const map = mapRef.current;
-    if (!map || !point) return;
+    if (!map || !map.isStyleLoaded()) return;
 
-    if (!impactMarkerRef.current) {
-      const el = document.createElement("div");
-      el.style.width = "18px";
-      el.style.height = "18px";
-      el.style.borderRadius = "50%";
-      el.style.background = "#ef4444";
-      el.style.border = "3px solid white";
-      el.style.boxShadow = "0 0 0 6px rgba(239,68,68,0.25)";
+    const source = map.getSource(IMPACT_SOURCE_ID);
+    if (!source) return;
 
-      impactMarkerRef.current = new mapboxgl.Marker(el)
-        .setLngLat([point.lng, point.lat])
-        .addTo(map);
+    source.setData({
+      type: "FeatureCollection",
+      features: [],
+    });
+  };
 
-      return;
-    }
+  const setImpactPointOnMap = (point) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || !point) return;
 
-    impactMarkerRef.current.setLngLat([point.lng, point.lat]);
+    ensureImpactLayers();
+
+    const source = map.getSource(IMPACT_SOURCE_ID);
+    if (!source) return;
+
+    source.setData({
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [point.lng, point.lat],
+          },
+          properties: {},
+        },
+      ],
+    });
   };
 
   const fetchElevation = async (lat, lng) => {
     try {
       const res = await fetch(
-        `${FLOOD_ENGINE}/elevation?lat=${encodeURIComponent(
-          lat
-        )}&lng=${encodeURIComponent(lng)}`
+        `${FLOOD_ENGINE}/elevation?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`
       );
 
       if (!res.ok) {
@@ -144,7 +200,7 @@ export default function HomePage() {
 
       const data = await res.json();
       setHoverElevation(data.elevation_m);
-    } catch (err) {
+    } catch {
       setHoverElevation(null);
     }
   };
@@ -153,12 +209,16 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
-    if (viewMode === "map" && seaLevelRef.current !== 0) {
+    ensureImpactLayers();
+
+    if (viewModeRef.current === "map" && seaLevelRef.current !== 0) {
       addFloodLayer(seaLevelRef.current);
     }
 
     if (scenarioModeRef.current === "impact" && impactPointRef.current) {
-      addOrUpdateImpactMarker(impactPointRef.current);
+      setImpactPointOnMap(impactPointRef.current);
+    } else {
+      clearImpactPointOnMap();
     }
   };
 
@@ -166,22 +226,18 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map) return;
 
-    removeFloodLayer();
-
     if (mode === "globe") {
       map.setProjection("globe");
       map.setStyle("mapbox://styles/mapbox/streets-v12");
+      map.once("style.load", () => {
+        map.setFog({});
+        restoreMapOverlays();
+      });
       map.flyTo({
         center: [-70, 28],
         zoom: 2.6,
         essential: true,
       });
-
-      map.once("style.load", () => {
-        map.setFog({});
-        restoreMapOverlays();
-      });
-
       setStatus("Globe preview mode");
       return;
     }
@@ -189,40 +245,37 @@ export default function HomePage() {
     if (mode === "satellite") {
       map.setProjection("mercator");
       map.setStyle("mapbox://styles/mapbox/satellite-streets-v12");
+      map.once("style.load", () => {
+        restoreMapOverlays();
+      });
       map.flyTo({
         center: [-80.19, 25.76],
         zoom: 6.2,
         essential: true,
       });
-
-      map.once("style.load", () => {
-        restoreMapOverlays();
-      });
-
       setStatus("Satellite placeholder");
       return;
     }
 
     map.setProjection("mercator");
     map.setStyle("mapbox://styles/mapbox/streets-v12");
+    map.once("style.load", () => {
+      restoreMapOverlays();
+    });
     map.flyTo({
       center: [-80.19, 25.76],
       zoom: 6.2,
       essential: true,
     });
-
-    map.once("style.load", () => {
-      restoreMapOverlays();
-    });
-
     setStatus("Standard Map ready");
   };
 
   const executeFlood = () => {
     const level = clampLevel(inputLevel);
     setSeaLevel(level);
+    seaLevelRef.current = level;
 
-    if (viewMode !== "map") {
+    if (viewModeRef.current !== "map") {
       setStatus("Switch to Standard Map to run flood layer");
       return;
     }
@@ -246,7 +299,7 @@ export default function HomePage() {
     impactPointRef.current = null;
 
     removeFloodLayer();
-    removeImpactMarker();
+    clearImpactPointOnMap();
     setStatus("Flood cleared");
   };
 
@@ -273,6 +326,7 @@ export default function HomePage() {
     map.getCanvas().style.cursor = "crosshair";
 
     const handleLoad = () => {
+      ensureImpactLayers();
       setStatus("Map ready");
     };
 
@@ -308,7 +362,7 @@ export default function HomePage() {
 
       impactPointRef.current = point;
       setImpactPoint(point);
-      addOrUpdateImpactMarker(point);
+      setImpactPointOnMap(point);
       setStatus("Impact point selected");
     };
 
@@ -327,7 +381,6 @@ export default function HomePage() {
       map.off("mouseleave", handleMouseLeave);
       map.off("click", handleMapClick);
 
-      removeImpactMarker();
       map.remove();
       mapRef.current = null;
     };
@@ -339,13 +392,16 @@ export default function HomePage() {
   }, [viewMode]);
 
   useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
     if (scenarioMode !== "impact") {
-      removeImpactMarker();
+      clearImpactPointOnMap();
       return;
     }
 
     if (impactPointRef.current) {
-      addOrUpdateImpactMarker(impactPointRef.current);
+      setImpactPointOnMap(impactPointRef.current);
     }
   }, [scenarioMode]);
 
