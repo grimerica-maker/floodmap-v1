@@ -23,6 +23,8 @@ export default function HomePage() {
   const hoverTimerRef = useRef(null);
   const impactMarkerRef = useRef(null);
   const scenarioModeRef = useRef("flood");
+  const impactPointRef = useRef(null);
+  const seaLevelRef = useRef(0);
 
   const [inputLevel, setInputLevel] = useState(0);
   const [seaLevel, setSeaLevel] = useState(0);
@@ -40,6 +42,14 @@ export default function HomePage() {
   useEffect(() => {
     scenarioModeRef.current = scenarioMode;
   }, [scenarioMode]);
+
+  useEffect(() => {
+    impactPointRef.current = impactPoint;
+  }, [impactPoint]);
+
+  useEffect(() => {
+    seaLevelRef.current = seaLevel;
+  }, [seaLevel]);
 
   const waterDifference =
     hoverElevation !== null
@@ -68,6 +78,7 @@ export default function HomePage() {
   const addFloodLayer = (level) => {
     const map = mapRef.current;
     if (!map) return;
+    if (!map.isStyleLoaded()) return;
 
     removeFloodLayer();
 
@@ -99,19 +110,19 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map || !point) return;
 
-    removeImpactMarker();
+    if (!impactMarkerRef.current) {
+      const el = document.createElement("div");
+      el.style.width = "18px";
+      el.style.height = "18px";
+      el.style.borderRadius = "50%";
+      el.style.background = "#ef4444";
+      el.style.border = "3px solid white";
+      el.style.boxShadow = "0 0 0 6px rgba(239,68,68,0.25)";
 
-    const el = document.createElement("div");
-    el.style.width = "18px";
-    el.style.height = "18px";
-    el.style.borderRadius = "50%";
-    el.style.background = "#ef4444";
-    el.style.border = "3px solid white";
-    el.style.boxShadow = "0 0 0 6px rgba(239,68,68,0.25)";
+      impactMarkerRef.current = new mapboxgl.Marker(el).addTo(map);
+    }
 
-    impactMarkerRef.current = new mapboxgl.Marker(el)
-      .setLngLat([point.lng, point.lat])
-      .addTo(map);
+    impactMarkerRef.current.setLngLat([point.lng, point.lat]);
   };
 
   const fetchElevation = async (lat, lng) => {
@@ -126,6 +137,19 @@ export default function HomePage() {
       setHoverElevation(data.elevation_m);
     } catch (err) {
       setHoverElevation(null);
+    }
+  };
+
+  const restoreMapOverlays = () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (viewMode === "map" && seaLevelRef.current !== 0) {
+      addFloodLayer(seaLevelRef.current);
+    }
+
+    if (scenarioModeRef.current === "impact" && impactPointRef.current) {
+      addOrUpdateImpactMarker(impactPointRef.current);
     }
   };
 
@@ -146,9 +170,7 @@ export default function HomePage() {
 
       map.once("style.load", () => {
         map.setFog({});
-        if (impactPoint && scenarioMode === "impact") {
-          addOrUpdateImpactMarker(impactPoint);
-        }
+        restoreMapOverlays();
       });
 
       setStatus("Globe preview mode");
@@ -165,9 +187,7 @@ export default function HomePage() {
       });
 
       map.once("style.load", () => {
-        if (impactPoint && scenarioMode === "impact") {
-          addOrUpdateImpactMarker(impactPoint);
-        }
+        restoreMapOverlays();
       });
 
       setStatus("Satellite placeholder");
@@ -183,12 +203,7 @@ export default function HomePage() {
     });
 
     map.once("style.load", () => {
-      if (seaLevel !== 0) {
-        addFloodLayer(seaLevel);
-      }
-      if (impactPoint && scenarioMode === "impact") {
-        addOrUpdateImpactMarker(impactPoint);
-      }
+      restoreMapOverlays();
     });
 
     setStatus("Standard Map ready");
@@ -216,8 +231,9 @@ export default function HomePage() {
   const clearFlood = () => {
     setInputLevel(0);
     setSeaLevel(0);
-    removeFloodLayer();
     setImpactPoint(null);
+    impactPointRef.current = null;
+    removeFloodLayer();
     removeImpactMarker();
     setStatus("Flood cleared");
   };
@@ -239,15 +255,16 @@ export default function HomePage() {
       touchZoomRotate: true,
     });
 
-    map.addControl(new mapboxgl.NavigationControl(), "top-right");
+    mapRef.current = map;
 
+    map.addControl(new mapboxgl.NavigationControl(), "top-right");
     map.getCanvas().style.cursor = "crosshair";
 
-    map.on("load", () => {
+    const handleLoad = () => {
       setStatus("Map ready");
-    });
+    };
 
-    map.on("mousemove", (e) => {
+    const handleMouseMove = (e) => {
       const lat = Number(e.lngLat.lat.toFixed(5));
       const lng = Number(e.lngLat.lng.toFixed(5));
 
@@ -261,15 +278,15 @@ export default function HomePage() {
       hoverTimerRef.current = setTimeout(() => {
         fetchElevation(lat, lng);
       }, 120);
-    });
+    };
 
-    map.on("mouseleave", () => {
+    const handleMouseLeave = () => {
       setHoverLat(null);
       setHoverLng(null);
       setHoverElevation(null);
-    });
+    };
 
-    map.on("click", (e) => {
+    const handleMapClick = (e) => {
       if (scenarioModeRef.current !== "impact") return;
 
       const point = {
@@ -277,17 +294,27 @@ export default function HomePage() {
         lat: e.lngLat.lat,
       };
 
+      impactPointRef.current = point;
       setImpactPoint(point);
       addOrUpdateImpactMarker(point);
       setStatus("Impact point selected");
-    });
+    };
 
-    mapRef.current = map;
+    map.on("load", handleLoad);
+    map.on("mousemove", handleMouseMove);
+    map.on("mouseleave", handleMouseLeave);
+    map.on("click", handleMapClick);
 
     return () => {
       if (hoverTimerRef.current) {
         clearTimeout(hoverTimerRef.current);
       }
+
+      map.off("load", handleLoad);
+      map.off("mousemove", handleMouseMove);
+      map.off("mouseleave", handleMouseLeave);
+      map.off("click", handleMapClick);
+
       removeImpactMarker();
       map.remove();
       mapRef.current = null;
@@ -305,13 +332,20 @@ export default function HomePage() {
       return;
     }
 
-    if (impactPoint) {
-      addOrUpdateImpactMarker(impactPoint);
+    if (impactPointRef.current) {
+      addOrUpdateImpactMarker(impactPointRef.current);
     }
   }, [scenarioMode, impactPoint]);
 
   return (
-    <div style={{ width: "100%", height: "100vh", position: "relative", overflow: "hidden" }}>
+    <div
+      style={{
+        width: "100%",
+        height: "100vh",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
       <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
 
       <div
@@ -335,14 +369,21 @@ export default function HomePage() {
           Python tile flood engine
         </div>
 
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>SEA LEVEL</div>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
+          SEA LEVEL
+        </div>
 
         <div
           style={{
             fontSize: 18,
             fontWeight: 700,
             marginBottom: 12,
-            color: seaLevel > 0 ? "#0f62fe" : seaLevel < 0 ? "#b45309" : "#111827",
+            color:
+              seaLevel > 0
+                ? "#0f62fe"
+                : seaLevel < 0
+                  ? "#b45309"
+                  : "#111827",
           }}
         >
           {seaLevel > 0 ? "+" : ""}
@@ -398,13 +439,24 @@ export default function HomePage() {
           </button>
         </div>
 
-        <div style={{ fontSize: 14, marginBottom: 24 }}>Range: -5000m to +5000m</div>
+        <div style={{ fontSize: 14, marginBottom: 24 }}>
+          Range: -5000m to +5000m
+        </div>
 
         <hr style={{ margin: "0 0 18px 0" }} />
 
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>PRESETS</div>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>
+          PRESETS
+        </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 28 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 10,
+            marginBottom: 28,
+          }}
+        >
           {PRESETS.map((preset) => {
             const active = inputLevel === preset.value;
             return (
@@ -431,7 +483,9 @@ export default function HomePage() {
           })}
         </div>
 
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>SCENARIO MODE</div>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>
+          SCENARIO MODE
+        </div>
 
         <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
           <button
@@ -475,7 +529,9 @@ export default function HomePage() {
 
         {scenarioMode === "impact" && (
           <>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>IMPACT SIZE</div>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
+              IMPACT SIZE
+            </div>
 
             <input
               type="range"
@@ -496,7 +552,9 @@ export default function HomePage() {
           </>
         )}
 
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>VIEW MODE</div>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>
+          VIEW MODE
+        </div>
 
         <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
           <button
@@ -513,7 +571,9 @@ export default function HomePage() {
             }}
           >
             <div>Standard Map</div>
-            <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>Flood tiles active</div>
+            <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
+              Flood tiles active
+            </div>
           </button>
 
           <button
@@ -530,7 +590,9 @@ export default function HomePage() {
             }}
           >
             <div>Satellite View</div>
-            <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>Pro placeholder</div>
+            <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
+              Pro placeholder
+            </div>
           </button>
 
           <button
@@ -547,7 +609,9 @@ export default function HomePage() {
             }}
           >
             <div>Globe View</div>
-            <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>Preview</div>
+            <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
+              Preview
+            </div>
           </button>
         </div>
       </div>
@@ -567,7 +631,9 @@ export default function HomePage() {
           minWidth: 260,
         }}
       >
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>Current Scenario</div>
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>
+          Current Scenario
+        </div>
         <div>
           Sea level: {seaLevel > 0 ? "+" : ""}
           {seaLevel}m
@@ -585,7 +651,9 @@ export default function HomePage() {
         <div>Impact Size: {impactSize}</div>
         <div>
           Impact Point:{" "}
-          {impactPoint ? `${impactPoint.lng.toFixed(3)}, ${impactPoint.lat.toFixed(3)}` : "--"}
+          {impactPoint
+            ? `${impactPoint.lng.toFixed(3)}, ${impactPoint.lat.toFixed(3)}`
+            : "--"}
         </div>
 
         <hr style={{ margin: "10px 0", opacity: 0.25 }} />
