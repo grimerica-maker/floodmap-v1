@@ -32,6 +32,7 @@ export default function HomePage() {
   const impactPointRef = useRef(null);
   const seaLevelRef = useRef(0);
   const viewModeRef = useRef("map");
+  const impactDiameterRef = useRef(100);
 
   const [inputLevel, setInputLevel] = useState(0);
   const [seaLevel, setSeaLevel] = useState(0);
@@ -39,7 +40,7 @@ export default function HomePage() {
   const [status, setStatus] = useState("Loading map...");
   const [scenarioMode, setScenarioMode] = useState("flood");
 
-  const [impactSize, setImpactSize] = useState(10);
+  const [impactDiameter, setImpactDiameter] = useState(100);
   const [impactPoint, setImpactPoint] = useState(null);
 
   const [hoverLat, setHoverLat] = useState(null);
@@ -62,6 +63,10 @@ export default function HomePage() {
     viewModeRef.current = viewMode;
   }, [viewMode]);
 
+  useEffect(() => {
+    impactDiameterRef.current = impactDiameter;
+  }, [impactDiameter]);
+
   const waterDifference =
     hoverElevation !== null
       ? Number((hoverElevation - seaLevel).toFixed(2))
@@ -71,6 +76,12 @@ export default function HomePage() {
     const parsed = parseInt(value, 10);
     if (Number.isNaN(parsed)) return 0;
     return Math.max(-5000, Math.min(5000, parsed));
+  };
+
+  const clampImpactDiameter = (value) => {
+    const parsed = parseInt(value, 10);
+    if (Number.isNaN(parsed)) return 10;
+    return Math.max(10, Math.min(1000, parsed));
   };
 
   const removeFloodLayer = () => {
@@ -134,13 +145,13 @@ export default function HomePage() {
             ["linear"],
             ["zoom"],
             0,
-            ["*", ["get", "size"], 1.2],
+            ["*", ["get", "diameter"], 0.08],
             4,
-            ["*", ["get", "size"], 3],
+            ["*", ["get", "diameter"], 0.2],
             8,
-            ["*", ["get", "size"], 8],
+            ["*", ["get", "diameter"], 0.6],
             12,
-            ["*", ["get", "size"], 18],
+            ["*", ["get", "diameter"], 1.5],
           ],
           "circle-color": "rgba(239,68,68,0.10)",
           "circle-stroke-color": "rgba(239,68,68,0.55)",
@@ -190,7 +201,7 @@ export default function HomePage() {
     });
   };
 
-  const setImpactPointOnMap = (point, sizeValue = impactSize) => {
+  const setImpactPointOnMap = (point, diameterValue = impactDiameterRef.current) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded() || !point) return;
 
@@ -209,7 +220,7 @@ export default function HomePage() {
             coordinates: [point.lng, point.lat],
           },
           properties: {
-            size: sizeValue,
+            diameter: diameterValue,
           },
         },
       ],
@@ -245,7 +256,7 @@ export default function HomePage() {
     }
 
     if (scenarioModeRef.current === "impact" && impactPointRef.current) {
-      setImpactPointOnMap(impactPointRef.current, impactSize);
+      setImpactPointOnMap(impactPointRef.current, impactDiameterRef.current);
     } else {
       clearImpactPointOnMap();
     }
@@ -391,7 +402,7 @@ export default function HomePage() {
 
       impactPointRef.current = point;
       setImpactPoint(point);
-      setImpactPointOnMap(point, impactSize);
+      setImpactPointOnMap(point, impactDiameterRef.current);
       setStatus("Impact point selected");
     };
 
@@ -413,7 +424,7 @@ export default function HomePage() {
       map.remove();
       mapRef.current = null;
     };
-  }, [impactSize]);
+  }, []);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -430,9 +441,9 @@ export default function HomePage() {
     }
 
     if (impactPointRef.current) {
-      setImpactPointOnMap(impactPointRef.current, impactSize);
+      setImpactPointOnMap(impactPointRef.current, impactDiameter);
     }
-  }, [scenarioMode, impactSize]);
+  }, [scenarioMode, impactDiameter]);
 
   return (
     <div
@@ -627,24 +638,41 @@ export default function HomePage() {
         {scenarioMode === "impact" && (
           <>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
-              IMPACT SIZE
+              ASTEROID DIAMETER
             </div>
 
             <input
               type="range"
-              min="1"
-              max="100"
-              step="1"
-              value={impactSize}
-              onChange={(e) => setImpactSize(Number(e.target.value))}
+              min="10"
+              max="1000"
+              step="10"
+              value={impactDiameter}
+              onChange={(e) => setImpactDiameter(clampImpactDiameter(e.target.value))}
               style={{
                 width: "100%",
-                marginBottom: 8,
+                marginBottom: 10,
+              }}
+            />
+
+            <input
+              type="number"
+              min="10"
+              max="1000"
+              step="10"
+              value={impactDiameter}
+              onChange={(e) => setImpactDiameter(clampImpactDiameter(e.target.value))}
+              style={{
+                width: "100%",
+                padding: 10,
+                fontSize: 16,
+                border: "1px solid #ccc",
+                marginBottom: 10,
+                boxSizing: "border-box",
               }}
             />
 
             <div style={{ fontSize: 14, marginBottom: 24 }}>
-              Size: {impactSize}
+              Diameter: {impactDiameter} m across
             </div>
           </>
         )}
@@ -745,7 +773,7 @@ export default function HomePage() {
         </div>
         <div>Status: {status}</div>
         <div>Scenario Mode: {scenarioMode}</div>
-        <div>Impact Size: {impactSize}</div>
+        <div>Asteroid Diameter: {impactDiameter} m</div>
         <div>
           Impact Point:{" "}
           {impactPoint
