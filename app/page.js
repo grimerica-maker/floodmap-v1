@@ -413,6 +413,29 @@ export default function HomePage() {
           </button>
         </div>
 
+        {scenarioMode === "impact" && (
+          <>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>IMPACT SIZE</div>
+
+            <input
+              type="range"
+              min="1"
+              max="100"
+              step="1"
+              value={impactSize}
+              onChange={(e) => setImpactSize(Number(e.target.value))}
+              style={{
+                width: "100%",
+                marginBottom: 8,
+              }}
+            />
+
+            <div style={{ fontSize: 14, marginBottom: 24 }}>
+              Size: {impactSize}
+            </div>
+          </>
+        )}
+
         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>VIEW MODE</div>
 
         <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
