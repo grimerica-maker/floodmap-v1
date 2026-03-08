@@ -119,7 +119,11 @@ export default function HomePage() {
       el.style.border = "3px solid white";
       el.style.boxShadow = "0 0 0 6px rgba(239,68,68,0.25)";
 
-      impactMarkerRef.current = new mapboxgl.Marker(el).addTo(map);
+      impactMarkerRef.current = new mapboxgl.Marker(el)
+        .setLngLat([point.lng, point.lat])
+        .addTo(map);
+
+      return;
     }
 
     impactMarkerRef.current.setLngLat([point.lng, point.lat]);
@@ -128,10 +132,15 @@ export default function HomePage() {
   const fetchElevation = async (lat, lng) => {
     try {
       const res = await fetch(
-        `${FLOOD_ENGINE}/elevation?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`
+        `${FLOOD_ENGINE}/elevation?lat=${encodeURIComponent(
+          lat
+        )}&lng=${encodeURIComponent(lng)}`
       );
 
-      if (!res.ok) return;
+      if (!res.ok) {
+        setHoverElevation(null);
+        return;
+      }
 
       const data = await res.json();
       setHoverElevation(data.elevation_m);
@@ -231,8 +240,11 @@ export default function HomePage() {
   const clearFlood = () => {
     setInputLevel(0);
     setSeaLevel(0);
+    seaLevelRef.current = 0;
+
     setImpactPoint(null);
     impactPointRef.current = null;
+
     removeFloodLayer();
     removeImpactMarker();
     setStatus("Flood cleared");
@@ -335,7 +347,7 @@ export default function HomePage() {
     if (impactPointRef.current) {
       addOrUpdateImpactMarker(impactPointRef.current);
     }
-  }, [scenarioMode, impactPoint]);
+  }, [scenarioMode]);
 
   return (
     <div
@@ -662,7 +674,8 @@ export default function HomePage() {
         <div>Lat: {hoverLat ?? "--"}</div>
         <div>Lng: {hoverLng ?? "--"}</div>
         <div>
-          Original Elevation: {hoverElevation !== null ? `${hoverElevation} m` : "--"}
+          Original Elevation:{" "}
+          {hoverElevation !== null ? `${hoverElevation} m` : "--"}
         </div>
         <div>
           Sea Level: {seaLevel > 0 ? "+" : ""}
