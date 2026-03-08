@@ -360,36 +360,44 @@ export default function HomePage() {
     }
   };
 
-  const restoreMapOverlays = () => {
+  const syncScenarioLayers = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
-    ensureImpactLayers();
+    if (scenarioModeRef.current === "flood") {
+      removeImpactFloodLayer();
+      clearImpactPointOnMap();
 
-    if (viewModeRef.current === "map" && seaLevelRef.current !== 0) {
-      addFloodLayer(seaLevelRef.current);
-    } else {
-      removeFloodLayer();
+      if (viewModeRef.current === "map" && seaLevelRef.current !== 0) {
+        addFloodLayer(seaLevelRef.current);
+      } else {
+        removeFloodLayer();
+      }
+
+      return;
     }
 
-    if (
-      scenarioModeRef.current === "impact" &&
-      impactPointRef.current
-    ) {
+    removeFloodLayer();
+
+    if (impactPointRef.current) {
       setImpactPointOnMap(impactPointRef.current, impactDiameterRef.current);
     } else {
       clearImpactPointOnMap();
     }
 
-    if (
-      scenarioModeRef.current === "impact" &&
-      executedImpactRef.current &&
-      viewModeRef.current === "map"
-    ) {
+    if (executedImpactRef.current && viewModeRef.current === "map") {
       addImpactFloodLayer(executedImpactRef.current);
     } else {
       removeImpactFloodLayer();
     }
+  };
+
+  const restoreMapOverlays = () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    ensureImpactLayers();
+    syncScenarioLayers();
   };
 
   const setMapStyleForMode = (mode) => {
@@ -460,13 +468,21 @@ export default function HomePage() {
 
   const executeFlood = () => {
     const level = clampLevel(inputLevel);
+
+    setScenarioMode("flood");
+    scenarioModeRef.current = "flood";
+
     setSeaLevel(level);
     seaLevelRef.current = level;
 
     if (viewModeRef.current !== "map") {
+      removeFloodLayer();
       setStatus("Switch to Standard Map to run flood layer");
       return;
     }
+
+    removeImpactFloodLayer();
+    clearImpactPointOnMap();
 
     if (level === 0) {
       removeFloodLayer();
@@ -484,6 +500,9 @@ export default function HomePage() {
       return;
     }
 
+    setScenarioMode("impact");
+    scenarioModeRef.current = "impact";
+
     const run = {
       lat: impactPointRef.current.lat,
       lng: impactPointRef.current.lng,
@@ -493,6 +512,8 @@ export default function HomePage() {
 
     setExecutedImpact(run);
     executedImpactRef.current = run;
+
+    removeFloodLayer();
 
     if (viewModeRef.current === "map") {
       addImpactFloodLayer(run);
@@ -579,7 +600,7 @@ export default function HomePage() {
       impactPointRef.current = point;
       setImpactPoint(point);
       setImpactPointOnMap(point, impactDiameterRef.current);
-      setStatus("Impact point selected");
+      setStatus("Impact point selected — click Execute Impact");
     };
 
     map.on("load", handleLoad);
@@ -611,31 +632,35 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
-    if (scenarioMode !== "impact") {
-      removeImpactFloodLayer();
-      clearImpactPointOnMap();
+    syncScenarioLayers();
+
+    if (scenarioMode === "impact") {
+      if (executedImpactRef.current) {
+        setStatus(
+          viewMode === "map"
+            ? "Impact result loaded"
+            : "Impact saved — switch to Standard Map to view flood extent"
+        );
+      } else if (impactPointRef.current) {
+        setStatus("Impact point selected — click Execute Impact");
+      } else {
+        setStatus("Click map to place impact point");
+      }
       return;
     }
 
-    if (impactPointRef.current) {
-      setImpactPointOnMap(impactPointRef.current, impactDiameter);
+    if (viewMode !== "map") {
+      setStatus("Switch to Standard Map to run flood layer");
+      return;
     }
 
-    if (executedImpactRef.current && viewMode === "map") {
-      addImpactFloodLayer(executedImpactRef.current);
-      setStatus("Impact result loaded");
-    } else if (executedImpactRef.current) {
-      removeImpactFloodLayer();
-      setStatus("Impact saved — switch to Standard Map to view flood extent");
-    } else {
-      removeImpactFloodLayer();
-      setStatus(
-        impactPointRef.current
-          ? "Impact point selected — click Execute Impact"
-          : "Click map to place impact point"
-      );
+    if (seaLevel === 0) {
+      setStatus("Flood cleared");
+      return;
     }
-  }, [scenarioMode, impactDiameter, viewMode]);
+
+    setStatus(`Flood tiles loaded at ${seaLevel > 0 ? "+" : ""}${seaLevel}m`);
+  }, [scenarioMode, impactDiameter, viewMode, seaLevel, executedImpact]);
 
   return (
     <div
