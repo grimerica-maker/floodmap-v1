@@ -430,6 +430,8 @@ export default function HomePage() {
   };
 
   const executeFlood = () => {
+    alert("Execute Flood clicked");
+
     const level = clampLevel(inputLevel);
     console.log("Execute Flood clicked", {
       inputLevel,
@@ -645,9 +647,21 @@ export default function HomePage() {
         overflow: "hidden",
       }}
     >
-      <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
+      <div
+        ref={mapContainer}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          zIndex: 0,
+        }}
+      />
 
       <div
+        onMouseDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
         style={{
           position: "absolute",
           top: 0,
@@ -658,8 +672,9 @@ export default function HomePage() {
           borderRight: "1px solid #e5e7eb",
           padding: 16,
           fontFamily: "Arial, sans-serif",
-          zIndex: 10,
+          zIndex: 1000,
           overflowY: "auto",
+          pointerEvents: "auto",
         }}
       >
         <h1 style={{ margin: "8px 0 24px 0", fontSize: 22 }}>Floodmap V1</h1>
@@ -761,7 +776,10 @@ export default function HomePage() {
             return (
               <button
                 key={preset.label}
-                onClick={() => setInputLevel(preset.value)}
+                onClick={() => {
+                  alert(`Preset clicked: ${preset.label}`);
+                  setInputLevel(preset.value);
+                }}
                 style={{
                   padding: "12px 10px",
                   border: "1px solid #d1d5db",
@@ -964,7 +982,7 @@ export default function HomePage() {
           borderRadius: 12,
           fontSize: 14,
           lineHeight: 1.45,
-          zIndex: 10,
+          zIndex: 1000,
           minWidth: 260,
         }}
       >
