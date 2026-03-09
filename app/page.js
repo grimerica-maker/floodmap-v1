@@ -5,10 +5,9 @@ import mapboxgl from "mapbox-gl";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-// For production, set NEXT_PUBLIC_FLOOD_ENGINE to your backend URL.
-// Temporary direct VPS URL:
+// Use the Vercel rewrite path by default so requests stay on HTTPS.
 const FLOOD_ENGINE =
-  process.env.NEXT_PUBLIC_FLOOD_ENGINE || "http://137.184.86.1:8000";
+  process.env.NEXT_PUBLIC_FLOOD_ENGINE || "/engine";
 
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
