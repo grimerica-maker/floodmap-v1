@@ -6,6 +6,7 @@ import mapboxgl from "mapbox-gl";
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
 const FLOOD_ENGINE = "/engine";
+const DEBUG_FLOOD = true;
 
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
@@ -65,6 +66,7 @@ export default function HomePage() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const hoverTimerRef = useRef(null);
+  const debugListenersAddedRef = useRef(false);
 
   const scenarioModeRef = useRef("flood");
   const impactPointRef = useRef(null);
@@ -143,16 +145,21 @@ export default function HomePage() {
 
   const addFloodLayer = (level) => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !map.isStyleLoaded()) {
+      console.log("Flood layer skipped: map not ready");
+      return;
+    }
 
     removeFloodLayer();
 
     const tileUrl = `${FLOOD_ENGINE}/flood/${level}/{z}/{x}/{y}.png?t=${Date.now()}`;
+    console.log("Adding flood layer:", tileUrl);
 
     map.addSource(FLOOD_SOURCE_ID, {
       type: "raster",
       tiles: [tileUrl],
       tileSize: 256,
+      scheme: "xyz",
     });
 
     map.addLayer({
@@ -160,7 +167,7 @@ export default function HomePage() {
       type: "raster",
       source: FLOOD_SOURCE_ID,
       paint: {
-        "raster-opacity": 0.82,
+        "raster-opacity": 0.95,
         "raster-fade-duration": 0,
       },
     });
@@ -424,6 +431,11 @@ export default function HomePage() {
 
   const executeFlood = () => {
     const level = clampLevel(inputLevel);
+    console.log("Execute Flood clicked", {
+      inputLevel,
+      level,
+      viewMode: viewModeRef.current,
+    });
 
     setScenarioMode("flood");
     scenarioModeRef.current = "flood";
@@ -513,6 +525,20 @@ export default function HomePage() {
 
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
     map.getCanvas().style.cursor = "crosshair";
+
+    if (DEBUG_FLOOD && !debugListenersAddedRef.current) {
+      debugListenersAddedRef.current = true;
+
+      map.on("sourcedata", (e) => {
+        if (e.sourceId === FLOOD_SOURCE_ID) {
+          console.log("Flood source event:", e);
+        }
+      });
+
+      map.on("error", (e) => {
+        console.log("Mapbox error:", e);
+      });
+    }
 
     const handleLoad = () => {
       ensureImpactLayers();
