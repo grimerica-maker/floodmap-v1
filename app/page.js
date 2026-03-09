@@ -5,7 +5,10 @@ import mapboxgl from "mapbox-gl";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-const FLOOD_ENGINE = "https://flood-engine.onrender.com";
+// For production, set NEXT_PUBLIC_FLOOD_ENGINE to your backend URL.
+// Temporary direct VPS URL:
+const FLOOD_ENGINE =
+  process.env.NEXT_PUBLIC_FLOOD_ENGINE || "http://137.184.86.1:8000";
 
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
@@ -345,7 +348,9 @@ export default function HomePage() {
   const fetchElevation = async (lat, lng) => {
     try {
       const res = await fetch(
-        `${FLOOD_ENGINE}/elevation?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`
+        `${FLOOD_ENGINE}/elevation?lat=${encodeURIComponent(
+          lat
+        )}&lng=${encodeURIComponent(lng)}`
       );
 
       if (!res.ok) {
@@ -1006,8 +1011,8 @@ export default function HomePage() {
           {viewMode === "map"
             ? "Standard Map"
             : viewMode === "satellite"
-              ? "Satellite"
-              : "Globe"}
+            ? "Satellite"
+            : "Globe"}
         </div>
         <div>Status: {status}</div>
         <div>Scenario Mode: {scenarioMode}</div>
@@ -1021,7 +1026,9 @@ export default function HomePage() {
         <div>
           Executed Impact:{" "}
           {executedImpact
-            ? `${executedImpact.lng.toFixed(3)}, ${executedImpact.lat.toFixed(3)} @ ${executedImpact.diameter}m`
+            ? `${executedImpact.lng.toFixed(3)}, ${executedImpact.lat.toFixed(
+                3
+              )} @ ${executedImpact.diameter}m`
             : "--"}
         </div>
 
