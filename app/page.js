@@ -6,14 +6,10 @@ import mapboxgl from "mapbox-gl";
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
 // Use the Vercel rewrite path by default so requests stay on HTTPS.
-const FLOOD_ENGINE =
-  process.env.NEXT_PUBLIC_FLOOD_ENGINE || "/engine";
+const FLOOD_ENGINE = process.env.NEXT_PUBLIC_FLOOD_ENGINE || "/engine";
 
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
-
-const IMPACT_FLOOD_SOURCE_ID = "impact-flood-source";
-const IMPACT_FLOOD_LAYER_ID = "impact-flood-layer";
 
 const IMPACT_SOURCE_ID = "impact-point-source";
 const IMPACT_RADIUS_SOURCE_ID = "impact-radius-source";
@@ -162,44 +158,6 @@ export default function HomePage() {
       id: FLOOD_LAYER_ID,
       type: "raster",
       source: FLOOD_SOURCE_ID,
-      paint: {
-        "raster-opacity": 0.82,
-        "raster-fade-duration": 0,
-      },
-    });
-  };
-
-  const removeImpactFloodLayer = () => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-
-    if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) {
-      map.removeLayer(IMPACT_FLOOD_LAYER_ID);
-    }
-
-    if (map.getSource(IMPACT_FLOOD_SOURCE_ID)) {
-      map.removeSource(IMPACT_FLOOD_SOURCE_ID);
-    }
-  };
-
-  const addImpactFloodLayer = ({ lat, lng, diameter, runId }) => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-
-    removeImpactFloodLayer();
-
-    map.addSource(IMPACT_FLOOD_SOURCE_ID, {
-      type: "raster",
-      tiles: [
-        `${FLOOD_ENGINE}/impact-flood/${lat}/${lng}/${diameter}/{z}/{x}/{y}.png?run=${runId}`,
-      ],
-      tileSize: 256,
-    });
-
-    map.addLayer({
-      id: IMPACT_FLOOD_LAYER_ID,
-      type: "raster",
-      source: IMPACT_FLOOD_SOURCE_ID,
       paint: {
         "raster-opacity": 0.82,
         "raster-fade-duration": 0,
@@ -369,7 +327,6 @@ export default function HomePage() {
     if (!map || !map.isStyleLoaded()) return;
 
     if (scenarioModeRef.current === "flood") {
-      removeImpactFloodLayer();
       clearImpactPointOnMap();
 
       if (viewModeRef.current === "map" && seaLevelRef.current !== 0) {
@@ -387,12 +344,6 @@ export default function HomePage() {
       setImpactPointOnMap(impactPointRef.current, impactDiameterRef.current);
     } else {
       clearImpactPointOnMap();
-    }
-
-    if (executedImpactRef.current && viewModeRef.current === "map") {
-      addImpactFloodLayer(executedImpactRef.current);
-    } else {
-      removeImpactFloodLayer();
     }
   };
 
@@ -423,7 +374,7 @@ export default function HomePage() {
       setStatus(
         scenarioModeRef.current === "impact"
           ? executedImpactRef.current
-            ? "Impact result loaded"
+            ? "Impact saved"
             : "Click map to place impact point"
           : "Globe preview mode"
       );
@@ -444,7 +395,7 @@ export default function HomePage() {
       setStatus(
         scenarioModeRef.current === "impact"
           ? executedImpactRef.current
-            ? "Impact result loaded"
+            ? "Impact saved"
             : "Click map to place impact point"
           : "Satellite placeholder"
       );
@@ -464,7 +415,7 @@ export default function HomePage() {
     setStatus(
       scenarioModeRef.current === "impact"
         ? executedImpactRef.current
-          ? "Impact result loaded"
+          ? "Impact saved"
           : "Click map to place impact point"
         : "Standard Map ready"
     );
@@ -479,13 +430,15 @@ export default function HomePage() {
     setSeaLevel(level);
     seaLevelRef.current = level;
 
+    setExecutedImpact(null);
+    executedImpactRef.current = null;
+
     if (viewModeRef.current !== "map") {
       removeFloodLayer();
       setStatus("Switch to Standard Map to run flood layer");
       return;
     }
 
-    removeImpactFloodLayer();
     clearImpactPointOnMap();
 
     if (level === 0) {
@@ -518,13 +471,8 @@ export default function HomePage() {
     executedImpactRef.current = run;
 
     removeFloodLayer();
-
-    if (viewModeRef.current === "map") {
-      addImpactFloodLayer(run);
-      setStatus("Impact flood simulated");
-    } else {
-      setStatus("Impact saved — switch to Standard Map to view flood extent");
-    }
+    setImpactPointOnMap(impactPointRef.current, impactDiameterRef.current);
+    setStatus("Impact point saved (backend impact flood not connected yet)");
   };
 
   const clearFlood = () => {
@@ -539,7 +487,6 @@ export default function HomePage() {
     executedImpactRef.current = null;
 
     removeFloodLayer();
-    removeImpactFloodLayer();
     clearImpactPointOnMap();
     setStatus("Flood cleared");
   };
@@ -640,11 +587,7 @@ export default function HomePage() {
 
     if (scenarioMode === "impact") {
       if (executedImpactRef.current) {
-        setStatus(
-          viewMode === "map"
-            ? "Impact result loaded"
-            : "Impact saved — switch to Standard Map to view flood extent"
-        );
+        setStatus("Impact point saved (backend impact flood not connected yet)");
       } else if (impactPointRef.current) {
         setStatus("Impact point selected — click Execute Impact");
       } else {
@@ -711,8 +654,8 @@ export default function HomePage() {
               seaLevel > 0
                 ? "#0f62fe"
                 : seaLevel < 0
-                  ? "#b45309"
-                  : "#111827",
+                ? "#b45309"
+                : "#111827",
           }}
         >
           {seaLevel > 0 ? "+" : ""}
