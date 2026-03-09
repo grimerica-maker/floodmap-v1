@@ -5,8 +5,10 @@ import mapboxgl from "mapbox-gl";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-const FLOOD_ENGINE = "/engine";
+const FLOOD_ENGINE = "/api/engine";
 const DEBUG_FLOOD = true;
+const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
+const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-streets-v12";
 
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
@@ -150,27 +152,35 @@ export default function HomePage() {
       return;
     }
 
-    removeFloodLayer();
-
     const tileUrl = `${FLOOD_ENGINE}/flood/${level}/{z}/{x}/{y}.png?t=${Date.now()}`;
     console.log("Adding flood layer:", tileUrl);
 
-    map.addSource(FLOOD_SOURCE_ID, {
-      type: "raster",
-      tiles: [tileUrl],
-      tileSize: 256,
-      scheme: "xyz",
-    });
+    const existingSource = map.getSource(FLOOD_SOURCE_ID);
 
-    map.addLayer({
-      id: FLOOD_LAYER_ID,
-      type: "raster",
-      source: FLOOD_SOURCE_ID,
-      paint: {
-        "raster-opacity": 1,
-        "raster-fade-duration": 0,
-      },
-    });
+    if (existingSource && typeof existingSource.setTiles === "function") {
+      existingSource.setTiles([tileUrl]);
+    } else {
+      removeFloodLayer();
+
+      map.addSource(FLOOD_SOURCE_ID, {
+        type: "raster",
+        tiles: [tileUrl],
+        tileSize: 256,
+        scheme: "xyz",
+      });
+    }
+
+    if (!map.getLayer(FLOOD_LAYER_ID)) {
+      map.addLayer({
+        id: FLOOD_LAYER_ID,
+        type: "raster",
+        source: FLOOD_SOURCE_ID,
+        paint: {
+          "raster-opacity": 1,
+          "raster-fade-duration": 0,
+        },
+      });
+    }
   };
 
   const ensureImpactLayers = () => {
@@ -369,7 +379,7 @@ export default function HomePage() {
 
     if (mode === "globe") {
       map.setProjection("globe");
-      map.setStyle("mapbox://styles/mapbox/streets-v12");
+      map.setStyle(MAP_STYLE_URL);
       map.once("style.load", () => {
         map.setFog({});
         restoreMapOverlays();
@@ -391,7 +401,7 @@ export default function HomePage() {
 
     if (mode === "satellite") {
       map.setProjection("mercator");
-      map.setStyle("mapbox://styles/mapbox/satellite-streets-v12");
+      map.setStyle(SATELLITE_STYLE_URL);
       map.once("style.load", () => {
         restoreMapOverlays();
       });
@@ -411,7 +421,7 @@ export default function HomePage() {
     }
 
     map.setProjection("mercator");
-    map.setStyle("mapbox://styles/mapbox/streets-v12");
+    map.setStyle(MAP_STYLE_URL);
     map.once("style.load", () => {
       restoreMapOverlays();
     });
@@ -430,8 +440,6 @@ export default function HomePage() {
   };
 
   const executeFlood = () => {
-    alert("Execute Flood clicked");
-
     const level = clampLevel(inputLevel);
     console.log("Execute Flood clicked", {
       inputLevel,
@@ -777,7 +785,6 @@ export default function HomePage() {
               <button
                 key={preset.label}
                 onClick={() => {
-                  alert(`Preset clicked: ${preset.label}`);
                   setInputLevel(preset.value);
                 }}
                 style={{
