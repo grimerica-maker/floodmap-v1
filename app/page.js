@@ -5,7 +5,8 @@ import mapboxgl from "mapbox-gl";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-const FLOOD_ENGINE = "/api/engine";
+const FLOOD_ENGINE =
+  process.env.NEXT_PUBLIC_FLOOD_ENGINE_URL || "http://127.0.0.1:8000";
 const DEBUG_FLOOD = true;
 const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-streets-v12";
@@ -155,7 +156,14 @@ export default function HomePage() {
     const tileUrl = `${FLOOD_ENGINE}/flood/${level}/{z}/{x}/{y}.png?t=${Date.now()}`;
     console.log("Adding flood layer:", tileUrl);
 
-    const existingSource = map.getSource(FLOOD_SOURCE_ID);
+    removeFloodLayer();
+
+    map.addSource(FLOOD_SOURCE_ID, {
+      type: "raster",
+      tiles: [tileUrl],
+      tileSize: 256,
+      scheme: "xyz",
+    });
 
     if (existingSource && typeof existingSource.setTiles === "function") {
       existingSource.setTiles([tileUrl]);

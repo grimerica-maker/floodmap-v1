@@ -1,21 +1,18 @@
 # floodmap-v1
 
-## Local flood tile backend
+## Flood engine endpoint
 
-The app proxies flood engine requests through Next.js at:
+The frontend reads flood tiles and elevation from:
 
-- `/api/engine/*`
+- `NEXT_PUBLIC_FLOOD_ENGINE_URL` (default: `http://127.0.0.1:8000`)
 
-This avoids browser CORS issues and makes tile + elevation requests same-origin.
-
-By default, the proxy forwards to:
-
-- `http://127.0.0.1:8000`
-
-Override backend target with:
+Set it when starting Next.js if your engine is on a different host/port:
 
 ```bash
-FLOOD_ENGINE_BASE_URL=http://your-engine-host:8000
+NEXT_PUBLIC_FLOOD_ENGINE_URL=http://your-engine-host:8000 npm run dev
 ```
 
-Then start Next.js as usual (`npm run dev`).
+The expected backend paths are:
+
+- `/flood/{level}/{z}/{x}/{y}.png`
+- `/elevation?lat=...&lng=...`
