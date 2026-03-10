@@ -1,5 +1,7 @@
 const FLOOD_ENGINE_BASE_URL =
-  process.env.FLOOD_ENGINE_BASE_URL || "http://127.0.0.1:8000";
+  process.env.FLOOD_ENGINE_BASE_URL ||
+  process.env.NEXT_PUBLIC_FLOOD_ENGINE_URL ||
+  "http://137.184.86.1:8000";
 
 const buildTargetUrl = (pathParts, requestUrl) => {
   const base = FLOOD_ENGINE_BASE_URL.replace(/\/+$/, "");
