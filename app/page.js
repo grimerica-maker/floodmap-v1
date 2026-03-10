@@ -70,8 +70,9 @@ export default function HomePage() {
   const mapRef = useRef(null);
   const hoverTimerRef = useRef(null);
   const debugListenersAddedRef = useRef(false);
-  const floodRetryBoundRef = useRef(false);
   const hasAppliedInitialViewModeRef = useRef(false);
+  const mapReadyRef = useRef(false);
+  const pendingFloodLevelRef = useRef(null);
 
   const scenarioModeRef = useRef("flood");
   const impactPointRef = useRef(null);
@@ -197,26 +198,9 @@ export default function HomePage() {
       return false;
     }
 
-    if (!map.isStyleLoaded()) {
-      console.log("Flood layer deferred: map/style not ready");
-
-      if (!floodRetryBoundRef.current) {
-        floodRetryBoundRef.current = true;
-
-        const retry = () => {
-          floodRetryBoundRef.current = false;
-          if (
-            scenarioModeRef.current === "flood" &&
-            viewModeRef.current === "map" &&
-            seaLevelRef.current !== 0
-          ) {
-            addFloodLayer(seaLevelRef.current);
-          }
-        };
-
-        map.once("style.load", retry);
-      }
-
+    if (!mapReadyRef.current) {
+      console.log("Flood layer queued until map is ready");
+      pendingFloodLevelRef.current = level;
       return false;
     }
 
@@ -248,7 +232,18 @@ export default function HomePage() {
       },
     });
 
+    pendingFloodLevelRef.current = null;
     return true;
+  };
+
+  const flushPendingFloodLayer = () => {
+    if (
+      scenarioModeRef.current === "flood" &&
+      viewModeRef.current === "map" &&
+      pendingFloodLevelRef.current !== null
+    ) {
+      addFloodLayer(pendingFloodLevelRef.current);
+    }
   };
 
   const ensureImpactLayers = () => {
@@ -445,12 +440,16 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map) return;
 
+    mapReadyRef.current = false;
+
     if (mode === "globe") {
       map.setProjection("globe");
       map.setStyle(MAP_STYLE_URL);
       map.once("style.load", () => {
+        mapReadyRef.current = true;
         map.setFog({});
         restoreMapOverlays();
+        flushPendingFloodLayer();
       });
       map.flyTo({
         center: [-70, 28],
@@ -471,7 +470,9 @@ export default function HomePage() {
       map.setProjection("mercator");
       map.setStyle(SATELLITE_STYLE_URL);
       map.once("style.load", () => {
+        mapReadyRef.current = true;
         restoreMapOverlays();
+        flushPendingFloodLayer();
       });
       map.flyTo({
         center: [-80.19, 25.76],
@@ -491,7 +492,9 @@ export default function HomePage() {
     map.setProjection("mercator");
     map.setStyle(MAP_STYLE_URL);
     map.once("style.load", () => {
+      mapReadyRef.current = true;
       restoreMapOverlays();
+      flushPendingFloodLayer();
     });
     map.flyTo({
       center: [-80.19, 25.76],
@@ -534,10 +537,13 @@ export default function HomePage() {
     clearImpactPointOnMap();
 
     if (level === 0) {
+      pendingFloodLevelRef.current = null;
       removeFloodLayer();
       setStatus("Flood cleared");
       return;
     }
+
+    pendingFloodLevelRef.current = level;
 
     const added = addFloodLayer(level);
 
@@ -567,6 +573,7 @@ export default function HomePage() {
     setExecutedImpact(run);
     executedImpactRef.current = run;
 
+    pendingFloodLevelRef.current = null;
     removeFloodLayer();
     setImpactPointOnMap(impactPointRef.current, impactDiameterRef.current);
     setStatus("Impact point saved (backend impact flood not connected yet)");
@@ -583,6 +590,7 @@ export default function HomePage() {
     setExecutedImpact(null);
     executedImpactRef.current = null;
 
+    pendingFloodLevelRef.current = null;
     removeFloodLayer();
     clearImpactPointOnMap();
     setStatus("Flood cleared");
@@ -631,6 +639,7 @@ export default function HomePage() {
     }
 
     const handleLoad = () => {
+      mapReadyRef.current = true;
       ensureImpactLayers();
 
       fetch(`${floodEngineUrl}/`)
@@ -647,6 +656,8 @@ export default function HomePage() {
         })
         .then((d) => console.log("Engine health:", d))
         .catch((e) => console.error("Engine unreachable", e));
+
+      flushPendingFloodLayer();
 
       if (
         scenarioModeRef.current === "flood" &&
@@ -696,6 +707,20 @@ export default function HomePage() {
     };
 
     map.on("load", handleLoad);
+
+    map.on("style.load", () => {
+      mapReadyRef.current = true;
+      ensureImpactLayers();
+      flushPendingFloodLayer();
+    });
+
+    map.on("styledata", () => {
+      if (map.isStyleLoaded()) {
+        mapReadyRef.current = true;
+        flushPendingFloodLayer();
+      }
+    });
+
     map.on("mousemove", handleMouseMove);
     map.on("mouseleave", handleMouseLeave);
     map.on("click", handleMapClick);
@@ -712,7 +737,8 @@ export default function HomePage() {
 
       map.remove();
       mapRef.current = null;
-      floodRetryBoundRef.current = false;
+      mapReadyRef.current = false;
+      pendingFloodLevelRef.current = null;
       hasAppliedInitialViewModeRef.current = false;
     };
   }, [floodEngineUrl]);
