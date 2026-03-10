@@ -195,15 +195,30 @@ export default function HomePage() {
       scheme: "xyz",
     });
 
-    map.addLayer({
-      id: FLOOD_LAYER_ID,
-      type: "raster",
-      source: FLOOD_SOURCE_ID,
-      paint: {
-        "raster-opacity": 1,
-        "raster-fade-duration": 0,
-      },
-    });
+    if (existingSource && typeof existingSource.setTiles === "function") {
+      existingSource.setTiles([tileUrl]);
+    } else {
+      removeFloodLayer();
+
+      map.addSource(FLOOD_SOURCE_ID, {
+        type: "raster",
+        tiles: [tileUrl],
+        tileSize: 256,
+        scheme: "xyz",
+      });
+    }
+
+    if (!map.getLayer(FLOOD_LAYER_ID)) {
+      map.addLayer({
+        id: FLOOD_LAYER_ID,
+        type: "raster",
+        source: FLOOD_SOURCE_ID,
+        paint: {
+          "raster-opacity": 1,
+          "raster-fade-duration": 0,
+        },
+      });
+    }
   };
 
   const ensureImpactLayers = () => {
