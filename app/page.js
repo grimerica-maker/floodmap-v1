@@ -71,6 +71,7 @@ export default function HomePage() {
   const hoverTimerRef = useRef(null);
   const debugListenersAddedRef = useRef(false);
   const floodRetryBoundRef = useRef(false);
+  const hasAppliedInitialViewModeRef = useRef(false);
 
   const scenarioModeRef = useRef("flood");
   const impactPointRef = useRef(null);
@@ -175,11 +176,6 @@ export default function HomePage() {
     }
   };
 
-  const isMapReady = () => {
-    const map = mapRef.current;
-    return Boolean(map && map.isStyleLoaded());
-  };
-
   const removeFloodLayer = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
@@ -206,18 +202,8 @@ export default function HomePage() {
 
       if (!floodRetryBoundRef.current) {
         floodRetryBoundRef.current = true;
-        map.once("load", () => {
-          floodRetryBoundRef.current = false;
-          if (
-            scenarioModeRef.current === "flood" &&
-            viewModeRef.current === "map" &&
-            seaLevelRef.current !== 0
-          ) {
-            addFloodLayer(seaLevelRef.current);
-          }
-        });
 
-        map.once("style.load", () => {
+        const retry = () => {
           floodRetryBoundRef.current = false;
           if (
             scenarioModeRef.current === "flood" &&
@@ -226,7 +212,9 @@ export default function HomePage() {
           ) {
             addFloodLayer(seaLevelRef.current);
           }
-        });
+        };
+
+        map.once("style.load", retry);
       }
 
       return false;
@@ -601,7 +589,7 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    if (mapRef.current) return;
+    if (mapRef.current || !floodEngineUrl) return;
 
     const map = new mapboxgl.Map({
       container: mapContainer.current,
@@ -724,11 +712,19 @@ export default function HomePage() {
 
       map.remove();
       mapRef.current = null;
+      floodRetryBoundRef.current = false;
+      hasAppliedInitialViewModeRef.current = false;
     };
   }, [floodEngineUrl]);
 
   useEffect(() => {
     if (!mapRef.current) return;
+
+    if (!hasAppliedInitialViewModeRef.current) {
+      hasAppliedInitialViewModeRef.current = true;
+      return;
+    }
+
     setMapStyleForMode(viewMode);
   }, [viewMode]);
 
