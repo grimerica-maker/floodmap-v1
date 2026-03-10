@@ -71,7 +71,6 @@ export default function HomePage() {
   const hoverTimerRef = useRef(null);
   const debugListenersAddedRef = useRef(false);
   const hasAppliedInitialViewModeRef = useRef(false);
-  const mapReadyRef = useRef(false);
   const pendingFloodLevelRef = useRef(null);
   const activeFloodLevelRef = useRef(null);
 
@@ -199,8 +198,8 @@ export default function HomePage() {
       return false;
     }
 
-    if (!mapReadyRef.current || !map.isStyleLoaded()) {
-      console.log("Flood layer queued until map is ready");
+    if (!map.isStyleLoaded()) {
+      console.log("Flood layer queued until style is ready");
       pendingFloodLevelRef.current = level;
       return false;
     }
@@ -244,12 +243,17 @@ export default function HomePage() {
   };
 
   const flushPendingFloodLayer = () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
     if (
       scenarioModeRef.current === "flood" &&
       viewModeRef.current === "map" &&
       pendingFloodLevelRef.current !== null
     ) {
-      addFloodLayer(pendingFloodLevelRef.current);
+      const pendingLevel = pendingFloodLevelRef.current;
+      pendingFloodLevelRef.current = null;
+      addFloodLayer(pendingLevel);
     }
   };
 
@@ -447,13 +451,10 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map) return;
 
-    mapReadyRef.current = false;
-
     if (mode === "globe") {
       map.setProjection("globe");
       map.setStyle(MAP_STYLE_URL);
       map.once("style.load", () => {
-        mapReadyRef.current = true;
         map.setFog({});
         restoreMapOverlays();
         flushPendingFloodLayer();
@@ -477,7 +478,6 @@ export default function HomePage() {
       map.setProjection("mercator");
       map.setStyle(SATELLITE_STYLE_URL);
       map.once("style.load", () => {
-        mapReadyRef.current = true;
         restoreMapOverlays();
         flushPendingFloodLayer();
       });
@@ -499,7 +499,6 @@ export default function HomePage() {
     map.setProjection("mercator");
     map.setStyle(MAP_STYLE_URL);
     map.once("style.load", () => {
-      mapReadyRef.current = true;
       restoreMapOverlays();
       flushPendingFloodLayer();
     });
@@ -649,7 +648,6 @@ export default function HomePage() {
     }
 
     const handleLoad = () => {
-      mapReadyRef.current = true;
       ensureImpactLayers();
 
       fetch(`${floodEngineUrl}/`)
@@ -719,14 +717,12 @@ export default function HomePage() {
     map.on("load", handleLoad);
 
     map.on("style.load", () => {
-      mapReadyRef.current = true;
       ensureImpactLayers();
       flushPendingFloodLayer();
     });
 
     map.on("styledata", () => {
       if (map.isStyleLoaded()) {
-        mapReadyRef.current = true;
         flushPendingFloodLayer();
       }
     });
@@ -747,7 +743,6 @@ export default function HomePage() {
 
       map.remove();
       mapRef.current = null;
-      mapReadyRef.current = false;
       pendingFloodLevelRef.current = null;
       activeFloodLevelRef.current = null;
       hasAppliedInitialViewModeRef.current = false;
@@ -853,8 +848,8 @@ export default function HomePage() {
               seaLevel > 0
                 ? "#0f62fe"
                 : seaLevel < 0
-                  ? "#b45309"
-                  : "#111827",
+                ? "#b45309"
+                : "#111827",
           }}
         >
           {seaLevel > 0 ? "+" : ""}
@@ -1171,8 +1166,8 @@ export default function HomePage() {
           {viewMode === "map"
             ? "Standard Map"
             : viewMode === "satellite"
-              ? "Satellite"
-              : "Globe"}
+            ? "Satellite"
+            : "Globe"}
         </div>
         <div>Status: {status}</div>
         <div>Scenario Mode: {scenarioMode}</div>
