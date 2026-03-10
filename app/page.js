@@ -199,47 +199,50 @@ export default function HomePage() {
     }
 
     if (!map.isStyleLoaded()) {
-      console.log("Flood layer queued until style is ready");
-      pendingFloodLevelRef.current = level;
+      console.log("Flood layer waiting for style");
       return false;
     }
 
     const tileUrl = `${floodEngineUrl}/flood/${level}/{z}/{x}/{y}.png`;
     console.log("Adding flood layer:", tileUrl);
 
-    if (map.getLayer(FLOOD_LAYER_ID)) {
-      map.removeLayer(FLOOD_LAYER_ID);
+    try {
+      if (map.getLayer(FLOOD_LAYER_ID)) {
+        map.removeLayer(FLOOD_LAYER_ID);
+      }
+
+      if (map.getSource(FLOOD_SOURCE_ID)) {
+        map.removeSource(FLOOD_SOURCE_ID);
+      }
+
+      map.addSource(FLOOD_SOURCE_ID, {
+        type: "raster",
+        tiles: [tileUrl],
+        tileSize: 256,
+        scheme: "xyz",
+        minzoom: 0,
+        maxzoom: 22,
+      });
+
+      map.addLayer({
+        id: FLOOD_LAYER_ID,
+        type: "raster",
+        source: FLOOD_SOURCE_ID,
+        paint: {
+          "raster-opacity": 0.88,
+          "raster-fade-duration": 0,
+          "raster-resampling": "linear",
+        },
+      });
+
+      console.log("Flood layer added:", map.getLayer(FLOOD_LAYER_ID));
+      activeFloodLevelRef.current = level;
+      pendingFloodLevelRef.current = null;
+      return true;
+    } catch (error) {
+      console.error("Failed to add flood layer", error);
+      return false;
     }
-
-    if (map.getSource(FLOOD_SOURCE_ID)) {
-      map.removeSource(FLOOD_SOURCE_ID);
-    }
-
-    map.addSource(FLOOD_SOURCE_ID, {
-      type: "raster",
-      tiles: [tileUrl],
-      tileSize: 256,
-      scheme: "xyz",
-      minzoom: 0,
-      maxzoom: 22,
-    });
-
-    map.addLayer({
-      id: FLOOD_LAYER_ID,
-      type: "raster",
-      source: FLOOD_SOURCE_ID,
-      paint: {
-        "raster-opacity": 0.88,
-        "raster-fade-duration": 0,
-        "raster-resampling": "linear",
-      },
-    });
-
-    console.log("Flood layer added:", map.getLayer(FLOOD_LAYER_ID));
-
-    pendingFloodLevelRef.current = null;
-    activeFloodLevelRef.current = level;
-    return true;
   };
 
   const flushPendingFloodLayer = () => {
@@ -251,9 +254,9 @@ export default function HomePage() {
       viewModeRef.current === "map" &&
       pendingFloodLevelRef.current !== null
     ) {
-      const pendingLevel = pendingFloodLevelRef.current;
+      const level = pendingFloodLevelRef.current;
       pendingFloodLevelRef.current = null;
-      addFloodLayer(pendingLevel);
+      addFloodLayer(level);
     }
   };
 
@@ -455,6 +458,7 @@ export default function HomePage() {
       map.setProjection("globe");
       map.setStyle(MAP_STYLE_URL);
       map.once("style.load", () => {
+        console.log("style.load fired");
         map.setFog({});
         restoreMapOverlays();
         flushPendingFloodLayer();
@@ -478,6 +482,7 @@ export default function HomePage() {
       map.setProjection("mercator");
       map.setStyle(SATELLITE_STYLE_URL);
       map.once("style.load", () => {
+        console.log("style.load fired");
         restoreMapOverlays();
         flushPendingFloodLayer();
       });
@@ -499,6 +504,7 @@ export default function HomePage() {
     map.setProjection("mercator");
     map.setStyle(MAP_STYLE_URL);
     map.once("style.load", () => {
+      console.log("style.load fired");
       restoreMapOverlays();
       flushPendingFloodLayer();
     });
@@ -550,15 +556,28 @@ export default function HomePage() {
       return;
     }
 
-    pendingFloodLevelRef.current = level;
-
     const added = addFloodLayer(level);
 
     if (added) {
       setStatus(`Flood tiles loaded at ${level > 0 ? "+" : ""}${level}m`);
-    } else {
-      setStatus("Preparing flood layer...");
+      return;
     }
+
+    pendingFloodLevelRef.current = level;
+    setStatus("Preparing flood layer...");
+
+    setTimeout(() => {
+      if (
+        scenarioModeRef.current === "flood" &&
+        viewModeRef.current === "map" &&
+        pendingFloodLevelRef.current === level
+      ) {
+        const retried = addFloodLayer(level);
+        if (retried) {
+          setStatus(`Flood tiles loaded at ${level > 0 ? "+" : ""}${level}m`);
+        }
+      }
+    }, 300);
   };
 
   const executeImpact = () => {
@@ -717,14 +736,13 @@ export default function HomePage() {
     map.on("load", handleLoad);
 
     map.on("style.load", () => {
+      console.log("style.load fired");
       ensureImpactLayers();
       flushPendingFloodLayer();
     });
 
-    map.on("styledata", () => {
-      if (map.isStyleLoaded()) {
-        flushPendingFloodLayer();
-      }
+    map.on("idle", () => {
+      flushPendingFloodLayer();
     });
 
     map.on("mousemove", handleMouseMove);
