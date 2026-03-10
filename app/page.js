@@ -73,6 +73,7 @@ export default function HomePage() {
   const hasAppliedInitialViewModeRef = useRef(false);
   const mapReadyRef = useRef(false);
   const pendingFloodLevelRef = useRef(null);
+  const activeFloodLevelRef = useRef(null);
 
   const scenarioModeRef = useRef("flood");
   const impactPointRef = useRef(null);
@@ -198,42 +199,50 @@ export default function HomePage() {
       return false;
     }
 
-    if (!mapReadyRef.current) {
+    if (!mapReadyRef.current || !map.isStyleLoaded()) {
       console.log("Flood layer queued until map is ready");
       pendingFloodLevelRef.current = level;
       return false;
     }
 
-    const tileUrl = `${floodEngineUrl}/flood/${level}/{z}/{x}/{y}.png?t=${Date.now()}`;
+    const tileUrl = `${floodEngineUrl}/flood/${level}/{z}/{x}/{y}.png`;
     console.log("Adding flood layer:", tileUrl);
 
-    if (map.getLayer(FLOOD_LAYER_ID)) {
-      map.removeLayer(FLOOD_LAYER_ID);
+    const levelChanged = activeFloodLevelRef.current !== level;
+    const existingSource = map.getSource(FLOOD_SOURCE_ID);
+
+    if (!existingSource || levelChanged) {
+      if (map.getLayer(FLOOD_LAYER_ID)) {
+        map.removeLayer(FLOOD_LAYER_ID);
+      }
+
+      if (map.getSource(FLOOD_SOURCE_ID)) {
+        map.removeSource(FLOOD_SOURCE_ID);
+      }
+
+      map.addSource(FLOOD_SOURCE_ID, {
+        type: "raster",
+        tiles: [tileUrl],
+        tileSize: 256,
+        scheme: "xyz",
+        minzoom: 0,
+        maxzoom: 22,
+      });
+
+      map.addLayer({
+        id: FLOOD_LAYER_ID,
+        type: "raster",
+        source: FLOOD_SOURCE_ID,
+        paint: {
+          "raster-opacity": 0.88,
+          "raster-fade-duration": 400,
+          "raster-resampling": "linear",
+        },
+      });
     }
-
-    if (map.getSource(FLOOD_SOURCE_ID)) {
-      map.removeSource(FLOOD_SOURCE_ID);
-    }
-
-    map.addSource(FLOOD_SOURCE_ID, {
-      type: "raster",
-      tiles: [tileUrl],
-      tileSize: 256,
-      scheme: "xyz",
-    });
-
-    map.addLayer({
-      id: FLOOD_LAYER_ID,
-      type: "raster",
-      source: FLOOD_SOURCE_ID,
-      paint: {
-        "raster-opacity": 0.78,
-        "raster-fade-duration": 0,
-        "raster-resampling": "linear",
-      },
-    });
 
     pendingFloodLevelRef.current = null;
+    activeFloodLevelRef.current = level;
     return true;
   };
 
@@ -539,6 +548,7 @@ export default function HomePage() {
 
     if (level === 0) {
       pendingFloodLevelRef.current = null;
+      activeFloodLevelRef.current = null;
       removeFloodLayer();
       setStatus("Flood cleared");
       return;
@@ -575,6 +585,7 @@ export default function HomePage() {
     executedImpactRef.current = run;
 
     pendingFloodLevelRef.current = null;
+    activeFloodLevelRef.current = null;
     removeFloodLayer();
     setImpactPointOnMap(impactPointRef.current, impactDiameterRef.current);
     setStatus("Impact point saved (backend impact flood not connected yet)");
@@ -592,6 +603,7 @@ export default function HomePage() {
     executedImpactRef.current = null;
 
     pendingFloodLevelRef.current = null;
+    activeFloodLevelRef.current = null;
     removeFloodLayer();
     clearImpactPointOnMap();
     setStatus("Flood cleared");
@@ -740,6 +752,7 @@ export default function HomePage() {
       mapRef.current = null;
       mapReadyRef.current = false;
       pendingFloodLevelRef.current = null;
+      activeFloodLevelRef.current = null;
       hasAppliedInitialViewModeRef.current = false;
     };
   }, [floodEngineUrl]);
@@ -1161,8 +1174,8 @@ export default function HomePage() {
           {viewMode === "map"
             ? "Standard Map"
             : viewMode === "satellite"
-            ? "Satellite"
-            : "Globe"}
+              ? "Satellite"
+              : "Globe"}
         </div>
         <div>Status: {status}</div>
         <div>Scenario Mode: {scenarioMode}</div>
