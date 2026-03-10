@@ -5,8 +5,8 @@ import mapboxgl from "mapbox-gl";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-const FLOOD_ENGINE_URL =
-  process.env.NEXT_PUBLIC_FLOOD_ENGINE_URL || "http://137.184.86.1:8000";
+const CONFIGURED_FLOOD_ENGINE_URL = process.env.NEXT_PUBLIC_FLOOD_ENGINE_URL;
+const FLOOD_ENGINE_PROXY_PATH = "/api/engine";
 const DEBUG_FLOOD = true;
 const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-streets-v12";
@@ -87,6 +87,7 @@ export default function HomePage() {
   const [impactDiameter, setImpactDiameter] = useState(100);
   const [impactPoint, setImpactPoint] = useState(null);
   const [executedImpact, setExecutedImpact] = useState(null);
+  const [floodEngineUrl, setFloodEngineUrl] = useState(FLOOD_ENGINE_PROXY_PATH);
 
   const [hoverLat, setHoverLat] = useState(null);
   const [hoverLng, setHoverLng] = useState(null);
@@ -117,18 +118,25 @@ export default function HomePage() {
   }, [impactDiameter]);
 
   useEffect(() => {
-    console.log("Flood engine URL:", FLOOD_ENGINE_URL);
-
-    if (
-      typeof window !== "undefined" &&
-      window.location.protocol === "https:" &&
-      FLOOD_ENGINE_URL.startsWith("http://")
-    ) {
-      console.error(
-        "Engine may be blocked as mixed content. Use HTTPS engine URL or same-origin proxy.",
-        FLOOD_ENGINE_URL
+    if (!CONFIGURED_FLOOD_ENGINE_URL) {
+      console.warn(
+        "NEXT_PUBLIC_FLOOD_ENGINE_URL is undefined. Using same-origin proxy (/api/engine)."
       );
+      setFloodEngineUrl(FLOOD_ENGINE_PROXY_PATH);
+      return;
     }
+
+    if (window.location.protocol === "https:" && CONFIGURED_FLOOD_ENGINE_URL.startsWith("http://")) {
+      console.warn(
+        "Mixed content risk detected for NEXT_PUBLIC_FLOOD_ENGINE_URL. Using same-origin proxy (/api/engine).",
+        CONFIGURED_FLOOD_ENGINE_URL
+      );
+      setFloodEngineUrl(FLOOD_ENGINE_PROXY_PATH);
+      return;
+    }
+
+    setFloodEngineUrl(CONFIGURED_FLOOD_ENGINE_URL.replace(/\/+$/, ""));
+    console.log("Flood engine URL:", CONFIGURED_FLOOD_ENGINE_URL);
   }, []);
 
   const waterDifference =
@@ -150,7 +158,7 @@ export default function HomePage() {
 
   const debugFetchElevation = async () => {
     try {
-      const res = await fetch(`${FLOOD_ENGINE_URL}/elevation?lat=40&lng=-74`);
+      const res = await fetch(`${floodEngineUrl}/elevation?lat=40&lng=-74`);
       if (!res.ok) {
         console.error("Debug elevation fetch failed", res.status);
         return;
@@ -183,17 +191,9 @@ export default function HomePage() {
       return;
     }
 
-    const tileUrl = `${FLOOD_ENGINE_URL}/flood/${level}/{z}/{x}/{y}.png?t=${Date.now()}`;
+    const tileUrl = `${floodEngineUrl}/flood/${level}/{z}/{x}/{y}.png?t=${Date.now()}`;
     console.log("Adding flood layer:", tileUrl);
-
-    removeFloodLayer();
-
-    map.addSource(FLOOD_SOURCE_ID, {
-      type: "raster",
-      tiles: [tileUrl],
-      tileSize: 256,
-      scheme: "xyz",
-    });
+    const existingSource = map.getSource(FLOOD_SOURCE_ID);
 
     if (existingSource && typeof existingSource.setTiles === "function") {
       existingSource.setTiles([tileUrl]);
@@ -361,7 +361,7 @@ export default function HomePage() {
   const fetchElevation = async (lat, lng) => {
     try {
       const res = await fetch(
-        `${FLOOD_ENGINE_URL}/elevation?lat=${encodeURIComponent(
+        `${floodEngineUrl}/elevation?lat=${encodeURIComponent(
           lat
         )}&lng=${encodeURIComponent(lng)}`
       );
@@ -597,7 +597,7 @@ export default function HomePage() {
 
     const handleLoad = () => {
       ensureImpactLayers();
-      fetch(`${FLOOD_ENGINE_URL}/`)
+      fetch(`${floodEngineUrl}/`)
         .then((r) => r.json())
         .then((d) => console.log("Engine health:", d))
         .catch((e) => console.error("Engine unreachable", e));
