@@ -227,7 +227,7 @@ export default function HomePage() {
       type: "raster",
       source: FLOOD_SOURCE_ID,
       paint: {
-        "raster-opacity": 0.45,
+        "raster-opacity": 0.42,
         "raster-fade-duration": 100,
         "raster-resampling": "linear",
       },
