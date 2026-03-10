@@ -4,7 +4,7 @@
 
 The frontend reads flood tiles and elevation from:
 
-- `NEXT_PUBLIC_FLOOD_ENGINE_URL` (default: `http://127.0.0.1:8000`)
+- `NEXT_PUBLIC_FLOOD_ENGINE_URL` (default: `http://137.184.86.1:8000`)
 
 Set it when starting Next.js if your engine is on a different host/port:
 

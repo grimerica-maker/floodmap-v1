@@ -5,8 +5,8 @@ import mapboxgl from "mapbox-gl";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-const FLOOD_ENGINE =
-  process.env.NEXT_PUBLIC_FLOOD_ENGINE_URL || "http://127.0.0.1:8000";
+const FLOOD_ENGINE_URL =
+  process.env.NEXT_PUBLIC_FLOOD_ENGINE_URL || "http://137.184.86.1:8000";
 const DEBUG_FLOOD = true;
 const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-streets-v12";
@@ -116,6 +116,21 @@ export default function HomePage() {
     impactDiameterRef.current = impactDiameter;
   }, [impactDiameter]);
 
+  useEffect(() => {
+    console.log("Flood engine URL:", FLOOD_ENGINE_URL);
+
+    if (
+      typeof window !== "undefined" &&
+      window.location.protocol === "https:" &&
+      FLOOD_ENGINE_URL.startsWith("http://")
+    ) {
+      console.error(
+        "Engine may be blocked as mixed content. Use HTTPS engine URL or same-origin proxy.",
+        FLOOD_ENGINE_URL
+      );
+    }
+  }, []);
+
   const waterDifference =
     hoverElevation !== null
       ? Number((hoverElevation - seaLevel).toFixed(2))
@@ -131,6 +146,21 @@ export default function HomePage() {
     const parsed = parseInt(value, 10);
     if (Number.isNaN(parsed)) return 10;
     return Math.max(10, Math.min(1000, parsed));
+  };
+
+  const debugFetchElevation = async () => {
+    try {
+      const res = await fetch(`${FLOOD_ENGINE_URL}/elevation?lat=40&lng=-74`);
+      if (!res.ok) {
+        console.error("Debug elevation fetch failed", res.status);
+        return;
+      }
+
+      const data = await res.json();
+      console.log("Debug elevation fetch result:", data);
+    } catch (error) {
+      console.error("Debug elevation fetch error", error);
+    }
   };
 
   const removeFloodLayer = () => {
@@ -153,7 +183,7 @@ export default function HomePage() {
       return;
     }
 
-    const tileUrl = `${FLOOD_ENGINE}/flood/${level}/{z}/{x}/{y}.png?t=${Date.now()}`;
+    const tileUrl = `${FLOOD_ENGINE_URL}/flood/${level}/{z}/{x}/{y}.png?t=${Date.now()}`;
     console.log("Adding flood layer:", tileUrl);
 
     removeFloodLayer();
@@ -331,7 +361,7 @@ export default function HomePage() {
   const fetchElevation = async (lat, lng) => {
     try {
       const res = await fetch(
-        `${FLOOD_ENGINE}/elevation?lat=${encodeURIComponent(
+        `${FLOOD_ENGINE_URL}/elevation?lat=${encodeURIComponent(
           lat
         )}&lng=${encodeURIComponent(lng)}`
       );
@@ -449,6 +479,7 @@ export default function HomePage() {
 
   const executeFlood = () => {
     const level = clampLevel(inputLevel);
+    console.log("Execute flood level:", level);
     console.log("Execute Flood clicked", {
       inputLevel,
       level,
@@ -537,6 +568,12 @@ export default function HomePage() {
       dragRotate: true,
       keyboard: true,
       touchZoomRotate: true,
+      transformRequest: (url, resourceType) => {
+        if (resourceType === "Tile" && url.includes("/flood/")) {
+          console.log("Flood tile request:", url);
+        }
+        return { url };
+      },
     });
 
     mapRef.current = map;
@@ -560,6 +597,10 @@ export default function HomePage() {
 
     const handleLoad = () => {
       ensureImpactLayers();
+      fetch(`${FLOOD_ENGINE_URL}/`)
+        .then((r) => r.json())
+        .then((d) => console.log("Engine health:", d))
+        .catch((e) => console.error("Engine unreachable", e));
       setStatus("Map ready");
     };
 
@@ -921,6 +962,23 @@ export default function HomePage() {
             </button>
           </>
         )}
+
+        <button
+          onClick={debugFetchElevation}
+          style={{
+            width: "100%",
+            padding: 12,
+            marginBottom: 20,
+            background: "#0b3b66",
+            color: "white",
+            border: "none",
+            fontWeight: 700,
+            borderRadius: 10,
+            cursor: "pointer",
+          }}
+        >
+          Debug Fetch Elevation (40, -74)
+        </button>
 
         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>
           VIEW MODE
