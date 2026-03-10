@@ -70,6 +70,7 @@ export default function HomePage() {
   const mapRef = useRef(null);
   const hoverTimerRef = useRef(null);
   const debugListenersAddedRef = useRef(false);
+  const floodRetryBoundRef = useRef(false);
 
   const scenarioModeRef = useRef("flood");
   const impactPointRef = useRef(null);
@@ -126,7 +127,10 @@ export default function HomePage() {
       return;
     }
 
-    if (window.location.protocol === "https:" && CONFIGURED_FLOOD_ENGINE_URL.startsWith("http://")) {
+    if (
+      window.location.protocol === "https:" &&
+      CONFIGURED_FLOOD_ENGINE_URL.startsWith("http://")
+    ) {
       console.warn(
         "Mixed content risk detected for NEXT_PUBLIC_FLOOD_ENGINE_URL. Using same-origin proxy (/api/engine).",
         CONFIGURED_FLOOD_ENGINE_URL
@@ -171,6 +175,11 @@ export default function HomePage() {
     }
   };
 
+  const isMapReady = () => {
+    const map = mapRef.current;
+    return Boolean(map && map.isStyleLoaded());
+  };
+
   const removeFloodLayer = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
@@ -186,39 +195,72 @@ export default function HomePage() {
 
   const addFloodLayer = (level) => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) {
-      console.log("Flood layer skipped: map not ready");
-      return;
+
+    if (!map) {
+      console.log("Flood layer skipped: map missing");
+      return false;
+    }
+
+    if (!map.isStyleLoaded()) {
+      console.log("Flood layer deferred: map/style not ready");
+
+      if (!floodRetryBoundRef.current) {
+        floodRetryBoundRef.current = true;
+        map.once("load", () => {
+          floodRetryBoundRef.current = false;
+          if (
+            scenarioModeRef.current === "flood" &&
+            viewModeRef.current === "map" &&
+            seaLevelRef.current !== 0
+          ) {
+            addFloodLayer(seaLevelRef.current);
+          }
+        });
+
+        map.once("style.load", () => {
+          floodRetryBoundRef.current = false;
+          if (
+            scenarioModeRef.current === "flood" &&
+            viewModeRef.current === "map" &&
+            seaLevelRef.current !== 0
+          ) {
+            addFloodLayer(seaLevelRef.current);
+          }
+        });
+      }
+
+      return false;
     }
 
     const tileUrl = `${floodEngineUrl}/flood/${level}/{z}/{x}/{y}.png?t=${Date.now()}`;
     console.log("Adding flood layer:", tileUrl);
-    const existingSource = map.getSource(FLOOD_SOURCE_ID);
 
-    if (existingSource && typeof existingSource.setTiles === "function") {
-      existingSource.setTiles([tileUrl]);
-    } else {
-      removeFloodLayer();
-
-      map.addSource(FLOOD_SOURCE_ID, {
-        type: "raster",
-        tiles: [tileUrl],
-        tileSize: 256,
-        scheme: "xyz",
-      });
+    if (map.getLayer(FLOOD_LAYER_ID)) {
+      map.removeLayer(FLOOD_LAYER_ID);
     }
 
-    if (!map.getLayer(FLOOD_LAYER_ID)) {
-      map.addLayer({
-        id: FLOOD_LAYER_ID,
-        type: "raster",
-        source: FLOOD_SOURCE_ID,
-        paint: {
-          "raster-opacity": 1,
-          "raster-fade-duration": 0,
-        },
-      });
+    if (map.getSource(FLOOD_SOURCE_ID)) {
+      map.removeSource(FLOOD_SOURCE_ID);
     }
+
+    map.addSource(FLOOD_SOURCE_ID, {
+      type: "raster",
+      tiles: [tileUrl],
+      tileSize: 256,
+      scheme: "xyz",
+    });
+
+    map.addLayer({
+      id: FLOOD_LAYER_ID,
+      type: "raster",
+      source: FLOOD_SOURCE_ID,
+      paint: {
+        "raster-opacity": 1,
+        "raster-fade-duration": 0,
+      },
+    });
+
+    return true;
   };
 
   const ensureImpactLayers = () => {
@@ -509,8 +551,13 @@ export default function HomePage() {
       return;
     }
 
-    addFloodLayer(level);
-    setStatus(`Flood tiles loaded at ${level > 0 ? "+" : ""}${level}m`);
+    const added = addFloodLayer(level);
+
+    if (added) {
+      setStatus(`Flood tiles loaded at ${level > 0 ? "+" : ""}${level}m`);
+    } else {
+      setStatus("Preparing flood layer...");
+    }
   };
 
   const executeImpact = () => {
@@ -558,7 +605,7 @@ export default function HomePage() {
 
     const map = new mapboxgl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/streets-v12",
+      style: MAP_STYLE_URL,
       center: [-80.19, 25.76],
       zoom: 6.2,
       projection: "mercator",
@@ -597,10 +644,30 @@ export default function HomePage() {
 
     const handleLoad = () => {
       ensureImpactLayers();
+
       fetch(`${floodEngineUrl}/`)
-        .then((r) => r.json())
+        .then(async (r) => {
+          const text = await r.text();
+          if (!r.ok) {
+            throw new Error(`Engine health ${r.status}: ${text}`);
+          }
+          try {
+            return JSON.parse(text);
+          } catch {
+            throw new Error(`Engine health non-JSON: ${text}`);
+          }
+        })
         .then((d) => console.log("Engine health:", d))
         .catch((e) => console.error("Engine unreachable", e));
+
+      if (
+        scenarioModeRef.current === "flood" &&
+        viewModeRef.current === "map" &&
+        seaLevelRef.current !== 0
+      ) {
+        addFloodLayer(seaLevelRef.current);
+      }
+
       setStatus("Map ready");
     };
 
@@ -637,7 +704,7 @@ export default function HomePage() {
       impactPointRef.current = point;
       setImpactPoint(point);
       setImpactPointOnMap(point, impactDiameterRef.current);
-      setStatus("Impact point selected — click Execute Impact");
+      setStatus("Impact point selected - click Execute Impact");
     };
 
     map.on("load", handleLoad);
@@ -658,7 +725,7 @@ export default function HomePage() {
       map.remove();
       mapRef.current = null;
     };
-  }, []);
+  }, [floodEngineUrl]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -675,7 +742,7 @@ export default function HomePage() {
       if (executedImpactRef.current) {
         setStatus("Impact point saved (backend impact flood not connected yet)");
       } else if (impactPointRef.current) {
-        setStatus("Impact point selected — click Execute Impact");
+        setStatus("Impact point selected - click Execute Impact");
       } else {
         setStatus("Click map to place impact point");
       }
