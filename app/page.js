@@ -208,38 +208,35 @@ export default function HomePage() {
     const tileUrl = `${floodEngineUrl}/flood/${level}/{z}/{x}/{y}.png`;
     console.log("Adding flood layer:", tileUrl);
 
-    const levelChanged = activeFloodLevelRef.current !== level;
-    const existingSource = map.getSource(FLOOD_SOURCE_ID);
-
-    if (!existingSource || levelChanged) {
-      if (map.getLayer(FLOOD_LAYER_ID)) {
-        map.removeLayer(FLOOD_LAYER_ID);
-      }
-
-      if (map.getSource(FLOOD_SOURCE_ID)) {
-        map.removeSource(FLOOD_SOURCE_ID);
-      }
-
-      map.addSource(FLOOD_SOURCE_ID, {
-        type: "raster",
-        tiles: [tileUrl],
-        tileSize: 256,
-        scheme: "xyz",
-        minzoom: 0,
-        maxzoom: 22,
-      });
-
-      map.addLayer({
-        id: FLOOD_LAYER_ID,
-        type: "raster",
-        source: FLOOD_SOURCE_ID,
-        paint: {
-          "raster-opacity": 0.88,
-          "raster-fade-duration": 400,
-          "raster-resampling": "linear",
-        },
-      });
+    if (map.getLayer(FLOOD_LAYER_ID)) {
+      map.removeLayer(FLOOD_LAYER_ID);
     }
+
+    if (map.getSource(FLOOD_SOURCE_ID)) {
+      map.removeSource(FLOOD_SOURCE_ID);
+    }
+
+    map.addSource(FLOOD_SOURCE_ID, {
+      type: "raster",
+      tiles: [tileUrl],
+      tileSize: 256,
+      scheme: "xyz",
+      minzoom: 0,
+      maxzoom: 22,
+    });
+
+    map.addLayer({
+      id: FLOOD_LAYER_ID,
+      type: "raster",
+      source: FLOOD_SOURCE_ID,
+      paint: {
+        "raster-opacity": 0.88,
+        "raster-fade-duration": 0,
+        "raster-resampling": "linear",
+      },
+    });
+
+    console.log("Flood layer added:", map.getLayer(FLOOD_LAYER_ID));
 
     pendingFloodLevelRef.current = null;
     activeFloodLevelRef.current = level;
@@ -856,8 +853,8 @@ export default function HomePage() {
               seaLevel > 0
                 ? "#0f62fe"
                 : seaLevel < 0
-                ? "#b45309"
-                : "#111827",
+                  ? "#b45309"
+                  : "#111827",
           }}
         >
           {seaLevel > 0 ? "+" : ""}
