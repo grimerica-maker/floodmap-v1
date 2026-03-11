@@ -1,45 +1,31 @@
-const FLOOD_ENGINE_BASE_URL =
-  process.env.FLOOD_ENGINE_BASE_URL ||
-  process.env.NEXT_PUBLIC_FLOOD_ENGINE_URL ||
-  "http://137.184.86.1:8000";
+const BACKEND_BASE = "http://137.184.86.1:8000";
 
-const buildTargetUrl = (pathParts, requestUrl) => {
-  const base = FLOOD_ENGINE_BASE_URL.replace(/\/+$/, "");
-  const path = (pathParts || []).join("/");
-  const incoming = new URL(requestUrl);
-  const search = incoming.search || "";
+async function handler(request, { params }) {
+  const path = (params.path || []).join("/");
+  const search = request.nextUrl.search || "";
+  const targetUrl = `${BACKEND_BASE}/${path}${search}`;
 
-  return `${base}/${path}${search}`;
-};
-
-const proxyRequest = async (request, context) => {
-  const targetUrl = buildTargetUrl(context?.params?.path, request.url);
-
-  const upstream = await fetch(targetUrl, {
+  const backendResponse = await fetch(targetUrl, {
     method: request.method,
     headers: {
-      accept: request.headers.get("accept") || "*/*",
+      Accept: request.headers.get("accept") || "*/*",
     },
     cache: "no-store",
   });
 
-  const headers = new Headers();
-  const contentType = upstream.headers.get("content-type");
-  const cacheControl = upstream.headers.get("cache-control");
+  const contentType = backendResponse.headers.get("content-type") || "";
+  const body = await backendResponse.arrayBuffer();
 
-  if (contentType) headers.set("content-type", contentType);
-  if (cacheControl) headers.set("cache-control", cacheControl);
-
-  return new Response(upstream.body, {
-    status: upstream.status,
-    headers,
+  return new Response(body, {
+    status: backendResponse.status,
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control":
+        backendResponse.headers.get("cache-control") || "no-store",
+    },
   });
-};
-
-export async function GET(request, context) {
-  return proxyRequest(request, context);
 }
 
-export async function HEAD(request, context) {
-  return proxyRequest(request, context);
+export async function GET(request, context) {
+  return handler(request, context);
 }
