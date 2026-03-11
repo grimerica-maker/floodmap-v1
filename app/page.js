@@ -30,6 +30,7 @@ const PRESETS = [
   { label: "Holocene", value: 6 },
   { label: "All Ice Melted", value: 70 },
   { label: "Biblical Flood", value: 3048 },
+  { label: "Fully Drained", value: -11000 },
 ];
 
 const createGeodesicCircle = (lng, lat, radiusMeters, steps = 96) => {
@@ -84,7 +85,8 @@ export default function HomePage() {
   const viewModeRef = useRef("map");
   const impactDiameterRef = useRef(100);
 
-  const [inputLevel, setInputLevel] = useState(0);
+  const [inputLevel, setInputLevel] = useState(0); // canonical pending input in meters
+  const [inputText, setInputText] = useState("0"); // raw text shown in input
   const [seaLevel, setSeaLevel] = useState(0);
   const [viewMode, setViewMode] = useState("map");
   const [unitMode, setUnitMode] = useState("m");
@@ -145,6 +147,53 @@ export default function HomePage() {
   const metersToFeet = (meters) => meters * 3.28084;
   const feetToMeters = (feet) => feet / 3.28084;
 
+  const formatNumericText = (value, digits = 2) => {
+    const rounded = Number(value.toFixed(digits));
+    return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+  };
+
+  const formatInputTextFromMeters = (meters, unit = unitMode) => {
+    if (unit === "ft") {
+      return formatNumericText(metersToFeet(meters), 2);
+    }
+    return formatNumericText(meters, 2);
+  };
+
+  const parseDisplayLevelToMeters = (text, unit = unitMode) => {
+    const trimmed = String(text ?? "").trim();
+
+    if (
+      trimmed === "" ||
+      trimmed === "-" ||
+      trimmed === "+" ||
+      trimmed === "." ||
+      trimmed === "-." ||
+      trimmed === "+."
+    ) {
+      return null;
+    }
+
+    const parsed = parseFloat(trimmed);
+    if (Number.isNaN(parsed)) return null;
+
+    return unit === "ft" ? feetToMeters(parsed) : parsed;
+  };
+
+  const commitInputText = (text = inputText, unit = unitMode) => {
+    const parsedMeters = parseDisplayLevelToMeters(text, unit);
+    if (parsedMeters === null) {
+      return null;
+    }
+
+    setInputLevel(parsedMeters);
+    setInputText(formatInputTextFromMeters(parsedMeters, unit));
+    return parsedMeters;
+  };
+
+  useEffect(() => {
+    setInputText(formatInputTextFromMeters(inputLevel, unitMode));
+  }, [unitMode]);
+
   const formatLevelForDisplay = (meters, unit = unitMode) => {
     if (unit === "ft") {
       const feet = Math.round(metersToFeet(meters));
@@ -157,12 +206,6 @@ export default function HomePage() {
     hoverElevation !== null
       ? Number((hoverElevation - seaLevel).toFixed(2))
       : null;
-
-  const clampLevel = (value) => {
-    const parsed = parseFloat(value);
-    if (Number.isNaN(parsed)) return 0;
-    return Math.max(-5000, Math.min(5000, parsed));
-  };
 
   const clampImpactDiameter = (value) => {
     const parsed = parseInt(value, 10);
@@ -201,7 +244,9 @@ export default function HomePage() {
 
     if (!map || !map.isStyleLoaded()) return false;
 
-    const tileUrl = `${floodEngineUrl}/flood/${level}/{z}/{x}/{y}.png`;
+    const tileUrl = `${floodEngineUrl}/flood/${encodeURIComponent(
+      level
+    )}/{z}/{x}/{y}.png`;
 
     try {
       if (map.getLayer(FLOOD_LAYER_ID)) map.removeLayer(FLOOD_LAYER_ID);
@@ -529,13 +574,21 @@ export default function HomePage() {
   };
 
   const executeFlood = () => {
-    const level = Math.round(clampLevel(inputLevel));
+    const parsedLevel = commitInputText(inputText, unitMode);
+
+    if (parsedLevel === null) {
+      setStatus("Enter a valid sea level first");
+      return;
+    }
+
+    const level = parsedLevel;
 
     setScenarioMode("flood");
     scenarioModeRef.current = "flood";
 
     setSeaLevel(level);
     seaLevelRef.current = level;
+    setInputLevel(level);
 
     setExecutedImpact(null);
     executedImpactRef.current = null;
@@ -638,6 +691,7 @@ export default function HomePage() {
 
   const clearFlood = () => {
     setInputLevel(0);
+    setInputText("0");
     setSeaLevel(0);
     seaLevelRef.current = 0;
 
@@ -674,7 +728,10 @@ export default function HomePage() {
       keyboard: true,
       touchZoomRotate: true,
       transformRequest: (url, resourceType) => {
-        if (resourceType === "Tile" && (url.includes("/flood/") || url.includes("/impact-flood/"))) {
+        if (
+          resourceType === "Tile" &&
+          (url.includes("/flood/") || url.includes("/impact-flood/"))
+        ) {
           console.log("Tile request:", url);
         }
         return { url };
@@ -816,7 +873,15 @@ export default function HomePage() {
     }
 
     setStatus(`Flood tiles loaded at ${formatLevelForDisplay(seaLevel)}`);
-  }, [scenarioMode, impactDiameter, viewMode, seaLevel, executedImpact, impactResult, unitMode]);
+  }, [
+    scenarioMode,
+    impactDiameter,
+    viewMode,
+    seaLevel,
+    executedImpact,
+    impactResult,
+    unitMode,
+  ]);
 
   return (
     <div
@@ -918,25 +983,22 @@ export default function HomePage() {
         </div>
 
         <input
-          type="number"
-          step={unitMode === "ft" ? "1" : "0.1"}
-          value={
-            unitMode === "ft"
-              ? Number(metersToFeet(inputLevel).toFixed(2))
-              : Number(inputLevel.toFixed(2))
-          }
+          type="text"
+          inputMode="decimal"
+          placeholder={unitMode === "ft" ? "Enter sea level in feet" : "Enter sea level in meters"}
+          value={inputText}
           onChange={(e) => {
-            const raw = Number(e.target.value);
-
-            if (Number.isNaN(raw)) {
-              setInputLevel(0);
-              return;
+            setInputText(e.target.value);
+          }}
+          onBlur={() => {
+            const committed = commitInputText(inputText, unitMode);
+            if (committed !== null) {
+              setInputLevel(committed);
             }
-
-            if (unitMode === "ft") {
-              setInputLevel(clampLevel(feetToMeters(raw)));
-            } else {
-              setInputLevel(clampLevel(raw));
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              executeFlood();
             }
           }}
           style={{
@@ -982,7 +1044,7 @@ export default function HomePage() {
         </div>
 
         <div style={{ fontSize: 14, marginBottom: 24 }}>
-          Range: {unitMode === "ft" ? "-16404ft to +16404ft" : "-5000m to +5000m"}
+          Custom input supports positive and negative values in {unitMode === "ft" ? "feet" : "meters"}
         </div>
 
         <hr style={{ margin: "0 0 18px 0" }} />
@@ -1000,7 +1062,7 @@ export default function HomePage() {
           }}
         >
           {PRESETS.map((preset) => {
-            const active = Math.round(inputLevel) === preset.value;
+            const active = Math.round(inputLevel) === Math.round(preset.value);
             const presetLabel =
               unitMode === "ft"
                 ? `${Math.round(metersToFeet(preset.value)) > 0 ? "+" : ""}${Math.round(
@@ -1013,6 +1075,7 @@ export default function HomePage() {
                 key={preset.label}
                 onClick={() => {
                   setInputLevel(preset.value);
+                  setInputText(formatInputTextFromMeters(preset.value, unitMode));
                 }}
                 style={{
                   padding: "12px 10px",
@@ -1118,7 +1181,8 @@ export default function HomePage() {
             />
 
             <div style={{ fontSize: 14, marginBottom: 12 }}>
-              Diameter: {impactDiameter >= 1000
+              Diameter:{" "}
+              {impactDiameter >= 1000
                 ? `${(impactDiameter / 1000).toFixed(2)} km`
                 : `${impactDiameter} m`}
             </div>
