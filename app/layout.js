@@ -1,3 +1,5 @@
+import "mapbox-gl/dist/mapbox-gl.css";
+
 export const metadata = {
   title: "Floodmap V1",
   description: "Flood map app",
