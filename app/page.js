@@ -379,6 +379,28 @@ export default function HomePage() {
     }
   };
 
+  const getOverlayAnchorLayerId = () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return undefined;
+
+    const preferred = [
+      "waterway-label",
+      "settlement-major-label",
+      "settlement-minor-label",
+      "country-label",
+      "state-label",
+      "road-label",
+    ];
+
+    for (const id of preferred) {
+      if (map.getLayer(id)) return id;
+    }
+
+    const style = map.getStyle?.();
+    const layers = style?.layers || [];
+    return layers.length ? layers[layers.length - 1].id : undefined;
+  };
+
   const ensureFillLineLayers = ({
     sourceId,
     fillId,
@@ -391,28 +413,36 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
+    const beforeId = getOverlayAnchorLayerId();
+
     if (!map.getLayer(fillId)) {
-      map.addLayer({
-        id: fillId,
-        type: "fill",
-        source: sourceId,
-        paint: {
-          "fill-color": fillColor,
-          "fill-opacity": fillOpacity,
+      map.addLayer(
+        {
+          id: fillId,
+          type: "fill",
+          source: sourceId,
+          paint: {
+            "fill-color": fillColor,
+            "fill-opacity": fillOpacity,
+          },
         },
-      });
+        beforeId
+      );
     }
 
     if (!map.getLayer(lineId)) {
-      map.addLayer({
-        id: lineId,
-        type: "line",
-        source: sourceId,
-        paint: {
-          "line-color": lineColor,
-          "line-width": lineWidth,
+      map.addLayer(
+        {
+          id: lineId,
+          type: "line",
+          source: sourceId,
+          paint: {
+            "line-color": lineColor,
+            "line-width": lineWidth,
+          },
         },
-      });
+        beforeId
+      );
     }
   };
 
@@ -477,31 +507,39 @@ export default function HomePage() {
       lineWidth: 2,
     });
 
+    const beforeId = getOverlayAnchorLayerId();
+
     if (!map.getLayer(IMPACT_RING_LAYER_ID)) {
-      map.addLayer({
-        id: IMPACT_RING_LAYER_ID,
-        type: "circle",
-        source: IMPACT_SOURCE_ID,
-        paint: {
-          "circle-radius": 16,
-          "circle-color": "rgba(239,68,68,0.25)",
-          "circle-stroke-width": 0,
+      map.addLayer(
+        {
+          id: IMPACT_RING_LAYER_ID,
+          type: "circle",
+          source: IMPACT_SOURCE_ID,
+          paint: {
+            "circle-radius": 16,
+            "circle-color": "rgba(239,68,68,0.25)",
+            "circle-stroke-width": 0,
+          },
         },
-      });
+        beforeId
+      );
     }
 
     if (!map.getLayer(IMPACT_LAYER_ID)) {
-      map.addLayer({
-        id: IMPACT_LAYER_ID,
-        type: "circle",
-        source: IMPACT_SOURCE_ID,
-        paint: {
-          "circle-radius": 8,
-          "circle-color": "#ef4444",
-          "circle-stroke-width": 3,
-          "circle-stroke-color": "#ffffff",
+      map.addLayer(
+        {
+          id: IMPACT_LAYER_ID,
+          type: "circle",
+          source: IMPACT_SOURCE_ID,
+          paint: {
+            "circle-radius": 8,
+            "circle-color": "#ef4444",
+            "circle-stroke-width": 3,
+            "circle-stroke-color": "#ffffff",
+          },
         },
-      });
+        beforeId
+      );
     }
   };
 
@@ -591,10 +629,13 @@ export default function HomePage() {
 
     setSourceData(IMPACT_PREVIEW_SOURCE_ID, emptyFeatureCollection());
 
-    const craterRadius = result.crater_diameter_m > 0 ? result.crater_diameter_m / 2 : 0;
+    const craterRadius =
+      result.crater_diameter_m > 0 ? result.crater_diameter_m / 2 : 0;
     const blastRadius = result.blast_radius_m > 0 ? result.blast_radius_m : 0;
-    const thermalRadius = result.thermal_radius_m > 0 ? result.thermal_radius_m : 0;
-    const tsunamiRadius = result.tsunami_radius_m > 0 ? result.tsunami_radius_m : 0;
+    const thermalRadius =
+      result.thermal_radius_m > 0 ? result.thermal_radius_m : 0;
+    const tsunamiRadius =
+      result.tsunami_radius_m > 0 ? result.tsunami_radius_m : 0;
 
     setSourceData(
       IMPACT_CRATER_SOURCE_ID,
@@ -1114,8 +1155,8 @@ export default function HomePage() {
               seaLevel > 0
                 ? "#0f62fe"
                 : seaLevel < 0
-                ? "#b45309"
-                : "#111827",
+                  ? "#b45309"
+                  : "#111827",
           }}
         >
           {formatLevelForDisplay(seaLevel)}
@@ -1502,7 +1543,8 @@ export default function HomePage() {
               Impact Results
             </div>
             <div>
-              Type: {impactResult.is_ocean_impact ? "Ocean impact" : "Land impact"}
+              Type:{" "}
+              {impactResult.is_ocean_impact ? "Ocean impact" : "Land impact"}
             </div>
             <div>Severity: {impactResult.severity_class}</div>
             <div>Energy: {impactResult.energy_mt.toExponential(2)} Mt TNT</div>
