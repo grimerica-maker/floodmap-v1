@@ -36,6 +36,11 @@ const IMPACT_THERMAL_LINE_ID = "impact-thermal-line";
 const IMPACT_TSUNAMI_FILL_ID = "impact-tsunami-fill";
 const IMPACT_TSUNAMI_LINE_ID = "impact-tsunami-line";
 
+const IMPACT_CRATER_DEBUG_ID = "impact-crater-debug";
+const IMPACT_BLAST_DEBUG_ID = "impact-blast-debug";
+const IMPACT_THERMAL_DEBUG_ID = "impact-thermal-debug";
+const IMPACT_TSUNAMI_DEBUG_ID = "impact-tsunami-debug";
+
 const IMPACT_SHOCK_SOURCE_ID = "impact-shock-source";
 const IMPACT_SHOCK_LINE_ID = "impact-shock-line";
 const IMPACT_WAVEFRONT_SOURCE_ID = "impact-wavefront-source";
@@ -277,6 +282,10 @@ export default function HomePage() {
       IMPACT_BLAST_LINE_ID,
       IMPACT_THERMAL_LINE_ID,
       IMPACT_TSUNAMI_LINE_ID,
+      IMPACT_CRATER_DEBUG_ID,
+      IMPACT_BLAST_DEBUG_ID,
+      IMPACT_THERMAL_DEBUG_ID,
+      IMPACT_TSUNAMI_DEBUG_ID,
       IMPACT_SHOCK_LINE_ID,
       IMPACT_WAVEFRONT_LINE_ID,
       IMPACT_RING_LAYER_ID,
@@ -503,6 +512,106 @@ export default function HomePage() {
             "circle-color": "#ef4444",
             "circle-stroke-width": 3,
             "circle-stroke-color": "#ffffff",
+          },
+        },
+        beforeId
+      );
+    }
+
+    if (!map.getLayer(IMPACT_CRATER_DEBUG_ID)) {
+      map.addLayer(
+        {
+          id: IMPACT_CRATER_DEBUG_ID,
+          type: "circle",
+          source: IMPACT_SOURCE_ID,
+          paint: {
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              0, 0.5,
+              5, 8,
+              8, 18,
+              12, 40,
+            ],
+            "circle-color": "rgba(0,0,0,0)",
+            "circle-stroke-color": "#ff0000",
+            "circle-stroke-width": 3,
+          },
+        },
+        beforeId
+      );
+    }
+
+    if (!map.getLayer(IMPACT_BLAST_DEBUG_ID)) {
+      map.addLayer(
+        {
+          id: IMPACT_BLAST_DEBUG_ID,
+          type: "circle",
+          source: IMPACT_SOURCE_ID,
+          paint: {
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              0, 2,
+              5, 30,
+              8, 80,
+              12, 180,
+            ],
+            "circle-color": "rgba(0,0,0,0)",
+            "circle-stroke-color": "#ff7a00",
+            "circle-stroke-width": 2,
+          },
+        },
+        beforeId
+      );
+    }
+
+    if (!map.getLayer(IMPACT_THERMAL_DEBUG_ID)) {
+      map.addLayer(
+        {
+          id: IMPACT_THERMAL_DEBUG_ID,
+          type: "circle",
+          source: IMPACT_SOURCE_ID,
+          paint: {
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              0, 3,
+              5, 45,
+              8, 120,
+              12, 260,
+            ],
+            "circle-color": "rgba(0,0,0,0)",
+            "circle-stroke-color": "#ffd400",
+            "circle-stroke-width": 2,
+          },
+        },
+        beforeId
+      );
+    }
+
+    if (!map.getLayer(IMPACT_TSUNAMI_DEBUG_ID)) {
+      map.addLayer(
+        {
+          id: IMPACT_TSUNAMI_DEBUG_ID,
+          type: "circle",
+          source: IMPACT_SOURCE_ID,
+          paint: {
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              0, 2,
+              5, 35,
+              8, 95,
+              12, 220,
+            ],
+            "circle-color": "rgba(0,0,0,0)",
+            "circle-stroke-color": "#00c8ff",
+            "circle-stroke-width": 2,
           },
         },
         beforeId
@@ -1357,8 +1466,8 @@ export default function HomePage() {
               seaLevel > 0
                 ? "#0f62fe"
                 : seaLevel < 0
-                  ? "#b45309"
-                  : "#111827",
+                ? "#b45309"
+                : "#111827",
           }}
         >
           {formatLevelForDisplay(seaLevel)}
