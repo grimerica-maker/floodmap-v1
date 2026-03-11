@@ -18,9 +18,24 @@ const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
 
 const IMPACT_SOURCE_ID = "impact-point-source";
-const IMPACT_RADIUS_SOURCE_ID = "impact-radius-source";
-const IMPACT_RADIUS_FILL_ID = "impact-radius-fill";
-const IMPACT_RADIUS_LINE_ID = "impact-radius-line";
+const IMPACT_PREVIEW_SOURCE_ID = "impact-preview-source";
+const IMPACT_PREVIEW_FILL_ID = "impact-preview-fill";
+const IMPACT_PREVIEW_LINE_ID = "impact-preview-line";
+
+const IMPACT_CRATER_SOURCE_ID = "impact-crater-source";
+const IMPACT_BLAST_SOURCE_ID = "impact-blast-source";
+const IMPACT_THERMAL_SOURCE_ID = "impact-thermal-source";
+const IMPACT_TSUNAMI_SOURCE_ID = "impact-tsunami-source";
+
+const IMPACT_CRATER_FILL_ID = "impact-crater-fill";
+const IMPACT_CRATER_LINE_ID = "impact-crater-line";
+const IMPACT_BLAST_FILL_ID = "impact-blast-fill";
+const IMPACT_BLAST_LINE_ID = "impact-blast-line";
+const IMPACT_THERMAL_FILL_ID = "impact-thermal-fill";
+const IMPACT_THERMAL_LINE_ID = "impact-thermal-line";
+const IMPACT_TSUNAMI_FILL_ID = "impact-tsunami-fill";
+const IMPACT_TSUNAMI_LINE_ID = "impact-tsunami-line";
+
 const IMPACT_RING_LAYER_ID = "impact-point-ring-layer";
 const IMPACT_LAYER_ID = "impact-point-layer";
 
@@ -35,6 +50,11 @@ const PRESETS = [
   { label: "Biblical Flood", value: 3048 },
   { label: "Fully Drained", value: -11000 },
 ];
+
+const emptyFeatureCollection = () => ({
+  type: "FeatureCollection",
+  features: [],
+});
 
 const createGeodesicCircle = (lng, lat, radiusMeters, steps = 96) => {
   const coords = [];
@@ -87,6 +107,7 @@ export default function HomePage() {
   const seaLevelRef = useRef(0);
   const viewModeRef = useRef("map");
   const impactDiameterRef = useRef(100);
+  const impactResultRef = useRef(null);
 
   const [inputLevel, setInputLevel] = useState(0);
   const [inputText, setInputText] = useState("0");
@@ -129,6 +150,10 @@ export default function HomePage() {
   useEffect(() => {
     impactDiameterRef.current = impactDiameter;
   }, [impactDiameter]);
+
+  useEffect(() => {
+    impactResultRef.current = impactResult;
+  }, [impactResult]);
 
   useEffect(() => {
     if (!CONFIGURED_FLOOD_ENGINE_URL) {
@@ -343,47 +368,114 @@ export default function HomePage() {
     }
   };
 
+  const ensureGeoJsonSource = (id) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    if (!map.getSource(id)) {
+      map.addSource(id, {
+        type: "geojson",
+        data: emptyFeatureCollection(),
+      });
+    }
+  };
+
+  const ensureFillLineLayers = ({
+    sourceId,
+    fillId,
+    lineId,
+    fillColor,
+    fillOpacity,
+    lineColor,
+    lineWidth,
+  }) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (!map.getLayer(fillId)) {
+      map.addLayer({
+        id: fillId,
+        type: "fill",
+        source: sourceId,
+        paint: {
+          "fill-color": fillColor,
+          "fill-opacity": fillOpacity,
+        },
+      });
+    }
+
+    if (!map.getLayer(lineId)) {
+      map.addLayer({
+        id: lineId,
+        type: "line",
+        source: sourceId,
+        paint: {
+          "line-color": lineColor,
+          "line-width": lineWidth,
+        },
+      });
+    }
+  };
+
   const ensureImpactLayers = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
-    if (!map.getSource(IMPACT_RADIUS_SOURCE_ID)) {
-      map.addSource(IMPACT_RADIUS_SOURCE_ID, {
-        type: "geojson",
-        data: { type: "FeatureCollection", features: [] },
-      });
-    }
+    ensureGeoJsonSource(IMPACT_SOURCE_ID);
+    ensureGeoJsonSource(IMPACT_PREVIEW_SOURCE_ID);
+    ensureGeoJsonSource(IMPACT_CRATER_SOURCE_ID);
+    ensureGeoJsonSource(IMPACT_BLAST_SOURCE_ID);
+    ensureGeoJsonSource(IMPACT_THERMAL_SOURCE_ID);
+    ensureGeoJsonSource(IMPACT_TSUNAMI_SOURCE_ID);
 
-    if (!map.getSource(IMPACT_SOURCE_ID)) {
-      map.addSource(IMPACT_SOURCE_ID, {
-        type: "geojson",
-        data: { type: "FeatureCollection", features: [] },
-      });
-    }
+    ensureFillLineLayers({
+      sourceId: IMPACT_PREVIEW_SOURCE_ID,
+      fillId: IMPACT_PREVIEW_FILL_ID,
+      lineId: IMPACT_PREVIEW_LINE_ID,
+      fillColor: "#ef4444",
+      fillOpacity: 0.08,
+      lineColor: "#ef4444",
+      lineWidth: 2,
+    });
 
-    if (!map.getLayer(IMPACT_RADIUS_FILL_ID)) {
-      map.addLayer({
-        id: IMPACT_RADIUS_FILL_ID,
-        type: "fill",
-        source: IMPACT_RADIUS_SOURCE_ID,
-        paint: {
-          "fill-color": "#ef4444",
-          "fill-opacity": 0.16,
-        },
-      });
-    }
+    ensureFillLineLayers({
+      sourceId: IMPACT_CRATER_SOURCE_ID,
+      fillId: IMPACT_CRATER_FILL_ID,
+      lineId: IMPACT_CRATER_LINE_ID,
+      fillColor: "#991b1b",
+      fillOpacity: 0.18,
+      lineColor: "#7f1d1d",
+      lineWidth: 3,
+    });
 
-    if (!map.getLayer(IMPACT_RADIUS_LINE_ID)) {
-      map.addLayer({
-        id: IMPACT_RADIUS_LINE_ID,
-        type: "line",
-        source: IMPACT_RADIUS_SOURCE_ID,
-        paint: {
-          "line-color": "#b91c1c",
-          "line-width": 3,
-        },
-      });
-    }
+    ensureFillLineLayers({
+      sourceId: IMPACT_BLAST_SOURCE_ID,
+      fillId: IMPACT_BLAST_FILL_ID,
+      lineId: IMPACT_BLAST_LINE_ID,
+      fillColor: "#f97316",
+      fillOpacity: 0.1,
+      lineColor: "#ea580c",
+      lineWidth: 2,
+    });
+
+    ensureFillLineLayers({
+      sourceId: IMPACT_THERMAL_SOURCE_ID,
+      fillId: IMPACT_THERMAL_FILL_ID,
+      lineId: IMPACT_THERMAL_LINE_ID,
+      fillColor: "#facc15",
+      fillOpacity: 0.08,
+      lineColor: "#eab308",
+      lineWidth: 2,
+    });
+
+    ensureFillLineLayers({
+      sourceId: IMPACT_TSUNAMI_SOURCE_ID,
+      fillId: IMPACT_TSUNAMI_FILL_ID,
+      lineId: IMPACT_TSUNAMI_LINE_ID,
+      fillColor: "#38bdf8",
+      fillOpacity: 0.06,
+      lineColor: "#0ea5e9",
+      lineWidth: 2,
+    });
 
     if (!map.getLayer(IMPACT_RING_LAYER_ID)) {
       map.addLayer({
@@ -413,22 +505,41 @@ export default function HomePage() {
     }
   };
 
-  const clearImpactPointOnMap = () => {
+  const setSourceData = (sourceId, data) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
-    const pointSource = map.getSource(IMPACT_SOURCE_ID);
-    if (pointSource) {
-      pointSource.setData({ type: "FeatureCollection", features: [] });
-    }
-
-    const radiusSource = map.getSource(IMPACT_RADIUS_SOURCE_ID);
-    if (radiusSource) {
-      radiusSource.setData({ type: "FeatureCollection", features: [] });
+    const source = map.getSource(sourceId);
+    if (source) {
+      source.setData(data);
     }
   };
 
-  const setImpactPointOnMap = (
+  const clearImpactRings = () => {
+    setSourceData(IMPACT_PREVIEW_SOURCE_ID, emptyFeatureCollection());
+    setSourceData(IMPACT_CRATER_SOURCE_ID, emptyFeatureCollection());
+    setSourceData(IMPACT_BLAST_SOURCE_ID, emptyFeatureCollection());
+    setSourceData(IMPACT_THERMAL_SOURCE_ID, emptyFeatureCollection());
+    setSourceData(IMPACT_TSUNAMI_SOURCE_ID, emptyFeatureCollection());
+  };
+
+  const clearImpactPointOnMap = () => {
+    setSourceData(IMPACT_SOURCE_ID, emptyFeatureCollection());
+    clearImpactRings();
+  };
+
+  const buildRingFeatureCollection = (lng, lat, radiusMeters) => {
+    if (!radiusMeters || radiusMeters <= 0) {
+      return emptyFeatureCollection();
+    }
+
+    return {
+      type: "FeatureCollection",
+      features: [createGeodesicCircle(lng, lat, radiusMeters)],
+    };
+  };
+
+  const setImpactPreviewOnMap = (
     point,
     diameterValue = impactDiameterRef.current
   ) => {
@@ -437,12 +548,7 @@ export default function HomePage() {
 
     ensureImpactLayers();
 
-    const pointSource = map.getSource(IMPACT_SOURCE_ID);
-    const radiusSource = map.getSource(IMPACT_RADIUS_SOURCE_ID);
-
-    if (!pointSource || !radiusSource) return;
-
-    pointSource.setData({
+    setSourceData(IMPACT_SOURCE_ID, {
       type: "FeatureCollection",
       features: [
         {
@@ -453,14 +559,59 @@ export default function HomePage() {
       ],
     });
 
-    const craterRadiusMeters = Math.max(500, diameterValue * 20);
+    const previewRadiusMeters = Math.max(500, diameterValue * 20);
 
-    radiusSource.setData({
+    setSourceData(
+      IMPACT_PREVIEW_SOURCE_ID,
+      buildRingFeatureCollection(point.lng, point.lat, previewRadiusMeters)
+    );
+
+    setSourceData(IMPACT_CRATER_SOURCE_ID, emptyFeatureCollection());
+    setSourceData(IMPACT_BLAST_SOURCE_ID, emptyFeatureCollection());
+    setSourceData(IMPACT_THERMAL_SOURCE_ID, emptyFeatureCollection());
+    setSourceData(IMPACT_TSUNAMI_SOURCE_ID, emptyFeatureCollection());
+  };
+
+  const setExecutedImpactOnMap = (point, diameterValue, result) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || !point || !result) return;
+
+    ensureImpactLayers();
+
+    setSourceData(IMPACT_SOURCE_ID, {
       type: "FeatureCollection",
       features: [
-        createGeodesicCircle(point.lng, point.lat, craterRadiusMeters),
+        {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [point.lng, point.lat] },
+          properties: { diameter: diameterValue },
+        },
       ],
     });
+
+    setSourceData(IMPACT_PREVIEW_SOURCE_ID, emptyFeatureCollection());
+
+    const craterRadius = result.crater_diameter_m > 0 ? result.crater_diameter_m / 2 : 0;
+    const blastRadius = result.blast_radius_m > 0 ? result.blast_radius_m : 0;
+    const thermalRadius = result.thermal_radius_m > 0 ? result.thermal_radius_m : 0;
+    const tsunamiRadius = result.tsunami_radius_m > 0 ? result.tsunami_radius_m : 0;
+
+    setSourceData(
+      IMPACT_CRATER_SOURCE_ID,
+      buildRingFeatureCollection(point.lng, point.lat, craterRadius)
+    );
+    setSourceData(
+      IMPACT_BLAST_SOURCE_ID,
+      buildRingFeatureCollection(point.lng, point.lat, blastRadius)
+    );
+    setSourceData(
+      IMPACT_THERMAL_SOURCE_ID,
+      buildRingFeatureCollection(point.lng, point.lat, thermalRadius)
+    );
+    setSourceData(
+      IMPACT_TSUNAMI_SOURCE_ID,
+      buildRingFeatureCollection(point.lng, point.lat, tsunamiRadius)
+    );
   };
 
   const fetchElevation = async (lat, lng) => {
@@ -502,8 +653,17 @@ export default function HomePage() {
 
     removeFloodLayer();
 
-    if (impactPointRef.current) {
-      setImpactPointOnMap(impactPointRef.current, impactDiameterRef.current);
+    if (executedImpactRef.current && impactResultRef.current) {
+      setExecutedImpactOnMap(
+        {
+          lng: executedImpactRef.current.lng,
+          lat: executedImpactRef.current.lat,
+        },
+        executedImpactRef.current.diameter,
+        impactResultRef.current
+      );
+    } else if (impactPointRef.current) {
+      setImpactPreviewOnMap(impactPointRef.current, impactDiameterRef.current);
     } else {
       clearImpactPointOnMap();
     }
@@ -600,6 +760,7 @@ export default function HomePage() {
     setExecutedImpact(null);
     executedImpactRef.current = null;
     setImpactResult(null);
+    impactResultRef.current = null;
 
     if (!floodAllowedInCurrentView()) {
       removeFloodLayer();
@@ -675,12 +836,17 @@ export default function HomePage() {
       setExecutedImpact(run);
       executedImpactRef.current = run;
       setImpactResult(data);
+      impactResultRef.current = data;
 
       pendingFloodLevelRef.current = null;
       activeFloodLevelRef.current = null;
       removeFloodLayer();
 
-      setImpactPointOnMap(impactPointRef.current, impactDiameterRef.current);
+      setExecutedImpactOnMap(
+        impactPointRef.current,
+        impactDiameterRef.current,
+        data
+      );
 
       if (data.is_ocean_impact && data.tsunami_radius_m > 0) {
         addImpactFloodLayer(data.run_id);
@@ -707,6 +873,7 @@ export default function HomePage() {
     setExecutedImpact(null);
     executedImpactRef.current = null;
     setImpactResult(null);
+    impactResultRef.current = null;
 
     pendingFloodLevelRef.current = null;
     activeFloodLevelRef.current = null;
@@ -800,7 +967,7 @@ export default function HomePage() {
 
       impactPointRef.current = point;
       setImpactPoint(point);
-      setImpactPointOnMap(point, impactDiameterRef.current);
+      setImpactPreviewOnMap(point, impactDiameterRef.current);
       setStatus("Impact point selected - click Execute Impact");
     };
 
@@ -1295,7 +1462,7 @@ export default function HomePage() {
           fontSize: 14,
           lineHeight: 1.45,
           zIndex: 1000,
-          minWidth: 300,
+          minWidth: 320,
         }}
       >
         <div style={{ fontWeight: 700, marginBottom: 8 }}>
@@ -1341,6 +1508,12 @@ export default function HomePage() {
             <div>Energy: {impactResult.energy_mt.toExponential(2)} Mt TNT</div>
             <div>Crater: {Math.round(impactResult.crater_diameter_m)} m</div>
             <div>Blast Radius: {Math.round(impactResult.blast_radius_m)} m</div>
+            <div>
+              Thermal Radius:{" "}
+              {impactResult.thermal_radius_m > 0
+                ? `${Math.round(impactResult.thermal_radius_m)} m`
+                : "--"}
+            </div>
             <div>
               Tsunami Radius:{" "}
               {impactResult.tsunami_radius_m > 0
