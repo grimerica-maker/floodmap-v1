@@ -9,7 +9,7 @@ const CONFIGURED_FLOOD_ENGINE_URL = process.env.NEXT_PUBLIC_FLOOD_ENGINE_URL;
 const FLOOD_ENGINE_PROXY_PATH = "/api/engine";
 const DEBUG_FLOOD = true;
 const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
-const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-streets-v12";
+const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-v9";
 
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
@@ -81,8 +81,8 @@ export default function HomePage() {
   const viewModeRef = useRef("map");
   const impactDiameterRef = useRef(100);
 
-  const [inputLevel, setInputLevel] = useState(0); // always meters internally
-  const [seaLevel, setSeaLevel] = useState(0); // always meters internally
+  const [inputLevel, setInputLevel] = useState(0); // meters internally
+  const [seaLevel, setSeaLevel] = useState(0); // meters internally
   const [viewMode, setViewMode] = useState("map");
   const [unitMode, setUnitMode] = useState("m");
   const [status, setStatus] = useState("Loading map...");
@@ -154,7 +154,7 @@ export default function HomePage() {
       const feet = Math.round(metersToFeet(meters));
       return `${feet > 0 ? "+" : ""}${feet} ft`;
     }
-    return `${meters > 0 ? "+" : ""}${meters} m`;
+    return `${meters > 0 ? "+" : ""}${Math.round(meters)} m`;
   };
 
   const waterDifference =
@@ -163,7 +163,7 @@ export default function HomePage() {
       : null;
 
   const clampLevel = (value) => {
-    const parsed = parseInt(value, 10);
+    const parsed = parseFloat(value);
     if (Number.isNaN(parsed)) return 0;
     return Math.max(-5000, Math.min(5000, parsed));
   };
@@ -512,8 +512,8 @@ export default function HomePage() {
             ? "Impact saved"
             : "Click map to place impact point"
           : seaLevelRef.current !== 0
-            ? "Satellite flood overlay active"
-            : "Satellite view ready"
+          ? "Satellite flood overlay active"
+          : "Satellite view ready"
       );
       return;
     }
@@ -540,7 +540,7 @@ export default function HomePage() {
   };
 
   const executeFlood = () => {
-    const level = clampLevel(inputLevel);
+    const level = Math.round(clampLevel(inputLevel));
     console.log("Execute flood level:", level);
     console.log("Execute Flood clicked", {
       inputLevel,
@@ -926,11 +926,11 @@ export default function HomePage() {
 
         <input
           type="number"
-          step={unitMode === "ft" ? "25" : "10"}
+          step={unitMode === "ft" ? "1" : "0.1"}
           value={
             unitMode === "ft"
-              ? Math.round(metersToFeet(inputLevel))
-              : inputLevel
+              ? Number(metersToFeet(inputLevel).toFixed(2))
+              : Number(inputLevel.toFixed(2))
           }
           onChange={(e) => {
             const raw = Number(e.target.value);
@@ -941,7 +941,7 @@ export default function HomePage() {
             }
 
             if (unitMode === "ft") {
-              setInputLevel(clampLevel(Math.round(feetToMeters(raw))));
+              setInputLevel(clampLevel(feetToMeters(raw)));
             } else {
               setInputLevel(clampLevel(raw));
             }
@@ -1007,7 +1007,7 @@ export default function HomePage() {
           }}
         >
           {PRESETS.map((preset) => {
-            const active = inputLevel === preset.value;
+            const active = Math.round(inputLevel) === preset.value;
             const presetLabel =
               unitMode === "ft"
                 ? `${Math.round(metersToFeet(preset.value)) > 0 ? "+" : ""}${Math.round(
