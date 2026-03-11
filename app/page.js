@@ -25,8 +25,8 @@ const PRESETS = [
   { label: "Ice Age", value: -120 },
   { label: "Modern", value: 0 },
   { label: "Holocene", value: 6 },
-  { label: "Eocene", value: 70 },
-  { label: "Total Flood", value: 5000 },
+  { label: "All Ice Melted", value: 70 },
+  { label: "Biblical Flood", value: 3048 }, // 10,000 ft
 ];
 
 const createGeodesicCircle = (lng, lat, radiusMeters, steps = 96) => {
@@ -81,9 +81,10 @@ export default function HomePage() {
   const viewModeRef = useRef("map");
   const impactDiameterRef = useRef(100);
 
-  const [inputLevel, setInputLevel] = useState(0);
-  const [seaLevel, setSeaLevel] = useState(0);
+  const [inputLevel, setInputLevel] = useState(0); // always meters internally
+  const [seaLevel, setSeaLevel] = useState(0); // always meters internally
   const [viewMode, setViewMode] = useState("map");
+  const [unitMode, setUnitMode] = useState("m");
   const [status, setStatus] = useState("Loading map...");
   const [scenarioMode, setScenarioMode] = useState("flood");
 
@@ -144,6 +145,17 @@ export default function HomePage() {
     setFloodEngineUrl(CONFIGURED_FLOOD_ENGINE_URL.replace(/\/+$/, ""));
     console.log("Flood engine URL:", CONFIGURED_FLOOD_ENGINE_URL);
   }, []);
+
+  const metersToFeet = (meters) => meters * 3.28084;
+  const feetToMeters = (feet) => feet / 3.28084;
+
+  const formatLevelForDisplay = (meters, unit = unitMode) => {
+    if (unit === "ft") {
+      const feet = Math.round(metersToFeet(meters));
+      return `${feet > 0 ? "+" : ""}${feet} ft`;
+    }
+    return `${meters > 0 ? "+" : ""}${meters} m`;
+  };
 
   const waterDifference =
     hoverElevation !== null
@@ -245,13 +257,16 @@ export default function HomePage() {
     }
   };
 
+  const floodAllowedInCurrentView = () =>
+    viewModeRef.current === "map" || viewModeRef.current === "satellite";
+
   const flushPendingFloodLayer = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
     if (
       scenarioModeRef.current === "flood" &&
-      viewModeRef.current === "map" &&
+      floodAllowedInCurrentView() &&
       pendingFloodLevelRef.current !== null
     ) {
       const level = pendingFloodLevelRef.current;
@@ -424,7 +439,7 @@ export default function HomePage() {
     if (scenarioModeRef.current === "flood") {
       clearImpactPointOnMap();
 
-      if (viewModeRef.current === "map" && seaLevelRef.current !== 0) {
+      if (floodAllowedInCurrentView() && seaLevelRef.current !== 0) {
         addFloodLayer(seaLevelRef.current);
       } else {
         removeFloodLayer();
@@ -496,7 +511,9 @@ export default function HomePage() {
           ? executedImpactRef.current
             ? "Impact saved"
             : "Click map to place impact point"
-          : "Satellite placeholder"
+          : seaLevelRef.current !== 0
+            ? "Satellite flood overlay active"
+            : "Satellite view ready"
       );
       return;
     }
@@ -540,9 +557,9 @@ export default function HomePage() {
     setExecutedImpact(null);
     executedImpactRef.current = null;
 
-    if (viewModeRef.current !== "map") {
+    if (!floodAllowedInCurrentView()) {
       removeFloodLayer();
-      setStatus("Switch to Standard Map to run flood layer");
+      setStatus("Switch to Standard Map or Satellite to run flood layer");
       return;
     }
 
@@ -559,7 +576,7 @@ export default function HomePage() {
     const added = addFloodLayer(level);
 
     if (added) {
-      setStatus(`Flood tiles loaded at ${level > 0 ? "+" : ""}${level}m`);
+      setStatus(`Flood tiles loaded at ${formatLevelForDisplay(level)}`);
       return;
     }
 
@@ -569,12 +586,12 @@ export default function HomePage() {
     setTimeout(() => {
       if (
         scenarioModeRef.current === "flood" &&
-        viewModeRef.current === "map" &&
+        floodAllowedInCurrentView() &&
         pendingFloodLevelRef.current === level
       ) {
         const retried = addFloodLayer(level);
         if (retried) {
-          setStatus(`Flood tiles loaded at ${level > 0 ? "+" : ""}${level}m`);
+          setStatus(`Flood tiles loaded at ${formatLevelForDisplay(level)}`);
         }
       }
     }, 300);
@@ -688,7 +705,7 @@ export default function HomePage() {
 
       if (
         scenarioModeRef.current === "flood" &&
-        viewModeRef.current === "map" &&
+        floodAllowedInCurrentView() &&
         seaLevelRef.current !== 0
       ) {
         addFloodLayer(seaLevelRef.current);
@@ -795,8 +812,8 @@ export default function HomePage() {
       return;
     }
 
-    if (viewMode !== "map") {
-      setStatus("Switch to Standard Map to run flood layer");
+    if (!floodAllowedInCurrentView() && viewMode === "globe") {
+      setStatus("Globe preview mode");
       return;
     }
 
@@ -805,8 +822,8 @@ export default function HomePage() {
       return;
     }
 
-    setStatus(`Flood tiles loaded at ${seaLevel > 0 ? "+" : ""}${seaLevel}m`);
-  }, [scenarioMode, impactDiameter, viewMode, seaLevel, executedImpact]);
+    setStatus(`Flood tiles loaded at ${formatLevelForDisplay(seaLevel)}`);
+  }, [scenarioMode, impactDiameter, viewMode, seaLevel, executedImpact, unitMode]);
 
   return (
     <div
@@ -870,17 +887,65 @@ export default function HomePage() {
                 : "#111827",
           }}
         >
-          {seaLevel > 0 ? "+" : ""}
-          {seaLevel} m
+          {formatLevelForDisplay(seaLevel)}
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <button
+            onClick={() => setUnitMode("m")}
+            style={{
+              flex: 1,
+              padding: "10px 8px",
+              border: "1px solid #d1d5db",
+              background: unitMode === "m" ? "#0f172a" : "white",
+              color: unitMode === "m" ? "white" : "#111827",
+              cursor: "pointer",
+              borderRadius: 10,
+              fontWeight: 700,
+            }}
+          >
+            Meters
+          </button>
+
+          <button
+            onClick={() => setUnitMode("ft")}
+            style={{
+              flex: 1,
+              padding: "10px 8px",
+              border: "1px solid #d1d5db",
+              background: unitMode === "ft" ? "#0f172a" : "white",
+              color: unitMode === "ft" ? "white" : "#111827",
+              cursor: "pointer",
+              borderRadius: 10,
+              fontWeight: 700,
+            }}
+          >
+            Feet
+          </button>
         </div>
 
         <input
           type="number"
-          min="-5000"
-          max="5000"
-          step="10"
-          value={inputLevel}
-          onChange={(e) => setInputLevel(clampLevel(e.target.value))}
+          step={unitMode === "ft" ? "25" : "10"}
+          value={
+            unitMode === "ft"
+              ? Math.round(metersToFeet(inputLevel))
+              : inputLevel
+          }
+          onChange={(e) => {
+            const raw = Number(e.target.value);
+
+            if (Number.isNaN(raw)) {
+              setInputLevel(0);
+              return;
+            }
+
+            if (unitMode === "ft") {
+              setInputLevel(clampLevel(Math.round(feetToMeters(raw))));
+            } else {
+              setInputLevel(clampLevel(raw));
+            }
+          }}
           style={{
             width: "100%",
             padding: 12,
@@ -924,7 +989,7 @@ export default function HomePage() {
         </div>
 
         <div style={{ fontSize: 14, marginBottom: 24 }}>
-          Range: -5000m to +5000m
+          Range: {unitMode === "ft" ? "-16404ft to +16404ft" : "-5000m to +5000m"}
         </div>
 
         <hr style={{ margin: "0 0 18px 0" }} />
@@ -943,6 +1008,13 @@ export default function HomePage() {
         >
           {PRESETS.map((preset) => {
             const active = inputLevel === preset.value;
+            const presetLabel =
+              unitMode === "ft"
+                ? `${Math.round(metersToFeet(preset.value)) > 0 ? "+" : ""}${Math.round(
+                    metersToFeet(preset.value)
+                  )}ft`
+                : `${preset.value > 0 ? "+" : ""}${preset.value}m`;
+
             return (
               <button
                 key={preset.label}
@@ -961,8 +1033,7 @@ export default function HomePage() {
               >
                 <div>{preset.label}</div>
                 <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
-                  {preset.value > 0 ? "+" : ""}
-                  {preset.value}m
+                  {presetLabel}
                 </div>
               </button>
             );
@@ -1132,7 +1203,7 @@ export default function HomePage() {
           >
             <div>Satellite View</div>
             <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
-              Pro placeholder
+              Flood overlay supported
             </div>
           </button>
 
@@ -1175,10 +1246,7 @@ export default function HomePage() {
         <div style={{ fontWeight: 700, marginBottom: 8 }}>
           Current Scenario
         </div>
-        <div>
-          Sea level: {seaLevel > 0 ? "+" : ""}
-          {seaLevel}m
-        </div>
+        <div>Sea level: {formatLevelForDisplay(seaLevel)}</div>
         <div>
           Mode:{" "}
           {viewMode === "map"
@@ -1212,16 +1280,25 @@ export default function HomePage() {
         <div>Lng: {hoverLng ?? "--"}</div>
         <div>
           Original Elevation:{" "}
-          {hoverElevation !== null ? `${hoverElevation} m` : "--"}
+          {hoverElevation !== null
+            ? unitMode === "ft"
+              ? `${Math.round(metersToFeet(hoverElevation))} ft`
+              : `${hoverElevation} m`
+            : "--"}
         </div>
-        <div>
-          Sea Level: {seaLevel > 0 ? "+" : ""}
-          {seaLevel} m
-        </div>
+        <div>Sea Level: {formatLevelForDisplay(seaLevel)}</div>
         <div>
           {waterDifference !== null
             ? waterDifference >= 0
-              ? `Above water by ${waterDifference} m`
+              ? unitMode === "ft"
+                ? `Above water by ${Math.round(
+                    metersToFeet(waterDifference)
+                  )} ft`
+                : `Above water by ${waterDifference} m`
+              : unitMode === "ft"
+              ? `Underwater by ${Math.round(
+                  metersToFeet(Math.abs(waterDifference))
+                )} ft`
               : `Underwater by ${Math.abs(waterDifference)} m`
             : "--"}
         </div>
