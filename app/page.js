@@ -267,16 +267,16 @@ export default function HomePage() {
 
     const orderedLayerIds = [
       IMPACT_PREVIEW_FILL_ID,
-      IMPACT_PREVIEW_LINE_ID,
       IMPACT_CRATER_FILL_ID,
-      IMPACT_CRATER_LINE_ID,
       IMPACT_BLAST_FILL_ID,
-      IMPACT_BLAST_LINE_ID,
       IMPACT_THERMAL_FILL_ID,
-      IMPACT_THERMAL_LINE_ID,
       IMPACT_TSUNAMI_FILL_ID,
-      IMPACT_TSUNAMI_LINE_ID,
       IMPACT_FLOOD_LAYER_ID,
+      IMPACT_PREVIEW_LINE_ID,
+      IMPACT_CRATER_LINE_ID,
+      IMPACT_BLAST_LINE_ID,
+      IMPACT_THERMAL_LINE_ID,
+      IMPACT_TSUNAMI_LINE_ID,
       IMPACT_SHOCK_LINE_ID,
       IMPACT_WAVEFRONT_LINE_ID,
       IMPACT_RING_LAYER_ID,
@@ -429,9 +429,9 @@ export default function HomePage() {
       fillId: IMPACT_PREVIEW_FILL_ID,
       lineId: IMPACT_PREVIEW_LINE_ID,
       fillColor: "#ef4444",
-      fillOpacity: 0.12,
-      lineColor: "#ef4444",
-      lineWidth: 3,
+      fillOpacity: 0.0,
+      lineColor: "#ffffff",
+      lineWidth: 4,
     });
 
     ensureFillLineLayers({
@@ -439,9 +439,9 @@ export default function HomePage() {
       fillId: IMPACT_CRATER_FILL_ID,
       lineId: IMPACT_CRATER_LINE_ID,
       fillColor: "#7f1d1d",
-      fillOpacity: 0.2,
-      lineColor: "#7f1d1d",
-      lineWidth: 4,
+      fillOpacity: 0.0,
+      lineColor: "#ff0000",
+      lineWidth: 6,
     });
 
     ensureFillLineLayers({
@@ -449,9 +449,9 @@ export default function HomePage() {
       fillId: IMPACT_BLAST_FILL_ID,
       lineId: IMPACT_BLAST_LINE_ID,
       fillColor: "#f97316",
-      fillOpacity: 0.12,
-      lineColor: "#ea580c",
-      lineWidth: 3,
+      fillOpacity: 0.0,
+      lineColor: "#ff7a00",
+      lineWidth: 5,
     });
 
     ensureFillLineLayers({
@@ -459,9 +459,9 @@ export default function HomePage() {
       fillId: IMPACT_THERMAL_FILL_ID,
       lineId: IMPACT_THERMAL_LINE_ID,
       fillColor: "#facc15",
-      fillOpacity: 0.1,
-      lineColor: "#ca8a04",
-      lineWidth: 3,
+      fillOpacity: 0.0,
+      lineColor: "#ffd400",
+      lineWidth: 5,
     });
 
     ensureFillLineLayers({
@@ -469,9 +469,9 @@ export default function HomePage() {
       fillId: IMPACT_TSUNAMI_FILL_ID,
       lineId: IMPACT_TSUNAMI_LINE_ID,
       fillColor: "#38bdf8",
-      fillOpacity: 0.08,
-      lineColor: "#0284c7",
-      lineWidth: 3,
+      fillOpacity: 0.0,
+      lineColor: "#00c8ff",
+      lineWidth: 5,
     });
 
     const beforeId = getTopLayerId();
@@ -742,6 +742,21 @@ export default function HomePage() {
     } catch (error) {
       console.error("Failed to add impact flood layer", error);
       return false;
+    }
+  };
+
+  const flushPendingFloodLayer = () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (
+      scenarioModeRef.current === "flood" &&
+      floodAllowedInCurrentView() &&
+      pendingFloodLevelRef.current !== null
+    ) {
+      const level = pendingFloodLevelRef.current;
+      pendingFloodLevelRef.current = null;
+      addFloodLayer(level);
     }
   };
 
@@ -1479,7 +1494,9 @@ export default function HomePage() {
                 key={preset.label}
                 onClick={() => {
                   setInputLevel(preset.value);
-                  setInputText(formatInputTextFromMeters(preset.value, unitMode));
+                  setInputText(
+                    formatInputTextFromMeters(preset.value, unitMode)
+                  );
                 }}
                 style={{
                   padding: "12px 10px",
@@ -1556,7 +1573,9 @@ export default function HomePage() {
               max="100000"
               step="50"
               value={impactDiameter}
-              onChange={(e) => setImpactDiameter(clampImpactDiameter(e.target.value))}
+              onChange={(e) =>
+                setImpactDiameter(clampImpactDiameter(e.target.value))
+              }
               style={{
                 width: "100%",
                 marginBottom: 10,
@@ -1569,7 +1588,9 @@ export default function HomePage() {
               max="100000"
               step="50"
               value={impactDiameter}
-              onChange={(e) => setImpactDiameter(clampImpactDiameter(e.target.value))}
+              onChange={(e) =>
+                setImpactDiameter(clampImpactDiameter(e.target.value))
+              }
               style={{
                 width: "100%",
                 padding: 10,
@@ -1694,8 +1715,8 @@ export default function HomePage() {
           {viewMode === "map"
             ? "Standard Map"
             : viewMode === "satellite"
-              ? "Satellite"
-              : "Globe"}
+            ? "Satellite"
+            : "Globe"}
         </div>
         <div>Status: {status}</div>
         <div>Scenario Mode: {scenarioMode}</div>
@@ -1722,7 +1743,8 @@ export default function HomePage() {
               Impact Results
             </div>
             <div>
-              Type: {impactResult.is_ocean_impact ? "Ocean impact" : "Land impact"}
+              Type:{" "}
+              {impactResult.is_ocean_impact ? "Ocean impact" : "Land impact"}
             </div>
             <div>Severity: {impactResult.severity_class}</div>
             <div>Energy: {impactResult.energy_mt.toExponential(2)} Mt TNT</div>
@@ -1747,8 +1769,8 @@ export default function HomePage() {
                 : "--"}
             </div>
             <div>
-              Rings: C {Math.round((impactResult.crater_diameter_m || 0) / 2)} | B{" "}
-              {Math.round(impactResult.blast_radius_m || 0)} | T{" "}
+              Rings: C {Math.round((impactResult.crater_diameter_m || 0) / 2)} |
+              B {Math.round(impactResult.blast_radius_m || 0)} | T{" "}
               {Math.round(impactResult.thermal_radius_m || 0)} | S{" "}
               {Math.round(impactResult.tsunami_radius_m || 0)}
             </div>
@@ -1778,10 +1800,10 @@ export default function HomePage() {
                   )} ft`
                 : `Above water by ${waterDifference} m`
               : unitMode === "ft"
-                ? `Underwater by ${Math.round(
-                    metersToFeet(Math.abs(waterDifference))
-                  )} ft`
-                : `Underwater by ${Math.abs(waterDifference)} m`
+              ? `Underwater by ${Math.round(
+                  metersToFeet(Math.abs(waterDifference))
+                )} ft`
+              : `Underwater by ${Math.abs(waterDifference)} m`
             : "--"}
         </div>
       </div>
