@@ -529,10 +529,14 @@ export default function HomePage() {
               "interpolate",
               ["linear"],
               ["zoom"],
-              0, 0.5,
-              5, 8,
-              8, 18,
-              12, 40,
+              0,
+              0.5,
+              5,
+              8,
+              8,
+              18,
+              12,
+              40,
             ],
             "circle-color": "rgba(0,0,0,0)",
             "circle-stroke-color": "#ff0000",
@@ -554,10 +558,14 @@ export default function HomePage() {
               "interpolate",
               ["linear"],
               ["zoom"],
-              0, 2,
-              5, 30,
-              8, 80,
-              12, 180,
+              0,
+              2,
+              5,
+              30,
+              8,
+              80,
+              12,
+              180,
             ],
             "circle-color": "rgba(0,0,0,0)",
             "circle-stroke-color": "#ff7a00",
@@ -579,10 +587,14 @@ export default function HomePage() {
               "interpolate",
               ["linear"],
               ["zoom"],
-              0, 3,
-              5, 45,
-              8, 120,
-              12, 260,
+              0,
+              3,
+              5,
+              45,
+              8,
+              120,
+              12,
+              260,
             ],
             "circle-color": "rgba(0,0,0,0)",
             "circle-stroke-color": "#ffd400",
@@ -604,10 +616,14 @@ export default function HomePage() {
               "interpolate",
               ["linear"],
               ["zoom"],
-              0, 2,
-              5, 35,
-              8, 95,
-              12, 220,
+              0,
+              2,
+              5,
+              35,
+              8,
+              95,
+              12,
+              220,
             ],
             "circle-color": "rgba(0,0,0,0)",
             "circle-stroke-color": "#00c8ff",
@@ -771,8 +787,10 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
-    if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) map.removeLayer(IMPACT_FLOOD_LAYER_ID);
-    if (map.getSource(IMPACT_FLOOD_SOURCE_ID)) map.removeSource(IMPACT_FLOOD_SOURCE_ID);
+    if (map.getLayer(IMPACT_FLOOD_LAYER_ID))
+      map.removeLayer(IMPACT_FLOOD_LAYER_ID);
+    if (map.getSource(IMPACT_FLOOD_SOURCE_ID))
+      map.removeSource(IMPACT_FLOOD_SOURCE_ID);
   };
 
   const addFloodLayer = (level) => {
@@ -823,8 +841,12 @@ export default function HomePage() {
     const tileUrl = `${floodEngineUrl}/impact-flood/${runId}/{z}/{x}/{y}.png?v=${IMPACT_TILE_VERSION}`;
 
     try {
-      if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) map.removeLayer(IMPACT_FLOOD_LAYER_ID);
-      if (map.getSource(IMPACT_FLOOD_SOURCE_ID)) map.removeSource(IMPACT_FLOOD_SOURCE_ID);
+      console.log("Adding impact flood tiles:", tileUrl);
+
+      if (map.getLayer(IMPACT_FLOOD_LAYER_ID))
+        map.removeLayer(IMPACT_FLOOD_LAYER_ID);
+      if (map.getSource(IMPACT_FLOOD_SOURCE_ID))
+        map.removeSource(IMPACT_FLOOD_SOURCE_ID);
 
       map.addSource(IMPACT_FLOOD_SOURCE_ID, {
         type: "raster",
@@ -1013,6 +1035,8 @@ export default function HomePage() {
     } else {
       removeImpactFloodLayer();
     }
+
+    bringImpactLayersToFront();
   };
 
   const restoreMapOverlays = () => {
@@ -1178,6 +1202,11 @@ export default function HomePage() {
       setImpactResult(data);
       impactResultRef.current = data;
 
+      setImpactPoint({
+        lng: impactPointRef.current.lng,
+        lat: impactPointRef.current.lat,
+      });
+
       pendingFloodLevelRef.current = null;
       activeFloodLevelRef.current = null;
       removeFloodLayer();
@@ -1247,11 +1276,12 @@ export default function HomePage() {
       keyboard: true,
       touchZoomRotate: true,
       transformRequest: (url, resourceType) => {
-        if (
-          resourceType === "Tile" &&
-          (url.includes("/flood/") || url.includes("/impact-flood/"))
-        ) {
-          console.log("Tile request:", url);
+        if (resourceType === "Tile") {
+          if (url.includes("/impact-flood/")) {
+            console.log("IMPACT TILE:", url);
+          } else if (url.includes("/flood/")) {
+            console.log("FLOOD TILE:", url);
+          }
         }
         return { url };
       },
@@ -1365,6 +1395,16 @@ export default function HomePage() {
 
     setMapStyleForMode(viewMode);
   }, [viewMode]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (scenarioMode !== "impact") return;
+
+    syncScenarioLayers();
+    bringImpactLayersToFront();
+  }, [scenarioMode, impactPoint, executedImpact, impactResult, impactDiameter]);
 
   useEffect(() => {
     const map = mapRef.current;
