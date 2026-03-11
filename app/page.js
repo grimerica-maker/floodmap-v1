@@ -522,7 +522,10 @@ export default function HomePage() {
     }
   };
 
-  const drawImpactPointNow = (point, diameterValue = impactDiameterRef.current) => {
+  const drawImpactPointNow = (
+    point,
+    diameterValue = impactDiameterRef.current
+  ) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded() || !point) return;
 
@@ -741,7 +744,10 @@ export default function HomePage() {
     )}`;
 
     try {
-      if (activeImpactRunIdRef.current === runId && map.getLayer(IMPACT_FLOOD_LAYER_ID)) {
+      if (
+        activeImpactRunIdRef.current === runId &&
+        map.getLayer(IMPACT_FLOOD_LAYER_ID)
+      ) {
         bringImpactLayersToFront();
         map.triggerRepaint();
         return true;
@@ -962,6 +968,7 @@ export default function HomePage() {
     removeImpactFloodLayer();
 
     if (impactPointRef.current) {
+      drawImpactPointNow(impactPointRef.current, impactDiameterRef.current);
       setImpactPreviewOnMap(impactPointRef.current, impactDiameterRef.current);
     } else {
       clearImpactPointOnMap();
@@ -1110,6 +1117,7 @@ export default function HomePage() {
     setScenarioMode("impact");
     scenarioModeRef.current = "impact";
     drawImpactPointNow(impactPointRef.current, impactDiameterRef.current);
+    setImpactPreviewOnMap(impactPointRef.current, impactDiameterRef.current);
     setStatus("Executing impact...");
 
     try {
@@ -1293,8 +1301,17 @@ export default function HomePage() {
       impactPointRef.current = point;
       setImpactPoint(point);
 
+      setExecutedImpact(null);
+      executedImpactRef.current = null;
+      setImpactResult(null);
+      impactResultRef.current = null;
+      activeImpactRunIdRef.current = null;
+      removeImpactFloodLayer();
+
       drawImpactPointNow(point, impactDiameterRef.current);
       setImpactPreviewOnMap(point, impactDiameterRef.current);
+      bringImpactLayersToFront();
+      map.triggerRepaint();
 
       setStatus("Impact point selected - click Execute Impact");
 
@@ -1361,15 +1378,23 @@ export default function HomePage() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    if (!impactPoint) return;
     if (scenarioMode !== "impact") return;
+    if (!impactPointRef.current) return;
 
-    drawImpactPointNow(impactPoint, impactDiameter);
-
-    if (!executedImpact) {
-      setImpactPreviewOnMap(impactPoint, impactDiameter);
+    if (executedImpactRef.current && impactResultRef.current) {
+      setExecutedImpactOnMap(
+        impactPointRef.current,
+        impactDiameter,
+        impactResultRef.current
+      );
+    } else {
+      drawImpactPointNow(impactPointRef.current, impactDiameter);
+      setImpactPreviewOnMap(impactPointRef.current, impactDiameter);
     }
-  }, [impactPoint, impactDiameter, scenarioMode, executedImpact]);
+
+    bringImpactLayersToFront();
+    map.triggerRepaint();
+  }, [impactDiameter, scenarioMode, impactPoint, executedImpact, impactResult]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1650,7 +1675,16 @@ export default function HomePage() {
 
         <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
           <button
-            onClick={() => setScenarioMode("flood")}
+            onClick={() => {
+              setScenarioMode("flood");
+              scenarioModeRef.current = "flood";
+              setStatus("Flood mode active");
+              removeImpactFloodLayer();
+              if (mapRef.current?.isStyleLoaded()) {
+                syncFloodScenario();
+                mapRef.current.triggerRepaint();
+              }
+            }}
             style={{
               width: "100%",
               padding: 14,
@@ -1669,7 +1703,18 @@ export default function HomePage() {
           </button>
 
           <button
-            onClick={() => setScenarioMode("impact")}
+            onClick={() => {
+              setScenarioMode("impact");
+              scenarioModeRef.current = "impact";
+              setStatus("Click map to place impact point");
+
+              if (mapRef.current?.isStyleLoaded()) {
+                ensureImpactLayers();
+                syncImpactScenario();
+                bringImpactLayersToFront();
+                mapRef.current.triggerRepaint();
+              }
+            }}
             style={{
               width: "100%",
               padding: 14,
