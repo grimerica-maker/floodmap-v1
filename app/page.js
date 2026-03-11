@@ -56,7 +56,7 @@ const emptyFeatureCollection = () => ({
   features: [],
 });
 
-const createGeodesicCircle = (lng, lat, radiusMeters, steps = 96) => {
+const createGeodesicCircle = (lng, lat, radiusMeters, steps = 128) => {
   const coords = [];
   const earthRadius = 6371008.8;
   const angularDistance = radiusMeters / earthRadius;
@@ -181,9 +181,7 @@ export default function HomePage() {
   };
 
   const formatInputTextFromMeters = (meters, unit = unitMode) => {
-    if (unit === "ft") {
-      return formatNumericText(metersToFeet(meters), 2);
-    }
+    if (unit === "ft") return formatNumericText(metersToFeet(meters), 2);
     return formatNumericText(meters, 2);
   };
 
@@ -209,9 +207,7 @@ export default function HomePage() {
 
   const commitInputText = (text = inputText, unit = unitMode) => {
     const parsedMeters = parseDisplayLevelToMeters(text, unit);
-    if (parsedMeters === null) {
-      return null;
-    }
+    if (parsedMeters === null) return null;
 
     setInputLevel(parsedMeters);
     setInputText(formatInputTextFromMeters(parsedMeters, unit));
@@ -241,29 +237,56 @@ export default function HomePage() {
     return Math.max(50, Math.min(100000, parsed));
   };
 
+  const floodAllowedInCurrentView = () =>
+    viewModeRef.current === "map" || viewModeRef.current === "satellite";
+
   const removeFloodLayer = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
-    if (map.getLayer(FLOOD_LAYER_ID)) {
-      map.removeLayer(FLOOD_LAYER_ID);
-    }
-
-    if (map.getSource(FLOOD_SOURCE_ID)) {
-      map.removeSource(FLOOD_SOURCE_ID);
-    }
+    if (map.getLayer(FLOOD_LAYER_ID)) map.removeLayer(FLOOD_LAYER_ID);
+    if (map.getSource(FLOOD_SOURCE_ID)) map.removeSource(FLOOD_SOURCE_ID);
   };
 
   const removeImpactFloodLayer = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
-    if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) {
-      map.removeLayer(IMPACT_FLOOD_LAYER_ID);
-    }
+    if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) map.removeLayer(IMPACT_FLOOD_LAYER_ID);
+    if (map.getSource(IMPACT_FLOOD_SOURCE_ID)) map.removeSource(IMPACT_FLOOD_SOURCE_ID);
+  };
 
-    if (map.getSource(IMPACT_FLOOD_SOURCE_ID)) {
-      map.removeSource(IMPACT_FLOOD_SOURCE_ID);
+  const getTopLayerId = () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return undefined;
+    const layers = map.getStyle()?.layers || [];
+    return layers.length ? layers[layers.length - 1].id : undefined;
+  };
+
+  const bringImpactLayersToFront = () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    const orderedLayerIds = [
+      IMPACT_PREVIEW_FILL_ID,
+      IMPACT_PREVIEW_LINE_ID,
+      IMPACT_CRATER_FILL_ID,
+      IMPACT_CRATER_LINE_ID,
+      IMPACT_BLAST_FILL_ID,
+      IMPACT_BLAST_LINE_ID,
+      IMPACT_THERMAL_FILL_ID,
+      IMPACT_THERMAL_LINE_ID,
+      IMPACT_TSUNAMI_FILL_ID,
+      IMPACT_TSUNAMI_LINE_ID,
+      IMPACT_FLOOD_LAYER_ID,
+      IMPACT_RING_LAYER_ID,
+      IMPACT_LAYER_ID,
+    ];
+
+    for (const id of orderedLayerIds) {
+      if (map.getLayer(id)) {
+        map.moveLayer(id);
+      }
     }
   };
 
@@ -315,13 +338,8 @@ export default function HomePage() {
     const tileUrl = `${floodEngineUrl}/impact-flood/${runId}/{z}/{x}/{y}.png?v=${IMPACT_TILE_VERSION}`;
 
     try {
-      if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) {
-        map.removeLayer(IMPACT_FLOOD_LAYER_ID);
-      }
-
-      if (map.getSource(IMPACT_FLOOD_SOURCE_ID)) {
-        map.removeSource(IMPACT_FLOOD_SOURCE_ID);
-      }
+      if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) map.removeLayer(IMPACT_FLOOD_LAYER_ID);
+      if (map.getSource(IMPACT_FLOOD_SOURCE_ID)) map.removeSource(IMPACT_FLOOD_SOURCE_ID);
 
       map.addSource(IMPACT_FLOOD_SOURCE_ID, {
         type: "raster",
@@ -343,15 +361,13 @@ export default function HomePage() {
         },
       });
 
+      bringImpactLayersToFront();
       return true;
     } catch (error) {
       console.error("Failed to add impact flood layer", error);
       return false;
     }
   };
-
-  const floodAllowedInCurrentView = () =>
-    viewModeRef.current === "map" || viewModeRef.current === "satellite";
 
   const flushPendingFloodLayer = () => {
     const map = mapRef.current;
@@ -371,34 +387,13 @@ export default function HomePage() {
   const ensureGeoJsonSource = (id) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
+
     if (!map.getSource(id)) {
       map.addSource(id, {
         type: "geojson",
         data: emptyFeatureCollection(),
       });
     }
-  };
-
-  const getOverlayAnchorLayerId = () => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return undefined;
-
-    const preferred = [
-      "waterway-label",
-      "settlement-major-label",
-      "settlement-minor-label",
-      "country-label",
-      "state-label",
-      "road-label",
-    ];
-
-    for (const id of preferred) {
-      if (map.getLayer(id)) return id;
-    }
-
-    const style = map.getStyle?.();
-    const layers = style?.layers || [];
-    return layers.length ? layers[layers.length - 1].id : undefined;
   };
 
   const ensureFillLineLayers = ({
@@ -413,7 +408,7 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
-    const beforeId = getOverlayAnchorLayerId();
+    const beforeId = getTopLayerId();
 
     if (!map.getLayer(fillId)) {
       map.addLayer(
@@ -439,6 +434,7 @@ export default function HomePage() {
           paint: {
             "line-color": lineColor,
             "line-width": lineWidth,
+            "line-opacity": 1,
           },
         },
         beforeId
@@ -462,19 +458,19 @@ export default function HomePage() {
       fillId: IMPACT_PREVIEW_FILL_ID,
       lineId: IMPACT_PREVIEW_LINE_ID,
       fillColor: "#ef4444",
-      fillOpacity: 0.08,
+      fillOpacity: 0.12,
       lineColor: "#ef4444",
-      lineWidth: 2,
+      lineWidth: 3,
     });
 
     ensureFillLineLayers({
       sourceId: IMPACT_CRATER_SOURCE_ID,
       fillId: IMPACT_CRATER_FILL_ID,
       lineId: IMPACT_CRATER_LINE_ID,
-      fillColor: "#991b1b",
-      fillOpacity: 0.18,
+      fillColor: "#7f1d1d",
+      fillOpacity: 0.22,
       lineColor: "#7f1d1d",
-      lineWidth: 3,
+      lineWidth: 5,
     });
 
     ensureFillLineLayers({
@@ -482,9 +478,9 @@ export default function HomePage() {
       fillId: IMPACT_BLAST_FILL_ID,
       lineId: IMPACT_BLAST_LINE_ID,
       fillColor: "#f97316",
-      fillOpacity: 0.1,
+      fillOpacity: 0.14,
       lineColor: "#ea580c",
-      lineWidth: 2,
+      lineWidth: 4,
     });
 
     ensureFillLineLayers({
@@ -492,9 +488,9 @@ export default function HomePage() {
       fillId: IMPACT_THERMAL_FILL_ID,
       lineId: IMPACT_THERMAL_LINE_ID,
       fillColor: "#facc15",
-      fillOpacity: 0.08,
-      lineColor: "#eab308",
-      lineWidth: 2,
+      fillOpacity: 0.12,
+      lineColor: "#ca8a04",
+      lineWidth: 4,
     });
 
     ensureFillLineLayers({
@@ -502,12 +498,12 @@ export default function HomePage() {
       fillId: IMPACT_TSUNAMI_FILL_ID,
       lineId: IMPACT_TSUNAMI_LINE_ID,
       fillColor: "#38bdf8",
-      fillOpacity: 0.06,
-      lineColor: "#0ea5e9",
-      lineWidth: 2,
+      fillOpacity: 0.1,
+      lineColor: "#0284c7",
+      lineWidth: 4,
     });
 
-    const beforeId = getOverlayAnchorLayerId();
+    const beforeId = getTopLayerId();
 
     if (!map.getLayer(IMPACT_RING_LAYER_ID)) {
       map.addLayer(
@@ -516,8 +512,8 @@ export default function HomePage() {
           type: "circle",
           source: IMPACT_SOURCE_ID,
           paint: {
-            "circle-radius": 16,
-            "circle-color": "rgba(239,68,68,0.25)",
+            "circle-radius": 18,
+            "circle-color": "rgba(239,68,68,0.3)",
             "circle-stroke-width": 0,
           },
         },
@@ -532,7 +528,7 @@ export default function HomePage() {
           type: "circle",
           source: IMPACT_SOURCE_ID,
           paint: {
-            "circle-radius": 8,
+            "circle-radius": 9,
             "circle-color": "#ef4444",
             "circle-stroke-width": 3,
             "circle-stroke-color": "#ffffff",
@@ -541,6 +537,8 @@ export default function HomePage() {
         beforeId
       );
     }
+
+    bringImpactLayersToFront();
   };
 
   const setSourceData = (sourceId, data) => {
@@ -608,6 +606,8 @@ export default function HomePage() {
     setSourceData(IMPACT_BLAST_SOURCE_ID, emptyFeatureCollection());
     setSourceData(IMPACT_THERMAL_SOURCE_ID, emptyFeatureCollection());
     setSourceData(IMPACT_TSUNAMI_SOURCE_ID, emptyFeatureCollection());
+
+    bringImpactLayersToFront();
   };
 
   const setExecutedImpactOnMap = (point, diameterValue, result) => {
@@ -653,6 +653,8 @@ export default function HomePage() {
       IMPACT_TSUNAMI_SOURCE_ID,
       buildRingFeatureCollection(point.lng, point.lat, tsunamiRadius)
     );
+
+    bringImpactLayersToFront();
   };
 
   const fetchElevation = async (lat, lng) => {
@@ -896,6 +898,12 @@ export default function HomePage() {
         removeImpactFloodLayer();
         setStatus("Impact executed (land impact)");
       }
+
+      mapRef.current?.flyTo({
+        center: [impactPointRef.current.lng, impactPointRef.current.lat],
+        zoom: Math.max(mapRef.current.getZoom(), 6.5),
+        essential: true,
+      });
     } catch (error) {
       console.error(error);
       setStatus("Impact execution failed");
@@ -1010,6 +1018,12 @@ export default function HomePage() {
       setImpactPoint(point);
       setImpactPreviewOnMap(point, impactDiameterRef.current);
       setStatus("Impact point selected - click Execute Impact");
+
+      map.flyTo({
+        center: [point.lng, point.lat],
+        zoom: Math.max(map.getZoom(), 6.5),
+        essential: true,
+      });
     };
 
     map.on("load", handleLoad);
@@ -1215,9 +1229,7 @@ export default function HomePage() {
             }
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              executeFlood();
-            }
+            if (e.key === "Enter") executeFlood();
           }}
           style={{
             width: "100%",
@@ -1294,9 +1306,7 @@ export default function HomePage() {
                 key={preset.label}
                 onClick={() => {
                   setInputLevel(preset.value);
-                  setInputText(
-                    formatInputTextFromMeters(preset.value, unitMode)
-                  );
+                  setInputText(formatInputTextFromMeters(preset.value, unitMode));
                 }}
                 style={{
                   padding: "12px 10px",
@@ -1373,9 +1383,7 @@ export default function HomePage() {
               max="100000"
               step="50"
               value={impactDiameter}
-              onChange={(e) =>
-                setImpactDiameter(clampImpactDiameter(e.target.value))
-              }
+              onChange={(e) => setImpactDiameter(clampImpactDiameter(e.target.value))}
               style={{
                 width: "100%",
                 marginBottom: 10,
@@ -1388,9 +1396,7 @@ export default function HomePage() {
               max="100000"
               step="50"
               value={impactDiameter}
-              onChange={(e) =>
-                setImpactDiameter(clampImpactDiameter(e.target.value))
-              }
+              onChange={(e) => setImpactDiameter(clampImpactDiameter(e.target.value))}
               style={{
                 width: "100%",
                 padding: 10,
@@ -1543,8 +1549,7 @@ export default function HomePage() {
               Impact Results
             </div>
             <div>
-              Type:{" "}
-              {impactResult.is_ocean_impact ? "Ocean impact" : "Land impact"}
+              Type: {impactResult.is_ocean_impact ? "Ocean impact" : "Land impact"}
             </div>
             <div>Severity: {impactResult.severity_class}</div>
             <div>Energy: {impactResult.energy_mt.toExponential(2)} Mt TNT</div>
@@ -1567,6 +1572,12 @@ export default function HomePage() {
               {impactResult.wave_height_m > 0
                 ? `${Math.round(impactResult.wave_height_m)} m`
                 : "--"}
+            </div>
+            <div>
+              Rings: C {Math.round((impactResult.crater_diameter_m || 0) / 2)} | B{" "}
+              {Math.round(impactResult.blast_radius_m || 0)} | T{" "}
+              {Math.round(impactResult.thermal_radius_m || 0)} | S{" "}
+              {Math.round(impactResult.tsunami_radius_m || 0)}
             </div>
           </>
         )}
