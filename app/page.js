@@ -11,6 +11,9 @@ const DEBUG_FLOOD = true;
 const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-v9";
 
+const FLOOD_TILE_VERSION = "2";
+const IMPACT_TILE_VERSION = "1";
+
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
 
@@ -85,8 +88,8 @@ export default function HomePage() {
   const viewModeRef = useRef("map");
   const impactDiameterRef = useRef(100);
 
-  const [inputLevel, setInputLevel] = useState(0); // canonical pending input in meters
-  const [inputText, setInputText] = useState("0"); // raw text shown in input
+  const [inputLevel, setInputLevel] = useState(0);
+  const [inputText, setInputText] = useState("0");
   const [seaLevel, setSeaLevel] = useState(0);
   const [viewMode, setViewMode] = useState("map");
   const [unitMode, setUnitMode] = useState("m");
@@ -149,7 +152,7 @@ export default function HomePage() {
 
   const formatNumericText = (value, digits = 2) => {
     const rounded = Number(value.toFixed(digits));
-    return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+    return String(rounded);
   };
 
   const formatInputTextFromMeters = (meters, unit = unitMode) => {
@@ -241,12 +244,11 @@ export default function HomePage() {
 
   const addFloodLayer = (level) => {
     const map = mapRef.current;
-
     if (!map || !map.isStyleLoaded()) return false;
 
     const tileUrl = `${floodEngineUrl}/flood/${encodeURIComponent(
       level
-    )}/{z}/{x}/{y}.png`;
+    )}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
 
     try {
       if (map.getLayer(FLOOD_LAYER_ID)) map.removeLayer(FLOOD_LAYER_ID);
@@ -285,7 +287,7 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded() || !runId) return false;
 
-    const tileUrl = `${floodEngineUrl}/impact-flood/${runId}/{z}/{x}/{y}.png`;
+    const tileUrl = `${floodEngineUrl}/impact-flood/${runId}/{z}/{x}/{y}.png?v=${IMPACT_TILE_VERSION}`;
 
     try {
       if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) {
@@ -426,7 +428,10 @@ export default function HomePage() {
     }
   };
 
-  const setImpactPointOnMap = (point, diameterValue = impactDiameterRef.current) => {
+  const setImpactPointOnMap = (
+    point,
+    diameterValue = impactDiameterRef.current
+  ) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded() || !point) return;
 
@@ -452,7 +457,9 @@ export default function HomePage() {
 
     radiusSource.setData({
       type: "FeatureCollection",
-      features: [createGeodesicCircle(point.lng, point.lat, craterRadiusMeters)],
+      features: [
+        createGeodesicCircle(point.lng, point.lat, craterRadiusMeters),
+      ],
     });
   };
 
@@ -645,12 +652,11 @@ export default function HomePage() {
     scenarioModeRef.current = "impact";
 
     try {
-      const url =
-        `${floodEngineUrl}/impact?lat=${encodeURIComponent(
-          impactPointRef.current.lat
-        )}&lng=${encodeURIComponent(
-          impactPointRef.current.lng
-        )}&diameter=${encodeURIComponent(impactDiameterRef.current)}`;
+      const url = `${floodEngineUrl}/impact?lat=${encodeURIComponent(
+        impactPointRef.current.lat
+      )}&lng=${encodeURIComponent(
+        impactPointRef.current.lng
+      )}&diameter=${encodeURIComponent(impactDiameterRef.current)}`;
 
       const res = await fetch(url);
       if (!res.ok) {
@@ -985,7 +991,11 @@ export default function HomePage() {
         <input
           type="text"
           inputMode="decimal"
-          placeholder={unitMode === "ft" ? "Enter sea level in feet" : "Enter sea level in meters"}
+          placeholder={
+            unitMode === "ft"
+              ? "Enter sea level in feet"
+              : "Enter sea level in meters"
+          }
           value={inputText}
           onChange={(e) => {
             setInputText(e.target.value);
@@ -1044,7 +1054,8 @@ export default function HomePage() {
         </div>
 
         <div style={{ fontSize: 14, marginBottom: 24 }}>
-          Custom input supports positive and negative values in {unitMode === "ft" ? "feet" : "meters"}
+          Custom input supports positive and negative values in{" "}
+          {unitMode === "ft" ? "feet" : "meters"}
         </div>
 
         <hr style={{ margin: "0 0 18px 0" }} />
@@ -1075,7 +1086,9 @@ export default function HomePage() {
                 key={preset.label}
                 onClick={() => {
                   setInputLevel(preset.value);
-                  setInputText(formatInputTextFromMeters(preset.value, unitMode));
+                  setInputText(
+                    formatInputTextFromMeters(preset.value, unitMode)
+                  );
                 }}
                 style={{
                   padding: "12px 10px",
@@ -1294,8 +1307,8 @@ export default function HomePage() {
           {viewMode === "map"
             ? "Standard Map"
             : viewMode === "satellite"
-            ? "Satellite"
-            : "Globe"}
+              ? "Satellite"
+              : "Globe"}
         </div>
         <div>Status: {status}</div>
         <div>Scenario Mode: {scenarioMode}</div>
@@ -1318,8 +1331,12 @@ export default function HomePage() {
         {impactResult && (
           <>
             <hr style={{ margin: "10px 0", opacity: 0.25 }} />
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>Impact Results</div>
-            <div>Type: {impactResult.is_ocean_impact ? "Ocean impact" : "Land impact"}</div>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>
+              Impact Results
+            </div>
+            <div>
+              Type: {impactResult.is_ocean_impact ? "Ocean impact" : "Land impact"}
+            </div>
             <div>Severity: {impactResult.severity_class}</div>
             <div>Energy: {impactResult.energy_mt.toExponential(2)} Mt TNT</div>
             <div>Crater: {Math.round(impactResult.crater_diameter_m)} m</div>
@@ -1362,10 +1379,10 @@ export default function HomePage() {
                   )} ft`
                 : `Above water by ${waterDifference} m`
               : unitMode === "ft"
-              ? `Underwater by ${Math.round(
-                  metersToFeet(Math.abs(waterDifference))
-                )} ft`
-              : `Underwater by ${Math.abs(waterDifference)} m`
+                ? `Underwater by ${Math.round(
+                    metersToFeet(Math.abs(waterDifference))
+                  )} ft`
+                : `Underwater by ${Math.abs(waterDifference)} m`
             : "--"}
         </div>
       </div>
