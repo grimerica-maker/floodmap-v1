@@ -149,6 +149,7 @@ export default function HomePage() {
   const [impactPoint, setImpactPoint] = useState(null);
   const [executedImpact, setExecutedImpact] = useState(null);
   const [impactResult, setImpactResult] = useState(null);
+  const [impactBusy, setImpactBusy] = useState(false);
   const [floodEngineUrl, setFloodEngineUrl] = useState(FLOOD_ENGINE_PROXY_PATH);
 
   const [hoverLat, setHoverLat] = useState(null);
@@ -949,6 +950,8 @@ export default function HomePage() {
   };
 
   const fetchElevation = async (lat, lng) => {
+    if (styleSwitchInProgressRef.current || impactBusy) return;
+
     try {
       const res = await fetch(
         `${floodEngineUrl}/elevation?lat=${encodeURIComponent(
@@ -1094,6 +1097,7 @@ export default function HomePage() {
 
     setScenarioMode("flood");
     scenarioModeRef.current = "flood";
+    setImpactBusy(false);
 
     setSeaLevel(level);
     seaLevelRef.current = level;
@@ -1146,6 +1150,8 @@ export default function HomePage() {
   };
 
   const executeImpact = async () => {
+    if (impactBusy) return;
+
     if (!impactPointRef.current) {
       setStatus("Click map to place impact point first");
       return;
@@ -1159,6 +1165,7 @@ export default function HomePage() {
     const executionSeq = impactExecutionSeqRef.current + 1;
     impactExecutionSeqRef.current = executionSeq;
 
+    setImpactBusy(true);
     setScenarioMode("impact");
     scenarioModeRef.current = "impact";
     removeFloodLayer();
@@ -1183,6 +1190,7 @@ export default function HomePage() {
       const data = await res.json();
 
       if (impactExecutionSeqRef.current !== executionSeq) {
+        setImpactBusy(false);
         return;
       }
 
@@ -1224,6 +1232,10 @@ export default function HomePage() {
         console.error(error);
         setStatus("Impact execution failed");
       }
+    } finally {
+      if (impactExecutionSeqRef.current === executionSeq) {
+        setImpactBusy(false);
+      }
     }
   };
 
@@ -1244,6 +1256,7 @@ export default function HomePage() {
     pendingFloodLevelRef.current = null;
     activeImpactRunIdRef.current = null;
     impactExecutionSeqRef.current += 1;
+    setImpactBusy(false);
 
     removeFloodLayer();
     removeImpactFloodLayer();
@@ -1288,6 +1301,12 @@ export default function HomePage() {
     if (DEBUG_FLOOD && !debugListenersAddedRef.current) {
       debugListenersAddedRef.current = true;
       map.on("error", (e) => {
+        const message =
+          e?.error?.message ||
+          e?.message ||
+          e?.sourceId ||
+          "";
+
         const sourceId =
           e?.sourceId ||
           e?.source?.id ||
@@ -1295,23 +1314,32 @@ export default function HomePage() {
           e?.error?.sourceId ||
           null;
 
-        const isKnownImpactTimingNoise =
-          sourceId &&
-          [
-            IMPACT_SOURCE_ID,
-            IMPACT_PREVIEW_SOURCE_ID,
-            IMPACT_CRATER_SOURCE_ID,
-            IMPACT_BLAST_SOURCE_ID,
-            IMPACT_THERMAL_SOURCE_ID,
-            IMPACT_TSUNAMI_SOURCE_ID,
-            IMPACT_SHOCK_SOURCE_ID,
-            IMPACT_WAVEFRONT_SOURCE_ID,
-            IMPACT_FLOOD_SOURCE_ID,
-          ].includes(sourceId);
+        const ignoreImpactSourceIds = new Set([
+          IMPACT_SOURCE_ID,
+          IMPACT_PREVIEW_SOURCE_ID,
+          IMPACT_CRATER_SOURCE_ID,
+          IMPACT_BLAST_SOURCE_ID,
+          IMPACT_THERMAL_SOURCE_ID,
+          IMPACT_TSUNAMI_SOURCE_ID,
+          IMPACT_SHOCK_SOURCE_ID,
+          IMPACT_WAVEFRONT_SOURCE_ID,
+          IMPACT_FLOOD_SOURCE_ID,
+        ]);
 
-        if (!isKnownImpactTimingNoise) {
-          console.log("Mapbox error:", e);
+        if (sourceId && ignoreImpactSourceIds.has(sourceId)) {
+          return;
         }
+
+        if (
+          typeof message === "string" &&
+          (message.includes("style") ||
+            message.includes("source") ||
+            message.includes("layer"))
+        ) {
+          return;
+        }
+
+        console.log("Mapbox error:", e);
       });
     }
 
@@ -1361,6 +1389,7 @@ export default function HomePage() {
 
     const handleMapClick = (e) => {
       if (scenarioModeRef.current !== "impact") return;
+      if (impactBusy) return;
 
       const point = {
         lng: e.lngLat.lng,
@@ -1420,7 +1449,7 @@ export default function HomePage() {
       activeImpactRunIdRef.current = null;
       styleSwitchInProgressRef.current = false;
     };
-  }, [floodEngineUrl]);
+  }, [floodEngineUrl, impactBusy]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -1469,7 +1498,9 @@ export default function HomePage() {
     if (!map || !map.isStyleLoaded()) return;
 
     if (scenarioMode === "impact") {
-      if (impactResult) {
+      if (impactBusy) {
+        setStatus("Executing impact...");
+      } else if (impactResult) {
         setStatus(
           impactResult.is_ocean_impact
             ? "Impact executed with tsunami flooding"
@@ -1494,7 +1525,7 @@ export default function HomePage() {
     }
 
     setStatus(`Flood tiles loaded at ${formatLevelForDisplay(seaLevel)}`);
-  }, [scenarioMode, viewMode, seaLevel, impactResult, unitMode]);
+  }, [scenarioMode, viewMode, seaLevel, impactResult, unitMode, impactBusy]);
 
   return (
     <div
@@ -1723,6 +1754,7 @@ export default function HomePage() {
             onClick={() => {
               setScenarioMode("flood");
               scenarioModeRef.current = "flood";
+              setImpactBusy(false);
               setStatus("Flood mode active");
               removeImpactFloodLayer();
               if (mapRef.current?.isStyleLoaded()) {
@@ -1828,19 +1860,20 @@ export default function HomePage() {
 
             <button
               onClick={executeImpact}
+              disabled={impactBusy}
               style={{
                 width: "100%",
                 padding: 14,
-                background: "#7f1d1d",
+                background: impactBusy ? "#7f1d1d99" : "#7f1d1d",
                 color: "white",
                 border: "none",
                 fontWeight: 700,
-                cursor: "pointer",
+                cursor: impactBusy ? "not-allowed" : "pointer",
                 borderRadius: 12,
                 marginBottom: 24,
               }}
             >
-              Execute Impact
+              {impactBusy ? "Executing..." : "Execute Impact"}
             </button>
           </>
         )}
