@@ -586,6 +586,8 @@ export default function HomePage() {
   };
 
   const clearAnimatedImpactRings = () => {
+    ensureAnimatedLayers();
+
     setSourceData(IMPACT_SHOCK_SOURCE_ID, emptyFeatureCollection());
     setSourceData(IMPACT_WAVEFRONT_SOURCE_ID, emptyFeatureCollection());
     setLinePaint(IMPACT_SHOCK_LINE_ID, {
@@ -631,8 +633,15 @@ export default function HomePage() {
     if (!map || !map.isStyleLoaded() || !point || !result) return;
 
     stopImpactAnimations();
-    clearAnimatedImpactRings();
     ensureAnimatedLayers();
+    clearAnimatedImpactRings();
+
+    if (
+      !map.getSource(IMPACT_SHOCK_SOURCE_ID) ||
+      !map.getSource(IMPACT_WAVEFRONT_SOURCE_ID)
+    ) {
+      return;
+    }
 
     const shockMaxRadius = Math.max(
       result.blast_radius_m || 0,
