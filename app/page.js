@@ -50,8 +50,8 @@ const SATELLITE_STYLE = {
   ],
 };
 
-const FLOOD_TILE_VERSION = "10";
-const IMPACT_TILE_VERSION = "10";
+const FLOOD_TILE_VERSION = "11";
+const IMPACT_TILE_VERSION = "11";
 
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
@@ -317,27 +317,6 @@ export default function HomePage() {
       clearTimeout(impactFloodRetryTimerRef.current);
       impactFloodRetryTimerRef.current = null;
     }
-  };
-
-  const scheduleImpactFloodRetry = (runId, delayMs = 250) => {
-    clearImpactFloodRetry();
-
-    impactFloodRetryTimerRef.current = setTimeout(() => {
-      impactFloodRetryTimerRef.current = null;
-
-      if (scenarioModeRef.current !== "impact") return;
-      if (!runId) return;
-
-      const retry = addImpactFloodLayer(runId);
-      console.log("Impact flood layer retry added:", retry);
-
-      if (retry) {
-        setStatus("Impact executed with tsunami flooding");
-      } else {
-        console.warn("Impact flood layer attach failed after retry");
-        setStatus("Impact executed, but flood layer attach failed");
-      }
-    }, delayMs);
   };
 
   const getTopLayerId = () => {
@@ -927,6 +906,27 @@ export default function HomePage() {
     }
   };
 
+  const scheduleImpactFloodRetry = (runId, delayMs = 250) => {
+    clearImpactFloodRetry();
+
+    impactFloodRetryTimerRef.current = setTimeout(() => {
+      impactFloodRetryTimerRef.current = null;
+
+      if (scenarioModeRef.current !== "impact") return;
+      if (!runId) return;
+
+      const retry = addImpactFloodLayer(runId);
+      console.log("Impact flood layer retry added:", retry);
+
+      if (retry) {
+        setStatus("Impact executed with tsunami flooding");
+      } else {
+        console.warn("Impact flood layer attach failed after retry");
+        setStatus("Impact executed, but flood layer attach failed");
+      }
+    }, delayMs);
+  };
+
   const flushPendingFloodLayer = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
@@ -1284,10 +1284,7 @@ export default function HomePage() {
       setExecutedImpactOnMap(point, diameter, data);
 
       if (data.is_ocean_impact && data.tsunami_radius_m > 0 && data.run_id) {
-        console.log("Attaching impact flood layer for run:", data.run_id);
-
         const added = addImpactFloodLayer(data.run_id);
-        console.log("Impact flood layer added:", added);
 
         if (added) {
           setStatus("Impact executed with tsunami flooding");
@@ -1410,16 +1407,7 @@ export default function HomePage() {
           return;
         }
 
-        if (
-          typeof message === "string" &&
-          (message.includes("style") ||
-            message.includes("source") ||
-            message.includes("layer"))
-        ) {
-          return;
-        }
-
-        console.log("Map error:", e);
+        console.log("Map error:", e, message, sourceId);
       });
     }
 
