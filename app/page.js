@@ -1458,7 +1458,7 @@ export default function HomePage() {
       activeImpactRunIdRef.current = null;
       styleSwitchInProgressRef.current = false;
     };
-  }, [floodEngineUrl, impactBusy]);
+  }, [floodEngineUrl]);
 
   useEffect(() => {
     if (!mapRef.current) return;
