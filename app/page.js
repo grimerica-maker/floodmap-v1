@@ -11,8 +11,8 @@ const DEBUG_FLOOD = true;
 const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-v9";
 
-const FLOOD_TILE_VERSION = "9";
-const IMPACT_TILE_VERSION = "9";
+const FLOOD_TILE_VERSION = "10";
+const IMPACT_TILE_VERSION = "10";
 
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
