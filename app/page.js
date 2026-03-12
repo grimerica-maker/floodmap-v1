@@ -133,6 +133,7 @@ export default function HomePage() {
   const activeImpactRunIdRef = useRef(null);
   const impactExecutionSeqRef = useRef(0);
   const styleSwitchInProgressRef = useRef(false);
+  const impactFloodRetryTimerRef = useRef(null);
 
   const shockAnimFrameRef = useRef(null);
   const waveAnimFrameRef = useRef(null);
@@ -271,6 +272,34 @@ export default function HomePage() {
 
   const floodAllowedInCurrentView = () =>
     viewModeRef.current === "map" || viewModeRef.current === "satellite";
+
+  const clearImpactFloodRetry = () => {
+    if (impactFloodRetryTimerRef.current) {
+      clearTimeout(impactFloodRetryTimerRef.current);
+      impactFloodRetryTimerRef.current = null;
+    }
+  };
+
+  const scheduleImpactFloodRetry = (runId, delayMs = 250) => {
+    clearImpactFloodRetry();
+
+    impactFloodRetryTimerRef.current = setTimeout(() => {
+      impactFloodRetryTimerRef.current = null;
+
+      if (scenarioModeRef.current !== "impact") return;
+      if (!runId) return;
+
+      const retry = addImpactFloodLayer(runId);
+      console.log("Impact flood layer retry added:", retry);
+
+      if (retry) {
+        setStatus("Impact executed with tsunami flooding");
+      } else {
+        console.warn("Impact flood layer attach failed after retry");
+        setStatus("Impact executed, but flood layer attach failed");
+      }
+    }, delayMs);
+  };
 
   const getTopLayerId = () => {
     const map = mapRef.current;
@@ -733,6 +762,8 @@ export default function HomePage() {
   };
 
   const removeImpactFloodLayer = () => {
+    clearImpactFloodRetry();
+
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) {
       activeImpactRunIdRef.current = null;
@@ -798,6 +829,7 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded() || !runId) return false;
     if (scenarioModeRef.current !== "impact") return false;
+    if (styleSwitchInProgressRef.current) return false;
 
     const tileUrl = `${floodEngineUrl}/impact-flood/${runId}/{z}/{x}/{y}.png?v=${IMPACT_TILE_VERSION}&run=${encodeURIComponent(
       runId
@@ -1023,7 +1055,10 @@ export default function HomePage() {
         impactResultRef.current.tsunami_radius_m > 0 &&
         runId
       ) {
-        addImpactFloodLayer(runId);
+        const added = addImpactFloodLayer(runId);
+        if (!added) {
+          scheduleImpactFloodRetry(runId, 250);
+        }
       } else {
         removeImpactFloodLayer();
       }
@@ -1059,6 +1094,7 @@ export default function HomePage() {
     if (!map) return;
 
     styleSwitchInProgressRef.current = true;
+    clearImpactFloodRetry();
 
     if (mode === "globe") {
       map.setProjection("globe");
@@ -1174,6 +1210,7 @@ export default function HomePage() {
     const executionSeq = impactExecutionSeqRef.current + 1;
     impactExecutionSeqRef.current = executionSeq;
 
+    clearImpactFloodRetry();
     setImpactBusy(true);
     setScenarioMode("impact");
     scenarioModeRef.current = "impact";
@@ -1223,13 +1260,16 @@ export default function HomePage() {
 
       if (data.is_ocean_impact && data.tsunami_radius_m > 0 && data.run_id) {
         console.log("Attaching impact flood layer for run:", data.run_id);
+
         const added = addImpactFloodLayer(data.run_id);
         console.log("Impact flood layer added:", added);
-        setStatus(
-          added
-            ? "Impact executed with tsunami flooding"
-            : "Impact executed, but flood layer attach failed"
-        );
+
+        if (added) {
+          setStatus("Impact executed with tsunami flooding");
+        } else {
+          setStatus("Preparing tsunami flooding...");
+          scheduleImpactFloodRetry(data.run_id, 250);
+        }
       } else {
         removeImpactFloodLayer();
         setStatus("Impact executed (land impact)");
@@ -1449,6 +1489,7 @@ export default function HomePage() {
 
     return () => {
       stopImpactAnimations();
+      clearImpactFloodRetry();
 
       if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
 
