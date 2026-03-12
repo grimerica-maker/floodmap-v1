@@ -80,7 +80,6 @@ const createGeodesicCircle = (lng, lat, radiusMeters, steps = 128) => {
 
     const newLat = Math.asin(
       Math.sin(latRad) * Math.cos(angularDistance) +
-        Math.cos(latRad) * math.sin ? Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearing) :
         Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearing)
     );
 
@@ -723,8 +722,8 @@ export default function HomePage() {
         source: FLOOD_SOURCE_ID,
         paint: {
           "raster-opacity": 0.88,
-          "raster-fade-duration": 150,
-          "raster-resampling": "nearest",
+          "raster-fade-duration": 0,
+          "raster-resampling": "linear",
         },
       });
 
@@ -778,8 +777,8 @@ export default function HomePage() {
         source: IMPACT_FLOOD_SOURCE_ID,
         paint: {
           "raster-opacity": 0.88,
-          "raster-fade-duration": 150,
-          "raster-resampling": "nearest",
+          "raster-fade-duration": 0,
+          "raster-resampling": "linear",
         },
       });
 
@@ -992,9 +991,10 @@ export default function HomePage() {
         restoreMapOverlays();
         flushPendingFloodLayer();
       });
-      map.flyTo({
+      map.easeTo({
         center: [-70, 28],
         zoom: 2.6,
+        duration: 250,
         essential: true,
       });
       setStatus(
@@ -1014,9 +1014,10 @@ export default function HomePage() {
         restoreMapOverlays();
         flushPendingFloodLayer();
       });
-      map.flyTo({
+      map.easeTo({
         center: [-80.19, 25.76],
         zoom: 6.2,
+        duration: 250,
         essential: true,
       });
       setStatus("Satellite view ready");
@@ -1029,9 +1030,10 @@ export default function HomePage() {
       restoreMapOverlays();
       flushPendingFloodLayer();
     });
-    map.flyTo({
+    map.easeTo({
       center: [-80.19, 25.76],
       zoom: 6.2,
+      duration: 250,
       essential: true,
     });
     setStatus("Standard Map ready");
@@ -1159,9 +1161,10 @@ export default function HomePage() {
         setStatus("Impact executed (land impact)");
       }
 
-      mapRef.current?.flyTo({
+      mapRef.current?.easeTo({
         center: [impactPointRef.current.lng, impactPointRef.current.lat],
         zoom: Math.max(mapRef.current.getZoom(), 5.8),
+        duration: 250,
         essential: true,
       });
     } catch (error) {
@@ -1209,6 +1212,7 @@ export default function HomePage() {
       dragRotate: true,
       keyboard: true,
       touchZoomRotate: true,
+      antialias: false,
       transformRequest: (url, resourceType) => {
         if (resourceType === "Tile") {
           if (url.includes("/impact-flood/")) {
@@ -1289,9 +1293,10 @@ export default function HomePage() {
 
       setStatus("Impact point selected - click Execute Impact");
 
-      map.flyTo({
+      map.easeTo({
         center: [point.lng, point.lat],
         zoom: Math.max(map.getZoom(), 5.8),
+        duration: 250,
         essential: true,
       });
     };
