@@ -1197,6 +1197,7 @@ export default function HomePage() {
       }
 
       const data = await res.json();
+      console.log("Impact response data:", data);
 
       if (impactExecutionSeqRef.current !== executionSeq) {
         setImpactBusy(false);
@@ -1221,8 +1222,14 @@ export default function HomePage() {
       setExecutedImpactOnMap(point, diameter, data);
 
       if (data.is_ocean_impact && data.tsunami_radius_m > 0 && data.run_id) {
-        addImpactFloodLayer(data.run_id);
-        setStatus("Impact executed with tsunami flooding");
+        console.log("Attaching impact flood layer for run:", data.run_id);
+        const added = addImpactFloodLayer(data.run_id);
+        console.log("Impact flood layer added:", added);
+        setStatus(
+          added
+            ? "Impact executed with tsunami flooding"
+            : "Impact executed, but flood layer attach failed"
+        );
       } else {
         removeImpactFloodLayer();
         setStatus("Impact executed (land impact)");
