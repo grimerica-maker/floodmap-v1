@@ -1,15 +1,54 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import mapboxgl from "mapbox-gl";
-
-mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 
 const CONFIGURED_FLOOD_ENGINE_URL = process.env.NEXT_PUBLIC_FLOOD_ENGINE_URL;
 const FLOOD_ENGINE_PROXY_PATH = "/api/engine";
 const DEBUG_FLOOD = true;
-const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
-const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-v9";
+
+const MAP_STYLE = {
+  version: 8,
+  sources: {
+    osm: {
+      type: "raster",
+      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+      tileSize: 256,
+      attribution: "© OpenStreetMap contributors",
+      maxzoom: 19,
+    },
+  },
+  layers: [
+    {
+      id: "osm",
+      type: "raster",
+      source: "osm",
+    },
+  ],
+};
+
+const SATELLITE_STYLE = {
+  version: 8,
+  sources: {
+    esri: {
+      type: "raster",
+      tiles: [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+      attribution: "Source: Esri, Maxar, Earthstar Geographics",
+      maxzoom: 19,
+    },
+  },
+  layers: [
+    {
+      id: "esri-satellite",
+      type: "raster",
+      source: "esri",
+    },
+  ],
+};
 
 const FLOOD_TILE_VERSION = "10";
 const IMPACT_TILE_VERSION = "10";
@@ -1096,21 +1135,8 @@ export default function HomePage() {
     styleSwitchInProgressRef.current = true;
     clearImpactFloodRetry();
 
-    if (mode === "globe") {
-      map.setProjection("globe");
-      map.setStyle(MAP_STYLE_URL);
-      map.easeTo({
-        center: [-70, 28],
-        zoom: 2.6,
-        duration: 250,
-        essential: true,
-      });
-      return;
-    }
-
     if (mode === "satellite") {
-      map.setProjection("mercator");
-      map.setStyle(SATELLITE_STYLE_URL);
+      map.setStyle(SATELLITE_STYLE);
       map.easeTo({
         center: [-80.19, 25.76],
         zoom: 6.2,
@@ -1120,11 +1146,10 @@ export default function HomePage() {
       return;
     }
 
-    map.setProjection("mercator");
-    map.setStyle(MAP_STYLE_URL);
+    map.setStyle(MAP_STYLE);
     map.easeTo({
-      center: [-80.19, 25.76],
-      zoom: 6.2,
+      center: mode === "globe" ? [-70, 28] : [-80.19, 25.76],
+      zoom: mode === "globe" ? 2.6 : 6.2,
       duration: 250,
       essential: true,
     });
@@ -1324,12 +1349,11 @@ export default function HomePage() {
   useEffect(() => {
     if (mapRef.current || !floodEngineUrl) return;
 
-    const map = new mapboxgl.Map({
+    const map = new maplibregl.Map({
       container: mapContainer.current,
-      style: MAP_STYLE_URL,
+      style: MAP_STYLE,
       center: [-80.19, 25.76],
       zoom: 6.2,
-      projection: "mercator",
       dragPan: true,
       scrollZoom: true,
       boxZoom: true,
@@ -1351,7 +1375,7 @@ export default function HomePage() {
 
     mapRef.current = map;
 
-    map.addControl(new mapboxgl.NavigationControl(), "top-right");
+    map.addControl(new maplibregl.NavigationControl(), "top-right");
     map.getCanvas().style.cursor = "crosshair";
 
     if (DEBUG_FLOOD && !debugListenersAddedRef.current) {
@@ -1395,7 +1419,7 @@ export default function HomePage() {
           return;
         }
 
-        console.log("Mapbox error:", e);
+        console.log("Map error:", e);
       });
     }
 
@@ -1412,13 +1436,10 @@ export default function HomePage() {
       setStatus("Map ready");
     };
 
-    const handleStyleLoad = () => {
+    const handleStyleData = () => {
+      if (!map.isStyleLoaded()) return;
+
       ensureImpactLayers();
-
-      if (viewModeRef.current === "globe") {
-        safely(() => map.setFog({}));
-      }
-
       restoreMapOverlays();
       flushPendingFloodLayer();
       styleSwitchInProgressRef.current = false;
@@ -1482,7 +1503,7 @@ export default function HomePage() {
     };
 
     map.on("load", handleLoad);
-    map.on("style.load", handleStyleLoad);
+    map.on("styledata", handleStyleData);
     map.on("mousemove", handleMouseMove);
     map.on("mouseleave", handleMouseLeave);
     map.on("click", handleMapClick);
@@ -1494,7 +1515,7 @@ export default function HomePage() {
       if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
 
       map.off("load", handleLoad);
-      map.off("style.load", handleStyleLoad);
+      map.off("styledata", handleStyleData);
       map.off("mousemove", handleMouseMove);
       map.off("mouseleave", handleMouseLeave);
       map.off("click", handleMapClick);
@@ -1571,8 +1592,8 @@ export default function HomePage() {
       return;
     }
 
-    if (!floodAllowedInCurrentView() && viewMode === "globe") {
-      setStatus("Globe preview mode");
+    if (viewMode === "globe") {
+      setStatus("Wide-area preview mode");
       return;
     }
 
@@ -1991,7 +2012,7 @@ export default function HomePage() {
               fontWeight: 700,
             }}
           >
-            <div>Globe View</div>
+            <div>Wide View</div>
             <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
               Preview
             </div>
@@ -2024,7 +2045,7 @@ export default function HomePage() {
             ? "Standard Map"
             : viewMode === "satellite"
             ? "Satellite"
-            : "Globe"}
+            : "Wide View"}
         </div>
         <div>Status: {status}</div>
         <div>Scenario Mode: {scenarioMode}</div>
