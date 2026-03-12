@@ -80,6 +80,7 @@ const createGeodesicCircle = (lng, lat, radiusMeters, steps = 128) => {
 
     const newLat = Math.asin(
       Math.sin(latRad) * Math.cos(angularDistance) +
+        Math.cos(latRad) * math.sin ? Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearing) :
         Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearing)
     );
 
@@ -722,8 +723,8 @@ export default function HomePage() {
         source: FLOOD_SOURCE_ID,
         paint: {
           "raster-opacity": 0.88,
-          "raster-fade-duration": 0,
-          "raster-resampling": "linear",
+          "raster-fade-duration": 150,
+          "raster-resampling": "nearest",
         },
       });
 
@@ -777,8 +778,8 @@ export default function HomePage() {
         source: IMPACT_FLOOD_SOURCE_ID,
         paint: {
           "raster-opacity": 0.88,
-          "raster-fade-duration": 0,
-          "raster-resampling": "linear",
+          "raster-fade-duration": 150,
+          "raster-resampling": "nearest",
         },
       });
 
