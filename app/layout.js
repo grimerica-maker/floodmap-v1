@@ -1,4 +1,4 @@
-import "mapbox-gl/dist/mapbox-gl.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 
 export const metadata = {
   title: "Floodmap V1",
