@@ -746,10 +746,10 @@ export default function HomePage() {
     try {
       if (
         activeImpactRunIdRef.current === runId &&
-        map.getLayer(IMPACT_FLOOD_LAYER_ID)
+        map.getLayer(IMPACT_FLOOD_LAYER_ID) &&
+        map.getSource(IMPACT_FLOOD_SOURCE_ID)
       ) {
         bringImpactLayersToFront();
-        map.triggerRepaint();
         return true;
       }
 
@@ -784,15 +784,6 @@ export default function HomePage() {
 
       activeImpactRunIdRef.current = runId;
       bringImpactLayersToFront();
-      map.triggerRepaint();
-
-      requestAnimationFrame(() => {
-        if (mapRef.current && mapRef.current.isStyleLoaded()) {
-          bringImpactLayersToFront();
-          mapRef.current.triggerRepaint();
-        }
-      });
-
       return true;
     } catch (error) {
       console.error("Failed to add impact flood layer", error);
@@ -1151,33 +1142,16 @@ export default function HomePage() {
       setImpactResult(data);
       impactResultRef.current = data;
 
-      drawImpactPointNow(impactPointRef.current, impactDiameterRef.current);
+      removeFloodLayer();
+
       setExecutedImpactOnMap(
         impactPointRef.current,
         impactDiameterRef.current,
         data
       );
 
-      removeFloodLayer();
-
       if (data.is_ocean_impact && data.tsunami_radius_m > 0) {
-        const addedNow = addImpactFloodLayer(data.run_id);
-        console.log("Impact flood layer added:", addedNow, data.run_id);
-
-        requestAnimationFrame(() => {
-          if (mapRef.current && mapRef.current.isStyleLoaded()) {
-            addImpactFloodLayer(data.run_id);
-          }
-        });
-
-        setTimeout(() => {
-          if (mapRef.current && mapRef.current.isStyleLoaded()) {
-            addImpactFloodLayer(data.run_id);
-            bringImpactLayersToFront();
-            mapRef.current.triggerRepaint();
-          }
-        }, 250);
-
+        addImpactFloodLayer(data.run_id);
         setStatus("Impact executed with tsunami flooding");
       } else {
         removeImpactFloodLayer();
@@ -1305,7 +1279,6 @@ export default function HomePage() {
       executedImpactRef.current = null;
       setImpactResult(null);
       impactResultRef.current = null;
-      activeImpactRunIdRef.current = null;
       removeImpactFloodLayer();
 
       drawImpactPointNow(point, impactDiameterRef.current);
@@ -1328,18 +1301,6 @@ export default function HomePage() {
       ensureImpactLayers();
       restoreMapOverlays();
       flushPendingFloodLayer();
-    });
-
-    map.on("idle", () => {
-      flushPendingFloodLayer();
-
-      if (
-        scenarioModeRef.current === "impact" &&
-        executedImpactRef.current?.runId &&
-        impactResultRef.current?.is_ocean_impact
-      ) {
-        addImpactFloodLayer(executedImpactRef.current.runId);
-      }
     });
 
     map.on("mousemove", handleMouseMove);
@@ -1378,6 +1339,17 @@ export default function HomePage() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
+
+    if (scenarioMode === "impact") {
+      syncImpactScenario();
+    } else {
+      syncFloodScenario();
+    }
+  }, [scenarioMode, seaLevel, impactPoint, executedImpact, impactResult]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
     if (scenarioMode !== "impact") return;
     if (!impactPointRef.current) return;
 
@@ -1393,31 +1365,7 @@ export default function HomePage() {
     }
 
     bringImpactLayersToFront();
-    map.triggerRepaint();
   }, [impactDiameter, scenarioMode, impactPoint, executedImpact, impactResult]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-
-    if (scenarioMode === "impact") {
-      syncImpactScenario();
-    } else {
-      syncFloodScenario();
-    }
-  }, [scenarioMode, seaLevel, impactPoint, executedImpact, impactResult]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    if (scenarioMode !== "impact") return;
-    if (!executedImpact?.runId) return;
-    if (!impactResult?.is_ocean_impact) return;
-
-    addImpactFloodLayer(executedImpact.runId);
-    bringImpactLayersToFront();
-    map.triggerRepaint();
-  }, [executedImpact, impactResult, scenarioMode]);
 
   useEffect(() => {
     const map = mapRef.current;
