@@ -12,7 +12,7 @@ const DEBUG_FLOOD = true;
 const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-v9";
 
-const FLOOD_TILE_VERSION = "200";
+const FLOOD_TILE_VERSION = "201";
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
 
@@ -131,7 +131,8 @@ export default function HomePage() {
 
   useEffect(() => {
     setInputText(formatInputTextFromMeters(inputLevel, unitMode));
-  }, [unitMode]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unitMode]);
 
   const formatLevelForDisplay = (meters, unit = unitMode) => {
     if (unit === "ft") {
@@ -140,11 +141,6 @@ export default function HomePage() {
     }
     return `${meters > 0 ? "+" : ""}${Math.round(meters)} m`;
   };
-
-  const waterDifference =
-    hoverElevation !== null
-      ? Number((hoverElevation - seaLevel).toFixed(2))
-      : null;
 
   const floodAllowedInCurrentView = () =>
     viewModeRef.current === "map" || viewModeRef.current === "satellite";
@@ -353,7 +349,7 @@ export default function HomePage() {
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
     map.getCanvas().style.cursor = "crosshair";
 
-    if (DEBUG_FLOOD && !hasAppliedInitialViewModeRef.current) {
+    if (DEBUG_FLOOD) {
       map.on("error", (e) => {
         const message = e?.error?.message || e?.message || "";
         console.log("Map error:", e, message);
@@ -446,6 +442,11 @@ export default function HomePage() {
     setStatus(`Flood tiles loaded at ${formatLevelForDisplay(seaLevel)}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, seaLevel, unitMode]);
+
+  const waterDifference =
+    hoverElevation !== null
+      ? Number((hoverElevation - seaLevel).toFixed(2))
+      : null;
 
   return (
     <div
@@ -802,7 +803,6 @@ export default function HomePage() {
         <div>Status: {status}</div>
         <div>Scenario Mode: flood</div>
         <div>Impact: disabled</div>
-        <div>Asteroid Diameter: {impactDiameter} m</div>
 
         <hr style={{ margin: "10px 0", opacity: 0.25 }} />
 
