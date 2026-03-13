@@ -1,62 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
+
+mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
 const CONFIGURED_FLOOD_ENGINE_URL = process.env.NEXT_PUBLIC_FLOOD_ENGINE_URL;
 const FLOOD_ENGINE_PROXY_PATH = "/api/engine";
 const DEBUG_FLOOD = true;
 
-const MAP_STYLE = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      attribution: "© OpenStreetMap contributors",
-      maxzoom: 19,
-    },
-  },
-  layers: [
-    {
-      id: "osm",
-      type: "raster",
-      source: "osm",
-    },
-  ],
-};
+const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
+const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-v9";
 
-const SATELLITE_STYLE = {
-  version: 8,
-  sources: {
-    esri: {
-      type: "raster",
-      tiles: [
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      ],
-      tileSize: 256,
-      attribution: "Source: Esri, Maxar, Earthstar Geographics",
-      maxzoom: 19,
-    },
-  },
-  layers: [
-    {
-      id: "esri-satellite",
-      type: "raster",
-      source: "esri",
-    },
-  ],
-};
-
-const FLOOD_TILE_VERSION = "99";
-
+const FLOOD_TILE_VERSION = "200";
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
-
-const MAX_ASTEROID_DIAMETER_M = 20000;
-const MIN_ASTEROID_DIAMETER_M = 50;
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -80,13 +39,12 @@ export default function HomePage() {
   const mapContainer = useRef(null);
   const mapRef = useRef(null);
   const hoverTimerRef = useRef(null);
-  const debugListenersAddedRef = useRef(false);
-  const hasAppliedInitialViewModeRef = useRef(false);
-  const styleRestoreFrameRef = useRef(null);
   const activeFloodLevelRef = useRef(null);
+  const hasAppliedInitialViewModeRef = useRef(false);
 
   const seaLevelRef = useRef(0);
   const viewModeRef = useRef("map");
+  const floodEngineUrlRef = useRef(FLOOD_ENGINE_PROXY_PATH);
 
   const [inputLevel, setInputLevel] = useState(0);
   const [inputText, setInputText] = useState("0");
@@ -94,9 +52,6 @@ export default function HomePage() {
   const [viewMode, setViewMode] = useState("map");
   const [unitMode, setUnitMode] = useState("m");
   const [status, setStatus] = useState("Loading map...");
-  const [scenarioMode] = useState("flood");
-
-  const [impactDiameter, setImpactDiameter] = useState(100);
   const [floodEngineUrl, setFloodEngineUrl] = useState(FLOOD_ENGINE_PROXY_PATH);
 
   const [hoverLat, setHoverLat] = useState(null);
@@ -110,6 +65,10 @@ export default function HomePage() {
   useEffect(() => {
     viewModeRef.current = viewMode;
   }, [viewMode]);
+
+  useEffect(() => {
+    floodEngineUrlRef.current = floodEngineUrl;
+  }, [floodEngineUrl]);
 
   useEffect(() => {
     if (!CONFIGURED_FLOOD_ENGINE_URL) {
@@ -189,31 +148,12 @@ export default function HomePage() {
       ? Number((hoverElevation - seaLevel).toFixed(2))
       : null;
 
-  const clampImpactDiameter = (value) => {
-    const parsed = parseInt(value, 10);
-    if (Number.isNaN(parsed)) return MIN_ASTEROID_DIAMETER_M;
-    return Math.max(
-      MIN_ASTEROID_DIAMETER_M,
-      Math.min(MAX_ASTEROID_DIAMETER_M, parsed)
-    );
-  };
-
   const floodAllowedInCurrentView = () =>
     viewModeRef.current === "map" || viewModeRef.current === "satellite";
 
   const isMapReady = () => {
     const map = mapRef.current;
-    if (!map) return false;
-    if (!map.isStyleLoaded()) return false;
-    const style = map.getStyle();
-    return !!style && Array.isArray(style.layers) && style.layers.length > 0;
-  };
-
-  const cancelStyleRestoreFrame = () => {
-    if (styleRestoreFrameRef.current) {
-      cancelAnimationFrame(styleRestoreFrameRef.current);
-      styleRestoreFrameRef.current = null;
-    }
+    return !!map && map.isStyleLoaded();
   };
 
   const removeFloodLayer = () => {
@@ -236,37 +176,31 @@ export default function HomePage() {
   const addFloodLayer = (level) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return false;
-    if (viewModeRef.current !== "map" && viewModeRef.current !== "satellite") {
-      return false;
-    }
+    if (!floodAllowedInCurrentView()) return false;
 
     const normalizedLevel = Number(level);
     if (!Number.isFinite(normalizedLevel) || normalizedLevel === 0) return false;
 
-    const tileUrl = `${floodEngineUrl}/flood/${encodeURIComponent(
+    const tileUrl = `${floodEngineUrlRef.current}/flood/${encodeURIComponent(
       normalizedLevel
     )}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
 
     try {
-      const existingLayer = map.getLayer(FLOOD_LAYER_ID);
-      const existingSource = map.getSource(FLOOD_SOURCE_ID);
-
       if (
         activeFloodLevelRef.current === normalizedLevel &&
-        existingLayer &&
-        existingSource
+        map.getLayer(FLOOD_LAYER_ID) &&
+        map.getSource(FLOOD_SOURCE_ID)
       ) {
         return true;
       }
 
-      if (existingLayer) map.removeLayer(FLOOD_LAYER_ID);
-      if (existingSource) map.removeSource(FLOOD_SOURCE_ID);
+      if (map.getLayer(FLOOD_LAYER_ID)) map.removeLayer(FLOOD_LAYER_ID);
+      if (map.getSource(FLOOD_SOURCE_ID)) map.removeSource(FLOOD_SOURCE_ID);
 
       map.addSource(FLOOD_SOURCE_ID, {
         type: "raster",
         tiles: [tileUrl],
         tileSize: 256,
-        scheme: "xyz",
         minzoom: 0,
         maxzoom: 22,
       });
@@ -283,6 +217,7 @@ export default function HomePage() {
       });
 
       activeFloodLevelRef.current = normalizedLevel;
+      safely(() => map.triggerRepaint());
       return true;
     } catch (error) {
       console.error("Failed to add flood layer", error);
@@ -295,7 +230,7 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
-    if (viewModeRef.current !== "map" && viewModeRef.current !== "satellite") {
+    if (!floodAllowedInCurrentView()) {
       removeFloodLayer();
       return;
     }
@@ -309,34 +244,12 @@ export default function HomePage() {
     addFloodLayer(level);
   };
 
-  const fetchElevation = async (lat, lng) => {
-    try {
-      const res = await fetch(
-        `${floodEngineUrl}/elevation?lat=${encodeURIComponent(
-          lat
-        )}&lng=${encodeURIComponent(lng)}`
-      );
-
-      if (!res.ok) {
-        setHoverElevation(null);
-        return;
-      }
-
-      const data = await res.json();
-      setHoverElevation(data.elevation_m);
-    } catch {
-      setHoverElevation(null);
-    }
-  };
-
   const applyStyleMode = (mode) => {
     const map = mapRef.current;
     if (!map) return;
 
-    cancelStyleRestoreFrame();
-
     if (mode === "satellite") {
-      map.setStyle(SATELLITE_STYLE);
+      map.setStyle(SATELLITE_STYLE_URL);
       map.easeTo({
         center: [-80.19, 25.76],
         zoom: 6.2,
@@ -346,7 +259,7 @@ export default function HomePage() {
       return;
     }
 
-    map.setStyle(MAP_STYLE);
+    map.setStyle(MAP_STYLE_URL);
     map.easeTo({
       center: mode === "globe" ? [-70, 28] : [-80.19, 25.76],
       zoom: mode === "globe" ? 2.6 : 6.2,
@@ -395,26 +308,42 @@ export default function HomePage() {
     setInputText("0");
     setSeaLevel(0);
     seaLevelRef.current = 0;
-
     removeFloodLayer();
     setStatus("Flood cleared");
+  };
+
+  const fetchElevation = async (lat, lng) => {
+    try {
+      const res = await fetch(
+        `${floodEngineUrlRef.current}/elevation?lat=${encodeURIComponent(
+          lat
+        )}&lng=${encodeURIComponent(lng)}`
+      );
+
+      if (!res.ok) {
+        setHoverElevation(null);
+        return;
+      }
+
+      const data = await res.json();
+      setHoverElevation(data.elevation_m);
+    } catch {
+      setHoverElevation(null);
+    }
   };
 
   useEffect(() => {
     if (mapRef.current || !floodEngineUrl) return;
 
-    const map = new maplibregl.Map({
+    const map = new mapboxgl.Map({
       container: mapContainer.current,
-      style: MAP_STYLE,
+      style: MAP_STYLE_URL,
       center: [-80.19, 25.76],
       zoom: 6.2,
-      dragPan: true,
-      scrollZoom: true,
-      boxZoom: true,
-      dragRotate: true,
-      keyboard: true,
-      touchZoomRotate: true,
+      accessToken: mapboxgl.accessToken,
       antialias: false,
+      attributionControl: true,
+      collectResourceTiming: false,
       transformRequest: (url, resourceType) => {
         if (resourceType === "Tile" && url.includes("/flood/")) {
           console.log("FLOOD TILE:", url);
@@ -424,45 +353,30 @@ export default function HomePage() {
     });
 
     mapRef.current = map;
-
-    map.addControl(new maplibregl.NavigationControl(), "top-right");
+    map.addControl(new mapboxgl.NavigationControl(), "top-right");
     map.getCanvas().style.cursor = "crosshair";
 
     if (DEBUG_FLOOD && !debugListenersAddedRef.current) {
       debugListenersAddedRef.current = true;
       map.on("error", (e) => {
-        const message = e?.error?.message || e?.message || e?.sourceId || "";
-        const sourceId =
-          e?.sourceId ||
-          e?.source?.id ||
-          e?.target?._sourceId ||
-          e?.error?.sourceId ||
-          null;
-
-        console.log("Map error:", e, message, sourceId);
+        const message = e?.error?.message || e?.message || "";
+        console.log("Map error:", e, message);
       });
     }
 
-    const handleLoad = () => {
-      fetch(`${floodEngineUrl}/`)
+    const handleStyleLoad = () => {
+      activeFloodLevelRef.current = null;
+      syncFloodScenario();
+    };
+
+    const handleMapLoad = () => {
+      fetch(`${floodEngineUrlRef.current}/`)
         .then((r) => r.json())
         .then((d) => console.log("Engine health:", d))
         .catch((e) => console.error("Engine unreachable", e));
 
       syncFloodScenario();
       setStatus("Map ready");
-    };
-
-    const handleStyleData = () => {
-      if (!map.isStyleLoaded()) return;
-
-      cancelStyleRestoreFrame();
-
-      styleRestoreFrameRef.current = requestAnimationFrame(() => {
-        if (!map.isStyleLoaded()) return;
-        activeFloodLevelRef.current = null;
-        syncFloodScenario();
-      });
     };
 
     const handleMouseMove = (e) => {
@@ -484,18 +398,16 @@ export default function HomePage() {
       setHoverElevation(null);
     };
 
-    map.on("load", handleLoad);
-    map.on("styledata", handleStyleData);
+    map.on("load", handleMapLoad);
+    map.on("style.load", handleStyleLoad);
     map.on("mousemove", handleMouseMove);
     map.on("mouseleave", handleMouseLeave);
 
     return () => {
-      cancelStyleRestoreFrame();
-
       if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
 
-      map.off("load", handleLoad);
-      map.off("styledata", handleStyleData);
+      map.off("load", handleMapLoad);
+      map.off("style.load", handleStyleLoad);
       map.off("mousemove", handleMouseMove);
       map.off("mouseleave", handleMouseLeave);
 
@@ -581,7 +493,7 @@ export default function HomePage() {
         <h1 style={{ margin: "8px 0 24px 0", fontSize: 22 }}>Floodmap V1</h1>
 
         <div style={{ fontSize: 14, color: "#666", marginBottom: 24 }}>
-          Flood-only surgical stabilization build
+          Mapbox flood-only stabilization build
         </div>
 
         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
@@ -892,7 +804,7 @@ export default function HomePage() {
             : "Wide View"}
         </div>
         <div>Status: {status}</div>
-        <div>Scenario Mode: {scenarioMode}</div>
+        <div>Scenario Mode: flood</div>
         <div>Impact: disabled</div>
         <div>Asteroid Diameter: {impactDiameter} m</div>
 
