@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
@@ -132,8 +131,7 @@ export default function HomePage() {
 
   useEffect(() => {
     setInputText(formatInputTextFromMeters(inputLevel, unitMode));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unitMode]);
+  }, [unitMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatLevelForDisplay = (meters, unit = unitMode) => {
     if (unit === "ft") {
@@ -340,7 +338,6 @@ export default function HomePage() {
       style: MAP_STYLE_URL,
       center: [-80.19, 25.76],
       zoom: 6.2,
-      accessToken: mapboxgl.accessToken,
       antialias: false,
       attributionControl: true,
       collectResourceTiming: false,
@@ -356,8 +353,7 @@ export default function HomePage() {
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
     map.getCanvas().style.cursor = "crosshair";
 
-    if (DEBUG_FLOOD && !debugListenersAddedRef.current) {
-      debugListenersAddedRef.current = true;
+    if (DEBUG_FLOOD && !hasAppliedInitialViewModeRef.current) {
       map.on("error", (e) => {
         const message = e?.error?.message || e?.message || "";
         console.log("Map error:", e, message);
