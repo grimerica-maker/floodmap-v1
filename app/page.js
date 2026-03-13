@@ -50,8 +50,8 @@ const SATELLITE_STYLE = {
   ],
 };
 
-const FLOOD_TILE_VERSION = "12";
-const IMPACT_TILE_VERSION = "12";
+const FLOOD_TILE_VERSION = "13";
+const IMPACT_TILE_VERSION = "13";
 
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
@@ -480,7 +480,6 @@ export default function HomePage() {
     const waveReady = ensureGeoJsonSource(IMPACT_WAVEFRONT_SOURCE_ID);
 
     if (!shockReady || !waveReady) {
-      console.warn("Animated impact sources not ready yet");
       return false;
     }
 
@@ -524,7 +523,6 @@ export default function HomePage() {
 
     for (const id of requiredSources) {
       if (!ensureGeoJsonSource(id)) {
-        console.warn(`Required impact source missing: ${id}`);
         return false;
       }
     }
@@ -675,7 +673,6 @@ export default function HomePage() {
   ) => {
     const map = mapRef.current;
     if (!isMapReady() || !point) return;
-
     if (!ensureImpactLayers()) return;
 
     setSourceData(IMPACT_SOURCE_ID, {
@@ -694,7 +691,7 @@ export default function HomePage() {
   };
 
   const clearAnimatedImpactRings = () => {
-    if (!ensureAnimatedLayers()) return;
+    if (!isMapReady()) return;
 
     setSourceData(IMPACT_SHOCK_SOURCE_ID, emptyFeatureCollection());
     setSourceData(IMPACT_WAVEFRONT_SOURCE_ID, emptyFeatureCollection());
@@ -902,7 +899,7 @@ export default function HomePage() {
         type: "raster",
         source: FLOOD_SOURCE_ID,
         paint: {
-          "raster-opacity": 0.88,
+          "raster-opacity": 1,
           "raster-fade-duration": 0,
           "raster-resampling": "nearest",
         },
@@ -941,8 +938,6 @@ export default function HomePage() {
 
       if (layerExists) map.removeLayer(IMPACT_FLOOD_LAYER_ID);
       if (sourceExists) map.removeSource(IMPACT_FLOOD_SOURCE_ID);
-
-      console.log("Adding impact flood tiles:", tileUrl);
 
       map.addSource(IMPACT_FLOOD_SOURCE_ID, {
         type: "raster",
@@ -983,12 +978,10 @@ export default function HomePage() {
       if (!runId) return;
 
       const retry = addImpactFloodLayer(runId);
-      console.log("Impact flood layer retry added:", retry);
 
       if (retry) {
         setStatus("Impact executed with tsunami flooding");
       } else {
-        console.warn("Impact flood layer attach failed after retry");
         setStatus("Impact executed, but flood layer attach failed");
       }
     }, delayMs);
@@ -1049,7 +1042,6 @@ export default function HomePage() {
   const setExecutedImpactOnMap = (point, diameterValue, result) => {
     const map = mapRef.current;
     if (!isMapReady() || !point || !result) return;
-
     if (!ensureImpactLayers()) return;
 
     setSourceData(IMPACT_SOURCE_ID, {
@@ -1125,13 +1117,21 @@ export default function HomePage() {
       return;
     }
 
-    clearImpactPointOnMap();
     removeImpactFloodLayer();
 
-    if (floodAllowedInCurrentView() && seaLevelRef.current !== 0) {
-      addFloodLayer(seaLevelRef.current);
-    } else {
+    if (!floodAllowedInCurrentView()) {
       removeFloodLayer();
+      return;
+    }
+
+    if (seaLevelRef.current === 0) {
+      removeFloodLayer();
+      return;
+    }
+
+    const added = addFloodLayer(seaLevelRef.current);
+    if (!added) {
+      pendingFloodLevelRef.current = seaLevelRef.current;
     }
   };
 
@@ -1183,11 +1183,12 @@ export default function HomePage() {
     if (!isMapReady()) return;
 
     if (scenarioModeRef.current === "impact") {
-      ensureImpactLayers();
+      if (!ensureImpactLayers()) return;
       syncImpactScenario();
-    } else {
-      syncFloodScenario();
+      return;
     }
+
+    syncFloodScenario();
   };
 
   const applyStyleMode = (mode) => {
@@ -1243,14 +1244,13 @@ export default function HomePage() {
     impactResultRef.current = null;
     impactExecutionSeqRef.current += 1;
 
+    removeImpactFloodLayer();
+
     if (!floodAllowedInCurrentView()) {
       removeFloodLayer();
       setStatus("Switch to Standard Map or Satellite to run flood layer");
       return;
     }
-
-    clearImpactPointOnMap();
-    removeImpactFloodLayer();
 
     if (level === 0) {
       pendingFloodLevelRef.current = null;
@@ -1323,7 +1323,6 @@ export default function HomePage() {
       }
 
       const data = await res.json();
-      console.log("Impact response data:", data);
 
       if (impactExecutionSeqRef.current !== executionSeq) {
         setImpactBusy(false);
@@ -1389,7 +1388,6 @@ export default function HomePage() {
 
     setImpactPoint(null);
     impactPointRef.current = null;
-
     setExecutedImpact(null);
     executedImpactRef.current = null;
     setImpactResult(null);
@@ -1443,7 +1441,6 @@ export default function HomePage() {
       debugListenersAddedRef.current = true;
       map.on("error", (e) => {
         const message = e?.error?.message || e?.message || e?.sourceId || "";
-
         const sourceId =
           e?.sourceId ||
           e?.source?.id ||
@@ -1451,29 +1448,13 @@ export default function HomePage() {
           e?.error?.sourceId ||
           null;
 
-        const ignoreImpactSourceIds = new Set([
-          IMPACT_SOURCE_ID,
-          IMPACT_PREVIEW_SOURCE_ID,
-          IMPACT_CRATER_SOURCE_ID,
-          IMPACT_BLAST_SOURCE_ID,
-          IMPACT_THERMAL_SOURCE_ID,
-          IMPACT_TSUNAMI_SOURCE_ID,
-          IMPACT_SHOCK_SOURCE_ID,
-          IMPACT_WAVEFRONT_SOURCE_ID,
-          IMPACT_FLOOD_SOURCE_ID,
-        ]);
-
-        if (sourceId && ignoreImpactSourceIds.has(sourceId)) {
-          return;
-        }
+        if (sourceId === IMPACT_FLOOD_SOURCE_ID) return;
 
         console.log("Map error:", e, message, sourceId);
       });
     }
 
     const handleLoad = () => {
-      ensureImpactLayers();
-
       fetch(`${floodEngineUrl}/`)
         .then((r) => r.json())
         .then((d) => console.log("Engine health:", d))
@@ -1491,11 +1472,9 @@ export default function HomePage() {
 
       styleRestoreFrameRef.current = requestAnimationFrame(() => {
         styleRestoreFrameRef.current = null;
-
         if (!isMapReady()) return;
 
         stopImpactAnimations();
-        ensureImpactLayers();
         restoreMapOverlays();
         flushPendingFloodLayer();
         styleSwitchInProgressRef.current = false;
@@ -1890,9 +1869,10 @@ export default function HomePage() {
               setImpactBusy(false);
               setStatus("Flood mode active");
               removeImpactFloodLayer();
+
               if (isMapReady()) {
                 syncFloodScenario();
-                safely(() => mapRef.current.triggerRepaint());
+                safely(() => mapRef.current?.triggerRepaint());
               }
             }}
             style={{
@@ -1919,10 +1899,9 @@ export default function HomePage() {
               setStatus("Click map to place impact point");
 
               if (isMapReady()) {
-                ensureImpactLayers();
                 syncImpactScenario();
                 bringImpactLayersToFront();
-                safely(() => mapRef.current.triggerRepaint());
+                safely(() => mapRef.current?.triggerRepaint());
               }
             }}
             style={{
