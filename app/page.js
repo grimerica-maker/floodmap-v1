@@ -12,7 +12,7 @@ const DEBUG_FLOOD = true;
 const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-v9";
 
-const FLOOD_TILE_VERSION = "201";
+const FLOOD_TILE_VERSION = "202";
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
 
@@ -150,6 +150,15 @@ export default function HomePage() {
     return !!map && map.isStyleLoaded();
   };
 
+  const forceFlatMap = () => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    safely(() => map.setProjection("mercator"));
+    safely(() => map.setPitch(0));
+    safely(() => map.setBearing(0));
+  };
+
   const removeFloodLayer = () => {
     const map = mapRef.current;
     if (!map) {
@@ -169,15 +178,33 @@ export default function HomePage() {
 
   const addFloodLayer = (level) => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return false;
-    if (!floodAllowedInCurrentView()) return false;
+
+    if (!map) {
+      console.warn("addFloodLayer: map missing");
+      return false;
+    }
+
+    if (!map.isStyleLoaded()) {
+      console.warn("addFloodLayer: style not loaded yet");
+      return false;
+    }
+
+    if (!floodAllowedInCurrentView()) {
+      console.warn("addFloodLayer: flood not allowed in this view");
+      return false;
+    }
 
     const normalizedLevel = Number(level);
-    if (!Number.isFinite(normalizedLevel) || normalizedLevel === 0) return false;
+    if (!Number.isFinite(normalizedLevel) || normalizedLevel === 0) {
+      console.warn("addFloodLayer: invalid level", level);
+      return false;
+    }
 
     const tileUrl = `${floodEngineUrlRef.current}/flood/${encodeURIComponent(
       normalizedLevel
     )}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
+
+    console.log("Adding flood layer:", tileUrl);
 
     try {
       if (
@@ -185,11 +212,16 @@ export default function HomePage() {
         map.getLayer(FLOOD_LAYER_ID) &&
         map.getSource(FLOOD_SOURCE_ID)
       ) {
+        console.log("Flood layer already active:", normalizedLevel);
         return true;
       }
 
-      if (map.getLayer(FLOOD_LAYER_ID)) map.removeLayer(FLOOD_LAYER_ID);
-      if (map.getSource(FLOOD_SOURCE_ID)) map.removeSource(FLOOD_SOURCE_ID);
+      if (map.getLayer(FLOOD_LAYER_ID)) {
+        map.removeLayer(FLOOD_LAYER_ID);
+      }
+      if (map.getSource(FLOOD_SOURCE_ID)) {
+        map.removeSource(FLOOD_SOURCE_ID);
+      }
 
       map.addSource(FLOOD_SOURCE_ID, {
         type: "raster",
@@ -211,6 +243,12 @@ export default function HomePage() {
       });
 
       activeFloodLevelRef.current = normalizedLevel;
+
+      map.once("idle", () => {
+        console.log("Flood layer idle for level:", normalizedLevel);
+        setStatus(`Flood tiles loaded at ${formatLevelForDisplay(normalizedLevel)}`);
+      });
+
       safely(() => map.triggerRepaint());
       return true;
     } catch (error) {
@@ -263,6 +301,13 @@ export default function HomePage() {
   };
 
   const executeFlood = () => {
+    console.log("Execute Flood clicked", {
+      inputText,
+      unitMode,
+      viewMode: viewModeRef.current,
+      engine: floodEngineUrlRef.current,
+    });
+
     const parsedLevel = commitInputText(inputText, unitMode);
 
     if (parsedLevel === null) {
@@ -288,12 +333,22 @@ export default function HomePage() {
       return;
     }
 
+    if (!mapRef.current) {
+      setStatus("Map not ready");
+      return;
+    }
+
+    if (!mapRef.current.isStyleLoaded()) {
+      setStatus("Map style still loading...");
+      return;
+    }
+
+    setStatus(`Loading flood tiles at ${formatLevelForDisplay(level)}...`);
+
     const added = addFloodLayer(level);
 
-    if (added) {
-      setStatus(`Flood tiles loaded at ${formatLevelForDisplay(level)}`);
-    } else {
-      setStatus("Preparing flood layer...");
+    if (!added) {
+      setStatus("Flood layer failed to attach");
     }
   };
 
@@ -346,28 +401,50 @@ export default function HomePage() {
     });
 
     mapRef.current = map;
+    forceFlatMap();
+
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
     map.getCanvas().style.cursor = "crosshair";
+    map.dragRotate.disable();
+    map.touchZoomRotate.disableRotation();
 
     if (DEBUG_FLOOD) {
       map.on("error", (e) => {
         const message = e?.error?.message || e?.message || "";
         console.log("Map error:", e, message);
       });
+      map.on("sourcedata", (e) => {
+        if (e.sourceId === FLOOD_SOURCE_ID) {
+          console.log("Flood sourcedata:", {
+            isSourceLoaded: e.isSourceLoaded,
+            sourceId: e.sourceId,
+            sourceDataType: e.sourceDataType,
+          });
+        }
+      });
     }
 
     const handleStyleLoad = () => {
+      console.log("style.load fired");
+      forceFlatMap();
       activeFloodLevelRef.current = null;
-      syncFloodScenario();
+
+      if (Number(seaLevelRef.current) !== 0) {
+        setTimeout(() => {
+          syncFloodScenario();
+        }, 50);
+      }
     };
 
     const handleMapLoad = () => {
+      console.log("map load fired");
+      forceFlatMap();
+
       fetch(`${floodEngineUrlRef.current}/`)
         .then((r) => r.json())
         .then((d) => console.log("Engine health:", d))
         .catch((e) => console.error("Engine unreachable", e));
 
-      syncFloodScenario();
       setStatus("Map ready");
     };
 
