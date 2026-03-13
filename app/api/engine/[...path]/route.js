@@ -28,6 +28,7 @@ async function handler(request, { params }) {
       headers: {
         "Content-Type": contentType || "application/octet-stream",
         "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Access-Control-Allow-Origin": "*",
       },
     });
   } catch (error) {
@@ -38,6 +39,7 @@ async function handler(request, { params }) {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*",
       },
     });
   }
@@ -45,4 +47,16 @@ async function handler(request, { params }) {
 
 export async function GET(request, context) {
   return handler(request, context);
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,OPTIONS",
+      "Access-Control-Allow-Headers": "*",
+      "Cache-Control": "no-store",
+    },
+  });
 }
