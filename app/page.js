@@ -18,6 +18,11 @@ const FLOOD_LAYER_ID = "flood-layer";
 
 const IMPACT_SOURCE_ID = "impact-point-source";
 const IMPACT_LAYER_ID = "impact-point-layer";
+const IMPACT_PREVIEW_SOURCE_ID = "impact-preview-source";
+const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
+const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
+const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
+const IMPACT_TSUNAMI_LAYER_ID = "impact-tsunami-layer";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -54,6 +59,7 @@ export default function HomePage() {
   const [seaLevel, setSeaLevel] = useState(0);
   const [viewMode, setViewMode] = useState("map");
   const [scenarioMode, setScenarioMode] = useState("flood");
+  const [impactDiameter, setImpactDiameter] = useState(1000);
   const [unitMode, setUnitMode] = useState("m");
   const [status, setStatus] = useState("Loading map...");
   const [floodEngineUrl, setFloodEngineUrl] = useState(FLOOD_ENGINE_PROXY_PATH);
@@ -194,6 +200,26 @@ export default function HomePage() {
     activeFloodLevelRef.current = null;
   };
 
+  const clearImpactPreview = () => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    try {
+      if (map.getLayer(IMPACT_TSUNAMI_LAYER_ID))
+        map.removeLayer(IMPACT_TSUNAMI_LAYER_ID);
+      if (map.getLayer(IMPACT_THERMAL_LAYER_ID))
+        map.removeLayer(IMPACT_THERMAL_LAYER_ID);
+      if (map.getLayer(IMPACT_BLAST_LAYER_ID))
+        map.removeLayer(IMPACT_BLAST_LAYER_ID);
+      if (map.getLayer(IMPACT_CRATER_LAYER_ID))
+        map.removeLayer(IMPACT_CRATER_LAYER_ID);
+      if (map.getSource(IMPACT_PREVIEW_SOURCE_ID))
+        map.removeSource(IMPACT_PREVIEW_SOURCE_ID);
+    } catch (error) {
+      console.warn("Failed clearing impact preview:", error);
+    }
+  };
+
   const removeImpactPoint = () => {
     const map = mapRef.current;
     if (!map) {
@@ -208,6 +234,7 @@ export default function HomePage() {
       console.warn("Failed removing impact point:", error);
     }
 
+    clearImpactPreview();
     impactPointRef.current = null;
   };
 
@@ -254,6 +281,127 @@ export default function HomePage() {
       safely(() => map.triggerRepaint());
     } catch (error) {
       console.error("Failed to draw impact point", error);
+    }
+  };
+
+  const kmCircle = (lng, lat, radiusKm, steps = 96) => {
+    const coords = [];
+    const latRad = (lat * Math.PI) / 180;
+    const kmPerDegLat = 110.574;
+    const kmPerDegLng = 111.32 * Math.cos(latRad);
+
+    for (let i = 0; i <= steps; i += 1) {
+      const t = (i / steps) * Math.PI * 2;
+      const dx = Math.cos(t) * radiusKm;
+      const dy = Math.sin(t) * radiusKm;
+
+      coords.push([
+        lng + dx / Math.max(kmPerDegLng, 0.0001),
+        lat + dy / kmPerDegLat,
+      ]);
+    }
+
+    return {
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        coordinates: [coords],
+      },
+      properties: {},
+    };
+  };
+
+  const getImpactPreviewRadiiKm = (diameterM) => {
+    const d = Math.max(50, Math.min(20000, Number(diameterM) || 1000));
+
+    return {
+      crater: Math.max(0.25, d * 0.0006),
+      blast: Math.max(1.0, d * 0.006),
+      thermal: Math.max(2.0, d * 0.012),
+      tsunami: Math.max(3.0, d * 0.02),
+    };
+  };
+
+  const drawImpactPreview = (lng, lat, diameterM) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    const radii = getImpactPreviewRadiiKm(diameterM);
+
+    const data = {
+      type: "FeatureCollection",
+      features: [
+        { ...kmCircle(lng, lat, radii.crater), properties: { kind: "crater" } },
+        { ...kmCircle(lng, lat, radii.blast), properties: { kind: "blast" } },
+        {
+          ...kmCircle(lng, lat, radii.thermal),
+          properties: { kind: "thermal" },
+        },
+        {
+          ...kmCircle(lng, lat, radii.tsunami),
+          properties: { kind: "tsunami" },
+        },
+      ],
+    };
+
+    try {
+      if (!map.getSource(IMPACT_PREVIEW_SOURCE_ID)) {
+        map.addSource(IMPACT_PREVIEW_SOURCE_ID, {
+          type: "geojson",
+          data,
+        });
+
+        map.addLayer({
+          id: IMPACT_TSUNAMI_LAYER_ID,
+          type: "fill",
+          source: IMPACT_PREVIEW_SOURCE_ID,
+          filter: ["==", ["get", "kind"], "tsunami"],
+          paint: {
+            "fill-color": "#3b82f6",
+            "fill-opacity": 0.08,
+          },
+        });
+
+        map.addLayer({
+          id: IMPACT_THERMAL_LAYER_ID,
+          type: "fill",
+          source: IMPACT_PREVIEW_SOURCE_ID,
+          filter: ["==", ["get", "kind"], "thermal"],
+          paint: {
+            "fill-color": "#f59e0b",
+            "fill-opacity": 0.1,
+          },
+        });
+
+        map.addLayer({
+          id: IMPACT_BLAST_LAYER_ID,
+          type: "line",
+          source: IMPACT_PREVIEW_SOURCE_ID,
+          filter: ["==", ["get", "kind"], "blast"],
+          paint: {
+            "line-color": "#ef4444",
+            "line-width": 2,
+            "line-opacity": 0.85,
+          },
+        });
+
+        map.addLayer({
+          id: IMPACT_CRATER_LAYER_ID,
+          type: "fill",
+          source: IMPACT_PREVIEW_SOURCE_ID,
+          filter: ["==", ["get", "kind"], "crater"],
+          paint: {
+            "fill-color": "#7f1d1d",
+            "fill-opacity": 0.28,
+          },
+        });
+      } else {
+        map.getSource(IMPACT_PREVIEW_SOURCE_ID).setData(data);
+      }
+
+      safely(() => map.triggerRepaint());
+    } catch (error) {
+      console.error("Failed to draw impact preview", error);
     }
   };
 
@@ -566,7 +714,8 @@ export default function HomePage() {
       const lng = e.lngLat.lng;
       const lat = e.lngLat.lat;
       drawImpactPoint(lng, lat);
-      setStatus("Impact point placed");
+      drawImpactPreview(lng, lat, impactDiameter);
+      setStatus("Impact preview ready");
     };
 
     map.on("load", handleMapLoad);
@@ -590,7 +739,7 @@ export default function HomePage() {
       impactPointRef.current = null;
       hasAppliedInitialViewModeRef.current = false;
     };
-  }, [floodEngineUrl, scenarioMode]);
+  }, [floodEngineUrl, scenarioMode, impactDiameter]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -610,7 +759,9 @@ export default function HomePage() {
     if (scenarioMode === "impact") {
       removeFloodLayer();
       setStatus(
-        impactPointRef.current ? "Impact point placed" : "Click map to place impact point"
+        impactPointRef.current
+          ? "Impact preview ready"
+          : "Click map to place impact point"
       );
       return;
     }
@@ -618,6 +769,18 @@ export default function HomePage() {
     removeImpactPoint();
     syncFloodScenario();
   }, [scenarioMode]);
+
+  useEffect(() => {
+    if (scenarioMode !== "impact") return;
+    if (!impactPointRef.current) return;
+    if (!mapRef.current || !mapRef.current.isStyleLoaded()) return;
+
+    drawImpactPreview(
+      impactPointRef.current.lng,
+      impactPointRef.current.lat,
+      impactDiameter
+    );
+  }, [impactDiameter, scenarioMode]);
 
   useEffect(() => {
     if (!isMapReady()) return;
@@ -630,7 +793,9 @@ export default function HomePage() {
 
     if (scenarioMode === "impact") {
       setStatus(
-        impactPointRef.current ? "Impact point placed" : "Click map to place impact point"
+        impactPointRef.current
+          ? "Impact preview ready"
+          : "Click map to place impact point"
       );
       return;
     }
@@ -916,6 +1081,50 @@ export default function HomePage() {
           </button>
         </div>
 
+        {scenarioMode === "impact" && (
+          <>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>
+              ASTEROID SIZE
+            </div>
+
+            <input
+              type="range"
+              min="50"
+              max="20000"
+              step="50"
+              value={impactDiameter}
+              onChange={(e) => setImpactDiameter(Number(e.target.value))}
+              style={{ width: "100%", marginBottom: 10 }}
+            />
+
+            <input
+              type="number"
+              min="50"
+              max="20000"
+              step="50"
+              value={impactDiameter}
+              onChange={(e) => {
+                const next = Number(e.target.value);
+                if (Number.isFinite(next)) {
+                  setImpactDiameter(Math.max(50, Math.min(20000, next)));
+                }
+              }}
+              style={{
+                width: "100%",
+                padding: 12,
+                fontSize: 18,
+                border: "1px solid #ccc",
+                marginBottom: 20,
+                boxSizing: "border-box",
+              }}
+            />
+
+            <div style={{ fontSize: 14, marginBottom: 24 }}>
+              Diameter: <b>{impactDiameter.toLocaleString()} m</b>
+            </div>
+          </>
+        )}
+
         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>
           VIEW MODE
         </div>
@@ -1015,6 +1224,7 @@ export default function HomePage() {
             ? `${impactPointRef.current.lng.toFixed(3)}, ${impactPointRef.current.lat.toFixed(3)}`
             : "--"}
         </div>
+        <div>Asteroid Diameter: {impactDiameter.toLocaleString()} m</div>
 
         <hr style={{ margin: "10px 0", opacity: 0.25 }} />
 
