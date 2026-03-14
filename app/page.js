@@ -143,7 +143,9 @@ export default function HomePage() {
   };
 
   const floodAllowedInCurrentView = () =>
-    viewModeRef.current === "map" || viewModeRef.current === "satellite";
+    viewModeRef.current === "map" ||
+    viewModeRef.current === "satellite" ||
+    viewModeRef.current === "globe";
 
   const isMapReady = () => {
     const map = mapRef.current;
@@ -158,12 +160,16 @@ export default function HomePage() {
       safely(() => map.setProjection("globe"));
       safely(() => map.setPitch(0));
       safely(() => map.setBearing(0));
+      safely(() => map.dragRotate.enable());
+      safely(() => map.touchZoomRotate.enableRotation());
       return;
     }
 
     safely(() => map.setProjection("mercator"));
     safely(() => map.setPitch(0));
     safely(() => map.setBearing(0));
+    safely(() => map.dragRotate.disable());
+    safely(() => map.touchZoomRotate.disableRotation());
   };
 
   const removeFloodLayer = () => {
@@ -253,7 +259,9 @@ export default function HomePage() {
 
       map.once("idle", () => {
         console.log("Flood layer idle for level:", normalizedLevel);
-        setStatus(`Flood tiles loaded at ${formatLevelForDisplay(normalizedLevel)}`);
+        setStatus(
+          `Flood tiles loaded at ${formatLevelForDisplay(normalizedLevel)}`
+        );
       });
 
       safely(() => map.triggerRepaint());
@@ -330,7 +338,7 @@ export default function HomePage() {
 
     if (!floodAllowedInCurrentView()) {
       removeFloodLayer();
-      setStatus("Flood layer disabled in globe mode");
+      setStatus("Switch to a supported view mode");
       return;
     }
 
@@ -412,8 +420,6 @@ export default function HomePage() {
 
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
     map.getCanvas().style.cursor = "crosshair";
-    map.dragRotate.disable();
-    map.touchZoomRotate.disableRotation();
 
     if (DEBUG_FLOOD) {
       map.on("error", (e) => {
@@ -436,10 +442,7 @@ export default function HomePage() {
       applyProjectionForMode(viewModeRef.current);
       activeFloodLevelRef.current = null;
 
-      if (
-        Number(seaLevelRef.current) !== 0 &&
-        (viewModeRef.current === "map" || viewModeRef.current === "satellite")
-      ) {
+      if (Number(seaLevelRef.current) !== 0 && floodAllowedInCurrentView()) {
         setTimeout(() => {
           syncFloodScenario();
         }, 50);
@@ -518,8 +521,8 @@ export default function HomePage() {
   useEffect(() => {
     if (!mapRef.current) return;
 
-    if (viewMode === "globe") {
-      setStatus("Globe preview mode");
+    if (viewMode === "globe" && seaLevel === 0) {
+      setStatus("Globe mode");
       return;
     }
 
@@ -856,7 +859,7 @@ export default function HomePage() {
           >
             <div>Globe View</div>
             <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
-              Preview only
+              Flood overlay supported
             </div>
           </button>
         </div>
