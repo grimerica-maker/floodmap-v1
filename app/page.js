@@ -62,6 +62,9 @@ export default function HomePage() {
   const [viewMode, setViewMode] = useState("map");
   const [scenarioMode, setScenarioMode] = useState("flood");
   const [impactDiameter, setImpactDiameter] = useState(1000);
+  const [impactResult, setImpactResult] = useState(null);
+  const [impactLoading, setImpactLoading] = useState(false);
+  const [impactError, setImpactError] = useState("");
   const [unitMode, setUnitMode] = useState("m");
   const [status, setStatus] = useState("Loading map...");
   const [floodEngineUrl, setFloodEngineUrl] = useState(FLOOD_ENGINE_PROXY_PATH);
@@ -587,12 +590,46 @@ export default function HomePage() {
     }
 
     removeImpactPoint();
+    setImpactResult(null);
+    setImpactError("");
     setStatus(`Loading flood tiles at ${formatLevelForDisplay(level)}...`);
 
     const added = addFloodLayer(level);
 
     if (!added) {
       setStatus("Flood layer failed to attach");
+    }
+  };
+
+  const runImpact = async () => {
+    if (!impactPointRef.current) {
+      setStatus("Place impact point first");
+      return;
+    }
+
+    try {
+      setImpactLoading(true);
+      setImpactError("");
+
+      const { lng, lat } = impactPointRef.current;
+
+      const res = await fetch(
+        `${floodEngineUrlRef.current}/impact?lat=${lat}&lng=${lng}&diameter=${impactDiameter}`
+      );
+
+      if (!res.ok) {
+        throw new Error("Impact request failed");
+      }
+
+      const data = await res.json();
+
+      setImpactResult(data);
+      setStatus("Impact simulation complete");
+    } catch (err) {
+      console.error(err);
+      setImpactError("Impact simulation failed");
+    } finally {
+      setImpactLoading(false);
     }
   };
 
@@ -604,6 +641,8 @@ export default function HomePage() {
     removeFloodLayer();
     if (scenarioModeRef.current === "impact") {
       removeImpactPoint();
+      setImpactResult(null);
+      setImpactError("");
     }
     setStatus("Flood cleared");
   };
@@ -725,6 +764,8 @@ export default function HomePage() {
       const lat = e.lngLat.lat;
       drawImpactPoint(lng, lat);
       drawImpactPreview(lng, lat, impactDiameterRef.current);
+      setImpactResult(null);
+      setImpactError("");
       setStatus("Impact preview ready");
     };
 
@@ -777,6 +818,8 @@ export default function HomePage() {
     }
 
     removeImpactPoint();
+    setImpactResult(null);
+    setImpactError("");
     syncFloodScenario();
   }, [scenarioMode]);
 
@@ -804,7 +847,11 @@ export default function HomePage() {
     if (scenarioMode === "impact") {
       setStatus(
         impactPointRef.current
-          ? "Impact preview ready"
+          ? impactLoading
+            ? "Running impact simulation..."
+            : impactResult
+            ? "Impact simulation complete"
+            : "Impact preview ready"
           : "Click map to place impact point"
       );
       return;
@@ -822,7 +869,7 @@ export default function HomePage() {
 
     setStatus(`Flood tiles loaded at ${formatLevelForDisplay(seaLevel)}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, seaLevel, unitMode, scenarioMode]);
+  }, [viewMode, seaLevel, unitMode, scenarioMode, impactLoading, impactResult]);
 
   const waterDifference =
     hoverElevation !== null
@@ -1132,6 +1179,25 @@ export default function HomePage() {
             <div style={{ fontSize: 14, marginBottom: 24 }}>
               Diameter: <b>{impactDiameter.toLocaleString()} m</b>
             </div>
+
+            <button
+              onClick={runImpact}
+              disabled={!impactPointRef.current || impactLoading}
+              style={{
+                width: "100%",
+                padding: 14,
+                background: "#ef4444",
+                color: "white",
+                border: "none",
+                borderRadius: 10,
+                fontWeight: 700,
+                cursor: "pointer",
+                marginBottom: 20,
+                opacity: !impactPointRef.current || impactLoading ? 0.7 : 1,
+              }}
+            >
+              {impactLoading ? "Running..." : "Run Impact"}
+            </button>
           </>
         )}
 
@@ -1235,6 +1301,69 @@ export default function HomePage() {
             : "--"}
         </div>
         <div>Asteroid Diameter: {impactDiameter.toLocaleString()} m</div>
+
+        {impactError && (
+          <>
+            <hr style={{ margin: "10px 0", opacity: 0.25 }} />
+            <div style={{ color: "#fecaca", fontWeight: 700 }}>{impactError}</div>
+          </>
+        )}
+
+        {impactResult && (
+          <>
+            <hr style={{ margin: "10px 0", opacity: 0.25 }} />
+
+            <div style={{ fontWeight: 700 }}>Impact Results</div>
+
+            <div>Energy: {impactResult.energy_mt_tnt.toFixed(2)} Mt</div>
+
+            <div>
+              Crater Diameter:{" "}
+              {Math.round(
+                impactResult.crater_diameter_m
+              ).toLocaleString()}{" "}
+              m
+            </div>
+
+            <div>
+              Blast Radius:{" "}
+              {Math.round(
+                impactResult.blast_radius_m
+              ).toLocaleString()}{" "}
+              m
+            </div>
+
+            <div>
+              Thermal Radius:{" "}
+              {Math.round(
+                impactResult.thermal_radius_m
+              ).toLocaleString()}{" "}
+              m
+            </div>
+
+            {impactResult.is_ocean_impact && (
+              <>
+                <div>
+                  Tsunami Radius:{" "}
+                  {Math.round(
+                    impactResult.tsunami_radius_m
+                  ).toLocaleString()}{" "}
+                  m
+                </div>
+
+                <div>
+                  Wave Height:{" "}
+                  {Math.round(
+                    impactResult.wave_height_m
+                  ).toLocaleString()}{" "}
+                  m
+                </div>
+              </>
+            )}
+
+            <div>Severity: {impactResult.severity_class}</div>
+          </>
+        )}
 
         <hr style={{ margin: "10px 0", opacity: 0.25 }} />
 
