@@ -150,9 +150,16 @@ export default function HomePage() {
     return !!map && map.isStyleLoaded();
   };
 
-  const forceFlatMap = () => {
+  const applyProjectionForMode = (mode) => {
     const map = mapRef.current;
     if (!map) return;
+
+    if (mode === "globe") {
+      safely(() => map.setProjection("globe"));
+      safely(() => map.setPitch(0));
+      safely(() => map.setBearing(0));
+      return;
+    }
 
     safely(() => map.setProjection("mercator"));
     safely(() => map.setPitch(0));
@@ -293,8 +300,8 @@ export default function HomePage() {
 
     map.setStyle(MAP_STYLE_URL);
     map.easeTo({
-      center: mode === "globe" ? [-70, 28] : [-80.19, 25.76],
-      zoom: mode === "globe" ? 2.6 : 6.2,
+      center: mode === "globe" ? [0, 20] : [-80.19, 25.76],
+      zoom: mode === "globe" ? 1.6 : 6.2,
       duration: 250,
       essential: true,
     });
@@ -323,7 +330,7 @@ export default function HomePage() {
 
     if (!floodAllowedInCurrentView()) {
       removeFloodLayer();
-      setStatus("Switch to Standard Map or Satellite to run flood layer");
+      setStatus("Flood layer disabled in globe mode");
       return;
     }
 
@@ -401,7 +408,7 @@ export default function HomePage() {
     });
 
     mapRef.current = map;
-    forceFlatMap();
+    applyProjectionForMode("map");
 
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
     map.getCanvas().style.cursor = "crosshair";
@@ -426,19 +433,24 @@ export default function HomePage() {
 
     const handleStyleLoad = () => {
       console.log("style.load fired");
-      forceFlatMap();
+      applyProjectionForMode(viewModeRef.current);
       activeFloodLevelRef.current = null;
 
-      if (Number(seaLevelRef.current) !== 0) {
+      if (
+        Number(seaLevelRef.current) !== 0 &&
+        (viewModeRef.current === "map" || viewModeRef.current === "satellite")
+      ) {
         setTimeout(() => {
           syncFloodScenario();
         }, 50);
+      } else {
+        removeFloodLayer();
       }
     };
 
     const handleMapLoad = () => {
       console.log("map load fired");
-      forceFlatMap();
+      applyProjectionForMode(viewModeRef.current);
 
       fetch(`${floodEngineUrlRef.current}/`)
         .then((r) => r.json())
@@ -501,13 +513,13 @@ export default function HomePage() {
   useEffect(() => {
     if (!isMapReady()) return;
     syncFloodScenario();
-  }, [seaLevel]);
+  }, [seaLevel, viewMode]);
 
   useEffect(() => {
     if (!mapRef.current) return;
 
     if (viewMode === "globe") {
-      setStatus("Wide-area preview mode");
+      setStatus("Globe preview mode");
       return;
     }
 
@@ -842,7 +854,7 @@ export default function HomePage() {
               fontWeight: 700,
             }}
           >
-            <div>Wide View</div>
+            <div>Globe View</div>
             <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
               Preview only
             </div>
@@ -875,7 +887,7 @@ export default function HomePage() {
             ? "Standard Map"
             : viewMode === "satellite"
             ? "Satellite"
-            : "Wide View"}
+            : "Globe"}
         </div>
         <div>Status: {status}</div>
         <div>Scenario Mode: flood</div>
