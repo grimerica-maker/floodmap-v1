@@ -16,6 +16,9 @@ const FLOOD_TILE_VERSION = "202";
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
 
+const IMPACT_SOURCE_ID = "impact-point-source";
+const IMPACT_LAYER_ID = "impact-point-layer";
+
 const PRESETS = [
   { label: "Ice Age", value: -120 },
   { label: "Modern", value: 0 },
@@ -40,6 +43,7 @@ export default function HomePage() {
   const hoverTimerRef = useRef(null);
   const activeFloodLevelRef = useRef(null);
   const hasAppliedInitialViewModeRef = useRef(false);
+  const impactPointRef = useRef(null);
 
   const seaLevelRef = useRef(0);
   const viewModeRef = useRef("map");
@@ -49,6 +53,7 @@ export default function HomePage() {
   const [inputText, setInputText] = useState("0");
   const [seaLevel, setSeaLevel] = useState(0);
   const [viewMode, setViewMode] = useState("map");
+  const [scenarioMode, setScenarioMode] = useState("flood");
   const [unitMode, setUnitMode] = useState("m");
   const [status, setStatus] = useState("Loading map...");
   const [floodEngineUrl, setFloodEngineUrl] = useState(FLOOD_ENGINE_PROXY_PATH);
@@ -189,6 +194,69 @@ export default function HomePage() {
     activeFloodLevelRef.current = null;
   };
 
+  const removeImpactPoint = () => {
+    const map = mapRef.current;
+    if (!map) {
+      impactPointRef.current = null;
+      return;
+    }
+
+    try {
+      if (map.getLayer(IMPACT_LAYER_ID)) map.removeLayer(IMPACT_LAYER_ID);
+      if (map.getSource(IMPACT_SOURCE_ID)) map.removeSource(IMPACT_SOURCE_ID);
+    } catch (error) {
+      console.warn("Failed removing impact point:", error);
+    }
+
+    impactPointRef.current = null;
+  };
+
+  const drawImpactPoint = (lng, lat) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    const data = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [lng, lat],
+          },
+        },
+      ],
+    };
+
+    try {
+      if (!map.getSource(IMPACT_SOURCE_ID)) {
+        map.addSource(IMPACT_SOURCE_ID, {
+          type: "geojson",
+          data,
+        });
+
+        map.addLayer({
+          id: IMPACT_LAYER_ID,
+          type: "circle",
+          source: IMPACT_SOURCE_ID,
+          paint: {
+            "circle-radius": 8,
+            "circle-color": "#ef4444",
+            "circle-stroke-width": 2,
+            "circle-stroke-color": "#ffffff",
+          },
+        });
+      } else {
+        map.getSource(IMPACT_SOURCE_ID).setData(data);
+      }
+
+      impactPointRef.current = { lng, lat };
+      safely(() => map.triggerRepaint());
+    } catch (error) {
+      console.error("Failed to draw impact point", error);
+    }
+  };
+
   const addFloodLayer = (level) => {
     const map = mapRef.current;
 
@@ -276,6 +344,7 @@ export default function HomePage() {
   const syncFloodScenario = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
+    if (scenarioMode !== "flood") return;
 
     if (!floodAllowedInCurrentView()) {
       removeFloodLayer();
@@ -335,6 +404,7 @@ export default function HomePage() {
     setSeaLevel(level);
     seaLevelRef.current = level;
     setInputLevel(level);
+    setScenarioMode("flood");
 
     if (!floodAllowedInCurrentView()) {
       removeFloodLayer();
@@ -358,6 +428,7 @@ export default function HomePage() {
       return;
     }
 
+    removeImpactPoint();
     setStatus(`Loading flood tiles at ${formatLevelForDisplay(level)}...`);
 
     const added = addFloodLayer(level);
@@ -373,6 +444,9 @@ export default function HomePage() {
     setSeaLevel(0);
     seaLevelRef.current = 0;
     removeFloodLayer();
+    if (scenarioMode === "impact") {
+      removeImpactPoint();
+    }
     setStatus("Flood cleared");
   };
 
@@ -442,7 +516,11 @@ export default function HomePage() {
       applyProjectionForMode(viewModeRef.current);
       activeFloodLevelRef.current = null;
 
-      if (Number(seaLevelRef.current) !== 0 && floodAllowedInCurrentView()) {
+      if (
+        scenarioMode === "flood" &&
+        Number(seaLevelRef.current) !== 0 &&
+        floodAllowedInCurrentView()
+      ) {
         setTimeout(() => {
           syncFloodScenario();
         }, 50);
@@ -482,10 +560,20 @@ export default function HomePage() {
       setHoverElevation(null);
     };
 
+    const handleMapClick = (e) => {
+      if (scenarioMode !== "impact") return;
+
+      const lng = e.lngLat.lng;
+      const lat = e.lngLat.lat;
+      drawImpactPoint(lng, lat);
+      setStatus("Impact point placed");
+    };
+
     map.on("load", handleMapLoad);
     map.on("style.load", handleStyleLoad);
     map.on("mousemove", handleMouseMove);
     map.on("mouseleave", handleMouseLeave);
+    map.on("click", handleMapClick);
 
     return () => {
       if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
@@ -494,13 +582,15 @@ export default function HomePage() {
       map.off("style.load", handleStyleLoad);
       map.off("mousemove", handleMouseMove);
       map.off("mouseleave", handleMouseLeave);
+      map.off("click", handleMapClick);
 
       map.remove();
       mapRef.current = null;
       activeFloodLevelRef.current = null;
+      impactPointRef.current = null;
       hasAppliedInitialViewModeRef.current = false;
     };
-  }, [floodEngineUrl]);
+  }, [floodEngineUrl, scenarioMode]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -514,12 +604,36 @@ export default function HomePage() {
   }, [viewMode]);
 
   useEffect(() => {
-    if (!isMapReady()) return;
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (scenarioMode === "impact") {
+      removeFloodLayer();
+      setStatus(
+        impactPointRef.current ? "Impact point placed" : "Click map to place impact point"
+      );
+      return;
+    }
+
+    removeImpactPoint();
     syncFloodScenario();
-  }, [seaLevel, viewMode]);
+  }, [scenarioMode]);
+
+  useEffect(() => {
+    if (!isMapReady()) return;
+    if (scenarioMode !== "flood") return;
+    syncFloodScenario();
+  }, [seaLevel, viewMode, scenarioMode]);
 
   useEffect(() => {
     if (!mapRef.current) return;
+
+    if (scenarioMode === "impact") {
+      setStatus(
+        impactPointRef.current ? "Impact point placed" : "Click map to place impact point"
+      );
+      return;
+    }
 
     if (viewMode === "globe" && seaLevel === 0) {
       setStatus("Globe mode");
@@ -533,7 +647,7 @@ export default function HomePage() {
 
     setStatus(`Flood tiles loaded at ${formatLevelForDisplay(seaLevel)}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, seaLevel, unitMode]);
+  }, [viewMode, seaLevel, unitMode, scenarioMode]);
 
   const waterDifference =
     hoverElevation !== null
@@ -582,7 +696,7 @@ export default function HomePage() {
         <h1 style={{ margin: "8px 0 24px 0", fontSize: 22 }}>Floodmap V1</h1>
 
         <div style={{ fontSize: 14, color: "#666", marginBottom: 24 }}>
-          Mapbox flood-only stabilization build
+          Mapbox flood + impact foundation build
         </div>
 
         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
@@ -764,39 +878,40 @@ export default function HomePage() {
 
         <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
           <button
+            onClick={() => setScenarioMode("flood")}
             style={{
               width: "100%",
               padding: 14,
               border: "1px solid #d1d5db",
-              background: "#0f172a",
-              color: "white",
-              cursor: "default",
+              background: scenarioMode === "flood" ? "#0f172a" : "white",
+              color: scenarioMode === "flood" ? "white" : "#111827",
+              cursor: "pointer",
               borderRadius: 12,
               fontWeight: 700,
             }}
           >
             <div>Flood</div>
             <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
-              Active
+              Sea level up / down
             </div>
           </button>
 
           <button
-            disabled
+            onClick={() => setScenarioMode("impact")}
             style={{
               width: "100%",
               padding: 14,
               border: "1px solid #d1d5db",
-              background: "#f3f4f6",
-              color: "#6b7280",
-              cursor: "not-allowed",
+              background: scenarioMode === "impact" ? "#0f172a" : "white",
+              color: scenarioMode === "impact" ? "white" : "#111827",
+              cursor: "pointer",
               borderRadius: 12,
               fontWeight: 700,
             }}
           >
             <div>Impact</div>
             <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
-              Disabled for this pass
+              Click map to place impact point
             </div>
           </button>
         </div>
@@ -893,8 +1008,13 @@ export default function HomePage() {
             : "Globe"}
         </div>
         <div>Status: {status}</div>
-        <div>Scenario Mode: flood</div>
-        <div>Impact: disabled</div>
+        <div>Scenario Mode: {scenarioMode}</div>
+        <div>
+          Impact Point:{" "}
+          {impactPointRef.current
+            ? `${impactPointRef.current.lng.toFixed(3)}, ${impactPointRef.current.lat.toFixed(3)}`
+            : "--"}
+        </div>
 
         <hr style={{ margin: "10px 0", opacity: 0.25 }} />
 
