@@ -418,6 +418,80 @@ export default function HomePage() {
     }
   };
 
+  const drawLandImpactFromResult = (lng, lat, result) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || !result) return;
+
+    const craterKm = Number(result.crater_diameter_m ?? 0) / 2000;
+    const blastKm = Number(result.blast_radius_m ?? 0) / 1000;
+    const thermalKm = Number(result.thermal_radius_m ?? 0) / 1000;
+
+    const data = {
+      type: "FeatureCollection",
+      features: [
+        {
+          ...kmCircle(lng, lat, craterKm),
+          properties: { kind: "crater" },
+        },
+        {
+          ...kmCircle(lng, lat, thermalKm),
+          properties: { kind: "thermal" },
+        },
+        {
+          ...kmCircle(lng, lat, blastKm),
+          properties: { kind: "blast" },
+        },
+      ],
+    };
+
+    try {
+      clearImpactPreview();
+
+      map.addSource(IMPACT_PREVIEW_SOURCE_ID, {
+        type: "geojson",
+        data,
+      });
+
+      map.addLayer({
+        id: IMPACT_THERMAL_LAYER_ID,
+        type: "fill",
+        source: IMPACT_PREVIEW_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "thermal"],
+        paint: {
+          "fill-color": "#ef4444",
+          "fill-opacity": 0.14,
+        },
+      });
+
+      map.addLayer({
+        id: IMPACT_BLAST_LAYER_ID,
+        type: "line",
+        source: IMPACT_PREVIEW_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "blast"],
+        paint: {
+          "line-color": "#dc2626",
+          "line-width": 2,
+          "line-opacity": 0.9,
+        },
+      });
+
+      map.addLayer({
+        id: IMPACT_CRATER_LAYER_ID,
+        type: "fill",
+        source: IMPACT_PREVIEW_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "crater"],
+        paint: {
+          "fill-color": "#3f1d1d",
+          "fill-opacity": 0.45,
+        },
+      });
+
+      safely(() => map.triggerRepaint());
+    } catch (error) {
+      console.error("Failed to draw land impact result", error);
+    }
+  };
+
   const addFloodLayer = (level) => {
     const map = mapRef.current;
 
@@ -624,6 +698,15 @@ export default function HomePage() {
       const data = await res.json();
 
       setImpactResult(data);
+
+      if (!data.is_ocean_impact && impactPointRef.current) {
+        drawLandImpactFromResult(
+          impactPointRef.current.lng,
+          impactPointRef.current.lat,
+          data
+        );
+      }
+
       setStatus("Impact simulation complete");
     } catch (err) {
       console.error(err);
@@ -828,12 +911,27 @@ export default function HomePage() {
     if (!impactPointRef.current) return;
     if (!mapRef.current || !mapRef.current.isStyleLoaded()) return;
 
+    if (impactResult && impactResult.is_ocean_impact === false) {
+      drawLandImpactFromResult(
+        impactPointRef.current.lng,
+        impactPointRef.current.lat,
+        impactResult
+      );
+      return;
+    }
+
     drawImpactPreview(
       impactPointRef.current.lng,
       impactPointRef.current.lat,
       impactDiameterRef.current
     );
-  }, [impactDiameter, scenarioMode]);
+  }, [impactDiameter, scenarioMode, impactResult]);
+
+  useEffect(() => {
+    if (scenarioMode !== "impact") return;
+    setImpactResult(null);
+    setImpactError("");
+  }, [impactDiameter]);
 
   useEffect(() => {
     if (!isMapReady()) return;
@@ -1305,7 +1403,9 @@ export default function HomePage() {
         {impactError && (
           <>
             <hr style={{ margin: "10px 0", opacity: 0.25 }} />
-            <div style={{ color: "#fecaca", fontWeight: 700 }}>{impactError}</div>
+            <div style={{ color: "#fecaca", fontWeight: 700 }}>
+              {impactError}
+            </div>
           </>
         )}
 
@@ -1315,12 +1415,18 @@ export default function HomePage() {
 
             <div style={{ fontWeight: 700 }}>Impact Results</div>
 
-            <div>Energy: {impactResult.energy_mt_tnt.toFixed(2)} Mt</div>
+            <div>
+              Energy:{" "}
+              {Number(
+                impactResult.energy_mt_tnt ?? impactResult.energy_mt ?? 0
+              ).toFixed(2)}{" "}
+              Mt
+            </div>
 
             <div>
               Crater Diameter:{" "}
               {Math.round(
-                impactResult.crater_diameter_m
+                Number(impactResult.crater_diameter_m ?? 0)
               ).toLocaleString()}{" "}
               m
             </div>
@@ -1328,7 +1434,7 @@ export default function HomePage() {
             <div>
               Blast Radius:{" "}
               {Math.round(
-                impactResult.blast_radius_m
+                Number(impactResult.blast_radius_m ?? 0)
               ).toLocaleString()}{" "}
               m
             </div>
@@ -1336,7 +1442,7 @@ export default function HomePage() {
             <div>
               Thermal Radius:{" "}
               {Math.round(
-                impactResult.thermal_radius_m
+                Number(impactResult.thermal_radius_m ?? 0)
               ).toLocaleString()}{" "}
               m
             </div>
@@ -1346,7 +1452,7 @@ export default function HomePage() {
                 <div>
                   Tsunami Radius:{" "}
                   {Math.round(
-                    impactResult.tsunami_radius_m
+                    Number(impactResult.tsunami_radius_m ?? 0)
                   ).toLocaleString()}{" "}
                   m
                 </div>
@@ -1354,14 +1460,14 @@ export default function HomePage() {
                 <div>
                   Wave Height:{" "}
                   {Math.round(
-                    impactResult.wave_height_m
+                    Number(impactResult.wave_height_m ?? 0)
                   ).toLocaleString()}{" "}
                   m
                 </div>
               </>
             )}
 
-            <div>Severity: {impactResult.severity_class}</div>
+            <div>Severity: {impactResult.severity_class ?? "--"}</div>
           </>
         )}
 
