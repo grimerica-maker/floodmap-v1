@@ -53,6 +53,8 @@ export default function HomePage() {
   const seaLevelRef = useRef(0);
   const viewModeRef = useRef("map");
   const floodEngineUrlRef = useRef(FLOOD_ENGINE_PROXY_PATH);
+  const scenarioModeRef = useRef("flood");
+  const impactDiameterRef = useRef(1000);
 
   const [inputLevel, setInputLevel] = useState(0);
   const [inputText, setInputText] = useState("0");
@@ -79,6 +81,14 @@ export default function HomePage() {
   useEffect(() => {
     floodEngineUrlRef.current = floodEngineUrl;
   }, [floodEngineUrl]);
+
+  useEffect(() => {
+    scenarioModeRef.current = scenarioMode;
+  }, [scenarioMode]);
+
+  useEffect(() => {
+    impactDiameterRef.current = impactDiameter;
+  }, [impactDiameter]);
 
   useEffect(() => {
     if (!CONFIGURED_FLOOD_ENGINE_URL) {
@@ -492,7 +502,7 @@ export default function HomePage() {
   const syncFloodScenario = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    if (scenarioMode !== "flood") return;
+    if (scenarioModeRef.current !== "flood") return;
 
     if (!floodAllowedInCurrentView()) {
       removeFloodLayer();
@@ -592,7 +602,7 @@ export default function HomePage() {
     setSeaLevel(0);
     seaLevelRef.current = 0;
     removeFloodLayer();
-    if (scenarioMode === "impact") {
+    if (scenarioModeRef.current === "impact") {
       removeImpactPoint();
     }
     setStatus("Flood cleared");
@@ -665,7 +675,7 @@ export default function HomePage() {
       activeFloodLevelRef.current = null;
 
       if (
-        scenarioMode === "flood" &&
+        scenarioModeRef.current === "flood" &&
         Number(seaLevelRef.current) !== 0 &&
         floodAllowedInCurrentView()
       ) {
@@ -709,12 +719,12 @@ export default function HomePage() {
     };
 
     const handleMapClick = (e) => {
-      if (scenarioMode !== "impact") return;
+      if (scenarioModeRef.current !== "impact") return;
 
       const lng = e.lngLat.lng;
       const lat = e.lngLat.lat;
       drawImpactPoint(lng, lat);
-      drawImpactPreview(lng, lat, impactDiameter);
+      drawImpactPreview(lng, lat, impactDiameterRef.current);
       setStatus("Impact preview ready");
     };
 
@@ -739,7 +749,7 @@ export default function HomePage() {
       impactPointRef.current = null;
       hasAppliedInitialViewModeRef.current = false;
     };
-  }, [floodEngineUrl, scenarioMode, impactDiameter]);
+  }, [floodEngineUrl]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -778,7 +788,7 @@ export default function HomePage() {
     drawImpactPreview(
       impactPointRef.current.lng,
       impactPointRef.current.lat,
-      impactDiameter
+      impactDiameterRef.current
     );
   }, [impactDiameter, scenarioMode]);
 
