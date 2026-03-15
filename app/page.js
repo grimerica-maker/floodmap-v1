@@ -270,6 +270,7 @@ export default function HomePage() {
       `${IMPACT_CRATER_LAYER_ID}-rim`,
       `${IMPACT_CRATER_LAYER_ID}-ejecta`,
       `${IMPACT_BLAST_LAYER_ID}-fill`,
+      `${IMPACT_TSUNAMI_LAYER_ID}-line`,
       IMPACT_TSUNAMI_LAYER_ID,
       IMPACT_THERMAL_LAYER_ID,
       IMPACT_BLAST_LAYER_ID,
@@ -611,6 +612,94 @@ export default function HomePage() {
     }
   };
 
+  const drawOceanImpactFromResult = (lng, lat, result) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || !result) return;
+
+    const tsunamiKm = Number(result.tsunami_radius_m ?? 0) / 1000;
+    const blastKm = Number(result.blast_radius_m ?? 0) / 1000;
+    const thermalKm = Number(result.thermal_radius_m ?? 0) / 1000;
+
+    if (tsunamiKm <= 0) return;
+
+    const data = {
+      type: "FeatureCollection",
+      features: [
+        {
+          ...kmCircle(lng, lat, tsunamiKm),
+          properties: { kind: "tsunami" },
+        },
+        {
+          ...kmCircle(lng, lat, blastKm),
+          properties: { kind: "blast" },
+        },
+        {
+          ...kmCircle(lng, lat, thermalKm),
+          properties: { kind: "thermal" },
+        },
+      ],
+    };
+
+    try {
+      clearImpactPreview();
+
+      map.addSource(IMPACT_PREVIEW_SOURCE_ID, {
+        type: "geojson",
+        data,
+      });
+
+      map.addLayer({
+        id: IMPACT_TSUNAMI_LAYER_ID,
+        type: "fill",
+        source: IMPACT_PREVIEW_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "tsunami"],
+        paint: {
+          "fill-color": "#2563eb",
+          "fill-opacity": 0.12,
+        },
+      });
+
+      map.addLayer({
+        id: `${IMPACT_TSUNAMI_LAYER_ID}-line`,
+        type: "line",
+        source: IMPACT_PREVIEW_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "tsunami"],
+        paint: {
+          "line-color": "#60a5fa",
+          "line-width": 3,
+          "line-opacity": 0.95,
+        },
+      });
+
+      map.addLayer({
+        id: IMPACT_THERMAL_LAYER_ID,
+        type: "fill",
+        source: IMPACT_PREVIEW_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "thermal"],
+        paint: {
+          "fill-color": "#111111",
+          "fill-opacity": 0.18,
+        },
+      });
+
+      map.addLayer({
+        id: IMPACT_BLAST_LAYER_ID,
+        type: "line",
+        source: IMPACT_PREVIEW_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "blast"],
+        paint: {
+          "line-color": "#ef4444",
+          "line-width": 2,
+          "line-opacity": 0.9,
+        },
+      });
+
+      safely(() => map.triggerRepaint());
+    } catch (error) {
+      console.error("Failed to draw ocean impact result", error);
+    }
+  };
+
   const addFloodLayer = (level) => {
     const map = mapRef.current;
 
@@ -818,12 +907,20 @@ export default function HomePage() {
 
       setImpactResult(data);
 
-      if (!data.is_ocean_impact && impactPointRef.current) {
-        drawLandImpactFromResult(
-          impactPointRef.current.lng,
-          impactPointRef.current.lat,
-          data
-        );
+      if (impactPointRef.current) {
+        if (data.is_ocean_impact === true) {
+          drawOceanImpactFromResult(
+            impactPointRef.current.lng,
+            impactPointRef.current.lat,
+            data
+          );
+        } else {
+          drawLandImpactFromResult(
+            impactPointRef.current.lng,
+            impactPointRef.current.lat,
+            data
+          );
+        }
       }
 
       setStatus("Impact simulation complete");
@@ -1034,7 +1131,16 @@ export default function HomePage() {
     if (!impactPointRef.current) return;
     if (!mapRef.current || !mapRef.current.isStyleLoaded()) return;
 
-    if (impactResult && impactResult.is_ocean_impact === false) {
+    if (impactResult) {
+      if (impactResult.is_ocean_impact === true) {
+        drawOceanImpactFromResult(
+          impactPointRef.current.lng,
+          impactPointRef.current.lat,
+          impactResult
+        );
+        return;
+      }
+
       drawLandImpactFromResult(
         impactPointRef.current.lng,
         impactPointRef.current.lat,
@@ -1570,25 +1676,26 @@ export default function HomePage() {
               m
             </div>
 
-            {impactResult.is_ocean_impact && (
-              <>
-                <div>
-                  Tsunami Radius:{" "}
-                  {Math.round(
-                    Number(impactResult.tsunami_radius_m ?? 0)
-                  ).toLocaleString()}{" "}
-                  m
-                </div>
+            {impactResult.is_ocean_impact === true &&
+              Number(impactResult.tsunami_radius_m ?? 0) > 0 && (
+                <>
+                  <div>
+                    Tsunami Radius:{" "}
+                    {Math.round(
+                      Number(impactResult.tsunami_radius_m ?? 0)
+                    ).toLocaleString()}{" "}
+                    m
+                  </div>
 
-                <div>
-                  Wave Height:{" "}
-                  {Math.round(
-                    Number(impactResult.wave_height_m ?? 0)
-                  ).toLocaleString()}{" "}
-                  m
-                </div>
-              </>
-            )}
+                  <div>
+                    Wave Height:{" "}
+                    {Math.round(
+                      Number(impactResult.wave_height_m ?? 0)
+                    ).toLocaleString()}{" "}
+                    m
+                  </div>
+                </>
+              )}
 
             <div>Severity: {impactResult.severity_class ?? "--"}</div>
 
@@ -1601,7 +1708,7 @@ export default function HomePage() {
                 : "Coming soon"}
             </div>
             <div>
-              Estimated Deaths:{" "}
+              Estimated Deaths (red circle):{" "}
               {impactResult.estimated_deaths != null
                 ? formatCompactCount(impactResult.estimated_deaths)
                 : "Coming soon"}
