@@ -228,8 +228,12 @@ export default function HomePage() {
     if (!map) return;
 
     try {
-      if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) map.removeLayer(IMPACT_FLOOD_LAYER_ID);
-      if (map.getSource(IMPACT_FLOOD_SOURCE_ID)) map.removeSource(IMPACT_FLOOD_SOURCE_ID);
+      if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) {
+        map.removeLayer(IMPACT_FLOOD_LAYER_ID);
+      }
+      if (map.getSource(IMPACT_FLOOD_SOURCE_ID)) {
+        map.removeSource(IMPACT_FLOOD_SOURCE_ID);
+      }
     } catch (error) {
       console.warn("Failed removing impact flood layer:", error);
     }
@@ -1729,7 +1733,7 @@ export default function HomePage() {
               Number(impactResult.tsunami_radius_m ?? 0) > 0 && (
                 <>
                   <div>
-                    Tsunami Radius:{" "}
+                    Estimated Wave Reach:{" "}
                     {Math.round(
                       Number(impactResult.tsunami_radius_m ?? 0)
                     ).toLocaleString()}{" "}
