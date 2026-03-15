@@ -167,6 +167,12 @@ export default function HomePage() {
     return `${meters > 0 ? "+" : ""}${Math.round(meters)} m`;
   };
 
+  const formatCompactCount = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0) return "--";
+    return Math.round(n).toLocaleString();
+  };
+
   const floodAllowedInCurrentView = () =>
     viewModeRef.current === "map" ||
     viewModeRef.current === "satellite" ||
@@ -1566,6 +1572,24 @@ export default function HomePage() {
             )}
 
             <div>Severity: {impactResult.severity_class ?? "--"}</div>
+
+            <hr style={{ margin: "10px 0", opacity: 0.2 }} />
+            <div style={{ fontWeight: 700 }}>Casualty Estimate</div>
+            <div>
+              Population Exposed:{" "}
+              {impactResult.population_exposed != null
+                ? formatCompactCount(impactResult.population_exposed)
+                : "Coming soon"}
+            </div>
+            <div>
+              Estimated Deaths:{" "}
+              {impactResult.estimated_deaths != null
+                ? formatCompactCount(impactResult.estimated_deaths)
+                : "Coming soon"}
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.8 }}>
+              Confidence: low / rough estimate
+            </div>
           </>
         )}
 
