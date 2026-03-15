@@ -240,6 +240,14 @@ export default function HomePage() {
     }
   };
 
+  const getFirstSymbolLayerId = () => {
+    const map = mapRef.current;
+    if (!map) return undefined;
+    const layers = map.getStyle()?.layers || [];
+    const firstSymbol = layers.find((layer) => layer.type === "symbol");
+    return firstSymbol?.id;
+  };
+
   const addImpactFloodLayer = (runId) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded() || !runId) return false;
@@ -247,6 +255,8 @@ export default function HomePage() {
     const tileUrl = `${floodEngineUrlRef.current}/impact-flood/${encodeURIComponent(
       runId
     )}/{z}/{x}/{y}.png?v=${IMPACT_FLOOD_TILE_VERSION}`;
+
+    console.log("Adding impact flood layer:", { runId, tileUrl });
 
     try {
       removeImpactFloodLayer();
@@ -259,16 +269,21 @@ export default function HomePage() {
         maxzoom: 22,
       });
 
-      map.addLayer({
-        id: IMPACT_FLOOD_LAYER_ID,
-        type: "raster",
-        source: IMPACT_FLOOD_SOURCE_ID,
-        paint: {
-          "raster-opacity": 0.95,
-          "raster-fade-duration": 0,
-          "raster-resampling": "linear",
+      const beforeId = getFirstSymbolLayerId();
+
+      map.addLayer(
+        {
+          id: IMPACT_FLOOD_LAYER_ID,
+          type: "raster",
+          source: IMPACT_FLOOD_SOURCE_ID,
+          paint: {
+            "raster-opacity": 0.95,
+            "raster-fade-duration": 0,
+            "raster-resampling": "linear",
+          },
         },
-      });
+        beforeId
+      );
 
       safely(() => map.triggerRepaint());
       return true;
@@ -972,6 +987,7 @@ export default function HomePage() {
       }
 
       const data = await res.json();
+      console.log("Impact response:", data);
 
       setImpactResult(data);
 
@@ -988,6 +1004,8 @@ export default function HomePage() {
 
           if (data.run_id) {
             addImpactFloodLayer(data.run_id);
+          } else {
+            console.warn("Impact response missing run_id");
           }
         } else {
           drawLandImpactFromResult(
@@ -1108,19 +1126,6 @@ export default function HomePage() {
       } else {
         removeFloodLayer();
       }
-
-      if (
-        scenarioModeRef.current === "impact" &&
-        impactPointRef.current &&
-        impactResult &&
-        impactResult.is_ocean_impact === true &&
-        Number(impactResult.tsunami_radius_m ?? 0) > 0 &&
-        impactResult.run_id
-      ) {
-        setTimeout(() => {
-          addImpactFloodLayer(impactResult.run_id);
-        }, 50);
-      }
     };
 
     const handleMapLoad = () => {
@@ -1225,6 +1230,23 @@ export default function HomePage() {
   }, [scenarioMode]);
 
   useEffect(() => {
+    if (!mapRef.current || !mapRef.current.isStyleLoaded()) return;
+
+    if (
+      scenarioMode === "impact" &&
+      impactResult &&
+      impactResult.is_ocean_impact === true &&
+      Number(impactResult.tsunami_radius_m ?? 0) > 0 &&
+      impactResult.run_id
+    ) {
+      addImpactFloodLayer(impactResult.run_id);
+      return;
+    }
+
+    removeImpactFloodLayer();
+  }, [impactResult, scenarioMode, viewMode]);
+
+  useEffect(() => {
     if (scenarioMode !== "impact") return;
     if (!impactPointRef.current) return;
     if (!mapRef.current || !mapRef.current.isStyleLoaded()) return;
@@ -1239,10 +1261,6 @@ export default function HomePage() {
           impactPointRef.current.lat,
           impactResult
         );
-
-        if (impactResult.run_id) {
-          addImpactFloodLayer(impactResult.run_id);
-        }
         return;
       }
 
