@@ -49,6 +49,7 @@ export default function HomePage() {
   const activeFloodLevelRef = useRef(null);
   const hasAppliedInitialViewModeRef = useRef(false);
   const impactPointRef = useRef(null);
+  const impactPulseFrameRef = useRef(null);
 
   const seaLevelRef = useRef(0);
   const viewModeRef = useRef("map");
@@ -213,21 +214,68 @@ export default function HomePage() {
     activeFloodLevelRef.current = null;
   };
 
+  const startImpactPulseAnimation = () => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (impactPulseFrameRef.current) {
+      cancelAnimationFrame(impactPulseFrameRef.current);
+      impactPulseFrameRef.current = null;
+    }
+
+    const layerId = `${IMPACT_CRATER_LAYER_ID}-pulse`;
+    const start = performance.now();
+
+    const tick = (now) => {
+      if (!mapRef.current || !mapRef.current.getLayer(layerId)) {
+        impactPulseFrameRef.current = null;
+        return;
+      }
+
+      const t = (now - start) / 1000;
+      const width = 2.5 + Math.sin(t * 2.6) * 0.8;
+      const opacity = 0.72 + ((Math.sin(t * 2.6) + 1) / 2) * 0.22;
+
+      safely(() =>
+        mapRef.current.setPaintProperty(layerId, "line-width", width)
+      );
+      safely(() =>
+        mapRef.current.setPaintProperty(layerId, "line-opacity", opacity)
+      );
+
+      impactPulseFrameRef.current = requestAnimationFrame(tick);
+    };
+
+    impactPulseFrameRef.current = requestAnimationFrame(tick);
+  };
+
   const clearImpactPreview = () => {
     const map = mapRef.current;
     if (!map) return;
 
+    if (impactPulseFrameRef.current) {
+      cancelAnimationFrame(impactPulseFrameRef.current);
+      impactPulseFrameRef.current = null;
+    }
+
+    const extraLayerIds = [
+      `${IMPACT_CRATER_LAYER_ID}-pulse`,
+      `${IMPACT_CRATER_LAYER_ID}-inner`,
+      `${IMPACT_CRATER_LAYER_ID}-rim`,
+      IMPACT_TSUNAMI_LAYER_ID,
+      IMPACT_THERMAL_LAYER_ID,
+      IMPACT_BLAST_LAYER_ID,
+      IMPACT_CRATER_LAYER_ID,
+    ];
+
     try {
-      if (map.getLayer(IMPACT_TSUNAMI_LAYER_ID))
-        map.removeLayer(IMPACT_TSUNAMI_LAYER_ID);
-      if (map.getLayer(IMPACT_THERMAL_LAYER_ID))
-        map.removeLayer(IMPACT_THERMAL_LAYER_ID);
-      if (map.getLayer(IMPACT_BLAST_LAYER_ID))
-        map.removeLayer(IMPACT_BLAST_LAYER_ID);
-      if (map.getLayer(IMPACT_CRATER_LAYER_ID))
-        map.removeLayer(IMPACT_CRATER_LAYER_ID);
-      if (map.getSource(IMPACT_PREVIEW_SOURCE_ID))
+      extraLayerIds.forEach((id) => {
+        if (map.getLayer(id)) map.removeLayer(id);
+      });
+
+      if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) {
         map.removeSource(IMPACT_PREVIEW_SOURCE_ID);
+      }
     } catch (error) {
       console.warn("Failed clearing impact preview:", error);
     }
@@ -426,13 +474,12 @@ export default function HomePage() {
     const blastKm = Number(result.blast_radius_m ?? 0) / 1000;
     const thermalKm = Number(result.thermal_radius_m ?? 0) / 1000;
 
+    const craterInnerKm = craterKm * 0.72;
+    const craterRimKm = craterKm * 1.08;
+
     const data = {
       type: "FeatureCollection",
       features: [
-        {
-          ...kmCircle(lng, lat, craterKm),
-          properties: { kind: "crater" },
-        },
         {
           ...kmCircle(lng, lat, thermalKm),
           properties: { kind: "thermal" },
@@ -440,6 +487,18 @@ export default function HomePage() {
         {
           ...kmCircle(lng, lat, blastKm),
           properties: { kind: "blast" },
+        },
+        {
+          ...kmCircle(lng, lat, craterRimKm),
+          properties: { kind: "crater-rim" },
+        },
+        {
+          ...kmCircle(lng, lat, craterKm),
+          properties: { kind: "crater" },
+        },
+        {
+          ...kmCircle(lng, lat, craterInnerKm),
+          properties: { kind: "crater-inner" },
         },
       ],
     };
@@ -458,8 +517,8 @@ export default function HomePage() {
         source: IMPACT_PREVIEW_SOURCE_ID,
         filter: ["==", ["get", "kind"], "thermal"],
         paint: {
-          "fill-color": "#ef4444",
-          "fill-opacity": 0.14,
+          "fill-color": "#111111",
+          "fill-opacity": 0.18,
         },
       });
 
@@ -471,7 +530,18 @@ export default function HomePage() {
         paint: {
           "line-color": "#dc2626",
           "line-width": 2,
-          "line-opacity": 0.9,
+          "line-opacity": 0.85,
+        },
+      });
+
+      map.addLayer({
+        id: `${IMPACT_CRATER_LAYER_ID}-rim`,
+        type: "fill",
+        source: IMPACT_PREVIEW_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "crater-rim"],
+        paint: {
+          "fill-color": "#1a0f0f",
+          "fill-opacity": 0.3,
         },
       });
 
@@ -481,12 +551,36 @@ export default function HomePage() {
         source: IMPACT_PREVIEW_SOURCE_ID,
         filter: ["==", ["get", "kind"], "crater"],
         paint: {
-          "fill-color": "#3f1d1d",
-          "fill-opacity": 0.45,
+          "fill-color": "#261313",
+          "fill-opacity": 0.52,
+        },
+      });
+
+      map.addLayer({
+        id: `${IMPACT_CRATER_LAYER_ID}-inner`,
+        type: "fill",
+        source: IMPACT_PREVIEW_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "crater-inner"],
+        paint: {
+          "fill-color": "#050505",
+          "fill-opacity": 0.42,
+        },
+      });
+
+      map.addLayer({
+        id: `${IMPACT_CRATER_LAYER_ID}-pulse`,
+        type: "line",
+        source: IMPACT_PREVIEW_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "crater-rim"],
+        paint: {
+          "line-color": "#ef4444",
+          "line-width": 3,
+          "line-opacity": 0.9,
         },
       });
 
       safely(() => map.triggerRepaint());
+      startImpactPulseAnimation();
     } catch (error) {
       console.error("Failed to draw land impact result", error);
     }
@@ -860,6 +954,10 @@ export default function HomePage() {
 
     return () => {
       if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      if (impactPulseFrameRef.current) {
+        cancelAnimationFrame(impactPulseFrameRef.current);
+        impactPulseFrameRef.current = null;
+      }
 
       map.off("load", handleMapLoad);
       map.off("style.load", handleStyleLoad);
