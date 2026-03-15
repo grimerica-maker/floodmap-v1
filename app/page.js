@@ -955,15 +955,25 @@ export default function HomePage() {
       }
 
       const data = await res.json();
-      console.log("Impact response:", data);
+      console.log("Impact response full:", JSON.stringify(data, null, 2));
 
       setImpactResult(data);
 
       if (impactPointRef.current) {
-        if (
+        const isOcean =
           data.is_ocean_impact === true &&
-          Number(data.tsunami_radius_m ?? 0) > 0
-        ) {
+          Number(data.tsunami_radius_m ?? 0) > 0;
+
+        console.log("Ocean branch check:", {
+          is_ocean_impact: data.is_ocean_impact,
+          tsunami_radius_m: data.tsunami_radius_m,
+          run_id: data.run_id,
+          tsunami_ready: data.tsunami_ready,
+          tsunami_error: data.tsunami_error,
+          isOcean,
+        });
+
+        if (isOcean) {
           drawOceanImpactFromResult(
             impactPointRef.current.lng,
             impactPointRef.current.lat,
@@ -971,9 +981,10 @@ export default function HomePage() {
           );
 
           if (data.run_id) {
-            addImpactFloodLayer(data.run_id);
+            const added = addImpactFloodLayer(data.run_id);
+            console.log("addImpactFloodLayer result:", added);
           } else {
-            console.warn("Impact response missing run_id");
+            console.warn("Ocean impact missing run_id");
           }
         } else {
           drawLandImpactFromResult(
@@ -1786,6 +1797,14 @@ export default function HomePage() {
                     ).toLocaleString()}{" "}
                     m
                   </div>
+                  <div>
+                    Tsunami Ready:{" "}
+                    {impactResult.tsunami_ready === true ? "yes" : "no"}
+                  </div>
+                  <div>
+                    Tsunami Error: {impactResult.tsunami_error ?? "--"}
+                  </div>
+                  <div>Run ID: {impactResult.run_id ?? "--"}</div>
                 </>
               )}
 
