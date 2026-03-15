@@ -24,6 +24,10 @@ const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 const IMPACT_TSUNAMI_LAYER_ID = "impact-tsunami-layer";
 
+const IMPACT_FLOOD_SOURCE_ID = "impact-flood-source";
+const IMPACT_FLOOD_LAYER_ID = "impact-flood-layer";
+const IMPACT_FLOOD_TILE_VERSION = "1";
+
 const PRESETS = [
   { label: "Ice Age", value: -120 },
   { label: "Modern", value: 0 },
@@ -220,6 +224,60 @@ export default function HomePage() {
     activeFloodLevelRef.current = null;
   };
 
+  const removeImpactFloodLayer = () => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    try {
+      if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) {
+        map.removeLayer(IMPACT_FLOOD_LAYER_ID);
+      }
+      if (map.getSource(IMPACT_FLOOD_SOURCE_ID)) {
+        map.removeSource(IMPACT_FLOOD_SOURCE_ID);
+      }
+    } catch (error) {
+      console.warn("Failed removing impact flood layer:", error);
+    }
+  };
+
+  const addImpactFloodLayer = (runId) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || !runId) return false;
+
+    const tileUrl = `${floodEngineUrlRef.current}/impact-flood/${encodeURIComponent(
+      runId
+    )}/{z}/{x}/{y}.png?v=${IMPACT_FLOOD_TILE_VERSION}`;
+
+    try {
+      removeImpactFloodLayer();
+
+      map.addSource(IMPACT_FLOOD_SOURCE_ID, {
+        type: "raster",
+        tiles: [tileUrl],
+        tileSize: 256,
+        minzoom: 0,
+        maxzoom: 22,
+      });
+
+      map.addLayer({
+        id: IMPACT_FLOOD_LAYER_ID,
+        type: "raster",
+        source: IMPACT_FLOOD_SOURCE_ID,
+        paint: {
+          "raster-opacity": 0.95,
+          "raster-fade-duration": 0,
+          "raster-resampling": "linear",
+        },
+      });
+
+      safely(() => map.triggerRepaint());
+      return true;
+    } catch (error) {
+      console.error("Failed to add impact flood layer", error);
+      return false;
+    }
+  };
+
   const startImpactPulseAnimation = () => {
     const map = mapRef.current;
     if (!map) return;
@@ -263,6 +321,8 @@ export default function HomePage() {
       cancelAnimationFrame(impactPulseFrameRef.current);
       impactPulseFrameRef.current = null;
     }
+
+    removeImpactFloodLayer();
 
     const extraLayerIds = [
       `${IMPACT_CRATER_LAYER_ID}-pulse`,
@@ -925,6 +985,10 @@ export default function HomePage() {
             impactPointRef.current.lat,
             data
           );
+
+          if (data.run_id) {
+            addImpactFloodLayer(data.run_id);
+          }
         } else {
           drawLandImpactFromResult(
             impactPointRef.current.lng,
@@ -992,6 +1056,9 @@ export default function HomePage() {
         if (resourceType === "Tile" && url.includes("/flood/")) {
           console.log("FLOOD TILE:", url);
         }
+        if (resourceType === "Tile" && url.includes("/impact-flood/")) {
+          console.log("IMPACT FLOOD TILE:", url);
+        }
         return { url };
       },
     });
@@ -1015,6 +1082,13 @@ export default function HomePage() {
             sourceDataType: e.sourceDataType,
           });
         }
+        if (e.sourceId === IMPACT_FLOOD_SOURCE_ID) {
+          console.log("Impact flood sourcedata:", {
+            isSourceLoaded: e.isSourceLoaded,
+            sourceId: e.sourceId,
+            sourceDataType: e.sourceDataType,
+          });
+        }
       });
     }
 
@@ -1033,6 +1107,19 @@ export default function HomePage() {
         }, 50);
       } else {
         removeFloodLayer();
+      }
+
+      if (
+        scenarioModeRef.current === "impact" &&
+        impactPointRef.current &&
+        impactResult &&
+        impactResult.is_ocean_impact === true &&
+        Number(impactResult.tsunami_radius_m ?? 0) > 0 &&
+        impactResult.run_id
+      ) {
+        setTimeout(() => {
+          addImpactFloodLayer(impactResult.run_id);
+        }, 50);
       }
     };
 
@@ -1152,6 +1239,10 @@ export default function HomePage() {
           impactPointRef.current.lat,
           impactResult
         );
+
+        if (impactResult.run_id) {
+          addImpactFloodLayer(impactResult.run_id);
+        }
         return;
       }
 
