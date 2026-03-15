@@ -268,6 +268,8 @@ export default function HomePage() {
       `${IMPACT_CRATER_LAYER_ID}-pulse`,
       `${IMPACT_CRATER_LAYER_ID}-inner`,
       `${IMPACT_CRATER_LAYER_ID}-rim`,
+      `${IMPACT_CRATER_LAYER_ID}-ejecta`,
+      `${IMPACT_BLAST_LAYER_ID}-fill`,
       IMPACT_TSUNAMI_LAYER_ID,
       IMPACT_THERMAL_LAYER_ID,
       IMPACT_BLAST_LAYER_ID,
@@ -404,10 +406,6 @@ export default function HomePage() {
           ...kmCircle(lng, lat, radii.thermal),
           properties: { kind: "thermal" },
         },
-        {
-          ...kmCircle(lng, lat, radii.tsunami),
-          properties: { kind: "tsunami" },
-        },
       ],
     };
 
@@ -419,24 +417,13 @@ export default function HomePage() {
         });
 
         map.addLayer({
-          id: IMPACT_TSUNAMI_LAYER_ID,
-          type: "fill",
-          source: IMPACT_PREVIEW_SOURCE_ID,
-          filter: ["==", ["get", "kind"], "tsunami"],
-          paint: {
-            "fill-color": "#3b82f6",
-            "fill-opacity": 0.08,
-          },
-        });
-
-        map.addLayer({
           id: IMPACT_THERMAL_LAYER_ID,
           type: "fill",
           source: IMPACT_PREVIEW_SOURCE_ID,
           filter: ["==", ["get", "kind"], "thermal"],
           paint: {
-            "fill-color": "#f59e0b",
-            "fill-opacity": 0.1,
+            "fill-color": "#111111",
+            "fill-opacity": 0.22,
           },
         });
 
@@ -447,8 +434,8 @@ export default function HomePage() {
           filter: ["==", ["get", "kind"], "blast"],
           paint: {
             "line-color": "#ef4444",
-            "line-width": 2,
-            "line-opacity": 0.85,
+            "line-width": 3,
+            "line-opacity": 1,
           },
         });
 
@@ -458,8 +445,8 @@ export default function HomePage() {
           source: IMPACT_PREVIEW_SOURCE_ID,
           filter: ["==", ["get", "kind"], "crater"],
           paint: {
-            "fill-color": "#7f1d1d",
-            "fill-opacity": 0.28,
+            "fill-color": "#000000",
+            "fill-opacity": 0.55,
           },
         });
       } else {
@@ -482,6 +469,8 @@ export default function HomePage() {
 
     const craterInnerKm = craterKm * 0.72;
     const craterRimKm = craterKm * 1.08;
+    const ejectaKm = craterKm * 1.55;
+    const blastFillKm = blastKm;
 
     const data = {
       type: "FeatureCollection",
@@ -491,8 +480,16 @@ export default function HomePage() {
           properties: { kind: "thermal" },
         },
         {
+          ...kmCircle(lng, lat, blastFillKm),
+          properties: { kind: "blast-fill" },
+        },
+        {
           ...kmCircle(lng, lat, blastKm),
           properties: { kind: "blast" },
+        },
+        {
+          ...kmCircle(lng, lat, ejectaKm),
+          properties: { kind: "ejecta" },
         },
         {
           ...kmCircle(lng, lat, craterRimKm),
@@ -524,7 +521,18 @@ export default function HomePage() {
         filter: ["==", ["get", "kind"], "thermal"],
         paint: {
           "fill-color": "#111111",
-          "fill-opacity": 0.18,
+          "fill-opacity": 0.35,
+        },
+      });
+
+      map.addLayer({
+        id: `${IMPACT_BLAST_LAYER_ID}-fill`,
+        type: "fill",
+        source: IMPACT_PREVIEW_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "blast-fill"],
+        paint: {
+          "fill-color": "#7f1d1d",
+          "fill-opacity": 0.12,
         },
       });
 
@@ -535,8 +543,19 @@ export default function HomePage() {
         filter: ["==", ["get", "kind"], "blast"],
         paint: {
           "line-color": "#dc2626",
-          "line-width": 2,
-          "line-opacity": 0.85,
+          "line-width": 3,
+          "line-opacity": 1,
+        },
+      });
+
+      map.addLayer({
+        id: `${IMPACT_CRATER_LAYER_ID}-ejecta`,
+        type: "fill",
+        source: IMPACT_PREVIEW_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "ejecta"],
+        paint: {
+          "fill-color": "#3b2a22",
+          "fill-opacity": 0.18,
         },
       });
 
@@ -557,8 +576,8 @@ export default function HomePage() {
         source: IMPACT_PREVIEW_SOURCE_ID,
         filter: ["==", ["get", "kind"], "crater"],
         paint: {
-          "fill-color": "#261313",
-          "fill-opacity": 0.52,
+          "fill-color": "#000000",
+          "fill-opacity": 0.85,
         },
       });
 
@@ -568,8 +587,8 @@ export default function HomePage() {
         source: IMPACT_PREVIEW_SOURCE_ID,
         filter: ["==", ["get", "kind"], "crater-inner"],
         paint: {
-          "fill-color": "#050505",
-          "fill-opacity": 0.42,
+          "fill-color": "#000000",
+          "fill-opacity": 0.55,
         },
       });
 
