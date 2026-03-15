@@ -22,11 +22,10 @@ const IMPACT_PREVIEW_SOURCE_ID = "impact-preview-source";
 const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
-const IMPACT_TSUNAMI_LAYER_ID = "impact-tsunami-layer";
 
 const IMPACT_FLOOD_SOURCE_ID = "impact-flood-source";
 const IMPACT_FLOOD_LAYER_ID = "impact-flood-layer";
-const IMPACT_FLOOD_TILE_VERSION = "22";
+const IMPACT_FLOOD_TILE_VERSION = "23";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -229,12 +228,8 @@ export default function HomePage() {
     if (!map) return;
 
     try {
-      if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) {
-        map.removeLayer(IMPACT_FLOOD_LAYER_ID);
-      }
-      if (map.getSource(IMPACT_FLOOD_SOURCE_ID)) {
-        map.removeSource(IMPACT_FLOOD_SOURCE_ID);
-      }
+      if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) map.removeLayer(IMPACT_FLOOD_LAYER_ID);
+      if (map.getSource(IMPACT_FLOOD_SOURCE_ID)) map.removeSource(IMPACT_FLOOD_SOURCE_ID);
     } catch (error) {
       console.warn("Failed removing impact flood layer:", error);
     }
@@ -315,12 +310,8 @@ export default function HomePage() {
       const width = 2.5 + Math.sin(t * 2.6) * 0.8;
       const opacity = 0.72 + ((Math.sin(t * 2.6) + 1) / 2) * 0.22;
 
-      safely(() =>
-        mapRef.current.setPaintProperty(layerId, "line-width", width)
-      );
-      safely(() =>
-        mapRef.current.setPaintProperty(layerId, "line-opacity", opacity)
-      );
+      safely(() => mapRef.current.setPaintProperty(layerId, "line-width", width));
+      safely(() => mapRef.current.setPaintProperty(layerId, "line-opacity", opacity));
 
       impactPulseFrameRef.current = requestAnimationFrame(tick);
     };
@@ -345,8 +336,6 @@ export default function HomePage() {
       `${IMPACT_CRATER_LAYER_ID}-rim`,
       `${IMPACT_CRATER_LAYER_ID}-ejecta`,
       `${IMPACT_BLAST_LAYER_ID}-fill`,
-      `${IMPACT_TSUNAMI_LAYER_ID}-line`,
-      IMPACT_TSUNAMI_LAYER_ID,
       IMPACT_THERMAL_LAYER_ID,
       IMPACT_BLAST_LAYER_ID,
       IMPACT_CRATER_LAYER_ID,
@@ -479,10 +468,7 @@ export default function HomePage() {
       features: [
         { ...kmCircle(lng, lat, radii.crater), properties: { kind: "crater" } },
         { ...kmCircle(lng, lat, radii.blast), properties: { kind: "blast" } },
-        {
-          ...kmCircle(lng, lat, radii.thermal),
-          properties: { kind: "thermal" },
-        },
+        { ...kmCircle(lng, lat, radii.thermal), properties: { kind: "thermal" } },
       ],
     };
 
@@ -552,34 +538,13 @@ export default function HomePage() {
     const data = {
       type: "FeatureCollection",
       features: [
-        {
-          ...kmCircle(lng, lat, thermalKm),
-          properties: { kind: "thermal" },
-        },
-        {
-          ...kmCircle(lng, lat, blastFillKm),
-          properties: { kind: "blast-fill" },
-        },
-        {
-          ...kmCircle(lng, lat, blastKm),
-          properties: { kind: "blast" },
-        },
-        {
-          ...kmCircle(lng, lat, ejectaKm),
-          properties: { kind: "ejecta" },
-        },
-        {
-          ...kmCircle(lng, lat, craterRimKm),
-          properties: { kind: "crater-rim" },
-        },
-        {
-          ...kmCircle(lng, lat, craterKm),
-          properties: { kind: "crater" },
-        },
-        {
-          ...kmCircle(lng, lat, craterInnerKm),
-          properties: { kind: "crater-inner" },
-        },
+        { ...kmCircle(lng, lat, thermalKm), properties: { kind: "thermal" } },
+        { ...kmCircle(lng, lat, blastFillKm), properties: { kind: "blast-fill" } },
+        { ...kmCircle(lng, lat, blastKm), properties: { kind: "blast" } },
+        { ...kmCircle(lng, lat, ejectaKm), properties: { kind: "ejecta" } },
+        { ...kmCircle(lng, lat, craterRimKm), properties: { kind: "crater-rim" } },
+        { ...kmCircle(lng, lat, craterKm), properties: { kind: "crater" } },
+        { ...kmCircle(lng, lat, craterInnerKm), properties: { kind: "crater-inner" } },
       ],
     };
 
@@ -706,14 +671,8 @@ export default function HomePage() {
       const data = {
         type: "FeatureCollection",
         features: [
-          {
-            ...kmCircle(lng, lat, blastKm),
-            properties: { kind: "blast" },
-          },
-          {
-            ...kmCircle(lng, lat, thermalKm),
-            properties: { kind: "thermal" },
-          },
+          { ...kmCircle(lng, lat, blastKm), properties: { kind: "blast" } },
+          { ...kmCircle(lng, lat, thermalKm), properties: { kind: "thermal" } },
         ],
       };
 
@@ -791,12 +750,8 @@ export default function HomePage() {
         return true;
       }
 
-      if (map.getLayer(FLOOD_LAYER_ID)) {
-        map.removeLayer(FLOOD_LAYER_ID);
-      }
-      if (map.getSource(FLOOD_SOURCE_ID)) {
-        map.removeSource(FLOOD_SOURCE_ID);
-      }
+      if (map.getLayer(FLOOD_LAYER_ID)) map.removeLayer(FLOOD_LAYER_ID);
+      if (map.getSource(FLOOD_SOURCE_ID)) map.removeSource(FLOOD_SOURCE_ID);
 
       map.addSource(FLOOD_SOURCE_ID, {
         type: "raster",
@@ -821,9 +776,7 @@ export default function HomePage() {
 
       map.once("idle", () => {
         console.log("Flood layer idle for level:", normalizedLevel);
-        setStatus(
-          `Flood tiles loaded at ${formatLevelForDisplay(normalizedLevel)}`
-        );
+        setStatus(`Flood tiles loaded at ${formatLevelForDisplay(normalizedLevel)}`);
       });
 
       safely(() => map.triggerRepaint());
@@ -1065,6 +1018,7 @@ export default function HomePage() {
         const message = e?.error?.message || e?.message || "";
         console.log("Map error:", e, message);
       });
+
       map.on("sourcedata", (e) => {
         if (e.sourceId === FLOOD_SOURCE_ID) {
           console.log("Flood sourcedata:", {
@@ -1495,9 +1449,7 @@ export default function HomePage() {
                 key={preset.label}
                 onClick={() => {
                   setInputLevel(preset.value);
-                  setInputText(
-                    formatInputTextFromMeters(preset.value, unitMode)
-                  );
+                  setInputText(formatInputTextFromMeters(preset.value, unitMode));
                 }}
                 style={{
                   padding: "12px 10px",
@@ -1834,9 +1786,7 @@ export default function HomePage() {
           {waterDifference !== null
             ? waterDifference >= 0
               ? unitMode === "ft"
-                ? `Above water by ${Math.round(
-                    metersToFeet(waterDifference)
-                  )} ft`
+                ? `Above water by ${Math.round(metersToFeet(waterDifference))} ft`
                 : `Above water by ${waterDifference} m`
               : unitMode === "ft"
               ? `Underwater by ${Math.round(
