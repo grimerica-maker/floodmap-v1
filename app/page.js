@@ -311,11 +311,38 @@ export default function HomePage() {
       }
 
       const t = (now - start) / 1000;
-      const width = 2.5 + Math.sin(t * 2.6) * 0.8;
-      const opacity = 0.72 + ((Math.sin(t * 2.6) + 1) / 2) * 0.22;
+      const pulse = (Math.sin(t * 2.6) + 1) / 2;
 
-      safely(() => mapRef.current.setPaintProperty(layerId, "line-width", width));
-      safely(() => mapRef.current.setPaintProperty(layerId, "line-opacity", opacity));
+      safely(() => {
+        const layer = mapRef.current.getLayer(layerId);
+        if (!layer) return;
+
+        if (layer.type === "line") {
+          mapRef.current.setPaintProperty(
+            layerId,
+            "line-width",
+            2.5 + pulse * 1.2
+          );
+          mapRef.current.setPaintProperty(
+            layerId,
+            "line-opacity",
+            0.72 + pulse * 0.2
+          );
+        }
+
+        if (layer.type === "circle") {
+          mapRef.current.setPaintProperty(
+            layerId,
+            "circle-radius",
+            20 + pulse * 14
+          );
+          mapRef.current.setPaintProperty(
+            layerId,
+            "circle-stroke-opacity",
+            0.45 + pulse * 0.35
+          );
+        }
+      });
 
       impactPulseFrameRef.current = requestAnimationFrame(tick);
     };
@@ -666,17 +693,20 @@ export default function HomePage() {
       return;
     }
 
-    const blastKm = Number(result.blast_radius_m ?? 0) / 1000;
-    const thermalKm = Number(result.thermal_radius_m ?? 0) / 1000;
-
     try {
       clearImpactPreview();
 
       const data = {
         type: "FeatureCollection",
         features: [
-          { ...kmCircle(lng, lat, blastKm), properties: { kind: "blast" } },
-          { ...kmCircle(lng, lat, thermalKm), properties: { kind: "thermal" } },
+          {
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: [lng, lat],
+            },
+            properties: { kind: "impact-core" },
+          },
         ],
       };
 
@@ -686,29 +716,34 @@ export default function HomePage() {
       });
 
       map.addLayer({
-        id: IMPACT_THERMAL_LAYER_ID,
-        type: "fill",
+        id: IMPACT_CRATER_LAYER_ID,
+        type: "circle",
         source: IMPACT_PREVIEW_SOURCE_ID,
-        filter: ["==", ["get", "kind"], "thermal"],
+        filter: ["==", ["get", "kind"], "impact-core"],
         paint: {
-          "fill-color": "#111111",
-          "fill-opacity": 0.18,
+          "circle-radius": 10,
+          "circle-color": "#ef4444",
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff",
         },
       });
 
       map.addLayer({
-        id: IMPACT_BLAST_LAYER_ID,
-        type: "line",
+        id: `${IMPACT_CRATER_LAYER_ID}-pulse`,
+        type: "circle",
         source: IMPACT_PREVIEW_SOURCE_ID,
-        filter: ["==", ["get", "kind"], "blast"],
+        filter: ["==", ["get", "kind"], "impact-core"],
         paint: {
-          "line-color": "#ef4444",
-          "line-width": 2,
-          "line-opacity": 0.9,
+          "circle-radius": 28,
+          "circle-color": "rgba(0,0,0,0)",
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ef4444",
+          "circle-stroke-opacity": 0.9,
         },
       });
 
       safely(() => map.triggerRepaint());
+      startImpactPulseAnimation();
     } catch (error) {
       console.error("Failed to draw ocean impact result", error);
     }
