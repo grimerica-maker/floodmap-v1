@@ -26,7 +26,7 @@ const IMPACT_TSUNAMI_LAYER_ID = "impact-tsunami-layer";
 
 const IMPACT_FLOOD_SOURCE_ID = "impact-flood-source";
 const IMPACT_FLOOD_LAYER_ID = "impact-flood-layer";
-const IMPACT_FLOOD_TILE_VERSION = "2";
+const IMPACT_FLOOD_TILE_VERSION = "22";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -955,50 +955,44 @@ export default function HomePage() {
       }
 
       const data = await res.json();
-      console.log("Impact response full:", JSON.stringify(data, null, 2));
+      console.log("Impact response:", data);
 
       setImpactResult(data);
 
-      if (impactPointRef.current) {
-        const isOcean =
-          data.is_ocean_impact === true &&
-          Number(data.tsunami_radius_m ?? 0) > 0;
+      if (!impactPointRef.current) return;
 
-        console.log("Ocean branch check:", {
-          is_ocean_impact: data.is_ocean_impact,
-          tsunami_radius_m: data.tsunami_radius_m,
-          run_id: data.run_id,
-          tsunami_ready: data.tsunami_ready,
-          tsunami_error: data.tsunami_error,
-          isOcean,
-        });
+      if (
+        data.is_ocean_impact === true &&
+        Number(data.tsunami_radius_m ?? 0) > 0
+      ) {
+        drawOceanImpactFromResult(
+          impactPointRef.current.lng,
+          impactPointRef.current.lat,
+          data
+        );
 
-        if (isOcean) {
-          drawOceanImpactFromResult(
-            impactPointRef.current.lng,
-            impactPointRef.current.lat,
-            data
-          );
-
-          if (data.run_id) {
-            const added = addImpactFloodLayer(data.run_id);
-            console.log("addImpactFloodLayer result:", added);
-          } else {
-            console.warn("Ocean impact missing run_id");
+        if (data.run_id) {
+          const added = addImpactFloodLayer(data.run_id);
+          if (!added) {
+            console.warn("Impact flood layer did not attach");
           }
         } else {
-          drawLandImpactFromResult(
-            impactPointRef.current.lng,
-            impactPointRef.current.lat,
-            data
-          );
+          console.warn("Impact response missing run_id");
         }
+      } else {
+        drawLandImpactFromResult(
+          impactPointRef.current.lng,
+          impactPointRef.current.lat,
+          data
+        );
       }
 
       setStatus("Impact simulation complete");
     } catch (err) {
       console.error(err);
       setImpactError("Impact simulation failed");
+      setStatus("Impact simulation failed");
+      removeImpactFloodLayer();
     } finally {
       setImpactLoading(false);
     }
@@ -1797,14 +1791,6 @@ export default function HomePage() {
                     ).toLocaleString()}{" "}
                     m
                   </div>
-                  <div>
-                    Tsunami Ready:{" "}
-                    {impactResult.tsunami_ready === true ? "yes" : "no"}
-                  </div>
-                  <div>
-                    Tsunami Error: {impactResult.tsunami_error ?? "--"}
-                  </div>
-                  <div>Run ID: {impactResult.run_id ?? "--"}</div>
                 </>
               )}
 
