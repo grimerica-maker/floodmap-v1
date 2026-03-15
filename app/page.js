@@ -25,7 +25,7 @@ const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
 const IMPACT_FLOOD_SOURCE_ID = "impact-flood-source";
 const IMPACT_FLOOD_LAYER_ID = "impact-flood-layer";
-const IMPACT_FLOOD_TILE_VERSION = "23";
+const IMPACT_FLOOD_TILE_VERSION = "24";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
