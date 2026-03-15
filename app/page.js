@@ -26,7 +26,7 @@ const IMPACT_TSUNAMI_LAYER_ID = "impact-tsunami-layer";
 
 const IMPACT_FLOOD_SOURCE_ID = "impact-flood-source";
 const IMPACT_FLOOD_LAYER_ID = "impact-flood-layer";
-const IMPACT_FLOOD_TILE_VERSION = "1";
+const IMPACT_FLOOD_TILE_VERSION = "2";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -463,13 +463,14 @@ export default function HomePage() {
       crater: Math.max(0.25, d * 0.0006),
       blast: Math.max(1.0, d * 0.006),
       thermal: Math.max(2.0, d * 0.012),
-      tsunami: Math.max(3.0, d * 0.02),
     };
   };
 
   const drawImpactPreview = (lng, lat, diameterM) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
+
+    removeImpactFloodLayer();
 
     const radii = getImpactPreviewRadiiKm(diameterM);
 
@@ -696,62 +697,29 @@ export default function HomePage() {
       return;
     }
 
-    const tsunamiKm = Number(result.tsunami_radius_m ?? 0) / 1000;
     const blastKm = Number(result.blast_radius_m ?? 0) / 1000;
     const thermalKm = Number(result.thermal_radius_m ?? 0) / 1000;
-
-    if (tsunamiKm <= 0) {
-      drawLandImpactFromResult(lng, lat, result);
-      return;
-    }
-
-    const data = {
-      type: "FeatureCollection",
-      features: [
-        {
-          ...kmCircle(lng, lat, tsunamiKm),
-          properties: { kind: "tsunami" },
-        },
-        {
-          ...kmCircle(lng, lat, blastKm),
-          properties: { kind: "blast" },
-        },
-        {
-          ...kmCircle(lng, lat, thermalKm),
-          properties: { kind: "thermal" },
-        },
-      ],
-    };
 
     try {
       clearImpactPreview();
 
+      const data = {
+        type: "FeatureCollection",
+        features: [
+          {
+            ...kmCircle(lng, lat, blastKm),
+            properties: { kind: "blast" },
+          },
+          {
+            ...kmCircle(lng, lat, thermalKm),
+            properties: { kind: "thermal" },
+          },
+        ],
+      };
+
       map.addSource(IMPACT_PREVIEW_SOURCE_ID, {
         type: "geojson",
         data,
-      });
-
-      map.addLayer({
-        id: IMPACT_TSUNAMI_LAYER_ID,
-        type: "fill",
-        source: IMPACT_PREVIEW_SOURCE_ID,
-        filter: ["==", ["get", "kind"], "tsunami"],
-        paint: {
-          "fill-color": "#2563eb",
-          "fill-opacity": 0.12,
-        },
-      });
-
-      map.addLayer({
-        id: `${IMPACT_TSUNAMI_LAYER_ID}-line`,
-        type: "line",
-        source: IMPACT_PREVIEW_SOURCE_ID,
-        filter: ["==", ["get", "kind"], "tsunami"],
-        paint: {
-          "line-color": "#60a5fa",
-          "line-width": 3,
-          "line-opacity": 0.95,
-        },
       });
 
       map.addLayer({
@@ -1283,6 +1251,7 @@ export default function HomePage() {
     if (scenarioMode !== "impact") return;
     setImpactResult(null);
     setImpactError("");
+    removeImpactFloodLayer();
   }, [impactDiameter]);
 
   useEffect(() => {
