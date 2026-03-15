@@ -12,7 +12,7 @@ const DEBUG_FLOOD = true;
 const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-v9";
 
-const FLOOD_TILE_VERSION = "202";
+const FLOOD_TILE_VERSION = "203";
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
 
@@ -25,7 +25,7 @@ const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
 const IMPACT_FLOOD_SOURCE_ID = "impact-flood-source";
 const IMPACT_FLOOD_LAYER_ID = "impact-flood-layer";
-const IMPACT_FLOOD_TILE_VERSION = "24";
+const IMPACT_FLOOD_TILE_VERSION = "25";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -53,6 +53,8 @@ export default function HomePage() {
   const hasAppliedInitialViewModeRef = useRef(false);
   const impactPointRef = useRef(null);
   const impactPulseFrameRef = useRef(null);
+  const impactRequestRef = useRef(null);
+  const impactTimeoutRef = useRef(null);
 
   const seaLevelRef = useRef(0);
   const viewModeRef = useRef("map");
@@ -114,6 +116,17 @@ export default function HomePage() {
 
     setFloodEngineUrl(CONFIGURED_FLOOD_ENGINE_URL.replace(/\/+$/, ""));
   }, []);
+
+  const cancelPendingImpactRequest = () => {
+    if (impactTimeoutRef.current) {
+      clearTimeout(impactTimeoutRef.current);
+      impactTimeoutRef.current = null;
+    }
+    if (impactRequestRef.current) {
+      impactRequestRef.current.abort();
+      impactRequestRef.current = null;
+    }
+  };
 
   const metersToFeet = (meters) => meters * 3.28084;
   const feetToMeters = (feet) => feet / 3.28084;
@@ -871,6 +884,9 @@ export default function HomePage() {
   };
 
   const executeFlood = () => {
+    cancelPendingImpactRequest();
+    setImpactLoading(false);
+
     console.log("Execute Flood clicked", {
       inputText,
       unitMode,
@@ -932,14 +948,27 @@ export default function HomePage() {
       return;
     }
 
+    cancelPendingImpactRequest();
+
+    const controller = new AbortController();
+    impactRequestRef.current = controller;
+    impactTimeoutRef.current = setTimeout(() => {
+      controller.abort();
+    }, 20000);
+
     try {
       setImpactLoading(true);
       setImpactError("");
+      setStatus("Running impact simulation...");
 
       const { lng, lat } = impactPointRef.current;
 
       const res = await fetch(
-        `${floodEngineUrlRef.current}/impact?lat=${lat}&lng=${lng}&diameter=${impactDiameter}`
+        `${floodEngineUrlRef.current}/impact?lat=${lat}&lng=${lng}&diameter=${impactDiameter}`,
+        {
+          signal: controller.signal,
+          cache: "no-store",
+        }
       );
 
       if (!res.ok) {
@@ -982,15 +1011,31 @@ export default function HomePage() {
       setStatus("Impact simulation complete");
     } catch (err) {
       console.error(err);
-      setImpactError("Impact simulation failed");
-      setStatus("Impact simulation failed");
       removeImpactFloodLayer();
+
+      if (err?.name === "AbortError") {
+        setImpactError("Impact simulation timed out");
+        setStatus("Impact simulation timed out");
+      } else {
+        setImpactError("Impact simulation failed");
+        setStatus("Impact simulation failed");
+      }
     } finally {
+      if (impactTimeoutRef.current) {
+        clearTimeout(impactTimeoutRef.current);
+        impactTimeoutRef.current = null;
+      }
+      if (impactRequestRef.current === controller) {
+        impactRequestRef.current = null;
+      }
       setImpactLoading(false);
     }
   };
 
   const clearFlood = () => {
+    cancelPendingImpactRequest();
+    setImpactLoading(false);
+
     setInputLevel(0);
     setInputText("0");
     setSeaLevel(0);
@@ -1009,7 +1054,8 @@ export default function HomePage() {
       const res = await fetch(
         `${floodEngineUrlRef.current}/elevation?lat=${encodeURIComponent(
           lat
-        )}&lng=${encodeURIComponent(lng)}`
+        )}&lng=${encodeURIComponent(lng)}`,
+        { cache: "no-store" }
       );
 
       if (!res.ok) {
@@ -1144,6 +1190,8 @@ export default function HomePage() {
     map.on("click", handleMapClick);
 
     return () => {
+      cancelPendingImpactRequest();
+
       if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
       if (impactPulseFrameRef.current) {
         cancelAnimationFrame(impactPulseFrameRef.current);
@@ -1189,6 +1237,8 @@ export default function HomePage() {
       return;
     }
 
+    cancelPendingImpactRequest();
+    setImpactLoading(false);
     removeImpactPoint();
     setImpactResult(null);
     setImpactError("");
@@ -1247,6 +1297,8 @@ export default function HomePage() {
 
   useEffect(() => {
     if (scenarioMode !== "impact") return;
+    cancelPendingImpactRequest();
+    setImpactLoading(false);
     setImpactResult(null);
     setImpactError("");
     removeImpactFloodLayer();
@@ -1770,7 +1822,7 @@ export default function HomePage() {
                   <div>
                     Estimated Wave Reach:{" "}
                     {Math.round(
-                      Number(impactResult.tsunami_radius_m ?? 0)
+                      Number(impactResult.estimated_wave_reach_m ?? impactResult.tsunami_radius_m ?? 0)
                     ).toLocaleString()}{" "}
                     m
                   </div>
