@@ -56,6 +56,7 @@ export default function HomePage() {
   const impactRequestRef = useRef(null);
   const impactTimeoutRef = useRef(null);
   const impactRunSeqRef = useRef(0);
+  const impactResultRef = useRef(null);
 
   const seaLevelRef = useRef(0);
   const viewModeRef = useRef("map");
@@ -99,6 +100,10 @@ export default function HomePage() {
   useEffect(() => {
     impactDiameterRef.current = impactDiameter;
   }, [impactDiameter]);
+
+  useEffect(() => {
+    impactResultRef.current = impactResult;
+  }, [impactResult]);
 
   useEffect(() => {
     if (!CONFIGURED_FLOOD_ENGINE_URL) {
@@ -868,6 +873,7 @@ export default function HomePage() {
 
   const executeFlood = () => {
     cancelPendingImpactRequest();
+    impactRunSeqRef.current += 1;
     setImpactLoading(false);
 
     const parsedLevel = commitInputText(inputText, unitMode);
@@ -960,6 +966,7 @@ export default function HomePage() {
 
       if (impactRunSeqRef.current !== runSeq) return;
       if (!impactPointRef.current) return;
+      if (scenarioModeRef.current !== "impact") return;
 
       setImpactResult(data);
 
@@ -1107,16 +1114,21 @@ export default function HomePage() {
         }, 50);
       } else {
         removeFloodLayer();
-        if (scenarioModeRef.current === "impact" && impactResult?.run_id) {
+
+        const currentImpactResult = impactResultRef.current;
+        if (
+          scenarioModeRef.current === "impact" &&
+          currentImpactResult?.run_id &&
+          currentImpactResult?.is_ocean_impact === true
+        ) {
           setTimeout(() => {
-            addImpactFloodLayer(impactResult.run_id);
+            addImpactFloodLayer(currentImpactResult.run_id);
           }, 50);
         }
       }
     };
 
     const handleMapLoad = () => {
-      applyProjectionForMode(viewModeRef.current);
       setStatus("Map ready");
     };
 
@@ -1183,7 +1195,7 @@ export default function HomePage() {
       impactPointRef.current = null;
       hasAppliedInitialViewModeRef.current = false;
     };
-  }, [floodEngineUrl, impactResult]);
+  }, [floodEngineUrl]);
 
   useEffect(() => {
     if (!mapRef.current) return;
