@@ -7,7 +7,7 @@ mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
 const CONFIGURED_FLOOD_ENGINE_URL = process.env.NEXT_PUBLIC_FLOOD_ENGINE_URL;
 const FLOOD_ENGINE_PROXY_PATH = "/api/engine";
-const DEBUG_FLOOD = true;
+const DEBUG_FLOOD = false;
 
 const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-v9";
@@ -25,7 +25,7 @@ const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
 const IMPACT_FLOOD_SOURCE_ID = "impact-flood-source";
 const IMPACT_FLOOD_LAYER_ID = "impact-flood-layer";
-const IMPACT_FLOOD_TILE_VERSION = "26";
+const IMPACT_FLOOD_TILE_VERSION = "31";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -57,6 +57,7 @@ export default function HomePage() {
   const impactTimeoutRef = useRef(null);
   const impactRunSeqRef = useRef(0);
   const impactResultRef = useRef(null);
+  const impactFloodRunIdRef = useRef(null);
 
   const seaLevelRef = useRef(0);
   const viewModeRef = useRef("map");
@@ -256,6 +257,8 @@ export default function HomePage() {
     } catch (error) {
       console.warn("Failed removing impact flood layer:", error);
     }
+
+    impactFloodRunIdRef.current = null;
   };
 
   const getFirstSymbolLayerId = () => {
@@ -270,9 +273,19 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded() || !runId) return false;
 
+    if (
+      impactFloodRunIdRef.current === runId &&
+      map.getLayer(IMPACT_FLOOD_LAYER_ID) &&
+      map.getSource(IMPACT_FLOOD_SOURCE_ID)
+    ) {
+      return true;
+    }
+
     const tileUrl = `${floodEngineUrlRef.current}/impact-flood/${encodeURIComponent(
       runId
-    )}/{z}/{x}/{y}.png?v=${IMPACT_FLOOD_TILE_VERSION}`;
+    )}/{z}/{x}/{y}.png?v=${IMPACT_FLOOD_TILE_VERSION}&rid=${encodeURIComponent(
+      runId
+    )}`;
 
     try {
       removeImpactFloodLayer();
@@ -283,6 +296,7 @@ export default function HomePage() {
         tileSize: 256,
         minzoom: 0,
         maxzoom: 22,
+        scheme: "xyz",
       });
 
       const beforeId = getFirstSymbolLayerId();
@@ -293,7 +307,7 @@ export default function HomePage() {
           type: "raster",
           source: IMPACT_FLOOD_SOURCE_ID,
           paint: {
-            "raster-opacity": 0.92,
+            "raster-opacity": 0.82,
             "raster-fade-duration": 0,
             "raster-resampling": "linear",
           },
@@ -301,10 +315,12 @@ export default function HomePage() {
         beforeId
       );
 
+      impactFloodRunIdRef.current = runId;
       safely(() => map.triggerRepaint());
       return true;
     } catch (error) {
       console.error("Failed to add impact flood layer", error);
+      impactFloodRunIdRef.current = null;
       return false;
     }
   };
@@ -1081,23 +1097,6 @@ export default function HomePage() {
         const message = e?.error?.message || e?.message || "";
         console.log("Map error:", e, message);
       });
-
-      map.on("sourcedata", (e) => {
-        if (e.sourceId === FLOOD_SOURCE_ID) {
-          console.log("Flood sourcedata:", {
-            isSourceLoaded: e.isSourceLoaded,
-            sourceId: e.sourceId,
-            sourceDataType: e.sourceDataType,
-          });
-        }
-        if (e.sourceId === IMPACT_FLOOD_SOURCE_ID) {
-          console.log("Impact flood sourcedata:", {
-            isSourceLoaded: e.isSourceLoaded,
-            sourceId: e.sourceId,
-            sourceDataType: e.sourceDataType,
-          });
-        }
-      });
     }
 
     const handleStyleLoad = () => {
@@ -1194,6 +1193,7 @@ export default function HomePage() {
       activeFloodLevelRef.current = null;
       impactPointRef.current = null;
       hasAppliedInitialViewModeRef.current = false;
+      impactFloodRunIdRef.current = null;
     };
   }, [floodEngineUrl]);
 
@@ -1809,7 +1809,11 @@ export default function HomePage() {
                   <div>
                     Estimated Wave Reach:{" "}
                     {Math.round(
-                      Number(impactResult.estimated_wave_reach_m ?? impactResult.tsunami_radius_m ?? 0)
+                      Number(
+                        impactResult.estimated_wave_reach_m ??
+                          impactResult.tsunami_radius_m ??
+                          0
+                      )
                     ).toLocaleString()}{" "}
                     m
                   </div>
