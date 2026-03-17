@@ -29,7 +29,7 @@ const IMPACT_TSUNAMI_LINE_LAYER_ID = "impact-tsunami-line-layer";
 
 const IMPACT_FLOOD_SOURCE_ID = "impact-flood-source";
 const IMPACT_FLOOD_LAYER_ID = "impact-flood-layer";
-const IMPACT_FLOOD_TILE_VERSION = "36";
+const IMPACT_FLOOD_TILE_VERSION = "37";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -228,10 +228,6 @@ export default function HomePage() {
     safely(() => map.setBearing(0));
     safely(() => map.dragRotate.disable());
     safely(() => map.touchZoomRotate.disableRotation());
-  };
-
-  const getFirstSymbolLayerId = () => {
-    return undefined;
   };
 
   const removeFloodLayer = () => {
@@ -486,6 +482,25 @@ export default function HomePage() {
 
     try {
       removeImpactFloodLayer();
+
+      fetch(tileUrl.replace("{z}", "4").replace("{x}", "4").replace("{y}", "6"), {
+        cache: "no-store",
+      })
+        .then((r) => {
+          console.log(
+            "IMPACT TILE TEST",
+            r.status,
+            r.url,
+            r.headers.get("content-type")
+          );
+          return r.blob();
+        })
+        .then((b) => {
+          console.log("IMPACT TILE BLOB SIZE", b.size);
+        })
+        .catch((e) => {
+          console.error("IMPACT TILE TEST FAILED", e);
+        });
 
       map.addSource(IMPACT_FLOOD_SOURCE_ID, {
         type: "raster",
@@ -801,11 +816,11 @@ export default function HomePage() {
 
   const drawOceanImpactFromResult = (lng, lat, result) => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !result) return;
+    if (!map || !map.isStyleLoaded() || !result) return false;
 
     if (result.is_ocean_impact !== true) {
       drawLandImpactFromResult(lng, lat, result);
-      return;
+      return false;
     }
 
     try {
@@ -862,13 +877,16 @@ export default function HomePage() {
       );
 
       if (reachM > 0) {
-        drawTsunamiRing(lng, lat, reachM);
+        const ringOk = drawTsunamiRing(lng, lat, reachM);
+        console.log("TSUNAMI RING RESULT", ringOk, reachM);
       }
 
       safely(() => map.triggerRepaint());
       startImpactPulseAnimation();
+      return true;
     } catch (error) {
       console.error("Failed to draw ocean impact result", error);
+      return false;
     }
   };
 
@@ -1085,14 +1103,17 @@ export default function HomePage() {
         data.is_ocean_impact === true &&
         Number(data.tsunami_radius_m ?? 0) > 0
       ) {
-        drawOceanImpactFromResult(
-          impactPointRef.current.lng,
-          impactPointRef.current.lat,
-          data
-        );
+        console.log("OCEAN BRANCH HIT", data.run_id, data);
+
+        const pointLng = impactPointRef.current.lng;
+        const pointLat = impactPointRef.current.lat;
+
+        const oceanOk = drawOceanImpactFromResult(pointLng, pointLat, data);
+        console.log("DRAW OCEAN CALLED", oceanOk);
 
         if (data.run_id) {
-          addImpactFloodLayer(data.run_id);
+          const floodOk = addImpactFloodLayer(data.run_id);
+          console.log("ADD IMPACT FLOOD CALLED", floodOk);
         }
 
         setStatus("Ocean impact simulation complete");
@@ -1487,7 +1508,7 @@ export default function HomePage() {
         }}
       >
         <h1 style={{ margin: "8px 0 24px 0", fontSize: 22, color: "red" }}>
-          Floodmap V1 v36 LIVE
+          Floodmap V1 v37 LIVE
         </h1>
 
         <div style={{ fontSize: 14, color: "#666", marginBottom: 24 }}>
@@ -1854,7 +1875,7 @@ export default function HomePage() {
         <div style={{ fontWeight: 700, marginBottom: 8 }}>
           Current Scenario
         </div>
-        <div style={{ color: "#facc15", fontWeight: 700 }}>Frontend build: v36</div>
+        <div style={{ color: "#facc15", fontWeight: 700 }}>Frontend build: v37</div>
         <div>Sea level: {formatLevelForDisplay(seaLevel)}</div>
         <div>
           Mode:{" "}
