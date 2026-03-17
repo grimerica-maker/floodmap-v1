@@ -29,7 +29,7 @@ const IMPACT_TSUNAMI_LINE_LAYER_ID = "impact-tsunami-line-layer";
 
 const IMPACT_FLOOD_SOURCE_ID = "impact-flood-source";
 const IMPACT_FLOOD_LAYER_ID = "impact-flood-layer";
-const IMPACT_FLOOD_TILE_VERSION = "35";
+const IMPACT_FLOOD_TILE_VERSION = "36";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -231,11 +231,7 @@ export default function HomePage() {
   };
 
   const getFirstSymbolLayerId = () => {
-    const map = mapRef.current;
-    if (!map) return undefined;
-    const layers = map.getStyle()?.layers || [];
-    const firstSymbol = layers.find((layer) => layer.type === "symbol");
-    return firstSymbol?.id;
+    return undefined;
   };
 
   const removeFloodLayer = () => {
@@ -443,34 +439,26 @@ export default function HomePage() {
         },
       });
 
-      const beforeId = getFirstSymbolLayerId();
-
-      map.addLayer(
-        {
-          id: IMPACT_TSUNAMI_FILL_LAYER_ID,
-          type: "fill",
-          source: IMPACT_TSUNAMI_SOURCE_ID,
-          paint: {
-            "fill-color": "#38bdf8",
-            "fill-opacity": 0.16,
-          },
+      map.addLayer({
+        id: IMPACT_TSUNAMI_FILL_LAYER_ID,
+        type: "fill",
+        source: IMPACT_TSUNAMI_SOURCE_ID,
+        paint: {
+          "fill-color": "#00ffff",
+          "fill-opacity": 0.28,
         },
-        beforeId
-      );
+      });
 
-      map.addLayer(
-        {
-          id: IMPACT_TSUNAMI_LINE_LAYER_ID,
-          type: "line",
-          source: IMPACT_TSUNAMI_SOURCE_ID,
-          paint: {
-            "line-color": "#00ffff",
-            "line-width": 4,
-            "line-opacity": 0.95,
-          },
+      map.addLayer({
+        id: IMPACT_TSUNAMI_LINE_LAYER_ID,
+        type: "line",
+        source: IMPACT_TSUNAMI_SOURCE_ID,
+        paint: {
+          "line-color": "#00ffff",
+          "line-width": 6,
+          "line-opacity": 1,
         },
-        beforeId
-      );
+      });
 
       if (DEBUG_FLOOD) {
         console.log("TSUNAMI ZONE DRAWN", { lng, lat, radiusM, radiusKm });
@@ -508,21 +496,16 @@ export default function HomePage() {
         scheme: "xyz",
       });
 
-      const beforeId = getFirstSymbolLayerId();
-
-      map.addLayer(
-        {
-          id: IMPACT_FLOOD_LAYER_ID,
-          type: "raster",
-          source: IMPACT_FLOOD_SOURCE_ID,
-          paint: {
-            "raster-opacity": 0.92,
-            "raster-fade-duration": 0,
-            "raster-resampling": "linear",
-          },
+      map.addLayer({
+        id: IMPACT_FLOOD_LAYER_ID,
+        type: "raster",
+        source: IMPACT_FLOOD_SOURCE_ID,
+        paint: {
+          "raster-opacity": 1,
+          "raster-fade-duration": 0,
+          "raster-resampling": "linear",
         },
-        beforeId
-      );
+      });
 
       impactFloodRunIdRef.current = runId;
 
@@ -1504,7 +1487,7 @@ export default function HomePage() {
         }}
       >
         <h1 style={{ margin: "8px 0 24px 0", fontSize: 22, color: "red" }}>
-          Floodmap V1 v35 LIVE
+          Floodmap V1 v36 LIVE
         </h1>
 
         <div style={{ fontSize: 14, color: "#666", marginBottom: 24 }}>
@@ -1871,7 +1854,7 @@ export default function HomePage() {
         <div style={{ fontWeight: 700, marginBottom: 8 }}>
           Current Scenario
         </div>
-        <div style={{ color: "#facc15", fontWeight: 700 }}>Frontend build: v35</div>
+        <div style={{ color: "#facc15", fontWeight: 700 }}>Frontend build: v36</div>
         <div>Sea level: {formatLevelForDisplay(seaLevel)}</div>
         <div>
           Mode:{" "}
