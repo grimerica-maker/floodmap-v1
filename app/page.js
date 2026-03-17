@@ -25,7 +25,7 @@ const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
 const IMPACT_FLOOD_SOURCE_ID = "impact-flood-source";
 const IMPACT_FLOOD_LAYER_ID = "impact-flood-layer";
-const IMPACT_FLOOD_TILE_VERSION = "38";
+const IMPACT_FLOOD_TILE_VERSION = "39";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -736,9 +736,32 @@ export default function HomePage() {
     }
   };
 
-  const addImpactFloodLayer = (runId) => {
+  const addImpactFloodLayer = (runId, attempt = 0) => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !runId) return false;
+
+    if (!map || !runId) {
+      if (DEBUG_FLOOD) {
+        console.warn("IMPACT FLOOD LAYER SKIPPED", {
+          hasMap: !!map,
+          runId,
+        });
+      }
+      return false;
+    }
+
+    if (!map.isStyleLoaded()) {
+      if (attempt < 10) {
+        window.setTimeout(() => {
+          addImpactFloodLayer(runId, attempt + 1);
+        }, 150);
+      } else if (DEBUG_FLOOD) {
+        console.warn("IMPACT FLOOD LAYER GAVE UP WAITING FOR STYLE", {
+          runId,
+          attempt,
+        });
+      }
+      return false;
+    }
 
     const tileUrl = `${floodEngineUrlRef.current}/impact-flood/${encodeURIComponent(
       runId
@@ -780,11 +803,17 @@ export default function HomePage() {
         console.log("IMPACT FLOOD LAYER ADDED", {
           runId,
           tileUrl,
+          hasSource: !!map.getSource(IMPACT_FLOOD_SOURCE_ID),
+          hasLayer: !!map.getLayer(IMPACT_FLOOD_LAYER_ID),
         });
       }
 
       safely(() => map.triggerRepaint());
-      return true;
+
+      return (
+        !!map.getSource(IMPACT_FLOOD_SOURCE_ID) &&
+        !!map.getLayer(IMPACT_FLOOD_LAYER_ID)
+      );
     } catch (error) {
       console.error("IMPACT FLOOD LAYER ERROR", error, {
         runId,
@@ -1147,6 +1176,37 @@ export default function HomePage() {
       } else {
         removeFloodLayer();
       }
+
+      if (
+        scenarioModeRef.current === "impact" &&
+        impactPointRef.current &&
+        impactResultRef.current
+      ) {
+        setTimeout(() => {
+          drawImpactPoint(
+            impactPointRef.current.lng,
+            impactPointRef.current.lat
+          );
+
+          if (impactResultRef.current.is_ocean_impact === true) {
+            drawOceanImpactFromResult(
+              impactPointRef.current.lng,
+              impactPointRef.current.lat,
+              impactResultRef.current
+            );
+
+            if (impactResultRef.current.run_id) {
+              addImpactFloodLayer(impactResultRef.current.run_id);
+            }
+          } else {
+            drawLandImpactFromResult(
+              impactPointRef.current.lng,
+              impactPointRef.current.lat,
+              impactResultRef.current
+            );
+          }
+        }, 50);
+      }
     };
 
     const handleMapLoad = () => {
@@ -1260,6 +1320,15 @@ export default function HomePage() {
     if (!impactPointRef.current) return;
 
     if (impactResult.is_ocean_impact === true) {
+      drawOceanImpactFromResult(
+        impactPointRef.current.lng,
+        impactPointRef.current.lat,
+        impactResult
+      );
+
+      if (impactResult.run_id) {
+        addImpactFloodLayer(impactResult.run_id);
+      }
       return;
     }
 
@@ -1278,7 +1347,17 @@ export default function HomePage() {
     setImpactResult(null);
     setImpactError("");
     clearImpactPreview();
-  }, [impactDiameter]);
+
+    if (impactPointRef.current && mapRef.current && mapRef.current.isStyleLoaded()) {
+      drawImpactPoint(impactPointRef.current.lng, impactPointRef.current.lat);
+      drawImpactPreview(
+        impactPointRef.current.lng,
+        impactPointRef.current.lat,
+        impactDiameter
+      );
+      setStatus("Impact preview ready");
+    }
+  }, [impactDiameter, scenarioMode]);
 
   useEffect(() => {
     if (!isMapReady()) return;
@@ -1296,7 +1375,9 @@ export default function HomePage() {
             ? "Running impact simulation..."
             : impactResult
             ? impactResult.is_ocean_impact
-              ? "Ocean impact simulation complete"
+              ? impactFloodRunIdRef.current
+                ? "Ocean impact simulation complete"
+                : "Ocean impact result returned, flood layer failed to attach"
               : "Land impact simulation complete"
             : "Impact preview ready"
           : "Click map to place impact point"
@@ -1363,7 +1444,7 @@ export default function HomePage() {
         }}
       >
         <h1 style={{ margin: "8px 0 24px 0", fontSize: 22, color: "red" }}>
-          Floodmap V1 v38 LIVE
+          Floodmap V1 v39 LIVE
         </h1>
 
         <div style={{ fontSize: 14, color: "#666", marginBottom: 24 }}>
@@ -1731,7 +1812,7 @@ export default function HomePage() {
           Current Scenario
         </div>
         <div style={{ color: "#facc15", fontWeight: 700 }}>
-          Frontend build: v38
+          Frontend build: v39
         </div>
         <div>Sea level: {formatLevelForDisplay(seaLevel)}</div>
         <div>
