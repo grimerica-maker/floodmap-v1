@@ -22,12 +22,14 @@ const IMPACT_PREVIEW_SOURCE_ID = "impact-preview-source";
 const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
+
 const IMPACT_TSUNAMI_SOURCE_ID = "impact-tsunami-source";
-const IMPACT_TSUNAMI_LAYER_ID = "impact-tsunami-layer";
+const IMPACT_TSUNAMI_FILL_LAYER_ID = "impact-tsunami-fill-layer";
+const IMPACT_TSUNAMI_LINE_LAYER_ID = "impact-tsunami-line-layer";
 
 const IMPACT_FLOOD_SOURCE_ID = "impact-flood-source";
 const IMPACT_FLOOD_LAYER_ID = "impact-flood-layer";
-const IMPACT_FLOOD_TILE_VERSION = "34";
+const IMPACT_FLOOD_TILE_VERSION = "35";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -228,6 +230,14 @@ export default function HomePage() {
     safely(() => map.touchZoomRotate.disableRotation());
   };
 
+  const getFirstSymbolLayerId = () => {
+    const map = mapRef.current;
+    if (!map) return undefined;
+    const layers = map.getStyle()?.layers || [];
+    const firstSymbol = layers.find((layer) => layer.type === "symbol");
+    return firstSymbol?.id;
+  };
+
   const removeFloodLayer = () => {
     const map = mapRef.current;
     if (!map) {
@@ -250,8 +260,11 @@ export default function HomePage() {
     if (!map) return;
 
     try {
-      if (map.getLayer(IMPACT_TSUNAMI_LAYER_ID)) {
-        map.removeLayer(IMPACT_TSUNAMI_LAYER_ID);
+      if (map.getLayer(IMPACT_TSUNAMI_FILL_LAYER_ID)) {
+        map.removeLayer(IMPACT_TSUNAMI_FILL_LAYER_ID);
+      }
+      if (map.getLayer(IMPACT_TSUNAMI_LINE_LAYER_ID)) {
+        map.removeLayer(IMPACT_TSUNAMI_LINE_LAYER_ID);
       }
       if (map.getSource(IMPACT_TSUNAMI_SOURCE_ID)) {
         map.removeSource(IMPACT_TSUNAMI_SOURCE_ID);
@@ -279,120 +292,7 @@ export default function HomePage() {
     impactFloodRunIdRef.current = null;
   };
 
-  const getFirstSymbolLayerId = () => {
-    const map = mapRef.current;
-    if (!map) return undefined;
-    const layers = map.getStyle()?.layers || [];
-    const firstSymbol = layers.find((layer) => layer.type === "symbol");
-    return firstSymbol?.id;
-  };
-
-  const drawTsunamiRing = (lng, lat, radiusM) => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return false;
-
-    const radiusKm = Math.max(1, Number(radiusM || 0) / 1000);
-    const ringFeature = {
-      ...kmCircle(lng, lat, radiusKm, 160),
-      properties: { kind: "tsunami-ring" },
-    };
-
-    try {
-      removeTsunamiRing();
-
-      map.addSource(IMPACT_TSUNAMI_SOURCE_ID, {
-        type: "geojson",
-        data: {
-          type: "FeatureCollection",
-          features: [ringFeature],
-        },
-      });
-
-      const beforeId = getFirstSymbolLayerId();
-
-      map.addLayer(
-        {
-          id: IMPACT_TSUNAMI_LAYER_ID,
-          type: "line",
-          source: IMPACT_TSUNAMI_SOURCE_ID,
-          paint: {
-            "line-color": "#00ffff",
-            "line-width": 6,
-            "line-opacity": 1,
-          },
-        },
-        beforeId
-      );
-
-      if (DEBUG_FLOOD) {
-        console.log("TSUNAMI RING DRAWN", { lng, lat, radiusM, radiusKm });
-      }
-
-      safely(() => map.triggerRepaint());
-      return true;
-    } catch (error) {
-      console.error("Failed to draw tsunami ring", error);
-      return false;
-    }
-  };
-
-  const addImpactFloodLayer = (runId) => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !runId) return false;
-
-    const cacheBust = Date.now();
-
-    const tileUrl = `${floodEngineUrlRef.current}/impact-flood/${encodeURIComponent(
-      runId
-    )}/{z}/{x}/{y}.png?v=${IMPACT_FLOOD_TILE_VERSION}&rid=${encodeURIComponent(
-      runId
-    )}&t=${cacheBust}`;
-
-    try {
-      removeImpactFloodLayer();
-
-      map.addSource(IMPACT_FLOOD_SOURCE_ID, {
-        type: "raster",
-        tiles: [tileUrl],
-        tileSize: 256,
-        minzoom: 0,
-        maxzoom: 22,
-        scheme: "xyz",
-      });
-
-      const beforeId = getFirstSymbolLayerId();
-
-      map.addLayer(
-        {
-          id: IMPACT_FLOOD_LAYER_ID,
-          type: "raster",
-          source: IMPACT_FLOOD_SOURCE_ID,
-          paint: {
-            "raster-opacity": 0.92,
-            "raster-fade-duration": 0,
-            "raster-resampling": "linear",
-          },
-        },
-        beforeId
-      );
-
-      impactFloodRunIdRef.current = runId;
-
-      if (DEBUG_FLOOD) {
-        console.log("ADDING IMPACT FLOOD LAYER", runId);
-        console.log("TILE URL", tileUrl);
-      }
-
-      safely(() => map.triggerRepaint());
-      return true;
-    } catch (error) {
-      console.error("Failed to add impact flood layer", error);
-      impactFloodRunIdRef.current = null;
-      return false;
-    }
-  };
-
-  const startImpactPulseAnimation = () => {
+  const removeImpactPreviewLayers = () => {
     const map = mapRef.current;
     if (!map) return;
 
@@ -400,67 +300,6 @@ export default function HomePage() {
       cancelAnimationFrame(impactPulseFrameRef.current);
       impactPulseFrameRef.current = null;
     }
-
-    const layerId = `${IMPACT_CRATER_LAYER_ID}-pulse`;
-    const start = performance.now();
-
-    const tick = (now) => {
-      if (!mapRef.current || !mapRef.current.getLayer(layerId)) {
-        impactPulseFrameRef.current = null;
-        return;
-      }
-
-      const t = (now - start) / 1000;
-      const pulse = (Math.sin(t * 2.6) + 1) / 2;
-
-      safely(() => {
-        const layer = mapRef.current.getLayer(layerId);
-        if (!layer) return;
-
-        if (layer.type === "line") {
-          mapRef.current.setPaintProperty(
-            layerId,
-            "line-width",
-            2.5 + pulse * 1.2
-          );
-          mapRef.current.setPaintProperty(
-            layerId,
-            "line-opacity",
-            0.72 + pulse * 0.2
-          );
-        }
-
-        if (layer.type === "circle") {
-          mapRef.current.setPaintProperty(
-            layerId,
-            "circle-radius",
-            20 + pulse * 14
-          );
-          mapRef.current.setPaintProperty(
-            layerId,
-            "circle-stroke-opacity",
-            0.45 + pulse * 0.35
-          );
-        }
-      });
-
-      impactPulseFrameRef.current = requestAnimationFrame(tick);
-    };
-
-    impactPulseFrameRef.current = requestAnimationFrame(tick);
-  };
-
-  const clearImpactPreview = () => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    if (impactPulseFrameRef.current) {
-      cancelAnimationFrame(impactPulseFrameRef.current);
-      impactPulseFrameRef.current = null;
-    }
-
-    removeImpactFloodLayer();
-    removeTsunamiRing();
 
     const extraLayerIds = [
       `${IMPACT_CRATER_LAYER_ID}-pulse`,
@@ -482,8 +321,14 @@ export default function HomePage() {
         map.removeSource(IMPACT_PREVIEW_SOURCE_ID);
       }
     } catch (error) {
-      console.warn("Failed clearing impact preview:", error);
+      console.warn("Failed clearing impact preview layers:", error);
     }
+  };
+
+  const clearImpactPreview = () => {
+    removeImpactFloodLayer();
+    removeTsunamiRing();
+    removeImpactPreviewLayers();
   };
 
   const removeImpactPoint = () => {
@@ -577,6 +422,182 @@ export default function HomePage() {
     };
   };
 
+  const drawTsunamiRing = (lng, lat, radiusM) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return false;
+
+    const radiusKm = Math.max(1, Number(radiusM || 0) / 1000);
+    const feature = {
+      ...kmCircle(lng, lat, radiusKm, 192),
+      properties: { kind: "tsunami-zone" },
+    };
+
+    try {
+      removeTsunamiRing();
+
+      map.addSource(IMPACT_TSUNAMI_SOURCE_ID, {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features: [feature],
+        },
+      });
+
+      const beforeId = getFirstSymbolLayerId();
+
+      map.addLayer(
+        {
+          id: IMPACT_TSUNAMI_FILL_LAYER_ID,
+          type: "fill",
+          source: IMPACT_TSUNAMI_SOURCE_ID,
+          paint: {
+            "fill-color": "#38bdf8",
+            "fill-opacity": 0.16,
+          },
+        },
+        beforeId
+      );
+
+      map.addLayer(
+        {
+          id: IMPACT_TSUNAMI_LINE_LAYER_ID,
+          type: "line",
+          source: IMPACT_TSUNAMI_SOURCE_ID,
+          paint: {
+            "line-color": "#00ffff",
+            "line-width": 4,
+            "line-opacity": 0.95,
+          },
+        },
+        beforeId
+      );
+
+      if (DEBUG_FLOOD) {
+        console.log("TSUNAMI ZONE DRAWN", { lng, lat, radiusM, radiusKm });
+      }
+
+      safely(() => map.triggerRepaint());
+      return true;
+    } catch (error) {
+      console.error("Failed to draw tsunami zone", error);
+      return false;
+    }
+  };
+
+  const addImpactFloodLayer = (runId) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || !runId) return false;
+
+    const cacheBust = Date.now();
+
+    const tileUrl = `${floodEngineUrlRef.current}/impact-flood/${encodeURIComponent(
+      runId
+    )}/{z}/{x}/{y}.png?v=${IMPACT_FLOOD_TILE_VERSION}&rid=${encodeURIComponent(
+      runId
+    )}&t=${cacheBust}`;
+
+    try {
+      removeImpactFloodLayer();
+
+      map.addSource(IMPACT_FLOOD_SOURCE_ID, {
+        type: "raster",
+        tiles: [tileUrl],
+        tileSize: 256,
+        minzoom: 0,
+        maxzoom: 22,
+        scheme: "xyz",
+      });
+
+      const beforeId = getFirstSymbolLayerId();
+
+      map.addLayer(
+        {
+          id: IMPACT_FLOOD_LAYER_ID,
+          type: "raster",
+          source: IMPACT_FLOOD_SOURCE_ID,
+          paint: {
+            "raster-opacity": 0.92,
+            "raster-fade-duration": 0,
+            "raster-resampling": "linear",
+          },
+        },
+        beforeId
+      );
+
+      impactFloodRunIdRef.current = runId;
+
+      if (DEBUG_FLOOD) {
+        console.log("ADDING IMPACT FLOOD LAYER", runId);
+        console.log("IMPACT FLOOD TILE URL", tileUrl);
+      }
+
+      safely(() => map.triggerRepaint());
+      return true;
+    } catch (error) {
+      console.error("Failed to add impact flood layer", error);
+      impactFloodRunIdRef.current = null;
+      return false;
+    }
+  };
+
+  const startImpactPulseAnimation = () => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (impactPulseFrameRef.current) {
+      cancelAnimationFrame(impactPulseFrameRef.current);
+      impactPulseFrameRef.current = null;
+    }
+
+    const layerId = `${IMPACT_CRATER_LAYER_ID}-pulse`;
+    const start = performance.now();
+
+    const tick = (now) => {
+      if (!mapRef.current || !mapRef.current.getLayer(layerId)) {
+        impactPulseFrameRef.current = null;
+        return;
+      }
+
+      const t = (now - start) / 1000;
+      const pulse = (Math.sin(t * 2.6) + 1) / 2;
+
+      safely(() => {
+        const layer = mapRef.current.getLayer(layerId);
+        if (!layer) return;
+
+        if (layer.type === "line") {
+          mapRef.current.setPaintProperty(
+            layerId,
+            "line-width",
+            2.5 + pulse * 1.2
+          );
+          mapRef.current.setPaintProperty(
+            layerId,
+            "line-opacity",
+            0.72 + pulse * 0.2
+          );
+        }
+
+        if (layer.type === "circle") {
+          mapRef.current.setPaintProperty(
+            layerId,
+            "circle-radius",
+            20 + pulse * 14
+          );
+          mapRef.current.setPaintProperty(
+            layerId,
+            "circle-stroke-opacity",
+            0.45 + pulse * 0.35
+          );
+        }
+      });
+
+      impactPulseFrameRef.current = requestAnimationFrame(tick);
+    };
+
+    impactPulseFrameRef.current = requestAnimationFrame(tick);
+  };
+
   const getImpactPreviewRadiiKm = (diameterM) => {
     const d = Math.max(50, Math.min(20000, Number(diameterM) || 1000));
 
@@ -593,6 +614,7 @@ export default function HomePage() {
 
     removeImpactFloodLayer();
     removeTsunamiRing();
+    removeImpactPreviewLayers();
 
     const radii = getImpactPreviewRadiiKm(diameterM);
 
@@ -609,48 +631,44 @@ export default function HomePage() {
     };
 
     try {
-      if (!map.getSource(IMPACT_PREVIEW_SOURCE_ID)) {
-        map.addSource(IMPACT_PREVIEW_SOURCE_ID, {
-          type: "geojson",
-          data,
-        });
+      map.addSource(IMPACT_PREVIEW_SOURCE_ID, {
+        type: "geojson",
+        data,
+      });
 
-        map.addLayer({
-          id: IMPACT_THERMAL_LAYER_ID,
-          type: "fill",
-          source: IMPACT_PREVIEW_SOURCE_ID,
-          filter: ["==", ["get", "kind"], "thermal"],
-          paint: {
-            "fill-color": "#111111",
-            "fill-opacity": 0.22,
-          },
-        });
+      map.addLayer({
+        id: IMPACT_THERMAL_LAYER_ID,
+        type: "fill",
+        source: IMPACT_PREVIEW_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "thermal"],
+        paint: {
+          "fill-color": "#111111",
+          "fill-opacity": 0.22,
+        },
+      });
 
-        map.addLayer({
-          id: IMPACT_BLAST_LAYER_ID,
-          type: "line",
-          source: IMPACT_PREVIEW_SOURCE_ID,
-          filter: ["==", ["get", "kind"], "blast"],
-          paint: {
-            "line-color": "#ef4444",
-            "line-width": 3,
-            "line-opacity": 1,
-          },
-        });
+      map.addLayer({
+        id: IMPACT_BLAST_LAYER_ID,
+        type: "line",
+        source: IMPACT_PREVIEW_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "blast"],
+        paint: {
+          "line-color": "#ef4444",
+          "line-width": 3,
+          "line-opacity": 1,
+        },
+      });
 
-        map.addLayer({
-          id: IMPACT_CRATER_LAYER_ID,
-          type: "fill",
-          source: IMPACT_PREVIEW_SOURCE_ID,
-          filter: ["==", ["get", "kind"], "crater"],
-          paint: {
-            "fill-color": "#000000",
-            "fill-opacity": 0.55,
-          },
-        });
-      } else {
-        map.getSource(IMPACT_PREVIEW_SOURCE_ID).setData(data);
-      }
+      map.addLayer({
+        id: IMPACT_CRATER_LAYER_ID,
+        type: "fill",
+        source: IMPACT_PREVIEW_SOURCE_ID,
+        filter: ["==", ["get", "kind"], "crater"],
+        paint: {
+          "fill-color": "#000000",
+          "fill-opacity": 0.55,
+        },
+      });
 
       safely(() => map.triggerRepaint());
     } catch (error) {
@@ -808,7 +826,7 @@ export default function HomePage() {
     }
 
     try {
-      clearImpactPreview();
+      removeImpactPreviewLayers();
 
       const data = {
         type: "FeatureCollection",
@@ -1080,13 +1098,10 @@ export default function HomePage() {
 
       setImpactResult(data);
 
-      alert(`v34 ocean check: ${data.is_ocean_impact} / ${data.run_id || "no-run-id"}`);
-
       if (
         data.is_ocean_impact === true &&
         Number(data.tsunami_radius_m ?? 0) > 0
       ) {
-        alert(`ocean impact v34 ${data.run_id}`);
         drawOceanImpactFromResult(
           impactPointRef.current.lng,
           impactPointRef.current.lat,
@@ -1096,15 +1111,16 @@ export default function HomePage() {
         if (data.run_id) {
           addImpactFloodLayer(data.run_id);
         }
+
+        setStatus("Ocean impact simulation complete");
       } else {
         drawLandImpactFromResult(
           impactPointRef.current.lng,
           impactPointRef.current.lat,
           data
         );
+        setStatus("Land impact simulation complete");
       }
-
-      setStatus("Impact simulation complete");
     } catch (err) {
       if (impactRunSeqRef.current !== runSeq) return;
 
@@ -1225,11 +1241,10 @@ export default function HomePage() {
           currentImpactResult?.is_ocean_impact === true
         ) {
           setTimeout(() => {
-            drawOceanImpactFromResult(
-              impactPointRef.current?.lng ?? currentImpactResult.lng,
-              impactPointRef.current?.lat ?? currentImpactResult.lat,
-              currentImpactResult
-            );
+            const impactLng = impactPointRef.current?.lng ?? currentImpactResult.lng;
+            const impactLat = impactPointRef.current?.lat ?? currentImpactResult.lat;
+
+            drawOceanImpactFromResult(impactLng, impactLat, currentImpactResult);
             addImpactFloodLayer(currentImpactResult.run_id);
           }, 50);
         }
@@ -1351,11 +1366,10 @@ export default function HomePage() {
       Number(impactResult.tsunami_radius_m ?? 0) > 0 &&
       impactResult.run_id
     ) {
-      drawOceanImpactFromResult(
-        impactPointRef.current?.lng ?? impactResult.lng,
-        impactPointRef.current?.lat ?? impactResult.lat,
-        impactResult
-      );
+      const impactLng = impactPointRef.current?.lng ?? impactResult.lng;
+      const impactLat = impactPointRef.current?.lat ?? impactResult.lat;
+
+      drawOceanImpactFromResult(impactLng, impactLat, impactResult);
       addImpactFloodLayer(impactResult.run_id);
       return;
     }
@@ -1490,7 +1504,7 @@ export default function HomePage() {
         }}
       >
         <h1 style={{ margin: "8px 0 24px 0", fontSize: 22, color: "red" }}>
-          Floodmap V1 v34 LIVE
+          Floodmap V1 v35 LIVE
         </h1>
 
         <div style={{ fontSize: 14, color: "#666", marginBottom: 24 }}>
@@ -1857,7 +1871,7 @@ export default function HomePage() {
         <div style={{ fontWeight: 700, marginBottom: 8 }}>
           Current Scenario
         </div>
-        <div style={{ color: "#facc15", fontWeight: 700 }}>Frontend build: v34</div>
+        <div style={{ color: "#facc15", fontWeight: 700 }}>Frontend build: v35</div>
         <div>Sea level: {formatLevelForDisplay(seaLevel)}</div>
         <div>
           Mode:{" "}
