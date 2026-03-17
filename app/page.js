@@ -7,7 +7,7 @@ mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
 const CONFIGURED_FLOOD_ENGINE_URL = process.env.NEXT_PUBLIC_FLOOD_ENGINE_URL;
 const FLOOD_ENGINE_PROXY_PATH = "/api/engine";
-const DEBUG_FLOOD = false;
+const DEBUG_FLOOD = true;
 
 const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-v9";
@@ -316,13 +316,17 @@ export default function HomePage() {
           type: "line",
           source: IMPACT_TSUNAMI_SOURCE_ID,
           paint: {
-            "line-color": "#38bdf8",
-            "line-width": 3,
-            "line-opacity": 0.8,
+            "line-color": "#00ffff",
+            "line-width": 6,
+            "line-opacity": 1,
           },
         },
         beforeId
       );
+
+      if (DEBUG_FLOOD) {
+        console.log("TSUNAMI RING DRAWN", { lng, lat, radiusM, radiusKm });
+      }
 
       safely(() => map.triggerRepaint());
       return true;
@@ -1076,10 +1080,13 @@ export default function HomePage() {
 
       setImpactResult(data);
 
+      alert(`v34 ocean check: ${data.is_ocean_impact} / ${data.run_id || "no-run-id"}`);
+
       if (
         data.is_ocean_impact === true &&
         Number(data.tsunami_radius_m ?? 0) > 0
       ) {
+        alert(`ocean impact v34 ${data.run_id}`);
         drawOceanImpactFromResult(
           impactPointRef.current.lng,
           impactPointRef.current.lat,
@@ -1482,7 +1489,9 @@ export default function HomePage() {
           pointerEvents: "auto",
         }}
       >
-        <h1 style={{ margin: "8px 0 24px 0", fontSize: 22 }}>Floodmap V1</h1>
+        <h1 style={{ margin: "8px 0 24px 0", fontSize: 22, color: "red" }}>
+          Floodmap V1 v34 LIVE
+        </h1>
 
         <div style={{ fontSize: 14, color: "#666", marginBottom: 24 }}>
           Mapbox flood + impact foundation build
@@ -1848,6 +1857,7 @@ export default function HomePage() {
         <div style={{ fontWeight: 700, marginBottom: 8 }}>
           Current Scenario
         </div>
+        <div style={{ color: "#facc15", fontWeight: 700 }}>Frontend build: v34</div>
         <div>Sea level: {formatLevelForDisplay(seaLevel)}</div>
         <div>
           Mode:{" "}
