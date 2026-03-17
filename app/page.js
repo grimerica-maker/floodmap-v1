@@ -25,7 +25,7 @@ const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
 const IMPACT_FLOOD_SOURCE_ID = "impact-flood-source";
 const IMPACT_FLOOD_LAYER_ID = "impact-flood-layer";
-const IMPACT_FLOOD_TILE_VERSION = "31";
+const IMPACT_FLOOD_TILE_VERSION = "33";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -532,7 +532,10 @@ export default function HomePage() {
       features: [
         { ...kmCircle(lng, lat, radii.crater), properties: { kind: "crater" } },
         { ...kmCircle(lng, lat, radii.blast), properties: { kind: "blast" } },
-        { ...kmCircle(lng, lat, radii.thermal), properties: { kind: "thermal" } },
+        {
+          ...kmCircle(lng, lat, radii.thermal),
+          properties: { kind: "thermal" },
+        },
       ],
     };
 
@@ -603,12 +606,21 @@ export default function HomePage() {
       type: "FeatureCollection",
       features: [
         { ...kmCircle(lng, lat, thermalKm), properties: { kind: "thermal" } },
-        { ...kmCircle(lng, lat, blastFillKm), properties: { kind: "blast-fill" } },
+        {
+          ...kmCircle(lng, lat, blastFillKm),
+          properties: { kind: "blast-fill" },
+        },
         { ...kmCircle(lng, lat, blastKm), properties: { kind: "blast" } },
         { ...kmCircle(lng, lat, ejectaKm), properties: { kind: "ejecta" } },
-        { ...kmCircle(lng, lat, craterRimKm), properties: { kind: "crater-rim" } },
+        {
+          ...kmCircle(lng, lat, craterRimKm),
+          properties: { kind: "crater-rim" },
+        },
         { ...kmCircle(lng, lat, craterKm), properties: { kind: "crater" } },
-        { ...kmCircle(lng, lat, craterInnerKm), properties: { kind: "crater-inner" } },
+        {
+          ...kmCircle(lng, lat, craterInnerKm),
+          properties: { kind: "crater-inner" },
+        },
       ],
     };
 
@@ -967,7 +979,7 @@ export default function HomePage() {
       const { lng, lat } = impactPointRef.current;
 
       const res = await fetch(
-        `${floodEngineUrlRef.current}/impact?lat=${lat}&lng=${lng}&diameter=${impactDiameter}`,
+        `${floodEngineUrlRef.current}/impact?lat=${lat}&lng=${lng}&diameter=${impactDiameter}&_=${Date.now()}`,
         {
           signal: controller.signal,
           cache: "no-store",
@@ -1044,10 +1056,15 @@ export default function HomePage() {
     setInputText("0");
     setSeaLevel(0);
     seaLevelRef.current = 0;
+
     removeFloodLayer();
     removeImpactPoint();
+    removeImpactFloodLayer();
+
     setImpactResult(null);
     setImpactError("");
+
+    setScenarioMode("flood");
     setStatus("Flood cleared");
   };
 
