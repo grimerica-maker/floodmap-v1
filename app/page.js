@@ -969,16 +969,14 @@ export default function HomePage() {
 
         /* ─────────────── MOBILE ≤ 640px ─────────────── */
         @media (max-width: 640px) {
-          /* Desktop sidebar: hide it entirely — mobile uses drawer instead */
+          /* Desktop sidebar: hide — mobile uses drawer instead */
           .fm-desktop-panel { display: none !important; }
-
-          /* Desktop stats: hide */
           .fm-desktop-stats { display: none !important; }
 
           /* Presets: horizontal scroll row on mobile */
           .fm-presets {
-            display: flex;
-            flex-direction: row;
+            display: flex !important;
+            flex-direction: row !important;
             overflow-x: auto;
             gap: 10px;
             padding-bottom: 4px;
@@ -990,18 +988,15 @@ export default function HomePage() {
             flex: 0 0 auto;
             min-width: 110px;
           }
-
-          /* Show mobile elements */
-          .fm-mobile-strip { display: flex !important; }
-          .fm-mobile-drawer { display: flex !important; }
-          .fm-mobile-stats-pill { display: flex !important; }
         }
 
         /* ─────────────── DESKTOP > 640px ─────────────── */
         @media (min-width: 641px) {
+          /* Hide all mobile-only elements on desktop */
           .fm-mobile-strip { display: none !important; }
           .fm-mobile-drawer { display: none !important; }
           .fm-mobile-stats-pill { display: none !important; }
+          .fm-stats-sheet { display: none !important; }
         }
       `}</style>
 
@@ -1055,7 +1050,6 @@ export default function HomePage() {
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => { e.stopPropagation(); setStatsExpanded((v) => !v); }}
         style={{
-          display: "none", // overridden by media query
           position: "absolute", top: 10, left: "50%",
           transform: "translateX(-50%)",
           background: "#1e3a5f", color: "white",
@@ -1103,14 +1097,13 @@ export default function HomePage() {
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         style={{
-          display: "none", // overridden to flex by media query
           flexDirection: "column",
           position: "absolute", bottom: 0, left: 0, right: 0,
           height: "76vh",
           background: "rgba(249,250,251,0.98)",
           borderTop: "1px solid #d1d5db",
           borderRadius: "18px 18px 0 0",
-          zIndex: 1000,
+          zIndex: 1002,
           transform: drawerOpen ? "translateY(0)" : "translateY(100%)",
           boxShadow: "0 -4px 24px rgba(0,0,0,0.18)",
           pointerEvents: "auto",
@@ -1138,22 +1131,21 @@ export default function HomePage() {
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         style={{
-          display: "none", // overridden to flex by media query
           position: "absolute", bottom: 0, left: 0, right: 0,
           height: 72,
           background: "rgba(249,250,251,0.97)",
           borderTop: "1px solid #e5e7eb",
-          borderRadius: drawerOpen ? 0 : "14px 14px 0 0",
+          borderRadius: "14px 14px 0 0",
           zIndex: 1001,
           alignItems: "center",
           padding: "0 12px",
           gap: 10,
           boxShadow: "0 -2px 12px rgba(0,0,0,0.1)",
-          pointerEvents: "auto",
           fontFamily: "Arial, sans-serif",
-          // Strip stays visible above the drawer when open (same z-index, drawer slides above it)
+          // When drawer open: slide strip away AND kill pointer events so drawer isn't blocked
           transform: drawerOpen ? "translateY(100%)" : "translateY(0)",
           transition: "transform 0.32s cubic-bezier(0.4,0,0.2,1)",
+          pointerEvents: drawerOpen ? "none" : "auto",
         }}
       >
         {/* Left: current level + mode pill */}
