@@ -1,52 +1,105 @@
-import { NextResponse } from "next/server";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const ENGINE_BASE =
-  process.env.FLOOD_ENGINE_URL ||
-  process.env.NEXT_PUBLIC_FLOOD_ENGINE_URL ||
-  "http://137.184.86.1:8000";
+  process.env.NEXT_PUBLIC_FLOOD_ENGINE_URL || "http://137.184.86.1:8000";
 
-async function handler(request, { params }) {
-  const path = Array.isArray(params?.path) ? params.path.join("/") : "";
-  const search = request.nextUrl.search || "";
-  const base = ENGINE_BASE.replace(/\/+$/, "");
-  const url = `${base}/${path}${search}`;
+function buildTargetUrl(pathSegments = [], requestUrl) {
+  const incomingUrl = new URL(requestUrl);
+  const cleanBase = ENGINE_BASE.replace(/\/+$/, "");
+  const joinedPath = pathSegments.length ? `/${pathSegments.join("/")}` : "";
+  const target = new URL(`${cleanBase}${joinedPath}`);
 
+  incomingUrl.searchParams.forEach((value, key) => {
+    target.searchParams.set(key, value);
+  });
+
+  return target;
+}
+
+async function proxyRequest(request, context) {
   try {
-    const upstream = await fetch(url, {
-      method: request.method,
-      headers: {
-        Accept: request.headers.get("accept") || "*/*",
-      },
+    const pathSegments = context?.params?.path || [];
+    const targetUrl = buildTargetUrl(pathSegments, request.url);
+
+    const method = request.method.toUpperCase();
+    const headers = new Headers(request.headers);
+
+    headers.delete("host");
+    headers.delete("connection");
+    headers.delete("content-length");
+
+    const init = {
+      method,
+      headers,
+      redirect: "follow",
       cache: "no-store",
-    });
+    };
 
-    const contentType =
-      upstream.headers.get("content-type") || "application/octet-stream";
-    const body = await upstream.arrayBuffer();
+    if (method !== "GET" && method !== "HEAD") {
+      init.body = await request.arrayBuffer();
+    }
 
-    return new NextResponse(body, {
+    const upstream = await fetch(targetUrl.toString(), init);
+
+    const responseHeaders = new Headers(upstream.headers);
+    responseHeaders.set("access-control-allow-origin", "*");
+    responseHeaders.set("access-control-allow-methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    responseHeaders.set("access-control-allow-headers", "*");
+    responseHeaders.set("cache-control", "no-store");
+
+    return new Response(upstream.body, {
       status: upstream.status,
-      headers: {
-        "Content-Type": contentType,
-        "Cache-Control": contentType.startsWith("image/")
-          ? "public, max-age=3600"
-          : "no-store",
-        "Access-Control-Allow-Origin": "*",
-      },
+      statusText: upstream.statusText,
+      headers: responseHeaders,
     });
   } catch (error) {
-    return NextResponse.json(
+    return new Response(
+      JSON.stringify({
+        error: "Engine proxy failed",
+        detail: error instanceof Error ? error.message : String(error),
+        engineBase: ENGINE_BASE,
+      }),
       {
-        error: "Proxy request failed",
-        engine_base: base,
-        path,
-        detail: String(error),
-      },
-      { status: 502 }
+        status: 502,
+        headers: {
+          "content-type": "application/json",
+          "access-control-allow-origin": "*",
+          "cache-control": "no-store",
+        },
+      }
     );
   }
 }
 
 export async function GET(request, context) {
-  return handler(request, context);
+  return proxyRequest(request, context);
+}
+
+export async function POST(request, context) {
+  return proxyRequest(request, context);
+}
+
+export async function PUT(request, context) {
+  return proxyRequest(request, context);
+}
+
+export async function PATCH(request, context) {
+  return proxyRequest(request, context);
+}
+
+export async function DELETE(request, context) {
+  return proxyRequest(request, context);
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+      "access-control-allow-headers": "*",
+      "cache-control": "no-store",
+    },
+  });
 }
