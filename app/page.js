@@ -23,7 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v58";
+const FRONTEND_BUILD_LABEL = "v59";
 
 const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
@@ -586,7 +586,8 @@ export default function HomePage() {
       const data = await res.json();
       setNukeResult(data);
       drawNukeResult(lng, lat, data);
-      setStatus(`${data.severity_class} — ${data.yield_kt >= 1000 ? (data.yield_kt/1000).toFixed(1)+"Mt" : data.yield_kt+"kt"} detonated`);
+      const nukeLabel = data.severity_class === "Extinction scale" ? "Civilization ending" : data.severity_class;
+      setStatus(`${nukeLabel} — ${data.yield_kt >= 1000 ? (data.yield_kt/1000).toFixed(1)+"Mt" : data.yield_kt+"kt"} detonated`);
     } catch (err) {
       setNukeError("Detonation failed");
       setStatus("Detonation failed");
@@ -598,7 +599,11 @@ export default function HomePage() {
   const drawNukeResult = (lng, lat, data) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    clearImpactPreview();
+    const nukeLayers = ["nuke-emp","nuke-emp-line","nuke-thermal","nuke-blast-light",
+      "nuke-blast-moderate","nuke-blast-heavy","nuke-fireball","nuke-radiation",
+      "nuke-fallout","nuke-fallout-line"];
+    nukeLayers.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e) {} });
+    try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e) {}
 
     const features = [];
 
@@ -863,7 +868,7 @@ export default function HomePage() {
     }
     if (scenarioMode === "nuke") {
       setStatus(nukePointSet
-        ? nukeLoading ? "Detonating..." : nukeResult ? `${nukeResult.severity_class} — ${nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"}` : "Nuke point placed — detonate"
+        ? nukeLoading ? "Detonating..." : nukeResult ? `${nukeResult.severity_class === "Extinction scale" ? "Civilization ending" : nukeResult.severity_class} — ${nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"}` : "Nuke point placed — detonate"
         : "Click map to place detonation point"
       );
       return;
@@ -1151,7 +1156,7 @@ export default function HomePage() {
           <div style={{ fontWeight: 700, marginBottom: 4 }}>☢️ Detonation Results</div>
           <div>Yield: {nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(2)+" Mt" : nukeResult.yield_kt+" kt"}</div>
           <div>Type: {nukeResult.burst_type}</div>
-          <div>Severity: {nukeResult.severity_class}</div>
+          <div>Severity: {nukeResult.severity_class === "Extinction scale" ? "Civilization ending" : nukeResult.severity_class}</div>
           <hr style={{ margin: "8px 0", opacity: 0.2 }} />
           <div style={{ color: "#fca5a5" }}>Fireball: {Math.round(nukeResult.fireball_r_m).toLocaleString()} m</div>
           <div style={{ color: "#fca5a5" }}>Heavy blast: {(Math.round(nukeResult.blast_heavy_r_m)/1000).toFixed(1)} km</div>
