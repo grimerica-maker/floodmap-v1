@@ -23,14 +23,13 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v51";
+const FRONTEND_BUILD_LABEL = "v53";
 
 const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
   { label: "Modern", value: 0 },
-  { label: "Holocene", value: 6 },
   { label: "All Ice Melted", value: 70 },
   { label: "Biblical Flood", value: 3048 },
   { label: "Fully Drained", value: -11000 },
@@ -77,6 +76,15 @@ export default function HomePage() {
   // Mobile-only UI state — purely cosmetic, zero effect on map/engine logic
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [statsExpanded, setStatsExpanded] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile on mount and on resize — drives display switching without CSS conflicts
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => { seaLevelRef.current = seaLevel; }, [seaLevel]);
   useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
@@ -795,8 +803,7 @@ export default function HomePage() {
 
       {/* ── PRESETS ── */}
       <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, letterSpacing: "0.05em" }}>PRESETS</div>
-      {/* Mobile: horizontal scroll row. Desktop: 2-col grid. Handled via CSS class. */}
-      <div className="fm-presets" style={{ marginBottom: 24 }}>
+      <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"}>
         {PRESETS.map((preset) => {
           const active = Math.round(inputLevel) === Math.round(preset.value);
           const lbl = unitMode === "ft"
@@ -967,36 +974,24 @@ export default function HomePage() {
           transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
         }
 
-        /* ─────────────── MOBILE ≤ 640px ─────────────── */
-        @media (max-width: 640px) {
-          /* Desktop sidebar: hide — mobile uses drawer instead */
-          .fm-desktop-panel { display: none !important; }
-          .fm-desktop-stats { display: none !important; }
-
-          /* Presets: horizontal scroll row on mobile */
-          .fm-presets {
-            display: flex !important;
-            flex-direction: row !important;
-            overflow-x: auto;
-            gap: 10px;
-            padding-bottom: 4px;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-          }
-          .fm-presets::-webkit-scrollbar { display: none; }
-          .fm-presets > button {
-            flex: 0 0 auto;
-            min-width: 110px;
-          }
+        /* Presets: horizontal scroll on mobile, 2-col grid on desktop — driven by isMobile inline styles */
+        .fm-presets-mobile {
+          display: flex;
+          flex-direction: row;
+          overflow-x: auto;
+          gap: 10px;
+          padding-bottom: 4px;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
+          margin-bottom: 24px;
         }
-
-        /* ─────────────── DESKTOP > 640px ─────────────── */
-        @media (min-width: 641px) {
-          /* Hide all mobile-only elements on desktop */
-          .fm-mobile-strip { display: none !important; }
-          .fm-mobile-drawer { display: none !important; }
-          .fm-mobile-stats-pill { display: none !important; }
-          .fm-stats-sheet { display: none !important; }
+        .fm-presets-mobile::-webkit-scrollbar { display: none; }
+        .fm-presets-mobile > button { flex: 0 0 auto; min-width: 110px; }
+        .fm-presets-desktop {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          margin-bottom: 24px;
         }
       `}</style>
 
@@ -1012,6 +1007,7 @@ export default function HomePage() {
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         style={{
+          display: isMobile ? "none" : "block",
           position: "absolute", top: 0, left: 0,
           width: 340, height: "100%",
           background: "rgba(249,250,251,0.97)",
@@ -1032,6 +1028,7 @@ export default function HomePage() {
       <div
         className="fm-desktop-stats"
         style={{
+          display: isMobile ? "none" : "block",
           position: "absolute", right: 20, top: 10,
           background: "#1e3a5f", color: "white",
           padding: 16, borderRadius: 12,
@@ -1050,16 +1047,18 @@ export default function HomePage() {
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => { e.stopPropagation(); setStatsExpanded((v) => !v); }}
         style={{
+          display: isMobile ? "flex" : "none",
           position: "absolute", top: 10, left: "50%",
           transform: "translateX(-50%)",
           background: "#1e3a5f", color: "white",
           borderRadius: 20, padding: "7px 16px",
           fontSize: 13, fontWeight: 700,
-          zIndex: 1100, cursor: "pointer",
+          zIndex: drawerOpen ? 999 : 1100, cursor: "pointer",
           alignItems: "center", gap: 8,
           boxShadow: "0 2px 12px rgba(0,0,0,0.35)",
           whiteSpace: "nowrap",
           userSelect: "none",
+          pointerEvents: drawerOpen ? "none" : "auto",
         }}
       >
         <span style={{ color: "#facc15" }}>{FRONTEND_BUILD_LABEL}</span>
@@ -1076,7 +1075,7 @@ export default function HomePage() {
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         style={{
-          display: statsExpanded ? undefined : "none",
+          display: (isMobile && statsExpanded) ? "block" : "none",
           position: "absolute", top: 48, left: 10, right: 10,
           background: "#1e3a5f", color: "white",
           padding: "14px 16px", borderRadius: 14,
@@ -1097,6 +1096,7 @@ export default function HomePage() {
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         style={{
+          display: isMobile ? "flex" : "none",
           flexDirection: "column",
           position: "absolute", bottom: 0, left: 0, right: 0,
           height: "76vh",
@@ -1106,7 +1106,7 @@ export default function HomePage() {
           zIndex: 1002,
           transform: drawerOpen ? "translateY(0)" : "translateY(100%)",
           boxShadow: "0 -4px 24px rgba(0,0,0,0.18)",
-          pointerEvents: "auto",
+          pointerEvents: drawerOpen ? "auto" : "none",
         }}
       >
         {/* Drawer handle bar */}
@@ -1131,6 +1131,7 @@ export default function HomePage() {
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         style={{
+          display: isMobile ? "flex" : "none",
           position: "absolute", bottom: 0, left: 0, right: 0,
           height: 72,
           background: "rgba(249,250,251,0.97)",
