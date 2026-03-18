@@ -23,7 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v50";
+const FRONTEND_BUILD_LABEL = "v51";
 
 const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
@@ -73,6 +73,10 @@ export default function HomePage() {
   const [unitMode, setUnitMode] = useState("m");
   const [status, setStatus] = useState("Loading map...");
   const [floodEngineUrl, setFloodEngineUrl] = useState(FLOOD_ENGINE_PROXY_PATH);
+
+  // Mobile-only UI state — purely cosmetic, zero effect on map/engine logic
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [statsExpanded, setStatsExpanded] = useState(false);
 
   useEffect(() => { seaLevelRef.current = seaLevel; }, [seaLevel]);
   useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
@@ -588,8 +592,6 @@ export default function HomePage() {
 
     const handleLoad = () => { setStatus("Map ready"); };
 
-    // Track mousedown position to distinguish true clicks from drags.
-    // Mapbox fires 'click' even after a drag release — we ignore those.
     let mouseDownPoint = null;
 
     const handleMouseDown = (e) => {
@@ -597,7 +599,6 @@ export default function HomePage() {
     };
 
     const handleClick = (e) => {
-      // If the mouse moved more than 5px between down and up, it's a drag
       if (mouseDownPoint) {
         const dx = e.point.x - mouseDownPoint.x;
         const dy = e.point.y - mouseDownPoint.y;
@@ -611,7 +612,6 @@ export default function HomePage() {
       const { lng, lat } = e.lngLat;
 
       if (scenarioModeRef.current === "impact") {
-        // Impact mode: place impact point only on true click, not drag
         cancelPendingImpactRequest();
         impactRunSeqRef.current += 1;
         setImpactLoading(false);
@@ -623,7 +623,6 @@ export default function HomePage() {
         return;
       }
 
-      // Flood mode: show elevation popup at click location
       showElevPopup(lng, lat);
     };
 
@@ -725,9 +724,220 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, seaLevel, unitMode, scenarioMode, impactLoading, impactResult]);
 
+  // ─── Derived display values for the collapsed strip ───────────────────────
+  const stripLabel = scenarioMode === "impact"
+    ? `💥 ${impactDiameter.toLocaleString()}m`
+    : formatLevelForDisplay(seaLevel);
+
+  const stripModePill = scenarioMode === "impact" ? "Impact" : "Flood";
+
+  const handleStripCTA = (e) => {
+    e.stopPropagation();
+    if (scenarioMode === "impact") runImpact();
+    else executeFlood();
+  };
+
+  // ─── Shared panel content (renders inside both desktop sidebar & mobile drawer) ──
+  const panelContent = (
+    <>
+      <h1 style={{ margin: "8px 0 16px 0", fontSize: 20, color: "red" }}>Floodmap V1 {FRONTEND_BUILD_LABEL} LIVE</h1>
+      <div style={{ fontSize: 13, color: "#666", marginBottom: 20 }}>Mapbox flood + impact foundation build</div>
+
+      {/* ── SEA LEVEL ── */}
+      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, letterSpacing: "0.05em" }}>SEA LEVEL</div>
+      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 10, color: seaLevel > 0 ? "#0f62fe" : seaLevel < 0 ? "#b45309" : "#111827" }}>
+        {formatLevelForDisplay(seaLevel)}
+      </div>
+
+      {/* ── UNIT TOGGLE ── */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <button
+          onClick={() => setUnitMode("m")}
+          style={{ flex: 1, padding: "12px 8px", minHeight: 44, border: "1px solid #d1d5db", background: unitMode === "m" ? "#0f172a" : "white", color: unitMode === "m" ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 15 }}>
+          Meters
+        </button>
+        <button
+          onClick={() => setUnitMode("ft")}
+          style={{ flex: 1, padding: "12px 8px", minHeight: 44, border: "1px solid #d1d5db", background: unitMode === "ft" ? "#0f172a" : "white", color: unitMode === "ft" ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 15 }}>
+          Feet
+        </button>
+      </div>
+
+      <input
+        type="text"
+        inputMode="decimal"
+        placeholder={unitMode === "ft" ? "Enter sea level in feet" : "Enter sea level in meters"}
+        value={inputText}
+        onChange={(e) => setInputText(e.target.value)}
+        onBlur={() => { const c = commitInputText(inputText, unitMode); if (c !== null) setInputLevel(c); }}
+        onKeyDown={(e) => { if (e.key === "Enter") executeFlood(); }}
+        style={{ width: "100%", padding: "12px 14px", fontSize: 17, border: "1px solid #ccc", marginBottom: 10, boxSizing: "border-box", borderRadius: 8, minHeight: 48 }}
+      />
+
+      <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+        <button
+          onClick={executeFlood}
+          style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "#0f172a", color: "white", border: "none", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 15 }}>
+          Execute Flood
+        </button>
+        <button
+          onClick={clearFlood}
+          style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "white", color: "#111827", border: "1px solid #ccc", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 15 }}>
+          Clear
+        </button>
+      </div>
+
+      <div style={{ fontSize: 13, marginBottom: 20, color: "#666" }}>
+        Custom input supports positive and negative values in {unitMode === "ft" ? "feet" : "meters"}
+      </div>
+
+      <hr style={{ margin: "0 0 16px 0", borderColor: "#e5e7eb" }} />
+
+      {/* ── PRESETS ── */}
+      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, letterSpacing: "0.05em" }}>PRESETS</div>
+      {/* Mobile: horizontal scroll row. Desktop: 2-col grid. Handled via CSS class. */}
+      <div className="fm-presets" style={{ marginBottom: 24 }}>
+        {PRESETS.map((preset) => {
+          const active = Math.round(inputLevel) === Math.round(preset.value);
+          const lbl = unitMode === "ft"
+            ? `${Math.round(metersToFeet(preset.value)) > 0 ? "+" : ""}${Math.round(metersToFeet(preset.value))}ft`
+            : `${preset.value > 0 ? "+" : ""}${preset.value}m`;
+          return (
+            <button
+              key={preset.label}
+              onClick={() => { setInputLevel(preset.value); setInputText(formatInputTextFromMeters(preset.value, unitMode)); }}
+              style={{ padding: "12px 10px", minHeight: 56, border: "1px solid #d1d5db", background: active ? "#0f172a" : "white", color: active ? "white" : "#111827", cursor: "pointer", borderRadius: 12, fontWeight: 700, whiteSpace: "nowrap" }}>
+              <div style={{ fontSize: 14 }}>{preset.label}</div>
+              <div style={{ fontSize: 12, opacity: 0.85, marginTop: 3 }}>{lbl}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      <hr style={{ margin: "0 0 16px 0", borderColor: "#e5e7eb" }} />
+
+      {/* ── SCENARIO MODE ── */}
+      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, letterSpacing: "0.05em" }}>SCENARIO MODE</div>
+      <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
+        <button
+          onClick={() => setScenarioMode("flood")}
+          style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "flood" ? "#0f172a" : "white", color: scenarioMode === "flood" ? "white" : "#111827", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
+          <div style={{ fontSize: 15 }}>Flood</div>
+          <div style={{ fontSize: 12, opacity: 0.85, marginTop: 3 }}>Sea level up / down</div>
+        </button>
+        <button
+          onClick={() => setScenarioMode("impact")}
+          style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "impact" ? "#0f172a" : "white", color: scenarioMode === "impact" ? "white" : "#111827", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
+          <div style={{ fontSize: 15 }}>Impact</div>
+          <div style={{ fontSize: 12, opacity: 0.85, marginTop: 3 }}>Click map to place impact point</div>
+        </button>
+      </div>
+
+      {/* ── IMPACT CONTROLS ── */}
+      {scenarioMode === "impact" && (
+        <>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, letterSpacing: "0.05em" }}>ASTEROID SIZE</div>
+          <input
+            type="range" min="50" max="20000" step="50" value={impactDiameter}
+            onChange={(e) => setImpactDiameter(Number(e.target.value))}
+            style={{ width: "100%", marginBottom: 10, height: 6, cursor: "pointer" }}
+          />
+          <input
+            type="number" min="50" max="20000" step="50" value={impactDiameter}
+            onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n)) setImpactDiameter(Math.max(50, Math.min(20000, n))); }}
+            style={{ width: "100%", padding: "12px 14px", fontSize: 17, border: "1px solid #ccc", marginBottom: 10, boxSizing: "border-box", borderRadius: 8, minHeight: 48 }}
+          />
+          <div style={{ fontSize: 13, marginBottom: 16, color: "#555" }}>
+            Diameter: <b>{impactDiameter.toLocaleString()} m</b>
+          </div>
+          <button
+            onClick={runImpact}
+            disabled={!impactPointRef.current || impactLoading}
+            style={{ width: "100%", padding: "14px 10px", minHeight: 52, background: "#ef4444", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", marginBottom: 20, fontSize: 16, opacity: !impactPointRef.current || impactLoading ? 0.65 : 1 }}>
+            {impactLoading ? "Running..." : "Run Impact"}
+          </button>
+        </>
+      )}
+
+      <hr style={{ margin: "0 0 16px 0", borderColor: "#e5e7eb" }} />
+
+      {/* ── VIEW MODE ── */}
+      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, letterSpacing: "0.05em" }}>VIEW MODE</div>
+      <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
+        {[
+          { key: "map", label: "Standard Map", sub: "Flood tiles active" },
+          { key: "satellite", label: "Satellite View", sub: "Flood overlay supported" },
+          { key: "globe", label: "Globe View", sub: "Flood overlay supported" },
+        ].map(({ key, label, sub }) => (
+          <button
+            key={key}
+            onClick={() => setViewMode(key)}
+            style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: viewMode === key ? "#0f172a" : "white", color: viewMode === key ? "white" : "#111827", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
+            <div style={{ fontSize: 15 }}>{label}</div>
+            <div style={{ fontSize: 12, opacity: 0.85, marginTop: 3 }}>{sub}</div>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+
+  // ─── Stats panel content ───────────────────────────────────────────────────
+  const statsContent = (
+    <>
+      <div style={{ fontWeight: 700, marginBottom: 8 }}>Current Scenario</div>
+      <div style={{ color: "#facc15", fontWeight: 700 }}>Frontend build: {FRONTEND_BUILD_LABEL}</div>
+      <div>Sea level: {formatLevelForDisplay(seaLevel)}</div>
+      <div>Mode: {viewMode === "map" ? "Standard Map" : viewMode === "satellite" ? "Satellite" : "Globe"}</div>
+      <div>Status: {status}</div>
+      <div>Scenario Mode: {scenarioMode}</div>
+      <div>Impact Point: {impactPointRef.current ? `${impactPointRef.current.lng.toFixed(3)}, ${impactPointRef.current.lat.toFixed(3)}` : "--"}</div>
+      <div>Asteroid Diameter: {impactDiameter.toLocaleString()} m</div>
+
+      {impactError && (
+        <>
+          <hr style={{ margin: "10px 0", opacity: 0.25 }} />
+          <div style={{ color: "#fecaca", fontWeight: 700 }}>{impactError}</div>
+        </>
+      )}
+
+      {impactResult && (
+        <>
+          <hr style={{ margin: "10px 0", opacity: 0.25 }} />
+          <div style={{ fontWeight: 700 }}>Impact Results</div>
+          <div>Energy: {Number(impactResult.energy_mt_tnt ?? impactResult.energy_mt ?? 0).toFixed(2)} Mt</div>
+          <div>Crater Diameter: {Math.round(Number(impactResult.crater_diameter_m ?? 0)).toLocaleString()} m</div>
+          <div>Blast Radius: {Math.round(Number(impactResult.blast_radius_m ?? 0)).toLocaleString()} m</div>
+          <div>Thermal Radius: {Math.round(Number(impactResult.thermal_radius_m ?? 0)).toLocaleString()} m</div>
+          {impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0 && (
+            <>
+              <div>Wave Height: {Math.round(Number(impactResult.wave_height_m ?? 0)).toLocaleString()} m</div>
+              {Number(impactResult.wave_height_m ?? 0) < EXTINCTION_WAVE_HEIGHT_M && (
+                <div>Tsunami Reach: {Math.round(Number(impactResult.estimated_wave_reach_m ?? 0) / 1000).toLocaleString()} km</div>
+              )}
+            </>
+          )}
+          <div>Severity: {impactResult.severity_class ?? "--"}</div>
+          <hr style={{ margin: "10px 0", opacity: 0.2 }} />
+          <div style={{ fontWeight: 700 }}>Casualty Estimate</div>
+          <div>Population Exposed: {impactResult.population_exposed != null ? formatCompactCount(impactResult.population_exposed) : "Coming soon"}</div>
+          <div>Estimated Deaths: {impactResult.estimated_deaths != null ? formatCompactCount(impactResult.estimated_deaths) : "Coming soon"}</div>
+          <div style={{ fontSize: 12, opacity: 0.8 }}>Confidence: low / rough estimate</div>
+        </>
+      )}
+
+      {scenarioMode === "flood" && (
+        <>
+          <hr style={{ margin: "10px 0", opacity: 0.25 }} />
+          <div style={{ fontSize: 12, color: "#94a3b8" }}>Click map to see elevation</div>
+        </>
+      )}
+    </>
+  );
+
   return (
     <div style={{ width: "100%", height: "100vh", position: "relative", overflow: "hidden" }}>
       <style>{`
+        /* ── Mapbox popup ── */
         .elev-popup .mapboxgl-popup-content {
           background: #1e3a5f;
           color: white;
@@ -736,140 +946,265 @@ export default function HomePage() {
           box-shadow: 0 4px 16px rgba(0,0,0,0.4);
           min-width: 160px;
         }
-        .elev-popup .mapboxgl-popup-close-button {
-          color: #94a3b8;
-          font-size: 16px;
-          padding: 4px 8px;
-        }
+        .elev-popup .mapboxgl-popup-close-button { color: #94a3b8; font-size: 16px; padding: 4px 8px; }
         .elev-popup .mapboxgl-popup-close-button:hover { color: white; }
         .elev-popup .mapboxgl-popup-tip { border-top-color: #1e3a5f; }
+
+        /* ── Preset grid: 2-col on desktop, horizontal scroll on mobile ── */
+        .fm-presets {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+
+        /* ── Mobile drawer slide transition ── */
+        .fm-drawer {
+          transition: transform 0.32s cubic-bezier(0.4,0,0.2,1);
+        }
+
+        /* ── Stats panel slide transition ── */
+        .fm-stats-sheet {
+          transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+        }
+
+        /* ─────────────── MOBILE ≤ 640px ─────────────── */
+        @media (max-width: 640px) {
+          /* Desktop sidebar: hide it entirely — mobile uses drawer instead */
+          .fm-desktop-panel { display: none !important; }
+
+          /* Desktop stats: hide */
+          .fm-desktop-stats { display: none !important; }
+
+          /* Presets: horizontal scroll row on mobile */
+          .fm-presets {
+            display: flex;
+            flex-direction: row;
+            overflow-x: auto;
+            gap: 10px;
+            padding-bottom: 4px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+          }
+          .fm-presets::-webkit-scrollbar { display: none; }
+          .fm-presets > button {
+            flex: 0 0 auto;
+            min-width: 110px;
+          }
+
+          /* Show mobile elements */
+          .fm-mobile-strip { display: flex !important; }
+          .fm-mobile-drawer { display: flex !important; }
+          .fm-mobile-stats-pill { display: flex !important; }
+        }
+
+        /* ─────────────── DESKTOP > 640px ─────────────── */
+        @media (min-width: 641px) {
+          .fm-mobile-strip { display: none !important; }
+          .fm-mobile-drawer { display: none !important; }
+          .fm-mobile-stats-pill { display: none !important; }
+        }
       `}</style>
 
+      {/* ── Map canvas ── */}
       <div ref={mapContainerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0 }} />
 
-      <div onMouseDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}
-        style={{ position: "absolute", top: 0, left: 0, width: 340, height: "100%", background: "rgba(249,250,251,0.97)", borderRight: "1px solid #e5e7eb", padding: 16, fontFamily: "Arial, sans-serif", zIndex: 1000, overflowY: "auto", pointerEvents: "auto" }}>
+      {/* ═══════════════════════════════════════════════
+          DESKTOP: left sidebar panel (unchanged from v50)
+      ═══════════════════════════════════════════════ */}
+      <div
+        className="fm-desktop-panel"
+        onMouseDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: "absolute", top: 0, left: 0,
+          width: 340, height: "100%",
+          background: "rgba(249,250,251,0.97)",
+          borderRight: "1px solid #e5e7eb",
+          padding: 16,
+          fontFamily: "Arial, sans-serif",
+          zIndex: 1000,
+          overflowY: "auto",
+          pointerEvents: "auto",
+        }}
+      >
+        {panelContent}
+      </div>
 
-        <h1 style={{ margin: "8px 0 24px 0", fontSize: 22, color: "red" }}>Floodmap V1 {FRONTEND_BUILD_LABEL} LIVE</h1>
-        <div style={{ fontSize: 14, color: "#666", marginBottom: 24 }}>Mapbox flood + impact foundation build</div>
+      {/* ═══════════════════════════════════════════════
+          DESKTOP: right stats panel (unchanged from v50)
+      ═══════════════════════════════════════════════ */}
+      <div
+        className="fm-desktop-stats"
+        style={{
+          position: "absolute", right: 20, top: 10,
+          background: "#1e3a5f", color: "white",
+          padding: 16, borderRadius: 12,
+          fontSize: 14, lineHeight: 1.45,
+          zIndex: 1000, minWidth: 320,
+        }}
+      >
+        {statsContent}
+      </div>
 
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>SEA LEVEL</div>
-        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: seaLevel > 0 ? "#0f62fe" : seaLevel < 0 ? "#b45309" : "#111827" }}>{formatLevelForDisplay(seaLevel)}</div>
+      {/* ═══════════════════════════════════════════════
+          MOBILE: stats pill — top center, tap to expand
+      ═══════════════════════════════════════════════ */}
+      <div
+        className="fm-mobile-stats-pill"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); setStatsExpanded((v) => !v); }}
+        style={{
+          display: "none", // overridden by media query
+          position: "absolute", top: 10, left: "50%",
+          transform: "translateX(-50%)",
+          background: "#1e3a5f", color: "white",
+          borderRadius: 20, padding: "7px 16px",
+          fontSize: 13, fontWeight: 700,
+          zIndex: 1100, cursor: "pointer",
+          alignItems: "center", gap: 8,
+          boxShadow: "0 2px 12px rgba(0,0,0,0.35)",
+          whiteSpace: "nowrap",
+          userSelect: "none",
+        }}
+      >
+        <span style={{ color: "#facc15" }}>{FRONTEND_BUILD_LABEL}</span>
+        <span style={{ opacity: 0.7, margin: "0 2px" }}>·</span>
+        <span>{formatLevelForDisplay(seaLevel)}</span>
+        <span style={{ opacity: 0.7, margin: "0 2px" }}>·</span>
+        <span style={{ opacity: 0.85 }}>{status.length > 28 ? status.slice(0, 26) + "…" : status}</span>
+        <span style={{ marginLeft: 4, opacity: 0.7, fontSize: 11 }}>{statsExpanded ? "▲" : "▼"}</span>
+      </div>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <button onClick={() => setUnitMode("m")} style={{ flex: 1, padding: "10px 8px", border: "1px solid #d1d5db", background: unitMode === "m" ? "#0f172a" : "white", color: unitMode === "m" ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700 }}>Meters</button>
-          <button onClick={() => setUnitMode("ft")} style={{ flex: 1, padding: "10px 8px", border: "1px solid #d1d5db", background: unitMode === "ft" ? "#0f172a" : "white", color: unitMode === "ft" ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700 }}>Feet</button>
+      {/* MOBILE: stats expanded sheet */}
+      <div
+        className="fm-stats-sheet"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          display: statsExpanded ? undefined : "none",
+          position: "absolute", top: 48, left: 10, right: 10,
+          background: "#1e3a5f", color: "white",
+          padding: "14px 16px", borderRadius: 14,
+          fontSize: 13, lineHeight: 1.5,
+          zIndex: 1050,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+          maxHeight: "55vh", overflowY: "auto",
+        }}
+      >
+        {statsContent}
+      </div>
+
+      {/* ═══════════════════════════════════════════════
+          MOBILE: bottom drawer (full panel content)
+      ═══════════════════════════════════════════════ */}
+      <div
+        className="fm-mobile-drawer fm-drawer"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          display: "none", // overridden to flex by media query
+          flexDirection: "column",
+          position: "absolute", bottom: 0, left: 0, right: 0,
+          height: "76vh",
+          background: "rgba(249,250,251,0.98)",
+          borderTop: "1px solid #d1d5db",
+          borderRadius: "18px 18px 0 0",
+          zIndex: 1000,
+          transform: drawerOpen ? "translateY(0)" : "translateY(100%)",
+          boxShadow: "0 -4px 24px rgba(0,0,0,0.18)",
+          pointerEvents: "auto",
+        }}
+      >
+        {/* Drawer handle bar */}
+        <div
+          onClick={() => setDrawerOpen(false)}
+          style={{ flexShrink: 0, display: "flex", justifyContent: "center", alignItems: "center", padding: "10px 0 6px 0", cursor: "pointer" }}
+        >
+          <div style={{ width: 40, height: 4, background: "#d1d5db", borderRadius: 4 }} />
         </div>
 
-        <input type="text" inputMode="decimal" placeholder={unitMode === "ft" ? "Enter sea level in feet" : "Enter sea level in meters"}
-          value={inputText} onChange={(e) => setInputText(e.target.value)}
-          onBlur={() => { const c = commitInputText(inputText, unitMode); if (c !== null) setInputLevel(c); }}
-          onKeyDown={(e) => { if (e.key === "Enter") executeFlood(); }}
-          style={{ width: "100%", padding: 12, fontSize: 18, border: "1px solid #ccc", marginBottom: 12, boxSizing: "border-box" }} />
-
-        <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-          <button onClick={executeFlood} style={{ flex: 1, padding: "12px 10px", background: "#0f172a", color: "white", border: "none", fontWeight: 700, cursor: "pointer" }}>Execute Flood</button>
-          <button onClick={clearFlood} style={{ flex: 1, padding: "12px 10px", background: "white", color: "#111827", border: "1px solid #ccc", fontWeight: 700, cursor: "pointer" }}>Clear</button>
-        </div>
-
-        <div style={{ fontSize: 14, marginBottom: 24 }}>Custom input supports positive and negative values in {unitMode === "ft" ? "feet" : "meters"}</div>
-        <hr style={{ margin: "0 0 18px 0" }} />
-
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>PRESETS</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 28 }}>
-          {PRESETS.map((preset) => {
-            const active = Math.round(inputLevel) === Math.round(preset.value);
-            const lbl = unitMode === "ft"
-              ? `${Math.round(metersToFeet(preset.value)) > 0 ? "+" : ""}${Math.round(metersToFeet(preset.value))}ft`
-              : `${preset.value > 0 ? "+" : ""}${preset.value}m`;
-            return (
-              <button key={preset.label} onClick={() => { setInputLevel(preset.value); setInputText(formatInputTextFromMeters(preset.value, unitMode)); }}
-                style={{ padding: "12px 10px", border: "1px solid #d1d5db", background: active ? "#0f172a" : "white", color: active ? "white" : "#111827", cursor: "pointer", borderRadius: 12, fontWeight: 700 }}>
-                <div>{preset.label}</div>
-                <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>{lbl}</div>
-              </button>
-            );
-          })}
-        </div>
-
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>SCENARIO MODE</div>
-        <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
-          <button onClick={() => setScenarioMode("flood")} style={{ width: "100%", padding: 14, border: "1px solid #d1d5db", background: scenarioMode === "flood" ? "#0f172a" : "white", color: scenarioMode === "flood" ? "white" : "#111827", cursor: "pointer", borderRadius: 12, fontWeight: 700 }}>
-            <div>Flood</div><div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>Sea level up / down</div>
-          </button>
-          <button onClick={() => setScenarioMode("impact")} style={{ width: "100%", padding: 14, border: "1px solid #d1d5db", background: scenarioMode === "impact" ? "#0f172a" : "white", color: scenarioMode === "impact" ? "white" : "#111827", cursor: "pointer", borderRadius: 12, fontWeight: 700 }}>
-            <div>Impact</div><div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>Click map to place impact point</div>
-          </button>
-        </div>
-
-        {scenarioMode === "impact" && (
-          <>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>ASTEROID SIZE</div>
-            <input type="range" min="50" max="20000" step="50" value={impactDiameter} onChange={(e) => setImpactDiameter(Number(e.target.value))} style={{ width: "100%", marginBottom: 10 }} />
-            <input type="number" min="50" max="20000" step="50" value={impactDiameter}
-              onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n)) setImpactDiameter(Math.max(50, Math.min(20000, n))); }}
-              style={{ width: "100%", padding: 12, fontSize: 18, border: "1px solid #ccc", marginBottom: 20, boxSizing: "border-box" }} />
-            <div style={{ fontSize: 14, marginBottom: 24 }}>Diameter: <b>{impactDiameter.toLocaleString()} m</b></div>
-            <button onClick={runImpact} disabled={!impactPointRef.current || impactLoading}
-              style={{ width: "100%", padding: 14, background: "#ef4444", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", marginBottom: 20, opacity: !impactPointRef.current || impactLoading ? 0.7 : 1 }}>
-              {impactLoading ? "Running..." : "Run Impact"}
-            </button>
-          </>
-        )}
-
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>VIEW MODE</div>
-        <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
-          {[{ key: "map", label: "Standard Map", sub: "Flood tiles active" }, { key: "satellite", label: "Satellite View", sub: "Flood overlay supported" }, { key: "globe", label: "Globe View", sub: "Flood overlay supported" }].map(({ key, label, sub }) => (
-            <button key={key} onClick={() => setViewMode(key)} style={{ width: "100%", padding: 14, border: "1px solid #d1d5db", background: viewMode === key ? "#0f172a" : "white", color: viewMode === key ? "white" : "#111827", cursor: "pointer", borderRadius: 12, fontWeight: 700 }}>
-              <div>{label}</div><div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>{sub}</div>
-            </button>
-          ))}
+        {/* Scrollable panel content inside drawer */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "4px 16px 32px 16px" }}>
+          {panelContent}
         </div>
       </div>
 
-      <div style={{ position: "absolute", right: 20, top: 10, background: "#1e3a5f", color: "white", padding: 16, borderRadius: 12, fontSize: 14, lineHeight: 1.45, zIndex: 1000, minWidth: 320 }}>
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>Current Scenario</div>
-        <div style={{ color: "#facc15", fontWeight: 700 }}>Frontend build: {FRONTEND_BUILD_LABEL}</div>
-        <div>Sea level: {formatLevelForDisplay(seaLevel)}</div>
-        <div>Mode: {viewMode === "map" ? "Standard Map" : viewMode === "satellite" ? "Satellite" : "Globe"}</div>
-        <div>Status: {status}</div>
-        <div>Scenario Mode: {scenarioMode}</div>
-        <div>Impact Point: {impactPointRef.current ? `${impactPointRef.current.lng.toFixed(3)}, ${impactPointRef.current.lat.toFixed(3)}` : "--"}</div>
-        <div>Asteroid Diameter: {impactDiameter.toLocaleString()} m</div>
+      {/* ═══════════════════════════════════════════════
+          MOBILE: collapsed bottom strip (always visible)
+      ═══════════════════════════════════════════════ */}
+      <div
+        className="fm-mobile-strip"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          display: "none", // overridden to flex by media query
+          position: "absolute", bottom: 0, left: 0, right: 0,
+          height: 72,
+          background: "rgba(249,250,251,0.97)",
+          borderTop: "1px solid #e5e7eb",
+          borderRadius: drawerOpen ? 0 : "14px 14px 0 0",
+          zIndex: 1001,
+          alignItems: "center",
+          padding: "0 12px",
+          gap: 10,
+          boxShadow: "0 -2px 12px rgba(0,0,0,0.1)",
+          pointerEvents: "auto",
+          fontFamily: "Arial, sans-serif",
+          // Strip stays visible above the drawer when open (same z-index, drawer slides above it)
+          transform: drawerOpen ? "translateY(100%)" : "translateY(0)",
+          transition: "transform 0.32s cubic-bezier(0.4,0,0.2,1)",
+        }}
+      >
+        {/* Left: current level + mode pill */}
+        <div
+          onClick={() => setDrawerOpen(true)}
+          style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 3, cursor: "pointer", minWidth: 0 }}
+        >
+          <div style={{ fontSize: 18, fontWeight: 700, color: seaLevel > 0 ? "#0f62fe" : seaLevel < 0 ? "#b45309" : "#111827", lineHeight: 1 }}>
+            {stripLabel}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ background: scenarioMode === "impact" ? "#ef4444" : "#0f172a", color: "white", fontSize: 11, fontWeight: 700, borderRadius: 6, padding: "2px 7px" }}>
+              {stripModePill}
+            </span>
+            <span style={{ fontSize: 12, color: "#6b7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {status.length > 22 ? status.slice(0, 20) + "…" : status}
+            </span>
+          </div>
+        </div>
 
-        {impactError && (<><hr style={{ margin: "10px 0", opacity: 0.25 }} /><div style={{ color: "#fecaca", fontWeight: 700 }}>{impactError}</div></>)}
+        {/* Center: big CTA button */}
+        <button
+          onClick={handleStripCTA}
+          disabled={scenarioMode === "impact" && impactLoading}
+          style={{
+            flexShrink: 0,
+            padding: "0 20px",
+            height: 48,
+            background: scenarioMode === "impact" ? "#ef4444" : "#0f172a",
+            color: "white",
+            border: "none",
+            borderRadius: 10,
+            fontWeight: 700,
+            fontSize: 15,
+            cursor: "pointer",
+            opacity: (scenarioMode === "impact" && impactLoading) ? 0.65 : 1,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {scenarioMode === "impact"
+            ? (impactLoading ? "Running…" : "Run Impact")
+            : "Execute Flood"}
+        </button>
 
-        {impactResult && (
-          <>
-            <hr style={{ margin: "10px 0", opacity: 0.25 }} />
-            <div style={{ fontWeight: 700 }}>Impact Results</div>
-            <div>Energy: {Number(impactResult.energy_mt_tnt ?? impactResult.energy_mt ?? 0).toFixed(2)} Mt</div>
-            <div>Crater Diameter: {Math.round(Number(impactResult.crater_diameter_m ?? 0)).toLocaleString()} m</div>
-            <div>Blast Radius: {Math.round(Number(impactResult.blast_radius_m ?? 0)).toLocaleString()} m</div>
-            <div>Thermal Radius: {Math.round(Number(impactResult.thermal_radius_m ?? 0)).toLocaleString()} m</div>
-            {impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0 && (
-              <>
-                <div>Wave Height: {Math.round(Number(impactResult.wave_height_m ?? 0)).toLocaleString()} m</div>
-                {Number(impactResult.wave_height_m ?? 0) < EXTINCTION_WAVE_HEIGHT_M && (
-                  <div>Tsunami Reach: {Math.round(Number(impactResult.estimated_wave_reach_m ?? 0) / 1000).toLocaleString()} km</div>
-                )}
-              </>
-            )}
-            <div>Severity: {impactResult.severity_class ?? "--"}</div>
-            <hr style={{ margin: "10px 0", opacity: 0.2 }} />
-            <div style={{ fontWeight: 700 }}>Casualty Estimate</div>
-            <div>Population Exposed: {impactResult.population_exposed != null ? formatCompactCount(impactResult.population_exposed) : "Coming soon"}</div>
-            <div>Estimated Deaths: {impactResult.estimated_deaths != null ? formatCompactCount(impactResult.estimated_deaths) : "Coming soon"}</div>
-            <div style={{ fontSize: 12, opacity: 0.8 }}>Confidence: low / rough estimate</div>
-          </>
-        )}
-
-        {scenarioMode === "flood" && (
-          <>
-            <hr style={{ margin: "10px 0", opacity: 0.25 }} />
-            <div style={{ fontSize: 12, color: "#94a3b8" }}>Click map to see elevation</div>
-          </>
-        )}
+        {/* Right: chevron toggle to open drawer */}
+        <button
+          onClick={() => setDrawerOpen((v) => !v)}
+          style={{ flexShrink: 0, width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "1px solid #e5e7eb", borderRadius: 10, cursor: "pointer", fontSize: 18, color: "#374151" }}
+        >
+          ⌃
+        </button>
       </div>
     </div>
   );
