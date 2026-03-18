@@ -23,7 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v48";
+const FRONTEND_BUILD_LABEL = "v47";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -56,8 +56,6 @@ export default function HomePage() {
   const impactPointRef = useRef(null);
   const impactResultRef = useRef(null);
   const activeFloodLevelRef = useRef(null);
-  const activeFloodSourceIdRef = useRef(null);
-  const activeFloodLayerIdRef = useRef(null);
   const initialViewAppliedRef = useRef(false);
   const impactRunSeqRef = useRef(0);
 
@@ -130,7 +128,9 @@ export default function HomePage() {
     return !Number.isFinite(n) || n < 0 ? "--" : Math.round(n).toLocaleString();
   };
 
-  const floodAllowedInCurrentView = () => ["map", "satellite", "globe"].includes(viewModeRef.current);
+  const floodAllowedInCurrentView = () =>
+    ["map", "satellite", "globe"].includes(viewModeRef.current);
+
   const isMapReady = () => !!mapRef.current && mapRef.current.isStyleLoaded();
 
   const cancelPendingImpactRequest = () => {
@@ -142,25 +142,24 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map) return;
     if (mode === "globe") {
-      safely(() => map.setProjection("globe")); safely(() => map.setPitch(0)); safely(() => map.setBearing(0));
-      safely(() => map.dragRotate.enable()); safely(() => map.touchZoomRotate.enableRotation()); return;
+      safely(() => map.setProjection("globe"));
+      safely(() => map.setPitch(0)); safely(() => map.setBearing(0));
+      safely(() => map.dragRotate.enable()); safely(() => map.touchZoomRotate.enableRotation());
+      return;
     }
-    safely(() => map.setProjection("mercator")); safely(() => map.setPitch(0)); safely(() => map.setBearing(0));
+    safely(() => map.setProjection("mercator"));
+    safely(() => map.setPitch(0)); safely(() => map.setBearing(0));
     safely(() => map.dragRotate.disable()); safely(() => map.touchZoomRotate.disableRotation());
   };
 
-  // Remove whatever flood layer is currently active (regular or tsunami)
   const removeFloodLayer = () => {
     const map = mapRef.current;
-    const layerId = activeFloodLayerIdRef.current || FLOOD_LAYER_ID;
-    const sourceId = activeFloodSourceIdRef.current || FLOOD_SOURCE_ID;
-    if (map) {
-      try { if (map.getLayer(layerId)) map.removeLayer(layerId); } catch (e) { console.warn(e); }
-      try { if (map.getSource(sourceId)) map.removeSource(sourceId); } catch (e) { console.warn(e); }
-    }
+    if (!map) { activeFloodLevelRef.current = null; return; }
+    try {
+      if (map.getLayer(FLOOD_LAYER_ID)) map.removeLayer(FLOOD_LAYER_ID);
+      if (map.getSource(FLOOD_SOURCE_ID)) map.removeSource(FLOOD_SOURCE_ID);
+    } catch (e) { console.warn("Failed removing flood layer:", e); }
     activeFloodLevelRef.current = null;
-    activeFloodLayerIdRef.current = null;
-    activeFloodSourceIdRef.current = null;
   };
 
   const removeImpactPreviewLayers = () => {
@@ -311,52 +310,52 @@ export default function HomePage() {
     } catch (e) { console.error("DRAW OCEAN MARKER ERROR", e); return false; }
   };
 
-  // Add a raster flood layer with unique IDs to prevent zombie state
-  const addRasterLayer = (tileUrl, layerIdSuffix) => {
+  // FIX v46/v47: removed isStyleLoaded() check — it briefly returns false
+  // after adding GeoJSON layers, causing the flood layer to silently fail.
+  const addFloodLayer = (level, opts = {}) => {
     const map = mapRef.current;
     if (!map || !floodAllowedInCurrentView()) return false;
+    const normalizedLevel = Number(level);
+    if (!Number.isFinite(normalizedLevel) || normalizedLevel === 0) return false;
 
-    const sourceId = `flood-source-${layerIdSuffix}`;
-    const layerId = `flood-layer-${layerIdSuffix}`;
+    // v47: for ocean impacts, use /flood-region which bounds flooding by tsunami reach
+    // opts: { impactLat, impactLng, reachM } for regional flood
+    const { impactLat, impactLng, reachM } = opts;
+    const isRegional = impactLat != null && impactLng != null && reachM != null && reachM > 0;
+
+    const tileUrl = isRegional
+      ? `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(normalizedLevel)}/${encodeURIComponent(impactLat)}/${encodeURIComponent(impactLng)}/${encodeURIComponent(reachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`
+      : `${floodEngineUrlRef.current}/flood/${encodeURIComponent(normalizedLevel)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
 
     try {
-      // Remove previous flood layer first
-      removeFloodLayer();
-
-      map.addSource(sourceId, { type: "raster", tiles: [tileUrl], tileSize: 256, minzoom: 0, maxzoom: 22 });
-      map.addLayer({ id: layerId, type: "raster", source: sourceId, paint: { "raster-opacity": 1, "raster-fade-duration": 0, "raster-resampling": "linear" } });
-
-      activeFloodLayerIdRef.current = layerId;
-      activeFloodSourceIdRef.current = sourceId;
+      if (
+        activeFloodLevelRef.current === normalizedLevel &&
+        map.getLayer(FLOOD_LAYER_ID) &&
+        map.getSource(FLOOD_SOURCE_ID)
+      ) return true;
+      if (map.getLayer(FLOOD_LAYER_ID)) map.removeLayer(FLOOD_LAYER_ID);
+      if (map.getSource(FLOOD_SOURCE_ID)) map.removeSource(FLOOD_SOURCE_ID);
+      map.addSource(FLOOD_SOURCE_ID, { type: "raster", tiles: [tileUrl], tileSize: 256, minzoom: 0, maxzoom: 22 });
+      map.addLayer({ id: FLOOD_LAYER_ID, type: "raster", source: FLOOD_SOURCE_ID, paint: { "raster-opacity": 1, "raster-fade-duration": 0, "raster-resampling": "linear" } });
+      activeFloodLevelRef.current = normalizedLevel;
       safely(() => map.triggerRepaint());
-      if (DEBUG_FLOOD) console.log("RASTER LAYER ADDED", { tileUrl, layerId });
+      if (DEBUG_FLOOD) console.log("FLOOD LAYER ADDED", { level: normalizedLevel, isRegional, tileUrl });
       return true;
     } catch (e) {
-      console.error("Failed to add raster layer", e);
+      console.error("Failed to add flood layer", e);
+      activeFloodLevelRef.current = null;
       return false;
     }
   };
 
-  const addFloodLayer = (level) => {
-    if (!floodAllowedInCurrentView()) return false;
-    const normalizedLevel = Number(level);
-    if (!Number.isFinite(normalizedLevel) || normalizedLevel === 0) return false;
-    const tileUrl = `${floodEngineUrlRef.current}/flood/${encodeURIComponent(normalizedLevel)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
-    activeFloodLevelRef.current = normalizedLevel;
-    return addRasterLayer(tileUrl, `flood-${normalizedLevel}`);
-  };
-
-  // v48: Ocean impacts use /flood-region/{run_id} — all basin logic is backend
-  const addTsunamiLayer = (runId) => {
-    if (!runId || !floodAllowedInCurrentView()) return false;
-    const tileUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(runId)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}&t=${Date.now()}`;
-    return addRasterLayer(tileUrl, `tsunami-${runId.slice(0, 8)}`);
-  };
-
-  const applyOceanImpactFlood = (result) => {
-    if (!result.run_id) return false;
-    const ok = addTsunamiLayer(result.run_id);
-    if (!ok) { setTimeout(() => { addTsunamiLayer(result.run_id); }, 50); }
+  const applyOceanImpactFlood = (result, lng, lat) => {
+    const waveHeight = Number(result.wave_height_m ?? 0);
+    const reachM = Number(result.estimated_wave_reach_m ?? result.tsunami_radius_m ?? 0);
+    if (waveHeight <= 0) return false;
+    const ok = addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM });
+    if (!ok) {
+      setTimeout(() => { addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM }); }, 50);
+    }
     return true;
   };
 
@@ -408,7 +407,7 @@ export default function HomePage() {
     impactRunSeqRef.current = runSeq;
     const controller = new AbortController();
     impactRequestRef.current = controller;
-    impactTimeoutRef.current = setTimeout(() => { controller.abort(); }, 20000); // longer timeout for basin computation
+    impactTimeoutRef.current = setTimeout(() => { controller.abort(); }, 12000);
     try {
       setImpactLoading(true); setImpactError(""); setImpactResult(null);
       setStatus("Running impact simulation...");
@@ -427,7 +426,7 @@ export default function HomePage() {
 
       if (data.is_ocean_impact === true && Number(data.wave_height_m ?? 0) > 0) {
         drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
-        applyOceanImpactFlood(data);
+        applyOceanImpactFlood(data, impactPointRef.current.lng, impactPointRef.current.lat);
         const wh = Math.round(Number(data.wave_height_m));
         const reach = Math.round(Number(data.estimated_wave_reach_m ?? 0) / 1000);
         setStatus(`Ocean impact — ${wh}m wave, ${reach}km reach`);
@@ -494,8 +493,6 @@ export default function HomePage() {
     const handleStyleLoad = () => {
       applyProjectionForMode(viewModeRef.current);
       activeFloodLevelRef.current = null;
-      activeFloodLayerIdRef.current = null;
-      activeFloodSourceIdRef.current = null;
       if (scenarioModeRef.current === "flood" && Number(seaLevelRef.current) !== 0 && floodAllowedInCurrentView()) {
         setTimeout(() => { syncFloodScenario(); }, 50);
       } else { removeFloodLayer(); }
@@ -505,7 +502,7 @@ export default function HomePage() {
           drawImpactPoint(impactPointRef.current.lng, impactPointRef.current.lat);
           if (result.is_ocean_impact === true && Number(result.wave_height_m ?? 0) > 0) {
             drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
-            setTimeout(() => { applyOceanImpactFlood(result); }, 50);
+            setTimeout(() => { applyOceanImpactFlood(result, impactPointRef.current.lng, impactPointRef.current.lat); }, 50);
           } else { drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, result); }
         }, 50);
       }
@@ -552,7 +549,6 @@ export default function HomePage() {
       map.off("mouseleave", handleMouseLeave); map.off("click", handleClick);
       map.remove();
       mapRef.current = null; activeFloodLevelRef.current = null;
-      activeFloodLayerIdRef.current = null; activeFloodSourceIdRef.current = null;
       impactPointRef.current = null; initialViewAppliedRef.current = false;
     };
   }, [floodEngineUrl]);
@@ -583,7 +579,7 @@ export default function HomePage() {
     if (scenarioMode !== "impact" || !impactResult || !impactPointRef.current) return;
     if (impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0) {
       drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
-      setTimeout(() => { applyOceanImpactFlood(impactResult); }, 50);
+      setTimeout(() => { applyOceanImpactFlood(impactResult, impactPointRef.current.lng, impactPointRef.current.lat); }, 50);
       return;
     }
     drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, impactResult);
