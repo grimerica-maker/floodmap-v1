@@ -23,7 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v57";
+const FRONTEND_BUILD_LABEL = "v58";
 
 const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
@@ -571,11 +571,13 @@ export default function HomePage() {
 
   const runNuke = async () => {
     if (!nukePointRef.current) { setStatus("Place detonation point first"); return; }
+    const nukeLat = nukePointRef.current.lat;
+    const nukeLng = nukePointRef.current.lng;
     setNukeLoading(true); setNukeError(""); setNukeResult(null);
-    clearImpactPreview();
     setStatus("Detonating...");
     try {
-      const { lng, lat } = nukePointRef.current;
+      const lat = nukeLat;
+      const lng = nukeLng;
       const res = await fetch(
         `${floodEngineUrlRef.current}/nuke?lat=${lat}&lng=${lng}&yield_kt=${Number(nukeYield).toFixed(3)}&burst_type=${nukeBurst}&wind_deg=${Number(nukeWindDeg).toFixed(1)}&_=${Date.now()}`,
         { cache: "no-store" }
@@ -1058,7 +1060,7 @@ export default function HomePage() {
             </>
           )}
 
-          <button onClick={runNuke} disabled={!nukePointRef.current || nukeLoading}
+          <button onClick={runNuke} disabled={!nukePointSet || nukeLoading}
             style={{ width: "100%", padding: "14px 10px", minHeight: 52, background: "#7c3aed", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", marginBottom: 16, fontSize: 16, opacity: !nukePointRef.current || nukeLoading ? 0.65 : 1 }}>
             {nukeLoading ? "Detonating..." : "☢️ Detonate"}
           </button>
