@@ -23,7 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v55";
+const FRONTEND_BUILD_LABEL = "v56";
 
 const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
@@ -33,6 +33,14 @@ const PRESETS = [
   { label: "All Ice Melted", value: 70 },
   { label: "Biblical Flood", value: 3048 },
   { label: "Fully Drained", value: -11000 },
+];
+
+const NUKE_PRESETS = [
+  { label: "Tactical", yield_kt: 1 },
+  { label: "Hiroshima", yield_kt: 15 },
+  { label: "B61", yield_kt: 340 },
+  { label: "B83 (1.2Mt)", yield_kt: 1200 },
+  { label: "Tsar Bomba", yield_kt: 50000 },
 ];
 
 const safely = (fn) => {
@@ -66,6 +74,13 @@ export default function HomePage() {
   const [viewMode, setViewMode] = useState("map");
   const [scenarioMode, setScenarioMode] = useState("flood");
   const [impactDiameter, setImpactDiameter] = useState(1000);
+  const [nukeYield, setNukeYield] = useState(15);
+  const [nukeBurst, setNukeBurst] = useState("airburst");
+  const [nukeWindDeg, setNukeWindDeg] = useState(270);
+  const [nukeResult, setNukeResult] = useState(null);
+  const [nukeLoading, setNukeLoading] = useState(false);
+  const [nukeError, setNukeError] = useState("");
+  const nukePointRef = useRef(null);
   const [impactResult, setImpactResult] = useState(null);
   const [impactLoading, setImpactLoading] = useState(false);
   const [impactError, setImpactError] = useState("");
@@ -553,6 +568,103 @@ export default function HomePage() {
     }
   };
 
+  const runNuke = async () => {
+    if (!nukePointRef.current) { setStatus("Place detonation point first"); return; }
+    setNukeLoading(true); setNukeError(""); setNukeResult(null);
+    clearImpactPreview();
+    setStatus("Detonating...");
+    try {
+      const { lng, lat } = nukePointRef.current;
+      const res = await fetch(
+        `${floodEngineUrlRef.current}/nuke?lat=${lat}&lng=${lng}&yield_kt=${nukeYield}&burst_type=${nukeBurst}&wind_deg=${nukeWindDeg}&_=${Date.now()}`,
+        { cache: "no-store" }
+      );
+      if (!res.ok) throw new Error("Nuke request failed");
+      const data = await res.json();
+      setNukeResult(data);
+      drawNukeResult(lng, lat, data);
+      setStatus(`${data.severity_class} — ${data.yield_kt >= 1000 ? (data.yield_kt/1000).toFixed(1)+"Mt" : data.yield_kt+"kt"} detonated`);
+    } catch (err) {
+      setNukeError("Detonation failed");
+      setStatus("Detonation failed");
+    } finally {
+      setNukeLoading(false);
+    }
+  };
+
+  const drawNukeResult = (lng, lat, data) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    clearImpactPreview();
+
+    const features = [];
+
+    // EMP zone (airburst only) — huge, show first (bottom layer)
+    if (data.emp_r_m > 0) {
+      features.push({ ...kmCircle(lng, lat, data.emp_r_m / 1000), properties: { kind: "emp" } });
+    }
+    // Thermal zone
+    features.push({ ...kmCircle(lng, lat, data.thermal_r_m / 1000), properties: { kind: "thermal" } });
+    // Light blast
+    features.push({ ...kmCircle(lng, lat, data.blast_light_r_m / 1000), properties: { kind: "blast-light" } });
+    // Moderate blast
+    features.push({ ...kmCircle(lng, lat, data.blast_moderate_r_m / 1000), properties: { kind: "blast-moderate" } });
+    // Heavy blast
+    features.push({ ...kmCircle(lng, lat, data.blast_heavy_r_m / 1000), properties: { kind: "blast-heavy" } });
+    // Fireball
+    features.push({ ...kmCircle(lng, lat, data.fireball_r_m / 1000), properties: { kind: "fireball" } });
+    // Radiation (surface only)
+    if (data.radiation_r_m > 0) {
+      features.push({ ...kmCircle(lng, lat, data.radiation_r_m / 1000), properties: { kind: "radiation" } });
+    }
+    // Fallout ellipse (surface only) — approximate as elongated circle
+    if (data.fallout_major_km > 0) {
+      const falloutFeature = buildFalloutEllipse(lng, lat, data.fallout_major_km, data.fallout_minor_km, data.fallout_direction_deg);
+      features.push({ ...falloutFeature, properties: { kind: "fallout" } });
+    }
+
+    try {
+      map.addSource(IMPACT_PREVIEW_SOURCE_ID, { type: "geojson", data: { type: "FeatureCollection", features } });
+      if (data.emp_r_m > 0) {
+        map.addLayer({ id: "nuke-emp", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "emp"], paint: { "fill-color": "#7c3aed", "fill-opacity": 0.06 } });
+        map.addLayer({ id: "nuke-emp-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "emp"], paint: { "line-color": "#7c3aed", "line-width": 1.5, "line-opacity": 0.5, "line-dasharray": [4, 4] } });
+      }
+      map.addLayer({ id: "nuke-thermal", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "fill-color": "#f97316", "fill-opacity": 0.12 } });
+      map.addLayer({ id: "nuke-blast-light", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-light"], paint: { "fill-color": "#fbbf24", "fill-opacity": 0.15 } });
+      map.addLayer({ id: "nuke-blast-moderate", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-moderate"], paint: { "fill-color": "#ef4444", "fill-opacity": 0.25 } });
+      map.addLayer({ id: "nuke-blast-heavy", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-heavy"], paint: { "fill-color": "#dc2626", "fill-opacity": 0.45 } });
+      map.addLayer({ id: "nuke-fireball", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fireball"], paint: { "fill-color": "#ffffff", "fill-opacity": 0.95 } });
+      if (data.radiation_r_m > 0) {
+        map.addLayer({ id: "nuke-radiation", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "radiation"], paint: { "line-color": "#84cc16", "line-width": 2, "line-opacity": 0.9, "line-dasharray": [3, 3] } });
+      }
+      if (data.fallout_major_km > 0) {
+        map.addLayer({ id: "nuke-fallout", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fallout"], paint: { "fill-color": "#84cc16", "fill-opacity": 0.12 } });
+        map.addLayer({ id: "nuke-fallout-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fallout"], paint: { "line-color": "#84cc16", "line-width": 1.5, "line-opacity": 0.7 } });
+      }
+      safely(() => map.triggerRepaint());
+    } catch (e) { console.error("Failed to draw nuke result", e); }
+  };
+
+  const buildFalloutEllipse = (lng, lat, majorKm, minorKm, directionDeg, steps = 64) => {
+    const coords = [];
+    const kpLat = 110.574;
+    const kpLng = 111.32 * Math.cos((lat * Math.PI) / 180);
+    const dirRad = (directionDeg * Math.PI) / 180;
+    // Center of ellipse is shifted downwind by half the major axis
+    const centerLat = lat + (Math.cos(dirRad) * majorKm * 0.5) / kpLat;
+    const centerLng = lng + (Math.sin(dirRad) * majorKm * 0.5) / Math.max(kpLng, 0.0001);
+    for (let i = 0; i <= steps; i++) {
+      const t = (i / steps) * Math.PI * 2;
+      const x = Math.cos(t) * majorKm;
+      const y = Math.sin(t) * minorKm;
+      // Rotate by direction
+      const xr = x * Math.cos(dirRad) - y * Math.sin(dirRad);
+      const yr = x * Math.sin(dirRad) + y * Math.cos(dirRad);
+      coords.push([centerLng + yr / Math.max(kpLng, 0.0001), centerLat + xr / kpLat]);
+    }
+    return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} };
+  };
+
   const clearFlood = () => {
     cancelPendingImpactRequest();
     impactRunSeqRef.current += 1;
@@ -638,6 +750,15 @@ export default function HomePage() {
         drawImpactPreview(lng, lat, impactDiameterRef.current);
         setImpactResult(null); setImpactError("");
         setStatus("Impact preview ready");
+        return;
+      }
+
+      if (scenarioModeRef.current === "nuke") {
+        nukePointRef.current = { lng, lat };
+        clearImpactPreview();
+        drawImpactPoint(lng, lat);
+        setNukeResult(null); setNukeError("");
+        setStatus("Nuke point placed — set yield and detonate");
         return;
       }
 
@@ -736,6 +857,13 @@ export default function HomePage() {
       );
       return;
     }
+    if (scenarioMode === "nuke") {
+      setStatus(nukePointRef.current
+        ? nukeLoading ? "Detonating..." : nukeResult ? `${nukeResult.severity_class} — ${nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"}` : "Nuke point placed — detonate"
+        : "Click map to place detonation point"
+      );
+      return;
+    }
     if (viewMode === "globe" && seaLevel === 0) { setStatus("Globe mode"); return; }
     if (seaLevel === 0) { setStatus("Flood cleared"); return; }
     setStatus(`Flood tiles loaded at ${formatLevelForDisplay(seaLevel)}`);
@@ -745,13 +873,16 @@ export default function HomePage() {
   // ─── Derived display values for the collapsed strip ───────────────────────
   const stripLabel = scenarioMode === "impact"
     ? `💥 ${impactDiameter.toLocaleString()}m`
+    : scenarioMode === "nuke"
+    ? `☢️ ${nukeYield >= 1000 ? (nukeYield/1000).toFixed(1)+"Mt" : nukeYield+"kt"}`
     : formatLevelForDisplay(seaLevel);
 
-  const stripModePill = scenarioMode === "impact" ? "Impact" : "Flood";
+  const stripModePill = scenarioMode === "impact" ? "Impact" : scenarioMode === "nuke" ? "Nuke" : "Flood";
 
   const handleStripCTA = (e) => {
     e.stopPropagation();
     if (scenarioMode === "impact") runImpact();
+    else if (scenarioMode === "nuke") runNuke();
     else executeFlood();
   };
 
@@ -848,6 +979,12 @@ export default function HomePage() {
           <div style={{ fontSize: 15 }}>Impact</div>
           <div style={{ fontSize: 12, opacity: 0.85, marginTop: 3 }}>Click map to place impact point</div>
         </button>
+        <button
+          onClick={() => { setScenarioMode("nuke"); clearImpactPreview(); setNukeResult(null); setNukeError(""); }}
+          style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "nuke" ? "#7c3aed" : "white", color: scenarioMode === "nuke" ? "white" : "#111827", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
+          <div style={{ fontSize: 15 }}>☢️ Nuke</div>
+          <div style={{ fontSize: 12, opacity: 0.85, marginTop: 3 }}>Click map to place detonation point</div>
+        </button>
       </div>
 
       {/* ── IMPACT CONTROLS ── */}
@@ -877,6 +1014,56 @@ export default function HomePage() {
       )}
 
       <hr style={{ margin: "0 0 16px 0", borderColor: "#e5e7eb" }} />
+
+      {/* ── NUKE CONTROLS ── */}
+      {scenarioMode === "nuke" && (
+        <>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, letterSpacing: "0.05em" }}>YIELD</div>
+          <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"} style={{ marginBottom: 12 }}>
+            {NUKE_PRESETS.map((p) => (
+              <button key={p.label} onClick={() => setNukeYield(p.yield_kt)}
+                style={{ padding: "10px 8px", minHeight: 48, border: "1px solid #d1d5db", background: nukeYield === p.yield_kt ? "#7c3aed" : "white", color: nukeYield === p.yield_kt ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700, whiteSpace: "nowrap", fontSize: 13 }}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <input type="range" min="0.001" max="50000" step="1" value={nukeYield}
+            onChange={(e) => setNukeYield(Number(e.target.value))}
+            style={{ width: "100%", marginBottom: 6, cursor: "pointer" }} />
+          <div style={{ fontSize: 13, marginBottom: 12, color: "#555" }}>
+            Yield: <b>{nukeYield >= 1000 ? (nukeYield/1000).toFixed(2)+" Mt" : nukeYield+" kt"}</b>
+          </div>
+
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>BURST TYPE</div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            <button onClick={() => setNukeBurst("airburst")}
+              style={{ flex: 1, padding: "11px 8px", minHeight: 44, border: "1px solid #d1d5db", background: nukeBurst === "airburst" ? "#7c3aed" : "white", color: nukeBurst === "airburst" ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 14 }}>
+              Airburst
+            </button>
+            <button onClick={() => setNukeBurst("surface")}
+              style={{ flex: 1, padding: "11px 8px", minHeight: 44, border: "1px solid #d1d5db", background: nukeBurst === "surface" ? "#7c3aed" : "white", color: nukeBurst === "surface" ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 14 }}>
+              Surface
+            </button>
+          </div>
+
+          {nukeBurst === "surface" && (
+            <>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>WIND DIRECTION</div>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>Wind blowing FROM: <b>{nukeWindDeg}°</b> → fallout goes {Math.round((nukeWindDeg + 180) % 360)}°</div>
+              <input type="range" min="0" max="359" step="1" value={nukeWindDeg}
+                onChange={(e) => setNukeWindDeg(Number(e.target.value))}
+                style={{ width: "100%", marginBottom: 14, cursor: "pointer" }} />
+            </>
+          )}
+
+          <button onClick={runNuke} disabled={!nukePointRef.current || nukeLoading}
+            style={{ width: "100%", padding: "14px 10px", minHeight: 52, background: "#7c3aed", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", marginBottom: 16, fontSize: 16, opacity: !nukePointRef.current || nukeLoading ? 0.65 : 1 }}>
+            {nukeLoading ? "Detonating..." : "☢️ Detonate"}
+          </button>
+
+          {nukeError && <div style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{nukeError}</div>}
+        </>
+      )}
 
       {/* ── VIEW MODE ── */}
       <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, letterSpacing: "0.05em" }}>VIEW MODE</div>
@@ -951,6 +1138,29 @@ export default function HomePage() {
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
           <div style={{ fontSize: 12, color: "#94a3b8" }}>Click map to see elevation</div>
+        </>
+      )}
+
+      {scenarioMode === "nuke" && nukeResult && (
+        <>
+          <hr style={{ margin: "10px 0", opacity: 0.25 }} />
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>☢️ Detonation Results</div>
+          <div>Yield: {nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(2)+" Mt" : nukeResult.yield_kt+" kt"}</div>
+          <div>Type: {nukeResult.burst_type}</div>
+          <div>Severity: {nukeResult.severity_class}</div>
+          <hr style={{ margin: "8px 0", opacity: 0.2 }} />
+          <div style={{ color: "#fca5a5" }}>Fireball: {Math.round(nukeResult.fireball_r_m).toLocaleString()} m</div>
+          <div style={{ color: "#fca5a5" }}>Heavy blast: {(Math.round(nukeResult.blast_heavy_r_m)/1000).toFixed(1)} km</div>
+          <div style={{ color: "#fbbf24" }}>Moderate blast: {(Math.round(nukeResult.blast_moderate_r_m)/1000).toFixed(1)} km</div>
+          <div style={{ color: "#fb923c" }}>Thermal (3rd°): {(Math.round(nukeResult.thermal_r_m)/1000).toFixed(1)} km</div>
+          <div style={{ color: "#a3e635" }}>Light blast: {(Math.round(nukeResult.blast_light_r_m)/1000).toFixed(1)} km</div>
+          {nukeResult.radiation_r_m > 0 && <div style={{ color: "#86efac" }}>Radiation 500rem: {Math.round(nukeResult.radiation_r_m).toLocaleString()} m</div>}
+          {nukeResult.emp_r_m > 0 && <div style={{ color: "#c4b5fd" }}>EMP radius: {(Math.round(nukeResult.emp_r_m)/1000).toFixed(0)} km</div>}
+          {nukeResult.fallout_major_km > 0 && <div style={{ color: "#86efac" }}>Fallout: {Math.round(nukeResult.fallout_major_km)} × {Math.round(nukeResult.fallout_minor_km)} km</div>}
+          <hr style={{ margin: "8px 0", opacity: 0.2 }} />
+          <div style={{ fontWeight: 700 }}>Casualties</div>
+          <div>Exposed: {nukeResult.population_exposed != null ? nukeResult.population_exposed.toLocaleString() : "—"}</div>
+          <div>Est. deaths: {nukeResult.estimated_deaths != null ? nukeResult.estimated_deaths.toLocaleString() : "—"}</div>
         </>
       )}
     </>
@@ -1186,12 +1396,12 @@ export default function HomePage() {
         {/* Center: big CTA button */}
         <button
           onClick={handleStripCTA}
-          disabled={scenarioMode === "impact" && impactLoading}
+          disabled={(scenarioMode === "impact" && impactLoading) || (scenarioMode === "nuke" && nukeLoading)}
           style={{
             flexShrink: 0,
             padding: "0 20px",
             height: 48,
-            background: scenarioMode === "impact" ? "#ef4444" : "#0f172a",
+            background: scenarioMode === "impact" ? "#ef4444" : scenarioMode === "nuke" ? "#7c3aed" : "#0f172a",
             color: "white",
             border: "none",
             borderRadius: 10,
@@ -1204,6 +1414,8 @@ export default function HomePage() {
         >
           {scenarioMode === "impact"
             ? (impactLoading ? "Running…" : "Run Impact")
+            : scenarioMode === "nuke"
+            ? (nukeLoading ? "Detonating…" : "☢️ Detonate")
             : "Execute Flood"}
         </button>
 
