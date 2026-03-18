@@ -4,92 +4,114 @@ export const dynamic = "force-dynamic";
 const ENGINE_BASE =
   process.env.NEXT_PUBLIC_FLOOD_ENGINE_URL || "http://137.184.86.1:8000";
 
-function buildTargetUrl(pathSegments = [], requestUrl) {
-  const incomingUrl = new URL(requestUrl);
+function makeUpstreamUrl(path = [], requestUrl) {
+  const incoming = new URL(requestUrl);
   const cleanBase = ENGINE_BASE.replace(/\/+$/, "");
-  const joinedPath = pathSegments.length ? `/${pathSegments.join("/")}` : "";
-  const target = new URL(`${cleanBase}${joinedPath}`);
+  const joinedPath = Array.isArray(path) && path.length ? `/${path.join("/")}` : "";
+  const upstream = new URL(`${cleanBase}${joinedPath}`);
 
-  incomingUrl.searchParams.forEach((value, key) => {
-    target.searchParams.set(key, value);
+  incoming.searchParams.forEach((value, key) => {
+    upstream.searchParams.set(key, value);
   });
 
-  return target;
+  return upstream.toString();
 }
 
-async function proxyRequest(request, context) {
-  try {
-    const pathSegments = context?.params?.path || [];
-    const targetUrl = buildTargetUrl(pathSegments, request.url);
+async function forwardRequest(request, path = []) {
+  const method = request.method.toUpperCase();
+  const url = makeUpstreamUrl(path, request.url);
 
-    const method = request.method.toUpperCase();
-    const headers = new Headers(request.headers);
+  const headers = new Headers(request.headers);
+  headers.delete("host");
+  headers.delete("connection");
+  headers.delete("content-length");
 
-    headers.delete("host");
-    headers.delete("connection");
-    headers.delete("content-length");
+  const init = {
+    method,
+    headers,
+    redirect: "follow",
+    cache: "no-store",
+  };
 
-    const init = {
-      method,
-      headers,
-      redirect: "follow",
-      cache: "no-store",
-    };
+  if (method !== "GET" && method !== "HEAD") {
+    init.body = await request.arrayBuffer();
+  }
 
-    if (method !== "GET" && method !== "HEAD") {
-      init.body = await request.arrayBuffer();
+  const upstream = await fetch(url, init);
+
+  const outHeaders = new Headers();
+  upstream.headers.forEach((value, key) => {
+    outHeaders.set(key, value);
+  });
+
+  outHeaders.set("access-control-allow-origin", "*");
+  outHeaders.set("access-control-allow-methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  outHeaders.set("access-control-allow-headers", "*");
+  outHeaders.set("cache-control", "no-store");
+
+  return new Response(upstream.body, {
+    status: upstream.status,
+    statusText: upstream.statusText,
+    headers: outHeaders,
+  });
+}
+
+function errorResponse(error) {
+  return new Response(
+    JSON.stringify({
+      error: "Engine proxy failed",
+      detail: error instanceof Error ? error.message : String(error),
+      engineBase: ENGINE_BASE,
+    }),
+    {
+      status: 502,
+      headers: {
+        "content-type": "application/json",
+        "access-control-allow-origin": "*",
+        "cache-control": "no-store",
+      },
     }
+  );
+}
 
-    const upstream = await fetch(targetUrl.toString(), init);
-
-    const responseHeaders = new Headers(upstream.headers);
-    responseHeaders.set("access-control-allow-origin", "*");
-    responseHeaders.set("access-control-allow-methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-    responseHeaders.set("access-control-allow-headers", "*");
-    responseHeaders.set("cache-control", "no-store");
-
-    return new Response(upstream.body, {
-      status: upstream.status,
-      statusText: upstream.statusText,
-      headers: responseHeaders,
-    });
+export async function GET(request, { params }) {
+  try {
+    return await forwardRequest(request, params?.path || []);
   } catch (error) {
-    return new Response(
-      JSON.stringify({
-        error: "Engine proxy failed",
-        detail: error instanceof Error ? error.message : String(error),
-        engineBase: ENGINE_BASE,
-      }),
-      {
-        status: 502,
-        headers: {
-          "content-type": "application/json",
-          "access-control-allow-origin": "*",
-          "cache-control": "no-store",
-        },
-      }
-    );
+    return errorResponse(error);
   }
 }
 
-export async function GET(request, context) {
-  return proxyRequest(request, context);
+export async function POST(request, { params }) {
+  try {
+    return await forwardRequest(request, params?.path || []);
+  } catch (error) {
+    return errorResponse(error);
+  }
 }
 
-export async function POST(request, context) {
-  return proxyRequest(request, context);
+export async function PUT(request, { params }) {
+  try {
+    return await forwardRequest(request, params?.path || []);
+  } catch (error) {
+    return errorResponse(error);
+  }
 }
 
-export async function PUT(request, context) {
-  return proxyRequest(request, context);
+export async function PATCH(request, { params }) {
+  try {
+    return await forwardRequest(request, params?.path || []);
+  } catch (error) {
+    return errorResponse(error);
+  }
 }
 
-export async function PATCH(request, context) {
-  return proxyRequest(request, context);
-}
-
-export async function DELETE(request, context) {
-  return proxyRequest(request, context);
+export async function DELETE(request, { params }) {
+  try {
+    return await forwardRequest(request, params?.path || []);
+  } catch (error) {
+    return errorResponse(error);
+  }
 }
 
 export async function OPTIONS() {
