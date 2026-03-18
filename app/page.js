@@ -23,7 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v53";
+const FRONTEND_BUILD_LABEL = "v54";
 
 const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
@@ -76,12 +76,14 @@ export default function HomePage() {
   // Mobile-only UI state — purely cosmetic, zero effect on map/engine logic
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [statsExpanded, setStatsExpanded] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  // Lazy initializer: correct on first render, no flash of wrong layout
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth <= 640 : false
+  );
 
-  // Detect mobile on mount and on resize — drives display switching without CSS conflicts
+  // Keep in sync on resize
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 640);
-    check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
@@ -942,7 +944,7 @@ export default function HomePage() {
   );
 
   return (
-    <div style={{ width: "100%", height: "100vh", position: "relative", overflow: "hidden" }}>
+    <div style={{ width: "100%", height: "100vh", height: "100dvh", position: "relative", overflow: "hidden" }}>
       <style>{`
         /* ── Mapbox popup ── */
         .elev-popup .mapboxgl-popup-content {
@@ -1098,8 +1100,9 @@ export default function HomePage() {
         style={{
           display: isMobile ? "flex" : "none",
           flexDirection: "column",
-          position: "absolute", bottom: 0, left: 0, right: 0,
+          position: "fixed", bottom: 0, left: 0, right: 0,
           height: "76vh",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
           background: "rgba(249,250,251,0.98)",
           borderTop: "1px solid #d1d5db",
           borderRadius: "18px 18px 0 0",
@@ -1132,8 +1135,9 @@ export default function HomePage() {
         onClick={(e) => e.stopPropagation()}
         style={{
           display: isMobile ? "flex" : "none",
-          position: "absolute", bottom: 0, left: 0, right: 0,
+          position: "fixed", bottom: 0, left: 0, right: 0,
           height: 72,
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
           background: "rgba(249,250,251,0.97)",
           borderTop: "1px solid #e5e7eb",
           borderRadius: "14px 14px 0 0",
@@ -1143,7 +1147,6 @@ export default function HomePage() {
           gap: 10,
           boxShadow: "0 -2px 12px rgba(0,0,0,0.1)",
           fontFamily: "Arial, sans-serif",
-          // When drawer open: slide strip away AND kill pointer events so drawer isn't blocked
           transform: drawerOpen ? "translateY(100%)" : "translateY(0)",
           transition: "transform 0.32s cubic-bezier(0.4,0,0.2,1)",
           pointerEvents: drawerOpen ? "none" : "auto",
