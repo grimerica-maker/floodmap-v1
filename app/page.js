@@ -23,7 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v60";
+const FRONTEND_BUILD_LABEL = "v61";
 
 const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
@@ -692,6 +692,25 @@ export default function HomePage() {
     return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} };
   };
 
+  const clearNuke = () => {
+    const map = mapRef.current;
+    if (map && map.isStyleLoaded()) {
+      const nukeLayers = ["nuke-emp","nuke-emp-line","nuke-thermal","nuke-thermal-line",
+        "nuke-blast-light","nuke-blast-light-line","nuke-blast-moderate","nuke-blast-moderate-line",
+        "nuke-blast-heavy","nuke-blast-heavy-line","nuke-fireball","nuke-fireball-line",
+        "nuke-radiation","nuke-fallout","nuke-fallout-line"];
+      nukeLayers.forEach((id) => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
+      try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e){}
+      try { if (map.getLayer(IMPACT_LAYER_ID)) map.removeLayer(IMPACT_LAYER_ID); } catch(e){}
+      try { if (map.getSource(IMPACT_SOURCE_ID)) map.removeSource(IMPACT_SOURCE_ID); } catch(e){}
+    }
+    nukePointRef.current = null;
+    setNukePointSet(false);
+    setNukeResult(null);
+    setNukeError("");
+    setStatus("Nuke cleared");
+  };
+
   const clearFlood = () => {
     cancelPendingImpactRequest();
     impactRunSeqRef.current += 1;
@@ -996,13 +1015,13 @@ export default function HomePage() {
       <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, letterSpacing: "0.05em" }}>SCENARIO MODE</div>
       <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
         <button
-          onClick={() => setScenarioMode("flood")}
+          onClick={() => { if (scenarioModeRef.current === "nuke") clearNuke(); setScenarioMode("flood"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "flood" ? "#0f172a" : "white", color: scenarioMode === "flood" ? "white" : "#111827", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>Flood</div>
           <div style={{ fontSize: 12, opacity: 0.85, marginTop: 3 }}>Sea level up / down</div>
         </button>
         <button
-          onClick={() => setScenarioMode("impact")}
+          onClick={() => { if (scenarioModeRef.current === "nuke") clearNuke(); setScenarioMode("impact"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "impact" ? "#0f172a" : "white", color: scenarioMode === "impact" ? "white" : "#111827", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>Impact</div>
           <div style={{ fontSize: 12, opacity: 0.85, marginTop: 3 }}>Click map to place impact point</div>
@@ -1084,10 +1103,16 @@ export default function HomePage() {
             </>
           )}
 
-          <button onClick={runNuke} disabled={!nukePointSet || nukeLoading}
-            style={{ width: "100%", padding: "14px 10px", minHeight: 52, background: "#7c3aed", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", marginBottom: 16, fontSize: 16, opacity: !nukePointRef.current || nukeLoading ? 0.65 : 1 }}>
-            {nukeLoading ? "Detonating..." : "☢️ Detonate"}
-          </button>
+          <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+            <button onClick={runNuke} disabled={!nukePointSet || nukeLoading}
+              style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#7c3aed", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15, opacity: !nukePointSet || nukeLoading ? 0.65 : 1 }}>
+              {nukeLoading ? "Detonating..." : "☢️ Detonate"}
+            </button>
+            <button onClick={clearNuke}
+              style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "white", color: "#111827", border: "1px solid #ccc", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15 }}>
+              Clear
+            </button>
+          </div>
 
           {nukeError && <div style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{nukeError}</div>}
         </>
