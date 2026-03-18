@@ -23,11 +23,8 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v48";
+const FRONTEND_BUILD_LABEL = "v49";
 
-// Wave height threshold above which we use global flood overlay
-// instead of bounded /flood-region tiles. At 1500m+ the wave is
-// extinction-scale and floods everywhere regardless of barriers.
 const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
 const PRESETS = [
@@ -46,8 +43,8 @@ const safely = (fn) => {
 export default function HomePage() {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
+  const elevPopupRef = useRef(null);  // mapboxgl.Popup for elevation
 
-  const hoverTimerRef = useRef(null);
   const impactPulseFrameRef = useRef(null);
   const impactRequestRef = useRef(null);
   const impactTimeoutRef = useRef(null);
@@ -76,10 +73,6 @@ export default function HomePage() {
   const [unitMode, setUnitMode] = useState("m");
   const [status, setStatus] = useState("Loading map...");
   const [floodEngineUrl, setFloodEngineUrl] = useState(FLOOD_ENGINE_PROXY_PATH);
-
-  const [hoverLat, setHoverLat] = useState(null);
-  const [hoverLng, setHoverLng] = useState(null);
-  const [hoverElevation, setHoverElevation] = useState(null);
 
   useEffect(() => { seaLevelRef.current = seaLevel; }, [seaLevel]);
   useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
@@ -141,6 +134,91 @@ export default function HomePage() {
   const cancelPendingImpactRequest = () => {
     if (impactTimeoutRef.current) { clearTimeout(impactTimeoutRef.current); impactTimeoutRef.current = null; }
     if (impactRequestRef.current) { impactRequestRef.current.abort(); impactRequestRef.current = null; }
+  };
+
+  const closeElevPopup = () => {
+    if (elevPopupRef.current) {
+      elevPopupRef.current.remove();
+      elevPopupRef.current = null;
+    }
+  };
+
+  const showElevPopup = async (lng, lat) => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Close any existing popup first
+    closeElevPopup();
+
+    // Show loading popup immediately
+    const popup = new mapboxgl.Popup({
+      closeButton: true,
+      closeOnClick: false,
+      className: "elev-popup",
+      maxWidth: "220px",
+    });
+
+    popup.setLngLat([lng, lat])
+      .setHTML(`
+        <div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+          <div style="color:#94a3b8;font-size:11px;margin-bottom:4px">${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+          <div style="color:#cbd5e1">Loading elevation...</div>
+        </div>
+      `)
+      .addTo(map);
+
+    elevPopupRef.current = popup;
+
+    try {
+      const res = await fetch(
+        `${floodEngineUrlRef.current}/elevation?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`,
+        { cache: "no-store" }
+      );
+      if (!res.ok) throw new Error("Elevation fetch failed");
+      const data = await res.json();
+      const elevM = data.elevation_m;
+
+      // If popup was closed while fetching, don't update
+      if (elevPopupRef.current !== popup) return;
+
+      const currentSeaLevel = seaLevelRef.current;
+      const diff = elevM - currentSeaLevel;
+
+      const elevDisplay = unitMode === "ft"
+        ? `${Math.round(metersToFeet(elevM))} ft`
+        : `${elevM} m`;
+
+      let waterStatus = "";
+      if (currentSeaLevel !== 0) {
+        if (diff >= 0) {
+          const aboveDisplay = unitMode === "ft"
+            ? `${Math.round(metersToFeet(diff))} ft`
+            : `${diff.toFixed(1)} m`;
+          waterStatus = `<div style="color:#86efac;margin-top:4px">Above water by ${aboveDisplay}</div>`;
+        } else {
+          const belowDisplay = unitMode === "ft"
+            ? `${Math.round(metersToFeet(Math.abs(diff)))} ft`
+            : `${Math.abs(diff).toFixed(1)} m`;
+          waterStatus = `<div style="color:#f87171;margin-top:4px">Underwater by ${belowDisplay}</div>`;
+        }
+      }
+
+      popup.setHTML(`
+        <div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+          <div style="color:#94a3b8;font-size:11px;margin-bottom:4px">${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+          <div style="color:#e2e8f0">Elevation: <b>${elevDisplay}</b></div>
+          ${waterStatus}
+        </div>
+      `);
+    } catch (e) {
+      if (elevPopupRef.current !== popup) return;
+      popup.setHTML(`
+        <div style="font-family:Arial,sans-serif;font-size:13px;padding:2px 4px">
+          <div style="color:#94a3b8;font-size:11px;margin-bottom:4px">${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+          <div style="color:#f87171">Elevation unavailable</div>
+        </div>
+      `);
+    }
   };
 
   const applyProjectionForMode = (mode) => {
@@ -353,17 +431,11 @@ export default function HomePage() {
     const waveHeight = Number(result.wave_height_m ?? 0);
     const reachM = Number(result.estimated_wave_reach_m ?? result.tsunami_radius_m ?? 0);
     if (waveHeight <= 0) return false;
-
-    // Extinction scale: wave >= 1500m means global catastrophe.
-    // Use the regular global flood overlay at wave_height_m — everything
-    // below that elevation floods worldwide. No need for bounded region.
     if (waveHeight >= EXTINCTION_WAVE_HEIGHT_M) {
       const ok = addFloodLayer(waveHeight);
       if (!ok) setTimeout(() => { addFloodLayer(waveHeight); }, 50);
       return true;
     }
-
-    // Normal tsunami: bounded /flood-region tiles with ray blocking
     const ok = addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM });
     if (!ok) {
       setTimeout(() => { addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM }); }, 50);
@@ -407,6 +479,7 @@ export default function HomePage() {
     if (!mapRef.current) { setStatus("Map not ready"); return; }
     if (!mapRef.current.isStyleLoaded()) { setStatus("Map style still loading..."); return; }
     removeImpactPoint(); setImpactResult(null); setImpactError("");
+    closeElevPopup();
     setStatus(`Loading flood tiles at ${formatLevelForDisplay(level)}...`);
     if (!addFloodLayer(level)) setStatus("Flood layer failed to attach");
   };
@@ -470,16 +543,9 @@ export default function HomePage() {
     setInputLevel(0); setInputText("0"); setSeaLevel(0); seaLevelRef.current = 0;
     removeFloodLayer(); removeImpactPoint(); clearImpactPreview();
     setImpactResult(null); setImpactError("");
-    setScenarioMode("flood"); setStatus("Flood cleared");
-  };
-
-  const fetchElevation = async (lat, lng) => {
-    try {
-      const res = await fetch(`${floodEngineUrlRef.current}/elevation?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`, { cache: "no-store" });
-      if (!res.ok) { setHoverElevation(null); return; }
-      const data = await res.json();
-      setHoverElevation(data.elevation_m);
-    } catch { setHoverElevation(null); }
+    setScenarioMode("flood");
+    closeElevPopup();
+    setStatus("Flood cleared");
   };
 
   useEffect(() => {
@@ -526,43 +592,39 @@ export default function HomePage() {
 
     const handleLoad = () => { setStatus("Map ready"); };
 
-    const handleMouseMove = (e) => {
-      const lat = Number(e.lngLat.lat.toFixed(5));
-      const lng = Number(e.lngLat.lng.toFixed(5));
-      setHoverLat(lat); setHoverLng(lng);
-      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = setTimeout(() => { fetchElevation(lat, lng); }, 120);
-    };
-
-    const handleMouseLeave = () => { setHoverLat(null); setHoverLng(null); setHoverElevation(null); };
-
     const handleClick = (e) => {
-      if (scenarioModeRef.current !== "impact") return;
-      cancelPendingImpactRequest();
-      impactRunSeqRef.current += 1;
-      setImpactLoading(false);
-      clearImpactPreview();
       const { lng, lat } = e.lngLat;
-      drawImpactPoint(lng, lat);
-      drawImpactPreview(lng, lat, impactDiameterRef.current);
-      setImpactResult(null); setImpactError("");
-      setStatus("Impact preview ready");
+
+      if (scenarioModeRef.current === "impact") {
+        // Impact mode: place impact point, no elevation popup
+        cancelPendingImpactRequest();
+        impactRunSeqRef.current += 1;
+        setImpactLoading(false);
+        clearImpactPreview();
+        drawImpactPoint(lng, lat);
+        drawImpactPreview(lng, lat, impactDiameterRef.current);
+        setImpactResult(null); setImpactError("");
+        setStatus("Impact preview ready");
+        return;
+      }
+
+      // Flood mode: show elevation popup at click location
+      showElevPopup(lng, lat);
     };
 
     map.on("error", handleError);
     map.on("load", handleLoad);
     map.on("style.load", handleStyleLoad);
-    map.on("mousemove", handleMouseMove);
-    map.on("mouseleave", handleMouseLeave);
     map.on("click", handleClick);
 
     return () => {
       cancelPendingImpactRequest();
-      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
       if (impactPulseFrameRef.current) { cancelAnimationFrame(impactPulseFrameRef.current); impactPulseFrameRef.current = null; }
-      map.off("error", handleError); map.off("load", handleLoad);
-      map.off("style.load", handleStyleLoad); map.off("mousemove", handleMouseMove);
-      map.off("mouseleave", handleMouseLeave); map.off("click", handleClick);
+      closeElevPopup();
+      map.off("error", handleError);
+      map.off("load", handleLoad);
+      map.off("style.load", handleStyleLoad);
+      map.off("click", handleClick);
       map.remove();
       mapRef.current = null; activeFloodLevelRef.current = null;
       impactPointRef.current = null; initialViewAppliedRef.current = false;
@@ -580,6 +642,7 @@ export default function HomePage() {
     if (!map || !map.isStyleLoaded()) return;
     if (scenarioMode === "impact") {
       removeFloodLayer();
+      closeElevPopup();
       setStatus(impactPointRef.current ? "Impact preview ready" : "Click map to place impact point");
       return;
     }
@@ -645,10 +708,27 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, seaLevel, unitMode, scenarioMode, impactLoading, impactResult]);
 
-  const waterDifference = hoverElevation !== null ? Number((hoverElevation - seaLevel).toFixed(2)) : null;
-
   return (
     <div style={{ width: "100%", height: "100vh", position: "relative", overflow: "hidden" }}>
+      {/* Popup dark styling injected globally */}
+      <style>{`
+        .elev-popup .mapboxgl-popup-content {
+          background: #1e3a5f;
+          color: white;
+          border-radius: 10px;
+          padding: 10px 12px;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+          min-width: 160px;
+        }
+        .elev-popup .mapboxgl-popup-close-button {
+          color: #94a3b8;
+          font-size: 16px;
+          padding: 4px 8px;
+        }
+        .elev-popup .mapboxgl-popup-close-button:hover { color: white; }
+        .elev-popup .mapboxgl-popup-tip { border-top-color: #1e3a5f; }
+      `}</style>
+
       <div ref={mapContainerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0 }} />
 
       <div onMouseDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}
@@ -731,6 +811,7 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* Info panel — cursor section removed, popup handles it now */}
       <div style={{ position: "absolute", right: 20, top: 10, background: "#1e3a5f", color: "white", padding: 16, borderRadius: 12, fontSize: 14, lineHeight: 1.45, zIndex: 1000, minWidth: 320 }}>
         <div style={{ fontWeight: 700, marginBottom: 8 }}>Current Scenario</div>
         <div style={{ color: "#facc15", fontWeight: 700 }}>Frontend build: {FRONTEND_BUILD_LABEL}</div>
@@ -768,19 +849,12 @@ export default function HomePage() {
           </>
         )}
 
-        <hr style={{ margin: "10px 0", opacity: 0.25 }} />
-        <div style={{ fontWeight: 700, marginBottom: 6 }}>Cursor</div>
-        <div>Lat: {hoverLat ?? "--"}</div>
-        <div>Lng: {hoverLng ?? "--"}</div>
-        <div>Original Elevation: {hoverElevation !== null ? unitMode === "ft" ? `${Math.round(metersToFeet(hoverElevation))} ft` : `${hoverElevation} m` : "--"}</div>
-        <div>Sea Level: {formatLevelForDisplay(seaLevel)}</div>
-        <div>
-          {waterDifference !== null
-            ? waterDifference >= 0
-              ? unitMode === "ft" ? `Above water by ${Math.round(metersToFeet(waterDifference))} ft` : `Above water by ${waterDifference} m`
-              : unitMode === "ft" ? `Underwater by ${Math.round(metersToFeet(Math.abs(waterDifference)))} ft` : `Underwater by ${Math.abs(waterDifference)} m`
-            : "--"}
-        </div>
+        {scenarioMode === "flood" && (
+          <>
+            <hr style={{ margin: "10px 0", opacity: 0.25 }} />
+            <div style={{ fontSize: 12, color: "#94a3b8" }}>Click map to see elevation</div>
+          </>
+        )}
       </div>
     </div>
   );
