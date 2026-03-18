@@ -23,7 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v56";
+const FRONTEND_BUILD_LABEL = "v57";
 
 const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
@@ -81,6 +81,7 @@ export default function HomePage() {
   const [nukeLoading, setNukeLoading] = useState(false);
   const [nukeError, setNukeError] = useState("");
   const nukePointRef = useRef(null);
+  const [nukePointSet, setNukePointSet] = useState(false);
   const [impactResult, setImpactResult] = useState(null);
   const [impactLoading, setImpactLoading] = useState(false);
   const [impactError, setImpactError] = useState("");
@@ -576,7 +577,7 @@ export default function HomePage() {
     try {
       const { lng, lat } = nukePointRef.current;
       const res = await fetch(
-        `${floodEngineUrlRef.current}/nuke?lat=${lat}&lng=${lng}&yield_kt=${nukeYield}&burst_type=${nukeBurst}&wind_deg=${nukeWindDeg}&_=${Date.now()}`,
+        `${floodEngineUrlRef.current}/nuke?lat=${lat}&lng=${lng}&yield_kt=${Number(nukeYield).toFixed(3)}&burst_type=${nukeBurst}&wind_deg=${Number(nukeWindDeg).toFixed(1)}&_=${Date.now()}`,
         { cache: "no-store" }
       );
       if (!res.ok) throw new Error("Nuke request failed");
@@ -755,6 +756,7 @@ export default function HomePage() {
 
       if (scenarioModeRef.current === "nuke") {
         nukePointRef.current = { lng, lat };
+        setNukePointSet(true);
         clearImpactPreview();
         drawImpactPoint(lng, lat);
         setNukeResult(null); setNukeError("");
@@ -858,7 +860,7 @@ export default function HomePage() {
       return;
     }
     if (scenarioMode === "nuke") {
-      setStatus(nukePointRef.current
+      setStatus(nukePointSet
         ? nukeLoading ? "Detonating..." : nukeResult ? `${nukeResult.severity_class} — ${nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"}` : "Nuke point placed — detonate"
         : "Click map to place detonation point"
       );
@@ -868,7 +870,7 @@ export default function HomePage() {
     if (seaLevel === 0) { setStatus("Flood cleared"); return; }
     setStatus(`Flood tiles loaded at ${formatLevelForDisplay(seaLevel)}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, seaLevel, unitMode, scenarioMode, impactLoading, impactResult]);
+  }, [viewMode, seaLevel, unitMode, scenarioMode, impactLoading, impactResult, nukeLoading, nukeResult, nukePointSet]);
 
   // ─── Derived display values for the collapsed strip ───────────────────────
   const stripLabel = scenarioMode === "impact"
@@ -980,7 +982,7 @@ export default function HomePage() {
           <div style={{ fontSize: 12, opacity: 0.85, marginTop: 3 }}>Click map to place impact point</div>
         </button>
         <button
-          onClick={() => { setScenarioMode("nuke"); clearImpactPreview(); setNukeResult(null); setNukeError(""); }}
+          onClick={() => { setScenarioMode("nuke"); clearImpactPreview(); setNukeResult(null); setNukeError(""); setNukePointSet(false); nukePointRef.current = null; }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "nuke" ? "#7c3aed" : "white", color: scenarioMode === "nuke" ? "white" : "#111827", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>☢️ Nuke</div>
           <div style={{ fontSize: 12, opacity: 0.85, marginTop: 3 }}>Click map to place detonation point</div>
@@ -1396,7 +1398,7 @@ export default function HomePage() {
         {/* Center: big CTA button */}
         <button
           onClick={handleStripCTA}
-          disabled={(scenarioMode === "impact" && impactLoading) || (scenarioMode === "nuke" && nukeLoading)}
+          disabled={(scenarioMode === "impact" && impactLoading) || (scenarioMode === "nuke" && (nukeLoading || !nukePointSet))}
           style={{
             flexShrink: 0,
             padding: "0 20px",
