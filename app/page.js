@@ -23,7 +23,12 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v47";
+const FRONTEND_BUILD_LABEL = "v48";
+
+// Wave height threshold above which we use global flood overlay
+// instead of bounded /flood-region tiles. At 1500m+ the wave is
+// extinction-scale and floods everywhere regardless of barriers.
+const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -310,16 +315,12 @@ export default function HomePage() {
     } catch (e) { console.error("DRAW OCEAN MARKER ERROR", e); return false; }
   };
 
-  // FIX v46/v47: removed isStyleLoaded() check — it briefly returns false
-  // after adding GeoJSON layers, causing the flood layer to silently fail.
   const addFloodLayer = (level, opts = {}) => {
     const map = mapRef.current;
     if (!map || !floodAllowedInCurrentView()) return false;
     const normalizedLevel = Number(level);
     if (!Number.isFinite(normalizedLevel) || normalizedLevel === 0) return false;
 
-    // v47: for ocean impacts, use /flood-region which bounds flooding by tsunami reach
-    // opts: { impactLat, impactLng, reachM } for regional flood
     const { impactLat, impactLng, reachM } = opts;
     const isRegional = impactLat != null && impactLng != null && reachM != null && reachM > 0;
 
@@ -352,6 +353,17 @@ export default function HomePage() {
     const waveHeight = Number(result.wave_height_m ?? 0);
     const reachM = Number(result.estimated_wave_reach_m ?? result.tsunami_radius_m ?? 0);
     if (waveHeight <= 0) return false;
+
+    // Extinction scale: wave >= 1500m means global catastrophe.
+    // Use the regular global flood overlay at wave_height_m — everything
+    // below that elevation floods worldwide. No need for bounded region.
+    if (waveHeight >= EXTINCTION_WAVE_HEIGHT_M) {
+      const ok = addFloodLayer(waveHeight);
+      if (!ok) setTimeout(() => { addFloodLayer(waveHeight); }, 50);
+      return true;
+    }
+
+    // Normal tsunami: bounded /flood-region tiles with ray blocking
     const ok = addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM });
     if (!ok) {
       setTimeout(() => { addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM }); }, 50);
@@ -429,7 +441,11 @@ export default function HomePage() {
         applyOceanImpactFlood(data, impactPointRef.current.lng, impactPointRef.current.lat);
         const wh = Math.round(Number(data.wave_height_m));
         const reach = Math.round(Number(data.estimated_wave_reach_m ?? 0) / 1000);
-        setStatus(`Ocean impact — ${wh}m wave, ${reach}km reach`);
+        const isExtinction = wh >= EXTINCTION_WAVE_HEIGHT_M;
+        setStatus(isExtinction
+          ? `Extinction scale impact — ${wh}m global wave`
+          : `Ocean impact — ${wh}m wave, ${reach}km reach`
+        );
       } else {
         drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, data);
         setStatus("Land impact simulation complete");
@@ -606,12 +622,17 @@ export default function HomePage() {
   useEffect(() => {
     if (!mapRef.current) return;
     if (scenarioMode === "impact") {
+      const wh = Math.round(Number(impactResult?.wave_height_m ?? 0));
+      const reach = Math.round(Number(impactResult?.estimated_wave_reach_m ?? 0) / 1000);
+      const isExtinction = wh >= EXTINCTION_WAVE_HEIGHT_M;
       setStatus(
         impactPointRef.current
           ? impactLoading ? "Running impact simulation..."
             : impactResult
               ? impactResult.is_ocean_impact
-                ? `Ocean impact — ${Math.round(Number(impactResult.wave_height_m ?? 0))}m wave, ${Math.round(Number(impactResult.estimated_wave_reach_m ?? 0) / 1000)}km reach`
+                ? isExtinction
+                  ? `Extinction scale impact — ${wh}m global wave`
+                  : `Ocean impact — ${wh}m wave, ${reach}km reach`
                 : "Land impact simulation complete"
               : "Impact preview ready"
           : "Click map to place impact point"
@@ -733,7 +754,9 @@ export default function HomePage() {
             {impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0 && (
               <>
                 <div>Wave Height: {Math.round(Number(impactResult.wave_height_m ?? 0)).toLocaleString()} m</div>
-                <div>Tsunami Reach: {Math.round(Number(impactResult.estimated_wave_reach_m ?? 0) / 1000).toLocaleString()} km</div>
+                {Number(impactResult.wave_height_m ?? 0) < EXTINCTION_WAVE_HEIGHT_M && (
+                  <div>Tsunami Reach: {Math.round(Number(impactResult.estimated_wave_reach_m ?? 0) / 1000).toLocaleString()} km</div>
+                )}
               </>
             )}
             <div>Severity: {impactResult.severity_class ?? "--"}</div>
