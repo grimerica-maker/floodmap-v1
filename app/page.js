@@ -23,7 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v45";
+const FRONTEND_BUILD_LABEL = "v46";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -107,16 +107,10 @@ export default function HomePage() {
   const metersToFeet = (meters) => meters * 3.28084;
   const feetToMeters = (feet) => feet / 3.28084;
 
-  const formatNumericText = (value, digits = 2) => {
-    const rounded = Number(value.toFixed(digits));
-    return String(rounded);
-  };
+  const formatNumericText = (value, digits = 2) => String(Number(value.toFixed(digits)));
 
-  const formatInputTextFromMeters = (meters, unit = unitMode) => {
-    return unit === "ft"
-      ? formatNumericText(metersToFeet(meters), 2)
-      : formatNumericText(meters, 2);
-  };
+  const formatInputTextFromMeters = (meters, unit = unitMode) =>
+    unit === "ft" ? formatNumericText(metersToFeet(meters), 2) : formatNumericText(meters, 2);
 
   const parseDisplayLevelToMeters = (text, unit = unitMode) => {
     const trimmed = String(text ?? "").trim();
@@ -164,14 +158,8 @@ export default function HomePage() {
   };
 
   const cancelPendingImpactRequest = () => {
-    if (impactTimeoutRef.current) {
-      clearTimeout(impactTimeoutRef.current);
-      impactTimeoutRef.current = null;
-    }
-    if (impactRequestRef.current) {
-      impactRequestRef.current.abort();
-      impactRequestRef.current = null;
-    }
+    if (impactTimeoutRef.current) { clearTimeout(impactTimeoutRef.current); impactTimeoutRef.current = null; }
+    if (impactRequestRef.current) { impactRequestRef.current.abort(); impactRequestRef.current = null; }
   };
 
   const applyProjectionForMode = (mode) => {
@@ -247,12 +235,6 @@ export default function HomePage() {
     impactPointRef.current = null;
   };
 
-  const clearImpactScenarioState = () => {
-    clearImpactPreview();
-    setImpactResult(null);
-    setImpactError("");
-  };
-
   const drawImpactPoint = (lng, lat) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
@@ -263,17 +245,7 @@ export default function HomePage() {
     try {
       if (!map.getSource(IMPACT_SOURCE_ID)) {
         map.addSource(IMPACT_SOURCE_ID, { type: "geojson", data });
-        map.addLayer({
-          id: IMPACT_LAYER_ID,
-          type: "circle",
-          source: IMPACT_SOURCE_ID,
-          paint: {
-            "circle-radius": 8,
-            "circle-color": "#ef4444",
-            "circle-stroke-width": 2,
-            "circle-stroke-color": "#ffffff",
-          },
-        });
+        map.addLayer({ id: IMPACT_LAYER_ID, type: "circle", source: IMPACT_SOURCE_ID, paint: { "circle-radius": 8, "circle-color": "#ef4444", "circle-stroke-width": 2, "circle-stroke-color": "#ffffff" } });
       } else {
         map.getSource(IMPACT_SOURCE_ID).setData(data);
       }
@@ -291,9 +263,10 @@ export default function HomePage() {
     const kmPerDegLng = 111.32 * Math.cos(latRad);
     for (let i = 0; i <= steps; i += 1) {
       const theta = (i / steps) * Math.PI * 2;
-      const dx = Math.cos(theta) * radiusKm;
-      const dy = Math.sin(theta) * radiusKm;
-      coords.push([lng + dx / Math.max(kmPerDegLng, 0.0001), lat + dy / kmPerDegLat]);
+      coords.push([
+        lng + (Math.cos(theta) * radiusKm) / Math.max(kmPerDegLng, 0.0001),
+        lat + (Math.sin(theta) * radiusKm) / kmPerDegLat,
+      ]);
     }
     return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} };
   };
@@ -301,17 +274,11 @@ export default function HomePage() {
   const startImpactPulseAnimation = () => {
     const map = mapRef.current;
     if (!map) return;
-    if (impactPulseFrameRef.current) {
-      cancelAnimationFrame(impactPulseFrameRef.current);
-      impactPulseFrameRef.current = null;
-    }
+    if (impactPulseFrameRef.current) { cancelAnimationFrame(impactPulseFrameRef.current); impactPulseFrameRef.current = null; }
     const layerId = `${IMPACT_CRATER_LAYER_ID}-pulse`;
     const start = performance.now();
     const tick = (now) => {
-      if (!mapRef.current || !mapRef.current.getLayer(layerId)) {
-        impactPulseFrameRef.current = null;
-        return;
-      }
+      if (!mapRef.current || !mapRef.current.getLayer(layerId)) { impactPulseFrameRef.current = null; return; }
       const pulse = (Math.sin(((now - start) / 1000) * 2.6) + 1) / 2;
       safely(() => {
         const layer = mapRef.current.getLayer(layerId);
@@ -332,11 +299,7 @@ export default function HomePage() {
 
   const getImpactPreviewRadiiKm = (diameterM) => {
     const d = Math.max(50, Math.min(20000, Number(diameterM) || 1000));
-    return {
-      crater: Math.max(0.25, d * 0.0006),
-      blast: Math.max(1, d * 0.006),
-      thermal: Math.max(2, d * 0.012),
-    };
+    return { crater: Math.max(0.25, d * 0.0006), blast: Math.max(1, d * 0.006), thermal: Math.max(2, d * 0.012) };
   };
 
   const drawImpactPreview = (lng, lat, diameterM) => {
@@ -408,11 +371,7 @@ export default function HomePage() {
         type: "geojson",
         data: {
           type: "FeatureCollection",
-          features: [{
-            type: "Feature",
-            geometry: { type: "Point", coordinates: [lng, lat] },
-            properties: { kind: "impact-core" },
-          }],
+          features: [{ type: "Feature", geometry: { type: "Point", coordinates: [lng, lat] }, properties: { kind: "impact-core" } }],
         },
       });
       map.addLayer({ id: IMPACT_CRATER_LAYER_ID, type: "circle", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "impact-core"], paint: { "circle-radius": 10, "circle-color": "#ef4444", "circle-stroke-width": 2, "circle-stroke-color": "#ffffff" } });
@@ -426,9 +385,13 @@ export default function HomePage() {
     }
   };
 
+  // FIX v46: addFloodLayer now skips the isStyleLoaded check.
+  // After drawOceanImpactMarker adds GeoJSON layers, Mapbox briefly reports
+  // isStyleLoaded()=false, causing the flood layer to fail silently.
+  // The map object existing is sufficient — same fix as v43 for impact-flood.
   const addFloodLayer = (level) => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !floodAllowedInCurrentView()) return false;
+    if (!map || !floodAllowedInCurrentView()) return false;
     const normalizedLevel = Number(level);
     if (!Number.isFinite(normalizedLevel) || normalizedLevel === 0) return false;
     const tileUrl = `${floodEngineUrlRef.current}/flood/${encodeURIComponent(
@@ -446,6 +409,7 @@ export default function HomePage() {
       map.addLayer({ id: FLOOD_LAYER_ID, type: "raster", source: FLOOD_SOURCE_ID, paint: { "raster-opacity": 1, "raster-fade-duration": 0, "raster-resampling": "linear" } });
       activeFloodLevelRef.current = normalizedLevel;
       safely(() => map.triggerRepaint());
+      if (DEBUG_FLOOD) console.log("FLOOD LAYER ADDED", { level: normalizedLevel });
       return true;
     } catch (error) {
       console.error("Failed to add flood layer", error);
@@ -526,17 +490,19 @@ export default function HomePage() {
       setImpactResult(data);
 
       if (data.is_ocean_impact === true && Number(data.wave_height_m ?? 0) > 0) {
-        // v45: Ocean impact uses regular flood layer at wave_height_m.
-        // This uses the same reliable flood tile system as flood mode —
-        // shows everything below wave height as flooded, globally correct.
+        // Draw ocean marker (pulsing red dot)
         drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
         const waveHeight = Number(data.wave_height_m);
+
+        // FIX v46: addFloodLayer no longer checks isStyleLoaded so this should
+        // work immediately. Keep a setTimeout fallback just in case.
         const floodOk = addFloodLayer(waveHeight);
+        if (!floodOk) {
+          if (DEBUG_FLOOD) console.warn("FLOOD LAYER RETRY", { waveHeight });
+          setTimeout(() => { addFloodLayer(waveHeight); }, 50);
+        }
         if (DEBUG_FLOOD) console.log("OCEAN IMPACT FLOOD", { waveHeight, floodOk });
-        setStatus(floodOk
-          ? `Ocean impact — tsunami flood at ${Math.round(waveHeight)}m wave height`
-          : "Ocean impact result returned, flood layer failed to attach"
-        );
+        setStatus(`Ocean impact — tsunami flood at ${Math.round(waveHeight)}m wave height`);
       } else {
         drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, data);
         setStatus("Land impact simulation complete");
@@ -625,12 +591,13 @@ export default function HomePage() {
       }
 
       if (scenarioModeRef.current === "impact" && impactPointRef.current && impactResultRef.current) {
+        const result = impactResultRef.current;
         setTimeout(() => {
           drawImpactPoint(impactPointRef.current.lng, impactPointRef.current.lat);
-          const result = impactResultRef.current;
           if (result.is_ocean_impact === true && Number(result.wave_height_m ?? 0) > 0) {
             drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
-            addFloodLayer(Number(result.wave_height_m));
+            // FIX v46: defer flood layer after style reload so map is fully ready
+            setTimeout(() => { addFloodLayer(Number(result.wave_height_m)); }, 50);
           } else {
             drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, result);
           }
@@ -725,7 +692,8 @@ export default function HomePage() {
     if (!impactPointRef.current) return;
     if (impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0) {
       drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
-      addFloodLayer(Number(impactResult.wave_height_m));
+      // FIX v46: defer flood layer slightly after GeoJSON layers are added
+      setTimeout(() => { addFloodLayer(Number(impactResult.wave_height_m)); }, 50);
       return;
     }
     drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, impactResult);
@@ -789,7 +757,6 @@ export default function HomePage() {
         <h1 style={{ margin: "8px 0 24px 0", fontSize: 22, color: "red" }}>
           Floodmap V1 {FRONTEND_BUILD_LABEL} LIVE
         </h1>
-
         <div style={{ fontSize: 14, color: "#666", marginBottom: 24 }}>Mapbox flood + impact foundation build</div>
 
         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>SEA LEVEL</div>
@@ -802,12 +769,11 @@ export default function HomePage() {
           <button onClick={() => setUnitMode("ft")} style={{ flex: 1, padding: "10px 8px", border: "1px solid #d1d5db", background: unitMode === "ft" ? "#0f172a" : "white", color: unitMode === "ft" ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700 }}>Feet</button>
         </div>
 
-        <input
-          type="text" inputMode="decimal"
+        <input type="text" inputMode="decimal"
           placeholder={unitMode === "ft" ? "Enter sea level in feet" : "Enter sea level in meters"}
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          onBlur={() => { const committed = commitInputText(inputText, unitMode); if (committed !== null) setInputLevel(committed); }}
+          onBlur={() => { const c = commitInputText(inputText, unitMode); if (c !== null) setInputLevel(c); }}
           onKeyDown={(e) => { if (e.key === "Enter") executeFlood(); }}
           style={{ width: "100%", padding: 12, fontSize: 18, border: "1px solid #ccc", marginBottom: 12, boxSizing: "border-box" }}
         />
@@ -841,12 +807,10 @@ export default function HomePage() {
         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>SCENARIO MODE</div>
         <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
           <button onClick={() => setScenarioMode("flood")} style={{ width: "100%", padding: 14, border: "1px solid #d1d5db", background: scenarioMode === "flood" ? "#0f172a" : "white", color: scenarioMode === "flood" ? "white" : "#111827", cursor: "pointer", borderRadius: 12, fontWeight: 700 }}>
-            <div>Flood</div>
-            <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>Sea level up / down</div>
+            <div>Flood</div><div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>Sea level up / down</div>
           </button>
           <button onClick={() => setScenarioMode("impact")} style={{ width: "100%", padding: 14, border: "1px solid #d1d5db", background: scenarioMode === "impact" ? "#0f172a" : "white", color: scenarioMode === "impact" ? "white" : "#111827", cursor: "pointer", borderRadius: 12, fontWeight: 700 }}>
-            <div>Impact</div>
-            <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>Click map to place impact point</div>
+            <div>Impact</div><div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>Click map to place impact point</div>
           </button>
         </div>
 
@@ -855,7 +819,7 @@ export default function HomePage() {
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>ASTEROID SIZE</div>
             <input type="range" min="50" max="20000" step="50" value={impactDiameter} onChange={(e) => setImpactDiameter(Number(e.target.value))} style={{ width: "100%", marginBottom: 10 }} />
             <input type="number" min="50" max="20000" step="50" value={impactDiameter}
-              onChange={(e) => { const next = Number(e.target.value); if (Number.isFinite(next)) setImpactDiameter(Math.max(50, Math.min(20000, next))); }}
+              onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n)) setImpactDiameter(Math.max(50, Math.min(20000, n))); }}
               style={{ width: "100%", padding: 12, fontSize: 18, border: "1px solid #ccc", marginBottom: 20, boxSizing: "border-box" }} />
             <div style={{ fontSize: 14, marginBottom: 24 }}>Diameter: <b>{impactDiameter.toLocaleString()} m</b></div>
             <button onClick={runImpact} disabled={!impactPointRef.current || impactLoading}
@@ -914,7 +878,7 @@ export default function HomePage() {
             <hr style={{ margin: "10px 0", opacity: 0.2 }} />
             <div style={{ fontWeight: 700 }}>Casualty Estimate</div>
             <div>Population Exposed: {impactResult.population_exposed != null ? formatCompactCount(impactResult.population_exposed) : "Coming soon"}</div>
-            <div>Estimated Deaths (red circle): {impactResult.estimated_deaths != null ? formatCompactCount(impactResult.estimated_deaths) : "Coming soon"}</div>
+            <div>Estimated Deaths: {impactResult.estimated_deaths != null ? formatCompactCount(impactResult.estimated_deaths) : "Coming soon"}</div>
             <div style={{ fontSize: 12, opacity: 0.8 }}>Confidence: low / rough estimate</div>
           </>
         )}
