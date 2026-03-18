@@ -78,6 +78,7 @@ export default function HomePage() {
   const [unitMode, setUnitMode] = useState("m");
   const [status, setStatus] = useState("Loading map...");
   const [floodEngineUrl, setFloodEngineUrl] = useState(FLOOD_ENGINE_PROXY_PATH);
+  const [impactFloodRunId, setImpactFloodRunId] = useState(null);
 
   const [hoverLat, setHoverLat] = useState(null);
   const [hoverLng, setHoverLng] = useState(null);
@@ -260,6 +261,7 @@ export default function HomePage() {
     }
 
     impactFloodRunIdRef.current = null;
+    setImpactFloodRunId(null);
   };
 
   const removeImpactPreviewLayers = () => {
@@ -323,6 +325,7 @@ export default function HomePage() {
     setImpactResult(null);
     setImpactError("");
     impactFloodRunIdRef.current = null;
+    setImpactFloodRunId(null);
   };
 
   const drawImpactPoint = (lng, lat) => {
@@ -803,6 +806,7 @@ export default function HomePage() {
       });
 
       impactFloodRunIdRef.current = runId;
+      setImpactFloodRunId(runId);
 
       console.log("IMPACT FLOOD LAYER ADDED", {
         runId,
@@ -811,27 +815,19 @@ export default function HomePage() {
         hasLayer: !!map.getLayer(IMPACT_FLOOD_LAYER_ID),
       });
 
-      map.once("error", (event) => {
-        const msg = event?.error?.message || event?.message || "";
-        if (
-          msg.includes("/impact-flood/") &&
-          (msg.includes("404") || msg.includes("Not Found"))
-        ) {
-          console.warn("Impact run expired or missing, clearing stale frontend state");
-          clearImpactScenarioState();
-          setStatus("Impact run expired. Run impact again.");
-        }
-      });
-
       safely(() => map.triggerRepaint());
 
-      return !!map.getSource(IMPACT_FLOOD_SOURCE_ID) && !!map.getLayer(IMPACT_FLOOD_LAYER_ID);
+      return (
+        !!map.getSource(IMPACT_FLOOD_SOURCE_ID) &&
+        !!map.getLayer(IMPACT_FLOOD_LAYER_ID)
+      );
     } catch (error) {
       console.error("IMPACT FLOOD LAYER ERROR", error, {
         runId,
         tileUrl,
       });
       impactFloodRunIdRef.current = null;
+      setImpactFloodRunId(null);
       return false;
     }
   };
@@ -1120,6 +1116,7 @@ export default function HomePage() {
 
     setImpactResult(null);
     setImpactError("");
+    setImpactFloodRunId(null);
 
     setScenarioMode("flood");
     setStatus("Flood cleared");
@@ -1322,14 +1319,27 @@ export default function HomePage() {
   }, [scenarioMode]);
 
   useEffect(() => {
-    if (_.current && _.current.isStyleLoaded() && "impact" === $ && en && N.current) {
-      if (en.is_ocean_impact === true) {
-        eV(N.current.lng, N.current.lat, en);
-        if (en.run_id) eG(en.run_id);
-        return;
+    if (!mapRef.current || !mapRef.current.isStyleLoaded()) return;
+    if (scenarioMode !== "impact") return;
+    if (!impactResult || !impactPointRef.current) return;
+
+    if (impactResult.is_ocean_impact === true) {
+      drawOceanImpactFromResult(
+        impactPointRef.current.lng,
+        impactPointRef.current.lat,
+        impactResult
+      );
+      if (impactResult.run_id) {
+        addImpactFloodLayer(impactResult.run_id);
       }
-      eY(N.current.lng, N.current.lat, en);
+      return;
     }
+
+    drawLandImpactFromResult(
+      impactPointRef.current.lng,
+      impactPointRef.current.lat,
+      impactResult
+    );
   }, [impactResult, scenarioMode]);
 
   useEffect(() => {
@@ -1372,7 +1382,7 @@ export default function HomePage() {
             ? "Running impact simulation..."
             : impactResult
             ? impactResult.is_ocean_impact
-              ? impactFloodRunIdRef.current
+              ? impactFloodRunId
                 ? "Ocean impact simulation complete"
                 : "Ocean impact result returned, flood layer failed to attach"
               : "Land impact simulation complete"
@@ -1394,7 +1404,7 @@ export default function HomePage() {
 
     setStatus(`Flood tiles loaded at ${formatLevelForDisplay(seaLevel)}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, seaLevel, unitMode, scenarioMode, impactLoading, impactResult]);
+  }, [viewMode, seaLevel, unitMode, scenarioMode, impactLoading, impactResult, impactFloodRunId]);
 
   const waterDifference =
     hoverElevation !== null
@@ -1829,7 +1839,7 @@ export default function HomePage() {
             : "--"}
         </div>
         <div>Asteroid Diameter: {impactDiameter.toLocaleString()} m</div>
-        <div>Impact Flood Run: {impactFloodRunIdRef.current || "--"}</div>
+        <div>Impact Flood Run: {impactFloodRunId || "--"}</div>
 
         {impactError && (
           <>
