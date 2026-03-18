@@ -23,11 +23,13 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const IMPACT_FLOOD_SOURCE_ID = "impact-flood-source";
-const IMPACT_FLOOD_LAYER_ID = "impact-flood-layer";
+// FIX v44: No longer using static IMPACT_FLOOD_SOURCE_ID / IMPACT_FLOOD_LAYER_ID constants.
+// Each run now gets unique IDs: impact-flood-source-{runId} and impact-flood-layer-{runId}.
+// This prevents zombie state when Mapbox is still fetching tiles for the old layer
+// and we try to remove + re-add with the same ID on a second impact click.
 const IMPACT_FLOOD_TILE_VERSION = "56";
 
-const FRONTEND_BUILD_LABEL = "v43";
+const FRONTEND_BUILD_LABEL = "v44";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -68,6 +70,10 @@ export default function HomePage() {
   const pendingImpactFloodRunIdRef = useRef(null);
   const initialViewAppliedRef = useRef(false);
   const impactRunSeqRef = useRef(0);
+
+  // FIX v44: track the active flood layer IDs so we can remove exactly the right ones
+  const activeImpactFloodLayerIdRef = useRef(null);
+  const activeImpactFloodSourceIdRef = useRef(null);
 
   const [inputLevel, setInputLevel] = useState(0);
   const [inputText, setInputText] = useState("0");
@@ -210,15 +216,36 @@ export default function HomePage() {
     activeFloodLevelRef.current = null;
   };
 
+  // FIX v44: removeImpactFloodLayer now removes by the tracked unique IDs,
+  // not a static constant. This prevents trying to remove a layer that was
+  // already removed or never added with that name.
   const removeImpactFloodLayer = () => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map) {
+      activeImpactFloodLayerIdRef.current = null;
+      activeImpactFloodSourceIdRef.current = null;
+      pendingImpactFloodRunIdRef.current = null;
+      setImpactFloodRunId(null);
+      return;
+    }
+
+    const layerId = activeImpactFloodLayerIdRef.current;
+    const sourceId = activeImpactFloodSourceIdRef.current;
+
     try {
-      if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) map.removeLayer(IMPACT_FLOOD_LAYER_ID);
-      if (map.getSource(IMPACT_FLOOD_SOURCE_ID)) map.removeSource(IMPACT_FLOOD_SOURCE_ID);
+      if (layerId && map.getLayer(layerId)) map.removeLayer(layerId);
     } catch (error) {
       console.warn("Failed removing impact flood layer:", error);
     }
+
+    try {
+      if (sourceId && map.getSource(sourceId)) map.removeSource(sourceId);
+    } catch (error) {
+      console.warn("Failed removing impact flood source:", error);
+    }
+
+    activeImpactFloodLayerIdRef.current = null;
+    activeImpactFloodSourceIdRef.current = null;
     pendingImpactFloodRunIdRef.current = null;
     setImpactFloodRunId(null);
   };
@@ -450,14 +477,16 @@ export default function HomePage() {
     }
   };
 
-  // FIX v43: Removed !map.isStyleLoaded() guard.
-  // After addSource/addLayer calls for GeoJSON preview layers, Mapbox briefly
-  // reports isStyleLoaded()=false even though the style is intact.
-  // That false reading caused this function to always bail out and defer,
-  // so tsunami tiles never attached. The map object existing is sufficient.
+  // FIX v44: Each call uses unique source/layer IDs scoped to the runId.
+  // This means a second impact click never conflicts with a still-loading
+  // raster tile set from the previous run. Old layers are cleaned up by
+  // removeImpactFloodLayer() which tracks the active IDs in refs.
   const attachImpactFloodLayerNow = (runId) => {
     const map = mapRef.current;
     if (!map || !runId) return false;
+
+    const sourceId = `impact-flood-source-${runId}`;
+    const layerId = `impact-flood-layer-${runId}`;
 
     const tileUrl = `${floodEngineUrlRef.current}/impact-flood/${encodeURIComponent(
       runId
@@ -466,38 +495,52 @@ export default function HomePage() {
     )}&t=${Date.now()}`;
 
     try {
-      if (map.getLayer(IMPACT_FLOOD_LAYER_ID)) map.removeLayer(IMPACT_FLOOD_LAYER_ID);
-      if (map.getSource(IMPACT_FLOOD_SOURCE_ID)) map.removeSource(IMPACT_FLOOD_SOURCE_ID);
+      // Clean up previous run's layer/source by tracked IDs before adding new ones
+      const prevLayerId = activeImpactFloodLayerIdRef.current;
+      const prevSourceId = activeImpactFloodSourceIdRef.current;
+      if (prevLayerId && prevLayerId !== layerId) {
+        try { if (map.getLayer(prevLayerId)) map.removeLayer(prevLayerId); } catch (_) {}
+      }
+      if (prevSourceId && prevSourceId !== sourceId) {
+        try { if (map.getSource(prevSourceId)) map.removeSource(prevSourceId); } catch (_) {}
+      }
 
-      map.addSource(IMPACT_FLOOD_SOURCE_ID, {
-        type: "raster",
-        tiles: [tileUrl],
-        tileSize: 256,
-        minzoom: 0,
-        maxzoom: 22,
-        scheme: "xyz",
-      });
+      // Add fresh source and layer for this run
+      if (!map.getSource(sourceId)) {
+        map.addSource(sourceId, {
+          type: "raster",
+          tiles: [tileUrl],
+          tileSize: 256,
+          minzoom: 0,
+          maxzoom: 22,
+          scheme: "xyz",
+        });
+      }
 
-      map.addLayer({
-        id: IMPACT_FLOOD_LAYER_ID,
-        type: "raster",
-        source: IMPACT_FLOOD_SOURCE_ID,
-        paint: {
-          "raster-opacity": 1,
-          "raster-fade-duration": 0,
-          "raster-resampling": "linear",
-        },
-      });
+      if (!map.getLayer(layerId)) {
+        map.addLayer({
+          id: layerId,
+          type: "raster",
+          source: sourceId,
+          paint: {
+            "raster-opacity": 1,
+            "raster-fade-duration": 0,
+            "raster-resampling": "linear",
+          },
+        });
+      }
 
+      activeImpactFloodLayerIdRef.current = layerId;
+      activeImpactFloodSourceIdRef.current = sourceId;
       pendingImpactFloodRunIdRef.current = null;
       setImpactFloodRunId(runId);
 
       if (DEBUG_FLOOD) {
         console.log("IMPACT FLOOD LAYER ADDED", {
           runId,
+          layerId,
+          sourceId,
           tileUrl,
-          hasSource: !!map.getSource(IMPACT_FLOOD_SOURCE_ID),
-          hasLayer: !!map.getLayer(IMPACT_FLOOD_LAYER_ID),
         });
       }
 
@@ -505,16 +548,11 @@ export default function HomePage() {
       return true;
     } catch (error) {
       console.error("IMPACT FLOOD LAYER ERROR", error, { runId, tileUrl });
-      // FIX v43: Clear pending on failure so idle handler stops retrying forever
       pendingImpactFloodRunIdRef.current = null;
       return false;
     }
   };
 
-  // FIX v43: Always call attachImpactFloodLayerNow directly.
-  // The old deferral path (storing runId and waiting for style.load/idle)
-  // was the root cause — style.load doesn't re-fire when you just add GeoJSON layers,
-  // and idle fires too late or not at all in some cases.
   const addImpactFloodLayer = (runId) => {
     const map = mapRef.current;
     if (!map || !runId) {
@@ -630,10 +668,6 @@ export default function HomePage() {
           impactPointRef.current.lat,
           data
         );
-        // FIX v43: Call attachImpactFloodLayerNow directly.
-        // drawOceanImpactFromResult adds GeoJSON layers which briefly makes
-        // isStyleLoaded() return false — so the old addImpactFloodLayer call
-        // would defer and the tiles would never load.
         const floodOk = data.run_id ? attachImpactFloodLayerNow(data.run_id) : false;
         if (DEBUG_FLOOD) console.log("OCEAN IMPACT APPLY", { oceanOk, floodOk, runId: data.run_id });
         setStatus(floodOk ? "Ocean impact simulation complete" : "Ocean impact result returned, flood layer failed to attach");
@@ -742,7 +776,6 @@ export default function HomePage() {
         }, 50);
       }
 
-      // FIX v43: Clear pending ref before attaching so we don't leave stale state
       if (pendingImpactFloodRunIdRef.current) {
         const runId = pendingImpactFloodRunIdRef.current;
         pendingImpactFloodRunIdRef.current = null;
@@ -750,8 +783,6 @@ export default function HomePage() {
       }
     };
 
-    // FIX v43: Always clear pendingImpactFloodRunIdRef whether attach succeeds or fails.
-    // Old code left it set on failure, causing idle to retry on every map render forever.
     const handleIdle = () => {
       if (pendingImpactFloodRunIdRef.current && mapRef.current) {
         const runId = pendingImpactFloodRunIdRef.current;
@@ -816,6 +847,8 @@ export default function HomePage() {
       activeFloodLevelRef.current = null;
       impactPointRef.current = null;
       pendingImpactFloodRunIdRef.current = null;
+      activeImpactFloodLayerIdRef.current = null;
+      activeImpactFloodSourceIdRef.current = null;
       initialViewAppliedRef.current = false;
     };
   }, [floodEngineUrl]);
