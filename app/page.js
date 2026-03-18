@@ -23,13 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-// FIX v44: No longer using static IMPACT_FLOOD_SOURCE_ID / IMPACT_FLOOD_LAYER_ID constants.
-// Each run now gets unique IDs: impact-flood-source-{runId} and impact-flood-layer-{runId}.
-// This prevents zombie state when Mapbox is still fetching tiles for the old layer
-// and we try to remove + re-add with the same ID on a second impact click.
-const IMPACT_FLOOD_TILE_VERSION = "56";
-
-const FRONTEND_BUILD_LABEL = "v44";
+const FRONTEND_BUILD_LABEL = "v45";
 
 const PRESETS = [
   { label: "Ice Age", value: -120 },
@@ -67,13 +61,8 @@ export default function HomePage() {
   const impactPointRef = useRef(null);
   const impactResultRef = useRef(null);
   const activeFloodLevelRef = useRef(null);
-  const pendingImpactFloodRunIdRef = useRef(null);
   const initialViewAppliedRef = useRef(false);
   const impactRunSeqRef = useRef(0);
-
-  // FIX v44: track the active flood layer IDs so we can remove exactly the right ones
-  const activeImpactFloodLayerIdRef = useRef(null);
-  const activeImpactFloodSourceIdRef = useRef(null);
 
   const [inputLevel, setInputLevel] = useState(0);
   const [inputText, setInputText] = useState("0");
@@ -87,7 +76,6 @@ export default function HomePage() {
   const [unitMode, setUnitMode] = useState("m");
   const [status, setStatus] = useState("Loading map...");
   const [floodEngineUrl, setFloodEngineUrl] = useState(FLOOD_ENGINE_PROXY_PATH);
-  const [impactFloodRunId, setImpactFloodRunId] = useState(null);
 
   const [hoverLat, setHoverLat] = useState(null);
   const [hoverLng, setHoverLng] = useState(null);
@@ -216,40 +204,6 @@ export default function HomePage() {
     activeFloodLevelRef.current = null;
   };
 
-  // FIX v44: removeImpactFloodLayer now removes by the tracked unique IDs,
-  // not a static constant. This prevents trying to remove a layer that was
-  // already removed or never added with that name.
-  const removeImpactFloodLayer = () => {
-    const map = mapRef.current;
-    if (!map) {
-      activeImpactFloodLayerIdRef.current = null;
-      activeImpactFloodSourceIdRef.current = null;
-      pendingImpactFloodRunIdRef.current = null;
-      setImpactFloodRunId(null);
-      return;
-    }
-
-    const layerId = activeImpactFloodLayerIdRef.current;
-    const sourceId = activeImpactFloodSourceIdRef.current;
-
-    try {
-      if (layerId && map.getLayer(layerId)) map.removeLayer(layerId);
-    } catch (error) {
-      console.warn("Failed removing impact flood layer:", error);
-    }
-
-    try {
-      if (sourceId && map.getSource(sourceId)) map.removeSource(sourceId);
-    } catch (error) {
-      console.warn("Failed removing impact flood source:", error);
-    }
-
-    activeImpactFloodLayerIdRef.current = null;
-    activeImpactFloodSourceIdRef.current = null;
-    pendingImpactFloodRunIdRef.current = null;
-    setImpactFloodRunId(null);
-  };
-
   const removeImpactPreviewLayers = () => {
     const map = mapRef.current;
     if (!map) return;
@@ -276,7 +230,7 @@ export default function HomePage() {
   };
 
   const clearImpactPreview = () => {
-    removeImpactFloodLayer();
+    removeFloodLayer();
     removeImpactPreviewLayers();
   };
 
@@ -445,13 +399,9 @@ export default function HomePage() {
     }
   };
 
-  const drawOceanImpactFromResult = (lng, lat, result) => {
+  const drawOceanImpactMarker = (lng, lat) => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !result) return false;
-    if (result.is_ocean_impact !== true) {
-      drawLandImpactFromResult(lng, lat, result);
-      return true;
-    }
+    if (!map || !map.isStyleLoaded()) return false;
     try {
       removeImpactPreviewLayers();
       map.addSource(IMPACT_PREVIEW_SOURCE_ID, {
@@ -469,97 +419,11 @@ export default function HomePage() {
       map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-pulse`, type: "circle", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "impact-core"], paint: { "circle-radius": 28, "circle-color": "rgba(0,0,0,0)", "circle-stroke-width": 2, "circle-stroke-color": "#ef4444", "circle-stroke-opacity": 0.9 } });
       safely(() => map.triggerRepaint());
       startImpactPulseAnimation();
-      if (DEBUG_FLOOD) console.log("DRAW OCEAN RESULT OK", { lng, lat, runId: result.run_id });
       return true;
     } catch (error) {
-      console.error("DRAW OCEAN RESULT ERROR", error);
+      console.error("DRAW OCEAN MARKER ERROR", error);
       return false;
     }
-  };
-
-  // FIX v44: Each call uses unique source/layer IDs scoped to the runId.
-  // This means a second impact click never conflicts with a still-loading
-  // raster tile set from the previous run. Old layers are cleaned up by
-  // removeImpactFloodLayer() which tracks the active IDs in refs.
-  const attachImpactFloodLayerNow = (runId) => {
-    const map = mapRef.current;
-    if (!map || !runId) return false;
-
-    const sourceId = `impact-flood-source-${runId}`;
-    const layerId = `impact-flood-layer-${runId}`;
-
-    const tileUrl = `${floodEngineUrlRef.current}/impact-flood/${encodeURIComponent(
-      runId
-    )}/{z}/{x}/{y}.png?v=${IMPACT_FLOOD_TILE_VERSION}&rid=${encodeURIComponent(
-      runId
-    )}&t=${Date.now()}`;
-
-    try {
-      // Clean up previous run's layer/source by tracked IDs before adding new ones
-      const prevLayerId = activeImpactFloodLayerIdRef.current;
-      const prevSourceId = activeImpactFloodSourceIdRef.current;
-      if (prevLayerId && prevLayerId !== layerId) {
-        try { if (map.getLayer(prevLayerId)) map.removeLayer(prevLayerId); } catch (_) {}
-      }
-      if (prevSourceId && prevSourceId !== sourceId) {
-        try { if (map.getSource(prevSourceId)) map.removeSource(prevSourceId); } catch (_) {}
-      }
-
-      // Add fresh source and layer for this run
-      if (!map.getSource(sourceId)) {
-        map.addSource(sourceId, {
-          type: "raster",
-          tiles: [tileUrl],
-          tileSize: 256,
-          minzoom: 0,
-          maxzoom: 22,
-          scheme: "xyz",
-        });
-      }
-
-      if (!map.getLayer(layerId)) {
-        map.addLayer({
-          id: layerId,
-          type: "raster",
-          source: sourceId,
-          paint: {
-            "raster-opacity": 1,
-            "raster-fade-duration": 0,
-            "raster-resampling": "linear",
-          },
-        });
-      }
-
-      activeImpactFloodLayerIdRef.current = layerId;
-      activeImpactFloodSourceIdRef.current = sourceId;
-      pendingImpactFloodRunIdRef.current = null;
-      setImpactFloodRunId(runId);
-
-      if (DEBUG_FLOOD) {
-        console.log("IMPACT FLOOD LAYER ADDED", {
-          runId,
-          layerId,
-          sourceId,
-          tileUrl,
-        });
-      }
-
-      safely(() => map.triggerRepaint());
-      return true;
-    } catch (error) {
-      console.error("IMPACT FLOOD LAYER ERROR", error, { runId, tileUrl });
-      pendingImpactFloodRunIdRef.current = null;
-      return false;
-    }
-  };
-
-  const addImpactFloodLayer = (runId) => {
-    const map = mapRef.current;
-    if (!map || !runId) {
-      console.warn("IMPACT FLOOD LAYER SKIPPED", { hasMap: !!map, runId });
-      return false;
-    }
-    return attachImpactFloodLayerNow(runId);
   };
 
   const addFloodLayer = (level) => {
@@ -647,8 +511,6 @@ export default function HomePage() {
       setImpactLoading(true);
       setImpactError("");
       setImpactResult(null);
-      setImpactFloodRunId(null);
-      pendingImpactFloodRunIdRef.current = null;
       setStatus("Running impact simulation...");
       const { lng, lat } = impactPointRef.current;
       const res = await fetch(
@@ -662,15 +524,19 @@ export default function HomePage() {
       if (!impactPointRef.current) return;
       if (scenarioModeRef.current !== "impact") return;
       setImpactResult(data);
-      if (data.is_ocean_impact === true && Number(data.tsunami_radius_m ?? 0) > 0) {
-        const oceanOk = drawOceanImpactFromResult(
-          impactPointRef.current.lng,
-          impactPointRef.current.lat,
-          data
+
+      if (data.is_ocean_impact === true && Number(data.wave_height_m ?? 0) > 0) {
+        // v45: Ocean impact uses regular flood layer at wave_height_m.
+        // This uses the same reliable flood tile system as flood mode —
+        // shows everything below wave height as flooded, globally correct.
+        drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
+        const waveHeight = Number(data.wave_height_m);
+        const floodOk = addFloodLayer(waveHeight);
+        if (DEBUG_FLOOD) console.log("OCEAN IMPACT FLOOD", { waveHeight, floodOk });
+        setStatus(floodOk
+          ? `Ocean impact — tsunami flood at ${Math.round(waveHeight)}m wave height`
+          : "Ocean impact result returned, flood layer failed to attach"
         );
-        const floodOk = data.run_id ? attachImpactFloodLayerNow(data.run_id) : false;
-        if (DEBUG_FLOOD) console.log("OCEAN IMPACT APPLY", { oceanOk, floodOk, runId: data.run_id });
-        setStatus(floodOk ? "Ocean impact simulation complete" : "Ocean impact result returned, flood layer failed to attach");
       } else {
         drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, data);
         setStatus("Land impact simulation complete");
@@ -706,7 +572,6 @@ export default function HomePage() {
     clearImpactPreview();
     setImpactResult(null);
     setImpactError("");
-    setImpactFloodRunId(null);
     setScenarioMode("flood");
     setStatus("Flood cleared");
   };
@@ -746,12 +611,7 @@ export default function HomePage() {
 
     const handleError = (e) => {
       const message = e?.error?.message || e?.message || "";
-      if (DEBUG_FLOOD) console.log("Map error:", e, message);
-      if (message.includes("/impact-flood/") && (message.includes("404") || message.includes("Not Found"))) {
-        console.warn("Impact run expired or missing, clearing stale frontend state");
-        clearImpactScenarioState();
-        setStatus("Impact run expired. Run impact again.");
-      }
+      if (DEBUG_FLOOD) console.log("Map error:", message);
     };
 
     const handleStyleLoad = () => {
@@ -767,27 +627,14 @@ export default function HomePage() {
       if (scenarioModeRef.current === "impact" && impactPointRef.current && impactResultRef.current) {
         setTimeout(() => {
           drawImpactPoint(impactPointRef.current.lng, impactPointRef.current.lat);
-          if (impactResultRef.current.is_ocean_impact === true) {
-            drawOceanImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, impactResultRef.current);
-            if (impactResultRef.current.run_id) attachImpactFloodLayerNow(impactResultRef.current.run_id);
+          const result = impactResultRef.current;
+          if (result.is_ocean_impact === true && Number(result.wave_height_m ?? 0) > 0) {
+            drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
+            addFloodLayer(Number(result.wave_height_m));
           } else {
-            drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, impactResultRef.current);
+            drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, result);
           }
         }, 50);
-      }
-
-      if (pendingImpactFloodRunIdRef.current) {
-        const runId = pendingImpactFloodRunIdRef.current;
-        pendingImpactFloodRunIdRef.current = null;
-        setTimeout(() => { attachImpactFloodLayerNow(runId); }, 0);
-      }
-    };
-
-    const handleIdle = () => {
-      if (pendingImpactFloodRunIdRef.current && mapRef.current) {
-        const runId = pendingImpactFloodRunIdRef.current;
-        pendingImpactFloodRunIdRef.current = null;
-        attachImpactFloodLayerNow(runId);
       }
     };
 
@@ -826,7 +673,6 @@ export default function HomePage() {
     map.on("error", handleError);
     map.on("load", handleLoad);
     map.on("style.load", handleStyleLoad);
-    map.on("idle", handleIdle);
     map.on("mousemove", handleMouseMove);
     map.on("mouseleave", handleMouseLeave);
     map.on("click", handleClick);
@@ -838,7 +684,6 @@ export default function HomePage() {
       map.off("error", handleError);
       map.off("load", handleLoad);
       map.off("style.load", handleStyleLoad);
-      map.off("idle", handleIdle);
       map.off("mousemove", handleMouseMove);
       map.off("mouseleave", handleMouseLeave);
       map.off("click", handleClick);
@@ -846,9 +691,6 @@ export default function HomePage() {
       mapRef.current = null;
       activeFloodLevelRef.current = null;
       impactPointRef.current = null;
-      pendingImpactFloodRunIdRef.current = null;
-      activeImpactFloodLayerIdRef.current = null;
-      activeImpactFloodSourceIdRef.current = null;
       initialViewAppliedRef.current = false;
     };
   }, [floodEngineUrl]);
@@ -873,7 +715,6 @@ export default function HomePage() {
     removeImpactPoint();
     setImpactResult(null);
     setImpactError("");
-    setImpactFloodRunId(null);
     syncFloodScenario();
   }, [scenarioMode]);
 
@@ -882,9 +723,9 @@ export default function HomePage() {
     if (scenarioMode !== "impact") return;
     if (!impactResult) return;
     if (!impactPointRef.current) return;
-    if (impactResult.is_ocean_impact === true) {
-      drawOceanImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, impactResult);
-      if (impactResult.run_id) attachImpactFloodLayerNow(impactResult.run_id);
+    if (impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0) {
+      drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
+      addFloodLayer(Number(impactResult.wave_height_m));
       return;
     }
     drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, impactResult);
@@ -920,9 +761,7 @@ export default function HomePage() {
             ? "Running impact simulation..."
             : impactResult
             ? impactResult.is_ocean_impact
-              ? impactFloodRunId
-                ? "Ocean impact simulation complete"
-                : "Ocean impact result returned, flood layer failed to attach"
+              ? `Ocean impact — tsunami flood at ${Math.round(Number(impactResult.wave_height_m ?? 0))}m`
               : "Land impact simulation complete"
             : "Impact preview ready"
           : "Click map to place impact point"
@@ -933,7 +772,7 @@ export default function HomePage() {
     if (seaLevel === 0) { setStatus("Flood cleared"); return; }
     setStatus(`Flood tiles loaded at ${formatLevelForDisplay(seaLevel)}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, seaLevel, unitMode, scenarioMode, impactLoading, impactResult, impactFloodRunId]);
+  }, [viewMode, seaLevel, unitMode, scenarioMode, impactLoading, impactResult]);
 
   const waterDifference = hoverElevation !== null ? Number((hoverElevation - seaLevel).toFixed(2)) : null;
 
@@ -1049,7 +888,6 @@ export default function HomePage() {
         <div>Scenario Mode: {scenarioMode}</div>
         <div>Impact Point: {impactPointRef.current ? `${impactPointRef.current.lng.toFixed(3)}, ${impactPointRef.current.lat.toFixed(3)}` : "--"}</div>
         <div>Asteroid Diameter: {impactDiameter.toLocaleString()} m</div>
-        <div>Impact Flood Run: {impactFloodRunId || "--"}</div>
 
         {impactError && (
           <>
@@ -1066,10 +904,10 @@ export default function HomePage() {
             <div>Crater Diameter: {Math.round(Number(impactResult.crater_diameter_m ?? 0)).toLocaleString()} m</div>
             <div>Blast Radius: {Math.round(Number(impactResult.blast_radius_m ?? 0)).toLocaleString()} m</div>
             <div>Thermal Radius: {Math.round(Number(impactResult.thermal_radius_m ?? 0)).toLocaleString()} m</div>
-            {impactResult.is_ocean_impact === true && Number(impactResult.tsunami_radius_m ?? 0) > 0 && (
+            {impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0 && (
               <>
-                <div>Estimated Wave Reach: {Math.round(Number(impactResult.estimated_wave_reach_m ?? impactResult.tsunami_radius_m ?? 0)).toLocaleString()} m</div>
                 <div>Wave Height: {Math.round(Number(impactResult.wave_height_m ?? 0)).toLocaleString()} m</div>
+                <div>Tsunami Radius: {Math.round(Number(impactResult.tsunami_radius_m ?? 0) / 1000).toLocaleString()} km</div>
               </>
             )}
             <div>Severity: {impactResult.severity_class ?? "--"}</div>
