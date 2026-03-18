@@ -23,7 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v59";
+const FRONTEND_BUILD_LABEL = "v60";
 
 const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
@@ -599,9 +599,13 @@ export default function HomePage() {
   const drawNukeResult = (lng, lat, data) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    const nukeLayers = ["nuke-emp","nuke-emp-line","nuke-thermal","nuke-blast-light",
-      "nuke-blast-moderate","nuke-blast-heavy","nuke-fireball","nuke-radiation",
-      "nuke-fallout","nuke-fallout-line"];
+    const nukeLayers = ["nuke-emp","nuke-emp-line",
+      "nuke-thermal","nuke-thermal-line",
+      "nuke-blast-light","nuke-blast-light-line",
+      "nuke-blast-moderate","nuke-blast-moderate-line",
+      "nuke-blast-heavy","nuke-blast-heavy-line",
+      "nuke-fireball","nuke-fireball-line",
+      "nuke-radiation","nuke-fallout","nuke-fallout-line"];
     nukeLayers.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e) {} });
     try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e) {}
 
@@ -637,38 +641,53 @@ export default function HomePage() {
         map.addLayer({ id: "nuke-emp", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "emp"], paint: { "fill-color": "#7c3aed", "fill-opacity": 0.06 } });
         map.addLayer({ id: "nuke-emp-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "emp"], paint: { "line-color": "#7c3aed", "line-width": 1.5, "line-opacity": 0.5, "line-dasharray": [4, 4] } });
       }
-      map.addLayer({ id: "nuke-thermal", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "fill-color": "#f97316", "fill-opacity": 0.12 } });
-      map.addLayer({ id: "nuke-blast-light", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-light"], paint: { "fill-color": "#fbbf24", "fill-opacity": 0.15 } });
-      map.addLayer({ id: "nuke-blast-moderate", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-moderate"], paint: { "fill-color": "#ef4444", "fill-opacity": 0.25 } });
-      map.addLayer({ id: "nuke-blast-heavy", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-heavy"], paint: { "fill-color": "#dc2626", "fill-opacity": 0.45 } });
-      map.addLayer({ id: "nuke-fireball", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fireball"], paint: { "fill-color": "#ffffff", "fill-opacity": 0.95 } });
+      // Thermal — orange fill + solid orange border
+      map.addLayer({ id: "nuke-thermal", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "fill-color": "#f97316", "fill-opacity": 0.18 } });
+      map.addLayer({ id: "nuke-thermal-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "line-color": "#f97316", "line-width": 2, "line-opacity": 0.9 } });
+      // Light blast — yellow fill + yellow border
+      map.addLayer({ id: "nuke-blast-light", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-light"], paint: { "fill-color": "#fbbf24", "fill-opacity": 0.20 } });
+      map.addLayer({ id: "nuke-blast-light-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-light"], paint: { "line-color": "#f59e0b", "line-width": 2, "line-opacity": 0.9 } });
+      // Moderate blast — red fill + red border
+      map.addLayer({ id: "nuke-blast-moderate", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-moderate"], paint: { "fill-color": "#ef4444", "fill-opacity": 0.30 } });
+      map.addLayer({ id: "nuke-blast-moderate-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-moderate"], paint: { "line-color": "#ef4444", "line-width": 2.5, "line-opacity": 1.0 } });
+      // Heavy blast — deep red fill + bright red border
+      map.addLayer({ id: "nuke-blast-heavy", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-heavy"], paint: { "fill-color": "#991b1b", "fill-opacity": 0.55 } });
+      map.addLayer({ id: "nuke-blast-heavy-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-heavy"], paint: { "line-color": "#dc2626", "line-width": 3, "line-opacity": 1.0 } });
+      // Fireball — white core with bright yellow border
+      map.addLayer({ id: "nuke-fireball", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fireball"], paint: { "fill-color": "#ffffff", "fill-opacity": 0.98 } });
+      map.addLayer({ id: "nuke-fireball-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fireball"], paint: { "line-color": "#fde047", "line-width": 3, "line-opacity": 1.0 } });
       if (data.radiation_r_m > 0) {
-        map.addLayer({ id: "nuke-radiation", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "radiation"], paint: { "line-color": "#84cc16", "line-width": 2, "line-opacity": 0.9, "line-dasharray": [3, 3] } });
+        map.addLayer({ id: "nuke-radiation", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "radiation"], paint: { "line-color": "#4ade80", "line-width": 3, "line-opacity": 1.0, "line-dasharray": [5, 3] } });
       }
       if (data.fallout_major_km > 0) {
-        map.addLayer({ id: "nuke-fallout", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fallout"], paint: { "fill-color": "#84cc16", "fill-opacity": 0.12 } });
-        map.addLayer({ id: "nuke-fallout-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fallout"], paint: { "line-color": "#84cc16", "line-width": 1.5, "line-opacity": 0.7 } });
+        map.addLayer({ id: "nuke-fallout", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fallout"], paint: { "fill-color": "#84cc16", "fill-opacity": 0.15 } });
+        map.addLayer({ id: "nuke-fallout-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fallout"], paint: { "line-color": "#84cc16", "line-width": 2.5, "line-opacity": 0.9, "line-dasharray": [6, 3] } });
       }
       safely(() => map.triggerRepaint());
     } catch (e) { console.error("Failed to draw nuke result", e); }
   };
 
   const buildFalloutEllipse = (lng, lat, majorKm, minorKm, directionDeg, steps = 64) => {
-    const coords = [];
+    // directionDeg = compass bearing fallout travels TO (0=N,90=E,180=S,270=W)
     const kpLat = 110.574;
     const kpLng = 111.32 * Math.cos((lat * Math.PI) / 180);
-    const dirRad = (directionDeg * Math.PI) / 180;
-    // Center of ellipse is shifted downwind by half the major axis
-    const centerLat = lat + (Math.cos(dirRad) * majorKm * 0.5) / kpLat;
-    const centerLng = lng + (Math.sin(dirRad) * majorKm * 0.5) / Math.max(kpLng, 0.0001);
+    const compassRad = (directionDeg * Math.PI) / 180;
+    const dNorth = Math.cos(compassRad);
+    const dEast  = Math.sin(compassRad);
+    // Shift center downwind so detonation point sits at the upwind edge
+    const centerLat = lat + (dNorth * majorKm * 0.5) / kpLat;
+    const centerLng = lng + (dEast  * majorKm * 0.5) / Math.max(kpLng, 0.0001);
+    const coords = [];
     for (let i = 0; i <= steps; i++) {
       const t = (i / steps) * Math.PI * 2;
-      const x = Math.cos(t) * majorKm;
-      const y = Math.sin(t) * minorKm;
-      // Rotate by direction
-      const xr = x * Math.cos(dirRad) - y * Math.sin(dirRad);
-      const yr = x * Math.sin(dirRad) + y * Math.cos(dirRad);
-      coords.push([centerLng + yr / Math.max(kpLng, 0.0001), centerLat + xr / kpLat]);
+      const along = Math.cos(t) * majorKm;
+      const perp  = Math.sin(t) * minorKm;
+      const northKm = dNorth * along - dEast  * perp;
+      const eastKm  = dEast  * along + dNorth * perp;
+      coords.push([
+        centerLng + eastKm  / Math.max(kpLng, 0.0001),
+        centerLat + northKm / kpLat,
+      ]);
     }
     return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} };
   };
