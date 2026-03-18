@@ -23,7 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v49";
+const FRONTEND_BUILD_LABEL = "v50";
 
 const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
@@ -43,7 +43,7 @@ const safely = (fn) => {
 export default function HomePage() {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
-  const elevPopupRef = useRef(null);  // mapboxgl.Popup for elevation
+  const elevPopupRef = useRef(null);
 
   const impactPulseFrameRef = useRef(null);
   const impactRequestRef = useRef(null);
@@ -146,11 +146,8 @@ export default function HomePage() {
   const showElevPopup = async (lng, lat) => {
     const map = mapRef.current;
     if (!map) return;
-
-    // Close any existing popup first
     closeElevPopup();
 
-    // Show loading popup immediately
     const popup = new mapboxgl.Popup({
       closeButton: true,
       closeOnClick: false,
@@ -178,7 +175,6 @@ export default function HomePage() {
       const data = await res.json();
       const elevM = data.elevation_m;
 
-      // If popup was closed while fetching, don't update
       if (elevPopupRef.current !== popup) return;
 
       const currentSeaLevel = seaLevelRef.current;
@@ -592,11 +588,30 @@ export default function HomePage() {
 
     const handleLoad = () => { setStatus("Map ready"); };
 
+    // Track mousedown position to distinguish true clicks from drags.
+    // Mapbox fires 'click' even after a drag release — we ignore those.
+    let mouseDownPoint = null;
+
+    const handleMouseDown = (e) => {
+      mouseDownPoint = e.point;
+    };
+
     const handleClick = (e) => {
+      // If the mouse moved more than 5px between down and up, it's a drag
+      if (mouseDownPoint) {
+        const dx = e.point.x - mouseDownPoint.x;
+        const dy = e.point.y - mouseDownPoint.y;
+        if (Math.sqrt(dx * dx + dy * dy) > 5) {
+          mouseDownPoint = null;
+          return;
+        }
+      }
+      mouseDownPoint = null;
+
       const { lng, lat } = e.lngLat;
 
       if (scenarioModeRef.current === "impact") {
-        // Impact mode: place impact point, no elevation popup
+        // Impact mode: place impact point only on true click, not drag
         cancelPendingImpactRequest();
         impactRunSeqRef.current += 1;
         setImpactLoading(false);
@@ -615,6 +630,7 @@ export default function HomePage() {
     map.on("error", handleError);
     map.on("load", handleLoad);
     map.on("style.load", handleStyleLoad);
+    map.on("mousedown", handleMouseDown);
     map.on("click", handleClick);
 
     return () => {
@@ -624,6 +640,7 @@ export default function HomePage() {
       map.off("error", handleError);
       map.off("load", handleLoad);
       map.off("style.load", handleStyleLoad);
+      map.off("mousedown", handleMouseDown);
       map.off("click", handleClick);
       map.remove();
       mapRef.current = null; activeFloodLevelRef.current = null;
@@ -710,7 +727,6 @@ export default function HomePage() {
 
   return (
     <div style={{ width: "100%", height: "100vh", position: "relative", overflow: "hidden" }}>
-      {/* Popup dark styling injected globally */}
       <style>{`
         .elev-popup .mapboxgl-popup-content {
           background: #1e3a5f;
@@ -811,7 +827,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Info panel — cursor section removed, popup handles it now */}
       <div style={{ position: "absolute", right: 20, top: 10, background: "#1e3a5f", color: "white", padding: 16, borderRadius: 12, fontSize: 14, lineHeight: 1.45, zIndex: 1000, minWidth: 320 }}>
         <div style={{ fontWeight: 700, marginBottom: 8 }}>Current Scenario</div>
         <div style={{ color: "#facc15", fontWeight: 700 }}>Frontend build: {FRONTEND_BUILD_LABEL}</div>
