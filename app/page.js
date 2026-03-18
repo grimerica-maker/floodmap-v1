@@ -23,7 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v54";
+const FRONTEND_BUILD_LABEL = "v55";
 
 const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
@@ -70,6 +70,7 @@ export default function HomePage() {
   const [impactLoading, setImpactLoading] = useState(false);
   const [impactError, setImpactError] = useState("");
   const [unitMode, setUnitMode] = useState("m");
+  const [floodDisplaced, setFloodDisplaced] = useState(null);
   const [status, setStatus] = useState("Loading map...");
   const [floodEngineUrl, setFloodEngineUrl] = useState(FLOOD_ENGINE_PROXY_PATH);
 
@@ -492,6 +493,12 @@ export default function HomePage() {
     closeElevPopup();
     setStatus(`Loading flood tiles at ${formatLevelForDisplay(level)}...`);
     if (!addFloodLayer(level)) setStatus("Flood layer failed to attach");
+    // Fetch displaced population estimate
+    setFloodDisplaced(null);
+    fetch(`${floodEngineUrlRef.current}/flood-population?level=${encodeURIComponent(level)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => { if (d.flood_displaced != null) setFloodDisplaced(d.flood_displaced); })
+      .catch(() => {});
   };
 
   const runImpact = async () => {
@@ -554,6 +561,7 @@ export default function HomePage() {
     removeFloodLayer(); removeImpactPoint(); clearImpactPreview();
     setImpactResult(null); setImpactError("");
     setScenarioMode("flood");
+    setFloodDisplaced(null);
     closeElevPopup();
     setStatus("Flood cleared");
   };
@@ -896,6 +904,11 @@ export default function HomePage() {
       <div style={{ fontWeight: 700, marginBottom: 8 }}>Current Scenario</div>
       <div style={{ color: "#facc15", fontWeight: 700 }}>Frontend build: {FRONTEND_BUILD_LABEL}</div>
       <div>Sea level: {formatLevelForDisplay(seaLevel)}</div>
+      {floodDisplaced != null && scenarioMode === "flood" && (
+        <div style={{ color: "#fca5a5", fontWeight: 700 }}>
+          Displaced: {floodDisplaced.toLocaleString()} people
+        </div>
+      )}
       <div>Mode: {viewMode === "map" ? "Standard Map" : viewMode === "satellite" ? "Satellite" : "Globe"}</div>
       <div>Status: {status}</div>
       <div>Scenario Mode: {scenarioMode}</div>
