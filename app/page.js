@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v78";
+const FRONTEND_BUILD_LABEL = "v79";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1451,10 +1451,10 @@ export default function HomePage() {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button className="share-btn" onClick={() => {
               const msg = impactResult
-                ? `💥 I just simulated a ${Number(impactResult.diameter_m ?? 0).toLocaleString()}m asteroid impact on Disaster Map! ${Math.round(Number(impactResult.estimated_deaths ?? 0)).toLocaleString()} estimated deaths. Try it: https://floodmap-v1.vercel.app`
+                ? `💥 I just simulated a ${Number(impactResult.diameter_m ?? 0).toLocaleString()}m asteroid impact on Disaster Map! ${Math.round(Number(impactResult.estimated_deaths ?? 0)).toLocaleString()} estimated deaths. Try it: https://www.disastermap.ca`
                 : nukeResult
-                ? `☢️ I just detonated a ${nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"} nuke on Disaster Map! ${Math.round(Number(nukeResult.estimated_deaths ?? 0)).toLocaleString()} estimated deaths. Try it: https://floodmap-v1.vercel.app`
-                : `🌊 I just flooded the world ${seaLevel > 0 ? "+" : ""}${Math.round(seaLevel)}m on Disaster Map!${floodDisplaced ? " " + floodDisplaced.toLocaleString() + " people displaced." : ""} Try it: https://floodmap-v1.vercel.app`;
+                ? `☢️ I just detonated a ${nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"} nuke on Disaster Map! ${Math.round(Number(nukeResult.estimated_deaths ?? 0)).toLocaleString()} estimated deaths. Try it: https://www.disastermap.ca`
+                : `🌊 I just flooded the world ${seaLevel > 0 ? "+" : ""}${Math.round(seaLevel)}m on Disaster Map!${floodDisplaced ? " " + floodDisplaced.toLocaleString() + " people displaced." : ""} Try it: https://www.disastermap.ca`;
               window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(msg), "_blank");
             }} style={{ background: "#000", color: "#fff" }}>
               𝕏 Tweet
