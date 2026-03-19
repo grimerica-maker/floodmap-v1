@@ -11,6 +11,8 @@
     "next": "14.2.30",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "mapbox-gl": "^3.9.0"
+    "mapbox-gl": "^3.9.0",
+    "@clerk/nextjs": "^5.7.0",
+    "stripe": "^14.0.0"
   }
 }
