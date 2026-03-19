@@ -4,13 +4,12 @@ export const metadata = {
   title: "Disaster Map — Simulate Floods, Asteroid Impacts & Nuclear Detonations",
   description: "Interactive world map to simulate rising sea levels, asteroid impacts, and nuclear detonations. See casualty estimates, blast zones, tsunami reach, and flood displaced populations in real time.",
   keywords: "flood simulation, sea level rise, asteroid impact, nuclear detonation, disaster map, climate change, tsunami, blast radius, interactive map",
-  authors: [{ name: "Disaster Map" }],
   openGraph: {
     title: "Disaster Map",
     description: "Simulate floods, asteroid impacts and nuclear detonations on an interactive world map.",
     url: "https://www.disastermap.ca",
     siteName: "Disaster Map",
-    images: [{ url: "/logo.png", width: 120, height: 120 }],
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Disaster Map" }],
     locale: "en_CA",
     type: "website",
   },
@@ -18,14 +17,19 @@ export const metadata = {
     card: "summary",
     title: "Disaster Map",
     description: "Simulate floods, asteroid impacts and nuclear detonations on an interactive world map.",
-    images: ["/logo.png"],
+    images: ["/og-image.png"],
   },
   icons: {
-    icon: "/favicon.png",
-    apple: "/logo.png",          // iOS add-to-homescreen icon
+    icon: [
+      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
     shortcut: "/favicon.png",
   },
-  manifest: "/manifest.json",    // PWA manifest for Android add-to-homescreen
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({ children }) {
