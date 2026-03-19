@@ -23,7 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v64";
+const FRONTEND_BUILD_LABEL = "v65";
 
 const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
@@ -1108,8 +1108,34 @@ export default function HomePage() {
 
           {nukeBurst === "surface" && (
             <>
-              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>WIND DIRECTION</div>
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>Wind blowing FROM: <b>{nukeWindDeg}°</b> → fallout goes {Math.round((nukeWindDeg + 180) % 360)}°</div>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>WIND DIRECTION</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
+                {/* Compass arrow — rotates to show fallout direction (wind + 180) */}
+                <div style={{ flexShrink: 0, width: 52, height: 52, borderRadius: "50%", background: "#0f172a", border: "2px solid #334155", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                  {/* Cardinal labels */}
+                  <span style={{ position: "absolute", top: 3, left: "50%", transform: "translateX(-50%)", fontSize: 9, color: "#64748b", fontWeight: 700 }}>N</span>
+                  <span style={{ position: "absolute", bottom: 3, left: "50%", transform: "translateX(-50%)", fontSize: 9, color: "#64748b", fontWeight: 700 }}>S</span>
+                  <span style={{ position: "absolute", left: 3, top: "50%", transform: "translateY(-50%)", fontSize: 9, color: "#64748b", fontWeight: 700 }}>W</span>
+                  <span style={{ position: "absolute", right: 3, top: "50%", transform: "translateY(-50%)", fontSize: 9, color: "#64748b", fontWeight: 700 }}>E</span>
+                  {/* Arrow pointing in fallout direction */}
+                  <div style={{
+                    width: 0, height: 0,
+                    transform: `rotate(${nukeWindDeg}deg)`,
+                    transition: "transform 0.1s ease",
+                    position: "relative", display: "flex", flexDirection: "column", alignItems: "center",
+                  }}>
+                    {/* Arrowhead (fallout direction = wind + 180, so arrow points FROM wind source) */}
+                    <div style={{ width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderBottom: "12px solid #84cc16" }} />
+                    <div style={{ width: 2, height: 12, background: "#84cc16" }} />
+                    <div style={{ width: 2, height: 4, background: "#ef4444" }} />
+                    <div style={{ width: 0, height: 0, borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderTop: "8px solid #ef4444" }} />
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: "#555" }}>Wind FROM <b style={{ color: "#111" }}>{nukeWindDeg}°</b></div>
+                  <div style={{ fontSize: 12, color: "#84cc16", fontWeight: 700 }}>↑ Fallout → {Math.round((nukeWindDeg + 180) % 360)}°</div>
+                </div>
+              </div>
               <input type="range" min="0" max="359" step="1" value={nukeWindDeg}
                 onChange={(e) => setNukeWindDeg(Number(e.target.value))}
                 style={{ width: "100%", marginBottom: 14, cursor: "pointer" }} />
