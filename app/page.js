@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v76";
+const FRONTEND_BUILD_LABEL = "v77";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1785,9 +1785,10 @@ export default function HomePage() {
         {/* Drawer handle bar */}
         <div
           onClick={() => setDrawerOpen(false)}
-          style={{ flexShrink: 0, display: "flex", justifyContent: "center", alignItems: "center", padding: "10px 0 6px 0", cursor: "pointer" }}
+          style={{ flexShrink: 0, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "10px 0 8px 0", cursor: "pointer", gap: 4 }}
         >
-          <div style={{ width: 40, height: 4, background: "#1e2d45", borderRadius: 4 }} />
+          <div style={{ width: 40, height: 4, background: "#334155", borderRadius: 4 }} />
+          <div style={{ fontSize: 11, color: "#475569", letterSpacing: "0.05em" }}>tap to close</div>
         </div>
 
         {/* Scrollable panel content inside drawer */}
@@ -1872,7 +1873,7 @@ export default function HomePage() {
           onClick={() => setDrawerOpen((v) => !v)}
           style={{ flexShrink: 0, width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "1px solid #1e2d45", borderRadius: 10, cursor: "pointer", fontSize: 18, color: "#94a3b8" }}
         >
-          ⌃
+          {drawerOpen ? "⌄" : "⌃"}
         </button>
       </div>
     </div>
