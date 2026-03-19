@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v75";
+const FRONTEND_BUILD_LABEL = "v76";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1146,6 +1146,35 @@ export default function HomePage() {
 
       <div style={{ fontSize: 13, marginBottom: 20, color: "#475569" }}>
         Custom input supports positive and negative values in {unitMode === "ft" ? "feet" : "meters"}
+      </div>
+
+      {/* Auth — sign in/up or user account */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, padding: "8px 12px", background: "#111827", borderRadius: 10, border: "1px solid #1e2d45" }}>
+        {isSignedIn ? (
+          <>
+            <div style={{ fontSize: 12, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 }}>
+              {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || "Account"}
+              {proTier !== "free" && <span style={{ marginLeft: 6, color: "#f97316", fontWeight: 700 }}>{proTier === "ultra" ? "⚡" : "✓"}</span>}
+            </div>
+            <UserButton afterSignOutUrl="/" />
+          </>
+        ) : (
+          <>
+            <span style={{ fontSize: 11, color: "#64748b" }}>Sync across devices</span>
+            <div style={{ display: "flex", gap: 6 }}>
+              <SignInButton mode="modal">
+                <button style={{ background: "transparent", border: "1px solid #1e2d45", color: "#94a3b8", padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontFamily: "Arial,sans-serif" }}>
+                  Sign In
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <button style={{ background: "#f97316", border: "none", color: "white", padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "Arial,sans-serif" }}>
+                  Sign Up
+                </button>
+              </SignUpButton>
+            </div>
+          </>
+        )}
       </div>
 
       <hr style={{ margin: "0 0 16px 0", borderColor: "#1e2d45" }} />
