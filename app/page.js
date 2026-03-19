@@ -10,7 +10,7 @@ const FLOOD_ENGINE_PROXY_PATH = "/api/engine";
 const DEBUG_FLOOD = true;
 
 const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
-const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-v9";
+const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-streets-v12";
 
 const FLOOD_TILE_VERSION = "204";
 const FLOOD_SOURCE_ID = "flood-source";
@@ -23,7 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v61";
+const FRONTEND_BUILD_LABEL = "v62";
 
 const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
@@ -279,7 +279,10 @@ export default function HomePage() {
     const ids = [
       `${IMPACT_CRATER_LAYER_ID}-pulse`, `${IMPACT_CRATER_LAYER_ID}-inner`,
       `${IMPACT_CRATER_LAYER_ID}-rim`, `${IMPACT_CRATER_LAYER_ID}-ejecta`,
-      `${IMPACT_BLAST_LAYER_ID}-fill`, IMPACT_THERMAL_LAYER_ID, IMPACT_BLAST_LAYER_ID, IMPACT_CRATER_LAYER_ID,
+      `${IMPACT_CRATER_LAYER_ID}-ejecta-line`,
+      `${IMPACT_BLAST_LAYER_ID}-fill`, IMPACT_THERMAL_LAYER_ID,
+      `${IMPACT_THERMAL_LAYER_ID}-line`,
+      IMPACT_BLAST_LAYER_ID, IMPACT_CRATER_LAYER_ID,
     ];
     try {
       ids.forEach((id) => { if (map.getLayer(id)) map.removeLayer(id); });
@@ -393,14 +396,22 @@ export default function HomePage() {
     try {
       clearImpactPreview();
       map.addSource(IMPACT_PREVIEW_SOURCE_ID, { type: "geojson", data });
-      map.addLayer({ id: IMPACT_THERMAL_LAYER_ID, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "fill-color": "#111111", "fill-opacity": 0.35 } });
-      map.addLayer({ id: `${IMPACT_BLAST_LAYER_ID}-fill`, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-fill"], paint: { "fill-color": "#7f1d1d", "fill-opacity": 0.12 } });
-      map.addLayer({ id: IMPACT_BLAST_LAYER_ID, type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast"], paint: { "line-color": "#dc2626", "line-width": 3, "line-opacity": 1 } });
-      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-ejecta`, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "ejecta"], paint: { "fill-color": "#3b2a22", "fill-opacity": 0.18 } });
-      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-rim`, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "crater-rim"], paint: { "fill-color": "#1a0f0f", "fill-opacity": 0.3 } });
-      map.addLayer({ id: IMPACT_CRATER_LAYER_ID, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "crater"], paint: { "fill-color": "#000000", "fill-opacity": 0.85 } });
-      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-inner`, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "crater-inner"], paint: { "fill-color": "#000000", "fill-opacity": 0.55 } });
-      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-pulse`, type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "crater-rim"], paint: { "line-color": "#ef4444", "line-width": 3, "line-opacity": 0.9 } });
+      // Thermal zone — orange fill + orange border
+      map.addLayer({ id: IMPACT_THERMAL_LAYER_ID, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "fill-color": "#f97316", "fill-opacity": 0.15 } });
+      map.addLayer({ id: `${IMPACT_THERMAL_LAYER_ID}-line`, type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "line-color": "#f97316", "line-width": 2, "line-opacity": 0.9 } });
+      // Blast zone — red fill + bright red border
+      map.addLayer({ id: `${IMPACT_BLAST_LAYER_ID}-fill`, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-fill"], paint: { "fill-color": "#ef4444", "fill-opacity": 0.25 } });
+      map.addLayer({ id: IMPACT_BLAST_LAYER_ID, type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast"], paint: { "line-color": "#ef4444", "line-width": 3, "line-opacity": 1 } });
+      // Ejecta ring — brown fill
+      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-ejecta`, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "ejecta"], paint: { "fill-color": "#92400e", "fill-opacity": 0.30 } });
+      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-ejecta-line`, type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "ejecta"], paint: { "line-color": "#b45309", "line-width": 2, "line-opacity": 0.8 } });
+      // Crater rim — dark red fill + pulsing red border
+      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-rim`, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "crater-rim"], paint: { "fill-color": "#7f1d1d", "fill-opacity": 0.50 } });
+      // Crater — black fill + bright yellow border
+      map.addLayer({ id: IMPACT_CRATER_LAYER_ID, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "crater"], paint: { "fill-color": "#000000", "fill-opacity": 0.90 } });
+      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-inner`, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "crater-inner"], paint: { "fill-color": "#000000", "fill-opacity": 0.70 } });
+      // Pulsing rim outline
+      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-pulse`, type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "crater-rim"], paint: { "line-color": "#fde047", "line-width": 3, "line-opacity": 0.95 } });
       safely(() => map.triggerRepaint());
       startImpactPulseAnimation();
     } catch (e) { console.error("Failed to draw land impact result", e); }
