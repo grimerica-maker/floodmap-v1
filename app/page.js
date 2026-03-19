@@ -23,7 +23,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v62";
+const FRONTEND_BUILD_LABEL = "v64";
 
 const EXTINCTION_WAVE_HEIGHT_M = 1500;
 
@@ -371,9 +371,11 @@ export default function HomePage() {
     ]};
     try {
       map.addSource(IMPACT_PREVIEW_SOURCE_ID, { type: "geojson", data });
-      map.addLayer({ id: IMPACT_THERMAL_LAYER_ID, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "fill-color": "#111111", "fill-opacity": 0.22 } });
-      map.addLayer({ id: IMPACT_BLAST_LAYER_ID, type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast"], paint: { "line-color": "#ef4444", "line-width": 3, "line-opacity": 1 } });
-      map.addLayer({ id: IMPACT_CRATER_LAYER_ID, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "crater"], paint: { "fill-color": "#000000", "fill-opacity": 0.55 } });
+      // Preview: colored zones with dashed borders to distinguish from final result
+      map.addLayer({ id: IMPACT_THERMAL_LAYER_ID, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "fill-color": "#f97316", "fill-opacity": 0.10 } });
+      map.addLayer({ id: `${IMPACT_THERMAL_LAYER_ID}-line`, type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "line-color": "#f97316", "line-width": 2, "line-opacity": 0.6, "line-dasharray": [4, 3] } });
+      map.addLayer({ id: IMPACT_BLAST_LAYER_ID, type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast"], paint: { "line-color": "#ef4444", "line-width": 2.5, "line-opacity": 0.7, "line-dasharray": [4, 3] } });
+      map.addLayer({ id: IMPACT_CRATER_LAYER_ID, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "crater"], paint: { "fill-color": "#000000", "fill-opacity": 0.40 } });
       safely(() => map.triggerRepaint());
     } catch (e) { console.error("Failed to draw impact preview", e); }
   };
@@ -1178,9 +1180,10 @@ export default function HomePage() {
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
           <div style={{ fontWeight: 700 }}>Impact Results</div>
           <div>Energy: {Number(impactResult.energy_mt_tnt ?? impactResult.energy_mt ?? 0).toFixed(2)} Mt</div>
-          <div>Crater Diameter: {Math.round(Number(impactResult.crater_diameter_m ?? 0)).toLocaleString()} m</div>
-          <div>Blast Radius: {Math.round(Number(impactResult.blast_radius_m ?? 0)).toLocaleString()} m</div>
-          <div>Thermal Radius: {Math.round(Number(impactResult.thermal_radius_m ?? 0)).toLocaleString()} m</div>
+          <div style={{ color: "#fde047" }}>● Crater: {Math.round(Number(impactResult.crater_diameter_m ?? 0)).toLocaleString()} m dia</div>
+          <div style={{ color: "#b45309" }}>● Ejecta: {Math.round(Number(impactResult.crater_diameter_m ?? 0) * 1.55).toLocaleString()} m</div>
+          <div style={{ color: "#ef4444" }}>● Blast: {Math.round(Number(impactResult.blast_radius_m ?? 0)).toLocaleString()} m</div>
+          <div style={{ color: "#f97316" }}>● Thermal: {Math.round(Number(impactResult.thermal_radius_m ?? 0)).toLocaleString()} m</div>
           {impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0 && (
             <>
               <div>Wave Height: {Math.round(Number(impactResult.wave_height_m ?? 0)).toLocaleString()} m</div>
@@ -1211,16 +1214,15 @@ export default function HomePage() {
           <div style={{ fontWeight: 700, marginBottom: 4 }}>☢️ Detonation Results</div>
           <div>Yield: {nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(2)+" Mt" : nukeResult.yield_kt+" kt"}</div>
           <div>Type: {nukeResult.burst_type}</div>
-          <div>Severity: {nukeResult.severity_class === "Extinction scale" ? "Civilization ending" : nukeResult.severity_class}</div>
           <hr style={{ margin: "8px 0", opacity: 0.2 }} />
-          <div style={{ color: "#fca5a5" }}>Fireball: {Math.round(nukeResult.fireball_r_m).toLocaleString()} m</div>
-          <div style={{ color: "#fca5a5" }}>Heavy blast: {(Math.round(nukeResult.blast_heavy_r_m)/1000).toFixed(1)} km</div>
-          <div style={{ color: "#fbbf24" }}>Moderate blast: {(Math.round(nukeResult.blast_moderate_r_m)/1000).toFixed(1)} km</div>
-          <div style={{ color: "#fb923c" }}>Thermal (3rd°): {(Math.round(nukeResult.thermal_r_m)/1000).toFixed(1)} km</div>
-          <div style={{ color: "#a3e635" }}>Light blast: {(Math.round(nukeResult.blast_light_r_m)/1000).toFixed(1)} km</div>
-          {nukeResult.radiation_r_m > 0 && <div style={{ color: "#86efac" }}>Radiation 500rem: {Math.round(nukeResult.radiation_r_m).toLocaleString()} m</div>}
-          {nukeResult.emp_r_m > 0 && <div style={{ color: "#c4b5fd" }}>EMP radius: {(Math.round(nukeResult.emp_r_m)/1000).toFixed(0)} km</div>}
-          {nukeResult.fallout_major_km > 0 && <div style={{ color: "#86efac" }}>Fallout: {Math.round(nukeResult.fallout_major_km)} × {Math.round(nukeResult.fallout_minor_km)} km</div>}
+          <div style={{ color: "#fde047" }}>● Fireball: {Math.round(nukeResult.fireball_r_m).toLocaleString()} m</div>
+          <div style={{ color: "#dc2626" }}>● Heavy blast: {(Math.round(nukeResult.blast_heavy_r_m)/1000).toFixed(1)} km</div>
+          <div style={{ color: "#ef4444" }}>● Moderate blast: {(Math.round(nukeResult.blast_moderate_r_m)/1000).toFixed(1)} km</div>
+          <div style={{ color: "#f97316" }}>● Thermal (3rd°): {(Math.round(nukeResult.thermal_r_m)/1000).toFixed(1)} km</div>
+          <div style={{ color: "#f59e0b" }}>● Light blast: {(Math.round(nukeResult.blast_light_r_m)/1000).toFixed(1)} km</div>
+          {nukeResult.radiation_r_m > 0 && <div style={{ color: "#4ade80" }}>◌ Radiation 500rem: {Math.round(nukeResult.radiation_r_m).toLocaleString()} m</div>}
+          {nukeResult.emp_r_m > 0 && <div style={{ color: "#a78bfa" }}>◌ EMP radius: {(Math.round(nukeResult.emp_r_m)/1000).toFixed(0)} km</div>}
+          {nukeResult.fallout_major_km > 0 && <div style={{ color: "#84cc16" }}>◌ Fallout: {Math.round(nukeResult.fallout_major_km)} × {Math.round(nukeResult.fallout_minor_km)} km</div>}
           <hr style={{ margin: "8px 0", opacity: 0.2 }} />
           <div style={{ fontWeight: 700 }}>Casualties</div>
           <div>Exposed: {nukeResult.population_exposed != null ? nukeResult.population_exposed.toLocaleString() : "—"}</div>
