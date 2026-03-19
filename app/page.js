@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v72";
+const FRONTEND_BUILD_LABEL = "v73";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1575,7 +1575,7 @@ export default function HomePage() {
                 ✓ Flood displaced counts<br/>
                 ✓ No ads
               </div>
-              <button onClick={() => { window.open("https://buy.stripe.com/5kQ00j9mM8s20i22fba3u08", "_blank"); }}
+              <button onClick={() => { window.open("https://buy.stripe.com/8x200j7eEcIi8OydXTa3u07", "_blank"); }}
                 style={{ width: "100%", marginTop: 12, padding: "10px", background: "#f97316", color: "white", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
                 Subscribe to Pro →
               </button>
@@ -1593,7 +1593,7 @@ export default function HomePage() {
                 ✓ Embeddable iframe<br/>
                 ✓ Feature request priority
               </div>
-              <button onClick={() => { window.open("https://buy.stripe.com/8x200j7eEcIi8OydXTa3u07", "_blank"); }}
+              <button onClick={() => { window.open("https://buy.stripe.com/5kQ00j9mM8s20i22fba3u08", "_blank"); }}
                 style={{ width: "100%", marginTop: 12, padding: "10px", background: "#7c3aed", color: "white", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
                 Subscribe to Ultra →
               </button>
