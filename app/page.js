@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v73";
+const FRONTEND_BUILD_LABEL = "v75";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1088,8 +1088,14 @@ export default function HomePage() {
         </div>
       ) : (
         <div style={{ marginBottom: 14, padding: "8px 12px", borderRadius: 10, background: "#0f2d1a", border: "1px solid #166534" }}>
-          <div style={{ fontSize: 12, color: "#4ade80", fontWeight: 700 }}>
-            {proTier === "ultra" ? "⚡ Ultra" : "✓ Pro"} — {proTier === "ultra" ? "Unlimited" : `${rlStatus.hourCount}/${PRO_SIM_PER_HOUR}/hr`}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontSize: 12, color: "#4ade80", fontWeight: 700 }}>
+              {proTier === "ultra" ? "⚡ Ultra" : "✓ Pro"} — {proTier === "ultra" ? "Unlimited" : `${rlStatus.hourCount}/${PRO_SIM_PER_HOUR}/hr`}
+            </div>
+            <a href="https://billing.stripe.com/p/login/00w28rcyY4bM8Oy1b7a3u00" target="_blank"
+              style={{ fontSize: 11, color: "#4ade80", opacity: 0.7, textDecoration: "none", cursor: "pointer" }}>
+              Manage →
+            </a>
           </div>
         </div>
       )}
@@ -1590,7 +1596,7 @@ export default function HomePage() {
               <div style={{ color: "#94a3b8", fontSize: 12, lineHeight: 1.7 }}>
                 ✓ Everything in Pro<br/>
                 ✓ Unlimited simulations<br/>
-                ✓ Embeddable iframe<br/>
+                ✓ Embeddable iframe *(coming soon)*<br/>
                 ✓ Feature request priority
               </div>
               <button onClick={() => { window.open("https://buy.stripe.com/5kQ00j9mM8s20i22fba3u08", "_blank"); }}
