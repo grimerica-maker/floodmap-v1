@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useUser, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import mapboxgl from "mapbox-gl";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
@@ -23,11 +24,11 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v69";
+const FRONTEND_BUILD_LABEL = "v71";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
-const FREE_SIM_PER_HOUR = 10;
-const FREE_SIM_PER_DAY  = 30;
+const FREE_SIM_PER_HOUR = 20;
+const FREE_SIM_PER_DAY  = 50;
 const PRO_SIM_PER_HOUR  = 50;
 const PRO_SIM_PER_DAY   = 200;
 
@@ -132,10 +133,19 @@ export default function HomePage() {
   const [floodEngineUrl, setFloodEngineUrl] = useState(FLOOD_ENGINE_PROXY_PATH);
 
   // ── Tier + paywall state ─────────────────────────────────────────────────
+  const { user, isSignedIn } = useUser();
+
+  // Derive tier: Clerk metadata (signed in) > localStorage (legacy) > free
+  const getEffectiveTier = () => {
+    if (isSignedIn && user?.publicMetadata?.tier) {
+      return user.publicMetadata.tier;
+    }
+    return getProTier(); // localStorage fallback
+  };
+
   const [proTier, setProTier] = useState(() => getProTier()); // "free" | "pro" | "ultra"
   const [paywallModal, setPaywallModal] = useState(null); // null | "pro" | "ultra" | "ratelimit"
   const [rlStatus, setRlStatus] = useState(() => getRLStatus());
-  const [adOverlay, setAdOverlay] = useState(false); // show ad before simulation
 
   // Mobile-only UI state — purely cosmetic, zero effect on map/engine logic
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -144,6 +154,16 @@ export default function HomePage() {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth <= 640 : false
   );
+
+  // Sync tier from Clerk when auth state changes
+  useEffect(() => {
+    const effective = getEffectiveTier();
+    setProTier(effective);
+    // Also persist to localStorage so it survives signed-out sessions
+    if (isSignedIn && user?.publicMetadata?.tier) {
+      try { localStorage.setItem("dm_pro_tier", user.publicMetadata.tier); } catch {}
+    }
+  }, [isSignedIn, user]);
 
   // Keep in sync on resize
   useEffect(() => {
@@ -621,12 +641,6 @@ export default function HomePage() {
       return;
     }
     setRlStatus(getRLStatus());
-    // Ad overlay for free users
-    if (proTier === "free") {
-      setAdOverlay(true);
-      await new Promise(r => setTimeout(r, 3000));
-      setAdOverlay(false);
-    }
     cancelPendingImpactRequest();
     clearImpactPreview();
     const runSeq = impactRunSeqRef.current + 1;
@@ -687,12 +701,6 @@ export default function HomePage() {
       return;
     }
     setRlStatus(getRLStatus());
-    // Ad overlay for free users
-    if (proTier === "free") {
-      setAdOverlay(true);
-      await new Promise(r => setTimeout(r, 3000));
-      setAdOverlay(false);
-    }
     const nukeLat = nukePointRef.current.lat;
     const nukeLng = nukePointRef.current.lng;
     setNukeLoading(true); setNukeError(""); setNukeResult(null);
@@ -1525,27 +1533,6 @@ export default function HomePage() {
       `}</style>
 
       {/* ── Map canvas ── */}
-      {/* ── Ad overlay (3s before simulation for free users) ── */}
-      {adOverlay && (
-        <div onPointerDown={(e) => e.stopPropagation()} style={{
-          position: "fixed", inset: 0, zIndex: 3000,
-          background: "rgba(10,15,30,0.95)",
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-          fontFamily: "Arial,sans-serif",
-        }}>
-          <div style={{ color: "#f97316", fontWeight: 700, fontSize: 14, marginBottom: 12, letterSpacing: "0.1em" }}>LOADING SIMULATION</div>
-          {/* AdSense slot — replace data-ad-slot with real ID after approval */}
-          <div style={{ width: 320, height: 100, background: "#1e293b", border: "1px solid #1e2d45", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
-            <span style={{ color: "#475569", fontSize: 12 }}>Advertisement</span>
-          </div>
-          <div style={{ color: "#64748b", fontSize: 12 }}>Upgrade to Pro for ad-free simulations</div>
-          <button onClick={() => setPaywallModal("pro")}
-            style={{ marginTop: 12, padding: "8px 20px", background: "#f97316", color: "white", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-            ⚡ Go Pro — $4.99/mo
-          </button>
-        </div>
-      )}
-
       {/* ── Paywall modal ── */}
       {paywallModal && (
         <div onPointerDown={(e) => e.stopPropagation()} onClick={() => setPaywallModal(null)} style={{
