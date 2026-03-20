@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v95";
+const FRONTEND_BUILD_LABEL = "v96";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -172,12 +172,12 @@ const TSUNAMI_SOURCES = [
     bearing: 270,            // waves propagate west toward Americas
     color: "#0ea5e9",
     threat: "US East Coast, Caribbean, NW Africa, W Europe",
-    maxWaveM: 25,
+    maxWaveM: 100,
     rings: [
-      { hours: 1,  major_km: 600,  minor_km: 400,  waveM: 20, label: "1 hr" },
-      { hours: 2,  major_km: 1200, minor_km: 800,  waveM: 15, label: "2 hr" },
-      { hours: 4,  major_km: 2400, minor_km: 1600, waveM: 8,  label: "4 hr" },
-      { hours: 8,  major_km: 4800, minor_km: 3200, waveM: 3,  label: "8 hr" },
+      { hours: 1,  major_km: 600,  minor_km: 400,  waveM: 100, label: "1 hr" },
+      { hours: 2,  major_km: 1200, minor_km: 800,  waveM: 40, label: "2 hr" },
+      { hours: 4,  major_km: 2400, minor_km: 1600, waveM: 25,  label: "4 hr" },
+      { hours: 8,  major_km: 4800, minor_km: 3200, waveM: 10,  label: "8 hr" },
     ],
     inundation_km: 3,   // avg km inland at target coasts
   },
@@ -189,12 +189,12 @@ const TSUNAMI_SOURCES = [
     bearing: 265,
     color: "#06b6d4",
     threat: "US East Coast, Brazil, Iberian Peninsula",
-    maxWaveM: 50,
+    maxWaveM: 650,
     rings: [
-      { hours: 1,  major_km: 700,  minor_km: 450,  waveM: 40, label: "1 hr" },
-      { hours: 2,  major_km: 1400, minor_km: 900,  waveM: 25, label: "2 hr" },
-      { hours: 4,  major_km: 2800, minor_km: 1800, waveM: 12, label: "4 hr" },
-      { hours: 9,  major_km: 5500, minor_km: 3500, waveM: 4,  label: "9 hr" },
+      { hours: 1,  major_km: 700,  minor_km: 450,  waveM: 650, label: "1 hr" },
+      { hours: 2,  major_km: 1400, minor_km: 900,  waveM: 80, label: "2 hr" },
+      { hours: 4,  major_km: 2800, minor_km: 1800, waveM: 40, label: "4 hr" },
+      { hours: 9,  major_km: 5500, minor_km: 3500, waveM: 15,  label: "9 hr" },
     ],
     inundation_km: 8,
   },
@@ -211,7 +211,7 @@ const TSUNAMI_SOURCES = [
       { hours: 0.5, major_km: 300,  minor_km: 200,  waveM: 30, label: "30 min" },
       { hours: 1,   major_km: 600,  minor_km: 400,  waveM: 20, label: "1 hr" },
       { hours: 3,   major_km: 1800, minor_km: 1200, waveM: 10, label: "3 hr" },
-      { hours: 9,   major_km: 5400, minor_km: 3600, waveM: 3,  label: "9 hr" },
+      { hours: 9,   major_km: 5400, minor_km: 3600, waveM: 5,  label: "9 hr" },
     ],
     inundation_km: 5,
   },
@@ -223,12 +223,12 @@ const TSUNAMI_SOURCES = [
     bearing: 200,
     color: "#8b5cf6",
     threat: "Hawaii, US West Coast, Japan, Pacific Islands",
-    maxWaveM: 20,
+    maxWaveM: 50,
     rings: [
-      { hours: 1,  major_km: 500,  minor_km: 350,  waveM: 18, label: "1 hr" },
-      { hours: 2,  major_km: 1000, minor_km: 700,  waveM: 12, label: "2 hr" },
-      { hours: 5,  major_km: 2500, minor_km: 1750, waveM: 6,  label: "5 hr" },
-      { hours: 10, major_km: 5000, minor_km: 3500, waveM: 2,  label: "10 hr" },
+      { hours: 1,  major_km: 500,  minor_km: 350,  waveM: 50, label: "1 hr" },
+      { hours: 2,  major_km: 1000, minor_km: 700,  waveM: 30, label: "2 hr" },
+      { hours: 5,  major_km: 2500, minor_km: 1750, waveM: 15,  label: "5 hr" },
+      { hours: 10, major_km: 5000, minor_km: 3500, waveM: 5,  label: "10 hr" },
     ],
     inundation_km: 2,
   },
@@ -1126,7 +1126,8 @@ export default function HomePage() {
           <div style="color:${src.color};font-weight:700;margin-bottom:4px">🌊 ${src.name}</div>
           <div style="color:#e2e8f0;margin-bottom:4px">Wave arrives in <b>${ringInfo.label}</b></div>
           <div style="color:#94a3b8;margin-bottom:4px">Est. wave height: <b style="color:#e2e8f0">${ringInfo.waveM}m</b></div>
-          <div style="color:#64748b;font-size:11px;font-style:italic">${ringInfo.waveM >= 20 ? "Unsurvivable. Evacuate immediately." : ringInfo.waveM >= 10 ? "Extremely dangerous. Evacuation essential." : ringInfo.waveM >= 5 ? "Deadly for coastal areas. Move inland now." : "Dangerous for coast. Move to high ground."}</div>
+          <div style="color:#64748b;font-size:11px;font-style:italic">${ringInfo.waveM >= 100 ? "Unsurvivable near source. Total destruction." : ringInfo.waveM >= 20 ? "Unsurvivable. Evacuate immediately." : ringInfo.waveM >= 10 ? "Extremely dangerous. Evacuation essential." : ringInfo.waveM >= 5 ? "Deadly for coastal areas. Move inland now." : "Dangerous for coast. Move to high ground."}</div>
+          <div style="color:#334155;font-size:10px;margin-top:5px">⚠ Worst-case scenario — actual heights may be lower</div>
         </div>`
       : `<div style="font-family:Arial,sans-serif;font-size:13px;padding:2px 4px">
           <div style="color:#94a3b8">Outside propagation zone</div>
@@ -1959,7 +1960,8 @@ export default function HomePage() {
             <hr style={{ margin: "10px 0", opacity: 0.25 }} />
             <div style={{ fontWeight: 700, marginBottom: 4 }}>🌊 {TSUNAMI_SOURCES[tsunamiSource].name}</div>
             <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 6 }}>{TSUNAMI_SOURCES[tsunamiSource].desc}</div>
-            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>{TSUNAMI_SOURCES[tsunamiSource].threat}</div>
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>{TSUNAMI_SOURCES[tsunamiSource].threat}</div>
+            <div style={{ fontSize: 11, color: "#334155", marginBottom: 8, fontStyle: "italic" }}>⚠ Worst-case scenario estimates</div>
             {tsunamiResult ? (
               <div style={{ padding: "8px 10px", background: "#0c1a2e", borderRadius: 8, border: "1px solid #0ea5e9", marginBottom: 6 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -2488,4 +2490,3 @@ export default function HomePage() {
     </div>
   );
 }
-
