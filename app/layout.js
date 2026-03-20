@@ -1,4 +1,5 @@
 import { ClerkProvider } from "@clerk/nextjs";
+import Script from "next/script";
 import "./globals.css";
 import "mapbox-gl/dist/mapbox-gl.css";
 
@@ -37,6 +38,15 @@ export default function RootLayout({ children }) {
     <ClerkProvider>
       <html lang="en" style={{ margin: 0, padding: 0, overflow: "hidden", height: "100%" }}>
         <body style={{ margin: 0, padding: 0, overflow: "hidden", height: "100%", display: "contents" }}>
+          
+          {/* ✅ AdSense Script */}
+          <Script
+            async
+            src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3953836356769269"
+            strategy="afterInteractive"
+            crossOrigin="anonymous"
+          />
+
           {children}
         </body>
       </html>
