@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v91";
+const FRONTEND_BUILD_LABEL = "v92";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -159,6 +159,105 @@ const buildAshEllipse = (centerLng, centerLat, majorKm, minorKm, bearingDeg = 70
 const YELLOWSTONE_SOURCE_ID = "yellowstone-source";
 const YELLOWSTONE_LAYER_PREFIX = "yellowstone-layer";
 
+// ── Mega-Tsunami scenario data ────────────────────────────────────────────────
+// Based on NOAA, Ward & Day (2001), Løvholt et al. (2008), and Cascadia studies
+// Wave propagation ellipses represent travel-time isochrones from source
+
+const TSUNAMI_SOURCES = [
+  {
+    label: "La Palma",
+    name: "La Palma Collapse",
+    desc: "Cumbre Vieja western flank — 500km³ into Atlantic",
+    origin: [-17.8, 28.6],  // Canary Islands
+    bearing: 270,            // waves propagate west toward Americas
+    color: "#0ea5e9",
+    threat: "US East Coast, Caribbean, NW Africa, W Europe",
+    maxWaveM: 25,
+    rings: [
+      { hours: 1,  major_km: 600,  minor_km: 400,  waveM: 20, label: "1 hr" },
+      { hours: 2,  major_km: 1200, minor_km: 800,  waveM: 15, label: "2 hr" },
+      { hours: 4,  major_km: 2400, minor_km: 1600, waveM: 8,  label: "4 hr" },
+      { hours: 8,  major_km: 4800, minor_km: 3200, waveM: 3,  label: "8 hr" },
+    ],
+    inundation_km: 3,   // avg km inland at target coasts
+  },
+  {
+    label: "Cumbre Vieja",
+    name: "Cumbre Vieja Eruption",
+    desc: "Full volcanic flank collapse — 1,500km³ ejecta",
+    origin: [-17.84, 28.57],
+    bearing: 265,
+    color: "#06b6d4",
+    threat: "US East Coast, Brazil, Iberian Peninsula",
+    maxWaveM: 50,
+    rings: [
+      { hours: 1,  major_km: 700,  minor_km: 450,  waveM: 40, label: "1 hr" },
+      { hours: 2,  major_km: 1400, minor_km: 900,  waveM: 25, label: "2 hr" },
+      { hours: 4,  major_km: 2800, minor_km: 1800, waveM: 12, label: "4 hr" },
+      { hours: 9,  major_km: 5500, minor_km: 3500, waveM: 4,  label: "9 hr" },
+    ],
+    inundation_km: 8,
+  },
+  {
+    label: "Cascadia",
+    name: "Cascadia Subduction Zone",
+    desc: "Mw 9.2 megathrust — entire 1,000km fault rupture",
+    origin: [-125.0, 45.0],
+    bearing: 250,
+    color: "#3b82f6",
+    threat: "US/Canada West Coast, Hawaii, Japan, Alaska",
+    maxWaveM: 30,
+    rings: [
+      { hours: 0.5, major_km: 300,  minor_km: 200,  waveM: 30, label: "30 min" },
+      { hours: 1,   major_km: 600,  minor_km: 400,  waveM: 20, label: "1 hr" },
+      { hours: 3,   major_km: 1800, minor_km: 1200, waveM: 10, label: "3 hr" },
+      { hours: 9,   major_km: 5400, minor_km: 3600, waveM: 3,  label: "9 hr" },
+    ],
+    inundation_km: 5,
+  },
+  {
+    label: "Alaska",
+    name: "Alaska / Aleutian Collapse",
+    desc: "Anak Krakatau-scale submarine collapse — Gulf of Alaska",
+    origin: [-152.0, 58.0],
+    bearing: 200,
+    color: "#8b5cf6",
+    threat: "Hawaii, US West Coast, Japan, Pacific Islands",
+    maxWaveM: 20,
+    rings: [
+      { hours: 1,  major_km: 500,  minor_km: 350,  waveM: 18, label: "1 hr" },
+      { hours: 2,  major_km: 1000, minor_km: 700,  waveM: 12, label: "2 hr" },
+      { hours: 5,  major_km: 2500, minor_km: 1750, waveM: 6,  label: "5 hr" },
+      { hours: 10, major_km: 5000, minor_km: 3500, waveM: 2,  label: "10 hr" },
+    ],
+    inundation_km: 2,
+  },
+];
+
+const TSUNAMI_SOURCE_ID = "tsunami-source";
+const TSUNAMI_LAYER_PREFIX = "tsunami-layer";
+
+const buildTsunamiEllipse = (originLng, originLat, majorKm, minorKm, bearingDeg, steps = 96) => {
+  const kpLat = 110.574;
+  const kpLng = 111.32 * Math.cos((originLat * Math.PI) / 180);
+  const bearingRad = (bearingDeg * Math.PI) / 180;
+  const dNorth = Math.cos(bearingRad);
+  const dEast  = Math.sin(bearingRad);
+  // Shift center in bearing direction so origin sits at upwind edge
+  const cLat = originLat + (dNorth * majorKm * 0.4) / kpLat;
+  const cLng = originLng + (dEast  * majorKm * 0.4) / Math.max(kpLng, 0.0001);
+  const coords = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * Math.PI * 2;
+    const along = Math.cos(t) * majorKm;
+    const perp  = Math.sin(t) * minorKm;
+    const nKm = dNorth * along - dEast * perp;
+    const eKm = dEast  * along + dNorth * perp;
+    coords.push([cLng + eKm / Math.max(kpLng, 0.0001), cLat + nKm / kpLat]);
+  }
+  return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} };
+};
+
 const safely = (fn) => {
   try { return fn(); } catch (e) { console.warn("Map operation skipped:", e); return null; }
 };
@@ -191,7 +290,13 @@ export default function HomePage() {
   const [scenarioMode, setScenarioMode] = useState("flood");
   const [impactDiameter, setImpactDiameter] = useState(1000);
   const [nukeYield, setNukeYield] = useState(15);
-  const [yellowstonePreset, setYellowstonePreset] = useState(0); // 0=640k, 1=1.3M, 2=2.1M
+  const [yellowstonePreset, setYellowstonePreset] = useState(0);
+  // Mega-Tsunami state
+  const [tsunamiSource, setTsunamiSource] = useState(0);
+  const tsunamiSourceRef = useRef(0);
+  const [tsunamiActive, setTsunamiActive] = useState(false);
+  const [tsunamiResult, setTsunamiResult] = useState(null);
+  const tsunamiPopupRef = useRef(null); // 0=640k, 1=1.3M, 2=2.1M
   const yellowstonePresetRef = useRef(0);
   const [yellowstoneActive, setYellowstoneActive] = useState(false);
   const [yellowstoneResult, setYellowstoneResult] = useState(null);
@@ -901,6 +1006,138 @@ export default function HomePage() {
     return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} };
   };
 
+  const clearTsunami = () => {
+    const map = mapRef.current;
+    if (map && map.isStyleLoaded()) {
+      for (let i = 0; i < 4; i++) {
+        [`${TSUNAMI_LAYER_PREFIX}-fill-${i}`, `${TSUNAMI_LAYER_PREFIX}-line-${i}`,
+         `${TSUNAMI_LAYER_PREFIX}-label-${i}`].forEach(id => {
+          try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){}
+        });
+      }
+      [`${TSUNAMI_SOURCE_ID}`, `${TSUNAMI_SOURCE_ID}-labels`].forEach(id => {
+        try { if (map.getSource(id)) map.removeSource(id); } catch(e){}
+      });
+    }
+    if (tsunamiPopupRef.current) { tsunamiPopupRef.current.remove(); tsunamiPopupRef.current = null; }
+    setTsunamiActive(false);
+    setTsunamiResult(null);
+    setStatus("Tsunami cleared");
+  };
+
+  const drawTsunami = (sourceIdx) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    clearTsunami();
+
+    tsunamiSourceRef.current = sourceIdx;
+    const src = TSUNAMI_SOURCES[sourceIdx];
+    const [oLng, oLat] = src.origin;
+
+    // Build rings largest first (outermost renders underneath)
+    const features = [...src.rings].reverse().map((ring, i) => ({
+      ...buildTsunamiEllipse(oLng, oLat, ring.major_km, ring.minor_km, src.bearing),
+      properties: { ringIdx: src.rings.length - 1 - i, hours: ring.hours, waveM: ring.waveM, label: ring.label },
+    }));
+
+    // Origin marker feature
+    const originFeature = {
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [oLng, oLat] },
+      properties: { type: "origin" },
+    };
+
+    try {
+      map.addSource(TSUNAMI_SOURCE_ID, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features },
+      });
+
+      // Add fill + line layers for each ring
+      src.rings.forEach((ring, i) => {
+        const actualIdx = src.rings.length - 1 - i;
+        const opacity = 0.08 + (src.rings.length - actualIdx) * 0.04;
+        map.addLayer({
+          id: `${TSUNAMI_LAYER_PREFIX}-fill-${actualIdx}`,
+          type: "fill",
+          source: TSUNAMI_SOURCE_ID,
+          filter: ["==", ["get", "ringIdx"], actualIdx],
+          paint: { "fill-color": src.color, "fill-opacity": opacity },
+        });
+        map.addLayer({
+          id: `${TSUNAMI_LAYER_PREFIX}-line-${actualIdx}`,
+          type: "line",
+          source: TSUNAMI_SOURCE_ID,
+          filter: ["==", ["get", "ringIdx"], actualIdx],
+          paint: {
+            "line-color": src.color,
+            "line-width": actualIdx === 0 ? 2.5 : 1.5,
+            "line-opacity": 0.7,
+            "line-dasharray": [4, 2],
+          },
+        });
+      });
+
+      // Fly to origin
+      safely(() => map.flyTo({ center: src.origin, zoom: 3, duration: 1200 }));
+      safely(() => map.triggerRepaint());
+      setTsunamiActive(true);
+      setStatus(`${src.name} — ${src.desc}`);
+
+      // Fetch casualties
+      setTsunamiResult(null);
+      fetch(`${floodEngineUrlRef.current}/tsunami?source=${sourceIdx}`, { cache: "no-store" })
+        .then(r => r.json())
+        .then(d => { if (d.total_deaths != null) setTsunamiResult(d); })
+        .catch(e => console.warn("Tsunami population fetch failed", e));
+
+    } catch(e) { console.error("Tsunami draw error", e); }
+  };
+
+  const showTsunamiPopup = (lng, lat) => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (tsunamiPopupRef.current) { tsunamiPopupRef.current.remove(); tsunamiPopupRef.current = null; }
+
+    const src = TSUNAMI_SOURCES[tsunamiSourceRef.current];
+    const [oLng, oLat] = src.origin;
+    const kpLat = 110.574;
+    const kpLng = 111.32 * Math.cos((oLat * Math.PI) / 180);
+    const bearingRad = (src.bearing * Math.PI) / 180;
+    const dNorth = Math.cos(bearingRad);
+    const dEast  = Math.sin(bearingRad);
+
+    // Find innermost ring containing this point
+    let ringInfo = null;
+    for (let i = 0; i < src.rings.length; i++) {
+      const ring = src.rings[i];
+      const eCLat = oLat + (dNorth * ring.major_km * 0.4) / kpLat;
+      const eCLng = oLng + (dEast  * ring.major_km * 0.4) / Math.max(kpLng, 0.0001);
+      const dLatKm = (lat - eCLat) * kpLat;
+      const dLngKm = (lng - eCLng) * Math.max(kpLng, 0.0001);
+      const along = dNorth * dLatKm + dEast * dLngKm;
+      const perp  = -dEast * dLatKm + dNorth * dLngKm;
+      if ((along / ring.major_km) ** 2 + (perp / ring.minor_km) ** 2 <= 1) {
+        ringInfo = ring; break;
+      }
+    }
+
+    const content = ringInfo
+      ? `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+          <div style="color:${src.color};font-weight:700;margin-bottom:4px">🌊 ${src.name}</div>
+          <div style="color:#e2e8f0;margin-bottom:4px">Wave arrives in <b>${ringInfo.label}</b></div>
+          <div style="color:#94a3b8;margin-bottom:4px">Est. wave height: <b style="color:#e2e8f0">${ringInfo.waveM}m</b></div>
+          <div style="color:#64748b;font-size:11px;font-style:italic">${ringInfo.waveM >= 20 ? "Unsurvivable. Evacuate immediately." : ringInfo.waveM >= 10 ? "Extremely dangerous. Evacuation essential." : ringInfo.waveM >= 5 ? "Deadly for coastal areas. Move inland now." : "Dangerous for coast. Move to high ground."}</div>
+        </div>`
+      : `<div style="font-family:Arial,sans-serif;font-size:13px;padding:2px 4px">
+          <div style="color:#94a3b8">Outside propagation zone</div>
+        </div>`;
+
+    const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: false, className: "elev-popup", maxWidth: "260px" });
+    popup.setLngLat([lng, lat]).setHTML(content).addTo(map);
+    tsunamiPopupRef.current = popup;
+  };
+
   const clearYellowstone = () => {
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
@@ -1243,6 +1480,10 @@ export default function HomePage() {
       );
       return;
     }
+    if (scenarioMode === "tsunami") {
+      setStatus(tsunamiActive ? TSUNAMI_SOURCES[tsunamiSource].name + " — click map for wave details" : "Click Trigger to show wave propagation");
+      return;
+    }
     if (scenarioMode === "yellowstone") {
       setStatus(yellowstoneActive ? `${YELLOWSTONE_PRESETS[yellowstonePreset].name} — click map for ash details` : "Click Erupt to show ash zones");
       return;
@@ -1418,13 +1659,13 @@ export default function HomePage() {
       <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Scenario Mode</div>
       <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
         <button
-          onClick={() => { if (scenarioModeRef.current === "nuke") clearNuke(); if (scenarioModeRef.current === "yellowstone") clearYellowstone(); setScenarioMode("flood"); }}
+          onClick={() => { if (scenarioModeRef.current === "nuke") clearNuke(); if (scenarioModeRef.current === "yellowstone") clearYellowstone(); if (scenarioModeRef.current === "tsunami") clearTsunami(); setScenarioMode("flood"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "flood" ? "#1e3a5f" : "#111827", color: scenarioMode === "flood" ? "#60a5fa" : "#94a3b8", border: scenarioMode === "flood" ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>Flood</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Sea level up / down</div>
         </button>
         <button
-          onClick={() => { if (scenarioModeRef.current === "nuke") clearNuke(); if (scenarioModeRef.current === "yellowstone") clearYellowstone(); setScenarioMode("impact"); }}
+          onClick={() => { if (scenarioModeRef.current === "nuke") clearNuke(); if (scenarioModeRef.current === "yellowstone") clearYellowstone(); if (scenarioModeRef.current === "tsunami") clearTsunami(); setScenarioMode("impact"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "impact" ? "#1e3a5f" : "#111827", color: scenarioMode === "impact" ? "#60a5fa" : "#94a3b8", border: scenarioMode === "impact" ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>Impact</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Click map to place impact point</div>
@@ -1584,6 +1825,42 @@ export default function HomePage() {
         </>
       )}
 
+      {scenarioMode === "tsunami" && (
+        <>
+          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#0ea5e9", textTransform: "uppercase" }}>Wave Source</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+            {TSUNAMI_SOURCES.map((s, i) => (
+              <button key={s.label} onClick={() => { setTsunamiSource(i); drawTsunami(i); }}
+                style={{ padding: "10px 6px", minHeight: 52, border: tsunamiSource === i ? "1px solid #0ea5e9" : "1px solid #1e2d45", background: tsunamiSource === i ? "#0c2a4a" : "#111827", color: tsunamiSource === i ? "#38bdf8" : "#94a3b8", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 12, textAlign: "center" }}>
+                <div>{s.label}</div>
+                <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>Max {s.maxWaveM}m</div>
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 10 }}>{TSUNAMI_SOURCES[tsunamiSource].threat}</div>
+          <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+            <button onClick={() => drawTsunami(tsunamiSource)}
+              style={{ flex: 1, padding: "12px", background: "#0ea5e9", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
+              🌊 Trigger
+            </button>
+            <button onClick={clearTsunami}
+              style={{ flex: 1, padding: "12px", background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
+              Clear
+            </button>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            {TSUNAMI_SOURCES[tsunamiSource].rings.map((r, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>⏱ {r.label}</span>
+                <span style={{ fontSize: 12, color: "#0ea5e9" }}>~{r.waveM}m waves</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Click map for wave arrival time</div>
+          <hr style={{ margin: "0 0 16px 0", borderColor: "#1e2d45" }} />
+        </>
+      )}
+
       {/* ── VIEW MODE ── */}
       <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>View Mode</div>
       <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
@@ -1668,6 +1945,36 @@ export default function HomePage() {
         </>
       )}
 
+        {scenarioMode === "tsunami" && tsunamiActive && (
+          <>
+            <hr style={{ margin: "10px 0", opacity: 0.25 }} />
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>🌊 {TSUNAMI_SOURCES[tsunamiSource].name}</div>
+            <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 6 }}>{TSUNAMI_SOURCES[tsunamiSource].desc}</div>
+            <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>{TSUNAMI_SOURCES[tsunamiSource].threat}</div>
+            {tsunamiResult ? (
+              <div style={{ padding: "8px 10px", background: "#0c1a2e", borderRadius: 8, border: "1px solid #0ea5e9", marginBottom: 6 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>Est. deaths</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#ef4444" }}>{tsunamiResult.total_deaths.toLocaleString()}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>Population exposed</span>
+                  <span style={{ fontSize: 12, color: "#cbd5e1" }}>{tsunamiResult.total_population.toLocaleString()}</span>
+                </div>
+                {tsunamiResult.zones && tsunamiResult.zones.map((z, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                    <span style={{ fontSize: 11, color: "#64748b" }}>{z.name}</span>
+                    <span style={{ fontSize: 11, color: "#94a3b8" }}>{z.deaths.toLocaleString()} ({z.mortality_pct}%)</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 11, color: "#475569", marginBottom: 8 }}>Calculating casualties...</div>
+            )}
+            <div style={{ fontSize: 11, color: "#475569" }}>Click map for wave arrival time</div>
+          </>
+        )}
+
       {scenarioMode === "yellowstone" && yellowstoneActive && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
@@ -1733,7 +2040,7 @@ export default function HomePage() {
         </>
       )}
 
-      {(impactResult || nukeResult || (scenarioMode === "flood" && seaLevel !== 0) || (scenarioMode === "yellowstone" && yellowstoneActive)) && (
+      {(impactResult || nukeResult || (scenarioMode === "flood" && seaLevel !== 0) || (scenarioMode === "yellowstone" && yellowstoneActive) || (scenarioMode === "tsunami" && tsunamiActive)) && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.2 }} />
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#f97316" }}>SHARE</div>
@@ -1743,6 +2050,8 @@ export default function HomePage() {
                 ? `💥 I just simulated a ${Number(impactResult.diameter_m ?? 0).toLocaleString()}m asteroid impact on Disaster Map! ${Math.round(Number(impactResult.estimated_deaths ?? 0)).toLocaleString()} estimated deaths. Try it: https://www.disastermap.ca`
                 : nukeResult
                 ? `☢️ I just detonated a ${nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"} nuke on Disaster Map! ${Math.round(Number(nukeResult.estimated_deaths ?? 0)).toLocaleString()} estimated deaths. Try it: https://www.disastermap.ca`
+                : (scenarioMode === "tsunami" && tsunamiActive)
+                ? `🌊 Just triggered the ${TSUNAMI_SOURCES[tsunamiSource].name} mega-tsunami on Disaster Map!${tsunamiResult ? " Est. " + tsunamiResult.total_deaths.toLocaleString() + " deaths." : ""} Try it: https://www.disastermap.ca`
                 : (scenarioMode === "yellowstone" && yellowstoneActive)
                 ? `🌋 Just simulated the Yellowstone ${YELLOWSTONE_PRESETS[yellowstonePreset].name} supervolcano on Disaster Map!${yellowstoneResult ? " Est. " + yellowstoneResult.total_deaths.toLocaleString() + " deaths." : ""} Ash covers most of North America. Try it: https://www.disastermap.ca`
                 : `🌊 I just flooded the world ${seaLevel > 0 ? "+" : ""}${Math.round(seaLevel)}m on Disaster Map!${floodDisplaced ? " " + floodDisplaced.toLocaleString() + " people displaced." : ""} Try it: https://www.disastermap.ca`;
