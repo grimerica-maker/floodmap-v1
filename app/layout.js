@@ -1,5 +1,6 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import Script from "next/script";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import "mapbox-gl/dist/mapbox-gl.css";
 
@@ -48,6 +49,7 @@ export default function RootLayout({ children }) {
           />
 
           {children}
+          <Analytics />
         </body>
       </html>
     </ClerkProvider>
