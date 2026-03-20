@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v79";
+const FRONTEND_BUILD_LABEL = "v80";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1637,18 +1637,6 @@ export default function HomePage() {
               <button onClick={() => { window.open("https://buy.stripe.com/5kQ00j9mM8s20i22fba3u08", "_blank"); }}
                 style={{ width: "100%", marginTop: 12, padding: "10px", background: "#7c3aed", color: "white", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
                 Subscribe to Ultra →
-              </button>
-            </div>
-
-            {/* Dev unlock — remove before production */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-              <button onClick={() => { localStorage.setItem("dm_pro_tier","pro"); setProTier("pro"); setPaywallModal(null); }}
-                style={{ flex: 1, padding: "6px", background: "#1e293b", color: "#64748b", border: "1px solid #1e2d45", borderRadius: 6, cursor: "pointer", fontSize: 11 }}>
-                [DEV] Unlock Pro
-              </button>
-              <button onClick={() => { localStorage.setItem("dm_pro_tier","ultra"); setProTier("ultra"); setPaywallModal(null); }}
-                style={{ flex: 1, padding: "6px", background: "#1e293b", color: "#64748b", border: "1px solid #1e2d45", borderRadius: 6, cursor: "pointer", fontSize: 11 }}>
-                [DEV] Unlock Ultra
               </button>
             </div>
 
