@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v92";
+const FRONTEND_BUILD_LABEL = "v93";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -327,7 +327,7 @@ export default function HomePage() {
     return getProTier(); // localStorage fallback
   };
 
-  const [proTier, setProTier] = useState(() => getProTier()); // "free" | "pro" | "ultra"
+  const [proTier, setProTier] = useState("free"); // set after mount in useEffect
   const [paywallModal, setPaywallModal] = useState(null); // null | "pro" | "ultra" | "ratelimit"
   const [rlStatus, setRlStatus] = useState(() => getRLStatus());
 
@@ -335,9 +335,7 @@ export default function HomePage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [statsExpanded, setStatsExpanded] = useState(false);
   // Lazy initializer: correct on first render, no flash of wrong layout
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== "undefined" ? window.innerWidth <= 640 : false
-  );
+  const [isMobile, setIsMobile] = useState(false);
 
   // Sync tier from Clerk when auth state changes
   useEffect(() => {
@@ -349,8 +347,9 @@ export default function HomePage() {
     }
   }, [isSignedIn, user]);
 
-  // Keep in sync on resize
+  // Set isMobile after mount (avoids SSR hydration mismatch) + keep in sync on resize
   useEffect(() => {
+    setIsMobile(window.innerWidth <= 640);
     const check = () => setIsMobile(window.innerWidth <= 640);
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
@@ -1681,6 +1680,12 @@ export default function HomePage() {
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "yellowstone" ? "#431407" : "#111827", color: scenarioMode === "yellowstone" ? "#fb923c" : "#94a3b8", border: scenarioMode === "yellowstone" ? "1px solid #ea580c" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>🌋 Yellowstone</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Supervolcano eruption ash zones</div>
+        </button>
+        <button
+          onClick={() => { if (proTier === "free") { setPaywallModal("pro"); return; } setScenarioMode("tsunami"); clearImpactPreview(); clearNuke(); clearYellowstone(); drawTsunami(tsunamiSource); }}
+          style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "tsunami" ? "#0c2a4a" : "#111827", color: scenarioMode === "tsunami" ? "#38bdf8" : "#94a3b8", border: scenarioMode === "tsunami" ? "1px solid #0ea5e9" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
+          <div style={{ fontSize: 15 }}>🌊 Mega-Tsunami {proTier === "free" && <span style={{ fontSize: 10, color: "#f97316", marginLeft: 4 }}>🔒 Pro</span>}</div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Ocean collapse wave propagation</div>
         </button>
       </div>
 
