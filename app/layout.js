@@ -14,7 +14,7 @@ export const metadata = {
     type: "website",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Disaster Map",
     description: "Simulate floods, asteroid impacts and nuclear detonations on an interactive world map.",
     images: ["/og-image.png"],
@@ -24,9 +24,7 @@ export const metadata = {
       { url: "/favicon.png", sizes: "32x32", type: "image/png" },
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
     ],
-    apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
-    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
     shortcut: "/favicon.png",
   },
   manifest: "/manifest.json",
@@ -35,8 +33,8 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <ClerkProvider>
-      <html lang="en">
-        <body style={{ margin: 0, padding: 0, overflow: "hidden" }}>
+      <html lang="en" style={{ height: "100%" }}>
+        <body style={{ margin: 0, padding: 0, overflow: "hidden", height: "100%", width: "100%" }}>
           {children}
         </body>
       </html>
