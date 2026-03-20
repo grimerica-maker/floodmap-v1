@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v89";
+const FRONTEND_BUILD_LABEL = "v91";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -100,10 +100,10 @@ const YELLOWSTONE_PRESETS = [
     vei: 8,
     color: "#ef4444",
     zones: [
-      { name: "Kill Zone", desc: "Total devastation, pyroclastic flows", ash_m: 100, major_km: 200, minor_km: 120, color: "#fef08a", opacity: 0.85 },
-      { name: "Heavy Ash (>1m)", desc: "Structures collapse, crops destroyed", ash_m: 1, major_km: 800, minor_km: 400, color: "#b91c1c", opacity: 0.55 },
-      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable, total crop failure", ash_cm: 10, major_km: 1800, minor_km: 800, color: "#ea580c", opacity: 0.30 },
-      { name: "Trace Ash (1cm+)", desc: "Air travel disrupted, health risk", ash_cm: 1, major_km: 3500, minor_km: 1600, color: "#92400e", opacity: 0.18 },
+      { name: "Kill Zone", desc: "Total devastation, pyroclastic flows", survival: "0%", survivalNote: "Pyroclastic flows, 1000°C+. No survival possible.", ash_m: 100, major_km: 200, minor_km: 120, color: "#fef08a", opacity: 0.85 },
+      { name: "Heavy Ash (>1m)", desc: "Structures collapse, crops destroyed", survival: "2-5%", survivalNote: "Roof collapse, water contamination, no food. Survival only with immediate evacuation.", ash_m: 1, major_km: 800, minor_km: 400, color: "#b91c1c", opacity: 0.55 },
+      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable, total crop failure", survival: "30-50%", survivalNote: "Survivable with evacuation. Infrastructure destroyed for years. Nuclear winter effects.",  ash_cm: 10, major_km: 1800, minor_km: 800, color: "#ea580c", opacity: 0.30 },
+      { name: "Trace Ash (1cm+)", desc: "Air travel disrupted, health risk", survival: "85-95%", survivalNote: "Most survive with preparation. Respiratory masks essential. Economic disruption for months.",  ash_cm: 1, major_km: 3500, minor_km: 1600, color: "#92400e", opacity: 0.18 },
     ],
   },
   {
@@ -113,10 +113,10 @@ const YELLOWSTONE_PRESETS = [
     vei: 8,
     color: "#f97316",
     zones: [
-      { name: "Kill Zone", desc: "Total devastation", ash_m: 50, major_km: 120, minor_km: 70, color: "#fef08a", opacity: 0.85 },
-      { name: "Heavy Ash (>1m)", desc: "Structures collapse", ash_m: 1, major_km: 450, minor_km: 220, color: "#b91c1c", opacity: 0.55 },
-      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable", ash_cm: 10, major_km: 1100, minor_km: 500, color: "#ea580c", opacity: 0.30 },
-      { name: "Trace Ash (1cm+)", desc: "Health risk", ash_cm: 1, major_km: 2200, minor_km: 900, color: "#92400e", opacity: 0.18 },
+      { name: "Kill Zone", desc: "Total devastation", survival: "0%", survivalNote: "Pyroclastic flows, 1000°C+. No survival possible.", ash_m: 50, major_km: 120, minor_km: 70, color: "#fef08a", opacity: 0.85 },
+      { name: "Heavy Ash (>1m)", desc: "Structures collapse", survival: "2-5%", survivalNote: "Roof collapse, water contamination, no food. Survival only with immediate evacuation.", ash_m: 1, major_km: 450, minor_km: 220, color: "#b91c1c", opacity: 0.55 },
+      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable", survival: "30-50%", survivalNote: "Survivable with evacuation. Infrastructure destroyed for years. Nuclear winter effects.",  ash_cm: 10, major_km: 1100, minor_km: 500, color: "#ea580c", opacity: 0.30 },
+      { name: "Trace Ash (1cm+)", desc: "Health risk", survival: "85-95%", survivalNote: "Most survive with preparation. Respiratory masks essential. Economic disruption for months.",  ash_cm: 1, major_km: 2200, minor_km: 900, color: "#92400e", opacity: 0.18 },
     ],
   },
   {
@@ -126,10 +126,10 @@ const YELLOWSTONE_PRESETS = [
     vei: 8,
     color: "#a855f7",
     zones: [
-      { name: "Kill Zone", desc: "Total devastation", ash_m: 200, major_km: 300, minor_km: 180, color: "#fef08a", opacity: 0.85 },
-      { name: "Heavy Ash (>1m)", desc: "Structures collapse", ash_m: 1, major_km: 1200, minor_km: 600, color: "#b91c1c", opacity: 0.55 },
-      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable", ash_cm: 10, major_km: 2800, minor_km: 1200, color: "#ea580c", opacity: 0.30 },
-      { name: "Trace Ash (1cm+)", desc: "Health risk", ash_cm: 1, major_km: 5000, minor_km: 2200, color: "#92400e", opacity: 0.18 },
+      { name: "Kill Zone", desc: "Total devastation", survival: "0%", survivalNote: "Pyroclastic flows, 1000°C+. No survival possible.", ash_m: 200, major_km: 300, minor_km: 180, color: "#fef08a", opacity: 0.85 },
+      { name: "Heavy Ash (>1m)", desc: "Structures collapse", survival: "2-5%", survivalNote: "Roof collapse, water contamination, no food. Survival only with immediate evacuation.", ash_m: 1, major_km: 1200, minor_km: 600, color: "#b91c1c", opacity: 0.55 },
+      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable", survival: "30-50%", survivalNote: "Survivable with evacuation. Infrastructure destroyed for years. Nuclear winter effects.",  ash_cm: 10, major_km: 2800, minor_km: 1200, color: "#ea580c", opacity: 0.30 },
+      { name: "Trace Ash (1cm+)", desc: "Health risk", survival: "85-95%", survivalNote: "Most survive with preparation. Respiratory masks essential. Economic disruption for months.",  ash_cm: 1, major_km: 5000, minor_km: 2200, color: "#92400e", opacity: 0.18 },
     ],
   },
 ];
@@ -194,6 +194,7 @@ export default function HomePage() {
   const [yellowstonePreset, setYellowstonePreset] = useState(0); // 0=640k, 1=1.3M, 2=2.1M
   const yellowstonePresetRef = useRef(0);
   const [yellowstoneActive, setYellowstoneActive] = useState(false);
+  const [yellowstoneResult, setYellowstoneResult] = useState(null);
   const yellowstonePopupRef = useRef(null);
   const [nukeBurst, setNukeBurst] = useState("airburst");
   const [nukeWindDeg, setNukeWindDeg] = useState(270);
@@ -914,6 +915,7 @@ export default function HomePage() {
     }
     if (yellowstonePopupRef.current) { yellowstonePopupRef.current.remove(); yellowstonePopupRef.current = null; }
     setYellowstoneActive(false);
+    setYellowstoneResult(null);
     setStatus("Yellowstone cleared");
   };
 
@@ -957,7 +959,15 @@ export default function HomePage() {
       safely(() => map.flyTo({ center: YELLOWSTONE_CENTER, zoom: 3.5, duration: 1200 }));
       safely(() => map.triggerRepaint());
       setYellowstoneActive(true);
+      setYellowstoneResult(null);
       setStatus(`${preset.name} — ${preset.desc}`);
+
+      // Fetch population impact
+      fetch(`${floodEngineUrlRef.current}/yellowstone?preset=${presetIdx}`, { cache: "no-store" })
+        .then(r => r.json())
+        .then(d => { if (d.total_deaths != null) setYellowstoneResult(d); })
+        .catch(e => console.warn("Yellowstone population fetch failed", e));
+
     } catch(e) { console.error("Yellowstone draw error", e); }
   };
 
@@ -998,9 +1008,14 @@ export default function HomePage() {
 
     const content = zoneInfo
       ? `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
-          <div style="color:#f97316;font-weight:700;margin-bottom:4px">🌋 ${zoneInfo.name}</div>
-          <div style="color:#e2e8f0">${zoneInfo.desc}</div>
-          <div style="color:#94a3b8;font-size:11px;margin-top:4px">${preset.name}</div>
+          <div style="color:${zoneInfo.color};font-weight:700;margin-bottom:4px">🌋 ${zoneInfo.name}</div>
+          <div style="color:#e2e8f0;margin-bottom:4px">${zoneInfo.desc}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span style="color:#94a3b8;font-size:11px">Survival odds:</span>
+            <span style="color:${zoneInfo.survival === '0%' ? '#ef4444' : zoneInfo.survival.startsWith('2') ? '#f97316' : zoneInfo.survival.startsWith('3') ? '#fbbf24' : '#4ade80'};font-weight:700;font-size:13px">${zoneInfo.survival}</span>
+          </div>
+          <div style="color:#64748b;font-size:11px;font-style:italic">${zoneInfo.survivalNote}</div>
+          <div style="color:#475569;font-size:10px;margin-top:4px">${preset.name}</div>
         </div>`
       : `<div style="font-family:Arial,sans-serif;font-size:13px;padding:2px 4px">
           <div style="color:#94a3b8">Outside ash fall zone</div>
@@ -1659,12 +1674,39 @@ export default function HomePage() {
           <div style={{ fontWeight: 700, marginBottom: 4 }}>🌋 {YELLOWSTONE_PRESETS[yellowstonePreset].name}</div>
           <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8 }}>{YELLOWSTONE_PRESETS[yellowstonePreset].desc}</div>
           {YELLOWSTONE_PRESETS[yellowstonePreset].zones.map((z, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: z.color, flexShrink: 0 }} />
-              <span style={{ fontSize: 12, color: z.color, fontWeight: 700 }}>{z.name}</span>
-              <span style={{ fontSize: 11, color: "#64748b" }}>— {z.desc}</span>
+            <div key={i} style={{ marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: 2, background: z.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, color: z.color, fontWeight: 700 }}>{z.name}</span>
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: z.survival === "0%" ? "#ef4444" : z.survival.startsWith("2") ? "#f97316" : z.survival.startsWith("3") ? "#fbbf24" : "#4ade80" }}>
+                  {z.survival} survival
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: "#475569", marginTop: 2, paddingLeft: 16 }}>{z.desc}</div>
             </div>
           ))}
+          {yellowstoneResult ? (
+            <div style={{ marginTop: 8, padding: "8px 10px", background: "#1a0a0a", borderRadius: 8, border: "1px solid #7f1d1d" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>Est. deaths</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#ef4444" }}>{yellowstoneResult.total_deaths.toLocaleString()}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>Population exposed</span>
+                <span style={{ fontSize: 12, color: "#cbd5e1" }}>{yellowstoneResult.total_population.toLocaleString()}</span>
+              </div>
+              {yellowstoneResult.zones.map((z, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                  <span style={{ fontSize: 11, color: "#64748b" }}>{z.name}</span>
+                  <span style={{ fontSize: 11, color: "#94a3b8" }}>{z.deaths.toLocaleString()} deaths ({z.mortality_pct}%)</span>
+                </div>
+              ))}
+            </div>
+          ) : yellowstoneActive ? (
+            <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>Calculating casualties...</div>
+          ) : null}
           <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>Click map for zone details</div>
         </>
       )}
@@ -1702,7 +1744,7 @@ export default function HomePage() {
                 : nukeResult
                 ? `☢️ I just detonated a ${nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"} nuke on Disaster Map! ${Math.round(Number(nukeResult.estimated_deaths ?? 0)).toLocaleString()} estimated deaths. Try it: https://www.disastermap.ca`
                 : (scenarioMode === "yellowstone" && yellowstoneActive)
-                ? `🌋 Just simulated the Yellowstone ${YELLOWSTONE_PRESETS[yellowstonePreset].name} supervolcano on Disaster Map — ash covers most of North America. Try it: https://www.disastermap.ca`
+                ? `🌋 Just simulated the Yellowstone ${YELLOWSTONE_PRESETS[yellowstonePreset].name} supervolcano on Disaster Map!${yellowstoneResult ? " Est. " + yellowstoneResult.total_deaths.toLocaleString() + " deaths." : ""} Ash covers most of North America. Try it: https://www.disastermap.ca`
                 : `🌊 I just flooded the world ${seaLevel > 0 ? "+" : ""}${Math.round(seaLevel)}m on Disaster Map!${floodDisplaced ? " " + floodDisplaced.toLocaleString() + " people displaced." : ""} Try it: https://www.disastermap.ca`;
               window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(msg), "_blank");
             }} style={{ background: "#000", color: "#fff" }}>
