@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v87";
+const FRONTEND_BUILD_LABEL = "v88";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -968,21 +968,30 @@ export default function HomePage() {
     const preset = YELLOWSTONE_PRESETS[yellowstonePreset];
     const [cLng, cLat] = YELLOWSTONE_CENTER;
 
-    // Find which zone this point is in
-    const distKm = Math.sqrt(
-      Math.pow((lat - cLat) * 110.574, 2) +
-      Math.pow((lng - cLng) * 111.32 * Math.cos(cLat * Math.PI / 180), 2)
-    );
+    // Point-in-ellipse test — same bearing and center shift as buildAshEllipse
+    const kpLat = 110.574;
+    const kpLng = 111.32 * Math.cos((cLat * Math.PI) / 180);
+    const bearingDeg = 70;
+    const bearingRad = (bearingDeg * Math.PI) / 180;
+    const dNorth = Math.cos(bearingRad);
+    const dEast  = Math.sin(bearingRad);
 
     let zoneInfo = null;
+    // Check smallest zone first (innermost = highest severity)
     for (let i = 0; i < preset.zones.length; i++) {
       const z = preset.zones[i];
-      // Rough check using minor axis as conservative estimate
-      if (distKm <= z.minor_km * 1.2) { zoneInfo = z; break; }
-    }
-
-    if (!zoneInfo && distKm <= preset.zones[preset.zones.length-1].major_km) {
-      zoneInfo = preset.zones[preset.zones.length-1];
+      // Ellipse center shifted downwind by 0.3 * major axis (matching buildAshEllipse)
+      const eCLat = cLat + (dNorth * z.major_km * 0.3) / kpLat;
+      const eCLng = cLng + (dEast  * z.major_km * 0.3) / Math.max(kpLng, 0.0001);
+      // Vector from ellipse center to click point in km
+      const dLatKm = (lat - eCLat) * kpLat;
+      const dLngKm = (lng - eCLng) * Math.max(kpLng, 0.0001);
+      // Rotate into ellipse coordinate frame
+      const along = dNorth * dLatKm + dEast * dLngKm;
+      const perp  = -dEast * dLatKm + dNorth * dLngKm;
+      // Standard ellipse equation: (along/a)² + (perp/b)² <= 1
+      const inside = (along / z.major_km) ** 2 + (perp / z.minor_km) ** 2 <= 1;
+      if (inside) { zoneInfo = z; break; }
     }
 
     const content = zoneInfo
