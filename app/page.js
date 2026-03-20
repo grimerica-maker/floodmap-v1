@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v93";
+const FRONTEND_BUILD_LABEL = "v94";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -244,8 +244,8 @@ const buildTsunamiEllipse = (originLng, originLat, majorKm, minorKm, bearingDeg,
   const dNorth = Math.cos(bearingRad);
   const dEast  = Math.sin(bearingRad);
   // Shift center in bearing direction so origin sits at upwind edge
-  const cLat = originLat + (dNorth * majorKm * 0.4) / kpLat;
-  const cLng = originLng + (dEast  * majorKm * 0.4) / Math.max(kpLng, 0.0001);
+  const cLat = originLat + (dNorth * majorKm * 0.85) / kpLat;
+  const cLng = originLng + (dEast  * majorKm * 0.85) / Math.max(kpLng, 0.0001);
   const coords = [];
   for (let i = 0; i <= steps; i++) {
     const t = (i / steps) * Math.PI * 2;
@@ -1110,7 +1110,7 @@ export default function HomePage() {
     let ringInfo = null;
     for (let i = 0; i < src.rings.length; i++) {
       const ring = src.rings[i];
-      const eCLat = oLat + (dNorth * ring.major_km * 0.4) / kpLat;
+      const eCLat = oLat + (dNorth * ring.major_km * 0.85) / kpLat;
       const eCLng = oLng + (dEast  * ring.major_km * 0.4) / Math.max(kpLng, 0.0001);
       const dLatKm = (lat - eCLat) * kpLat;
       const dLngKm = (lng - eCLng) * Math.max(kpLng, 0.0001);
@@ -1682,7 +1682,7 @@ export default function HomePage() {
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Supervolcano eruption ash zones</div>
         </button>
         <button
-          onClick={() => { if (proTier === "free") { setPaywallModal("pro"); return; } setScenarioMode("tsunami"); clearImpactPreview(); clearNuke(); clearYellowstone(); drawTsunami(tsunamiSource); }}
+          onClick={() => { if (proTier === "free") { setPaywallModal("pro"); return; } scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); clearImpactPreview(); clearNuke(); clearYellowstone(); drawTsunami(tsunamiSource); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "tsunami" ? "#0c2a4a" : "#111827", color: scenarioMode === "tsunami" ? "#38bdf8" : "#94a3b8", border: scenarioMode === "tsunami" ? "1px solid #0ea5e9" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>🌊 Mega-Tsunami {proTier === "free" && <span style={{ fontSize: 10, color: "#f97316", marginLeft: 4 }}>🔒 Pro</span>}</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Ocean collapse wave propagation</div>
@@ -1835,7 +1835,7 @@ export default function HomePage() {
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#0ea5e9", textTransform: "uppercase" }}>Wave Source</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
             {TSUNAMI_SOURCES.map((s, i) => (
-              <button key={s.label} onClick={() => { setTsunamiSource(i); drawTsunami(i); }}
+              <button key={s.label} onClick={() => { setTsunamiSource(i); tsunamiSourceRef.current = i; drawTsunami(i); }}
                 style={{ padding: "10px 6px", minHeight: 52, border: tsunamiSource === i ? "1px solid #0ea5e9" : "1px solid #1e2d45", background: tsunamiSource === i ? "#0c2a4a" : "#111827", color: tsunamiSource === i ? "#38bdf8" : "#94a3b8", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 12, textAlign: "center" }}>
                 <div>{s.label}</div>
                 <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>Max {s.maxWaveM}m</div>
@@ -1844,7 +1844,7 @@ export default function HomePage() {
           </div>
           <div style={{ fontSize: 12, color: "#64748b", marginBottom: 10 }}>{TSUNAMI_SOURCES[tsunamiSource].threat}</div>
           <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-            <button onClick={() => drawTsunami(tsunamiSource)}
+            <button onClick={() => { tsunamiSourceRef.current = tsunamiSource; drawTsunami(tsunamiSource); }}
               style={{ flex: 1, padding: "12px", background: "#0ea5e9", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
               🌊 Trigger
             </button>
