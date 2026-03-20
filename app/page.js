@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v88";
+const FRONTEND_BUILD_LABEL = "v89";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -192,6 +192,7 @@ export default function HomePage() {
   const [impactDiameter, setImpactDiameter] = useState(1000);
   const [nukeYield, setNukeYield] = useState(15);
   const [yellowstonePreset, setYellowstonePreset] = useState(0); // 0=640k, 1=1.3M, 2=2.1M
+  const yellowstonePresetRef = useRef(0);
   const [yellowstoneActive, setYellowstoneActive] = useState(false);
   const yellowstonePopupRef = useRef(null);
   const [nukeBurst, setNukeBurst] = useState("airburst");
@@ -921,6 +922,7 @@ export default function HomePage() {
     if (!map || !map.isStyleLoaded()) return;
     clearYellowstone();
 
+    yellowstonePresetRef.current = presetIdx;
     const preset = YELLOWSTONE_PRESETS[presetIdx];
     const [cLng, cLat] = YELLOWSTONE_CENTER;
 
@@ -965,7 +967,7 @@ export default function HomePage() {
     if (!map) return;
     if (yellowstonePopupRef.current) { yellowstonePopupRef.current.remove(); yellowstonePopupRef.current = null; }
 
-    const preset = YELLOWSTONE_PRESETS[yellowstonePreset];
+    const preset = YELLOWSTONE_PRESETS[yellowstonePresetRef.current];
     const [cLng, cLat] = YELLOWSTONE_CENTER;
 
     // Point-in-ellipse test — same bearing and center shift as buildAshEllipse
