@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v81";
+const FRONTEND_BUILD_LABEL = "v82";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -283,6 +283,7 @@ export default function HomePage() {
       closeOnClick: false,
       className: "elev-popup",
       maxWidth: "220px",
+      anchor: "bottom",
     });
 
     popup.setLngLat([lng, lat])
@@ -863,7 +864,7 @@ export default function HomePage() {
       center: [-80.19, 25.76],
       zoom: 6.2,
       antialias: false,
-      attributionControl: true,
+      attributionControl: false,
       collectResourceTiming: false,
       transformRequest: (url) => ({ url }),
     });
@@ -871,6 +872,7 @@ export default function HomePage() {
     mapRef.current = map;
     applyProjectionForMode("map");
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
+    map.addControl(new mapboxgl.AttributionControl({ compact: true }), "bottom-right");
     map.getCanvas().style.cursor = "crosshair";
 
     const handleError = (e) => {
@@ -1655,7 +1657,7 @@ export default function HomePage() {
       )}
 
       <canvas id="star-canvas" className={viewMode === "globe" ? "visible" : ""} />
-      <div ref={mapContainerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0 }} />
+      <div ref={mapContainerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0, overflow: "hidden" }} />
       {/* Disaster Map wordmark — top center, unobtrusive */}
       <div style={{
         position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)",
