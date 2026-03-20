@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v80";
+const FRONTEND_BUILD_LABEL = "v81";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1482,7 +1482,7 @@ export default function HomePage() {
   );
 
   return (
-    <div style={{ width: "100%", height: "100vh", height: "100dvh", position: "relative", overflow: "hidden" }}>
+    <div style={{ position: "fixed", inset: 0, width: "100%", height: "100%", overflow: "hidden" }}>
       <style>{`
         /* ── Mapbox popup ── */
         /* ── Dark panel theme ── */
