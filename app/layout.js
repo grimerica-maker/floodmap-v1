@@ -1,5 +1,6 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
+import "mapbox-gl/dist/mapbox-gl.css";
 
 export const metadata = {
   title: "Disaster Map — Simulate Floods, Asteroid Impacts & Nuclear Detonations",
@@ -33,11 +34,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <ClerkProvider
-      appearance={{
-        variables: { colorBackground: "#0a0f1e" }
-      }}
-    >
+    <ClerkProvider>
       <html lang="en" style={{ margin: 0, padding: 0, overflow: "hidden", height: "100%" }}>
         <body style={{ margin: 0, padding: 0, overflow: "hidden", height: "100%", display: "contents" }}>
           {children}
