@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v85";
+const FRONTEND_BUILD_LABEL = "v87";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -100,10 +100,10 @@ const YELLOWSTONE_PRESETS = [
     vei: 8,
     color: "#ef4444",
     zones: [
-      { name: "Kill Zone", desc: "Total devastation, pyroclastic flows", ash_m: 100, major_km: 200, minor_km: 120, color: "#7f1d1d", opacity: 0.6 },
-      { name: "Heavy Ash (>1m)", desc: "Structures collapse, crops destroyed", ash_m: 1, major_km: 800, minor_km: 400, color: "#dc2626", opacity: 0.35 },
-      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable, total crop failure", ash_cm: 10, major_km: 1800, minor_km: 800, color: "#f97316", opacity: 0.2 },
-      { name: "Trace Ash (1cm+)", desc: "Air travel disrupted, health risk", ash_cm: 1, major_km: 3500, minor_km: 1600, color: "#fbbf24", opacity: 0.1 },
+      { name: "Kill Zone", desc: "Total devastation, pyroclastic flows", ash_m: 100, major_km: 200, minor_km: 120, color: "#fef08a", opacity: 0.85 },
+      { name: "Heavy Ash (>1m)", desc: "Structures collapse, crops destroyed", ash_m: 1, major_km: 800, minor_km: 400, color: "#b91c1c", opacity: 0.55 },
+      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable, total crop failure", ash_cm: 10, major_km: 1800, minor_km: 800, color: "#ea580c", opacity: 0.30 },
+      { name: "Trace Ash (1cm+)", desc: "Air travel disrupted, health risk", ash_cm: 1, major_km: 3500, minor_km: 1600, color: "#92400e", opacity: 0.18 },
     ],
   },
   {
@@ -113,10 +113,10 @@ const YELLOWSTONE_PRESETS = [
     vei: 8,
     color: "#f97316",
     zones: [
-      { name: "Kill Zone", desc: "Total devastation", ash_m: 50, major_km: 120, minor_km: 70, color: "#7f1d1d", opacity: 0.6 },
-      { name: "Heavy Ash (>1m)", desc: "Structures collapse", ash_m: 1, major_km: 450, minor_km: 220, color: "#dc2626", opacity: 0.35 },
-      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable", ash_cm: 10, major_km: 1100, minor_km: 500, color: "#f97316", opacity: 0.2 },
-      { name: "Trace Ash (1cm+)", desc: "Health risk", ash_cm: 1, major_km: 2200, minor_km: 900, color: "#fbbf24", opacity: 0.1 },
+      { name: "Kill Zone", desc: "Total devastation", ash_m: 50, major_km: 120, minor_km: 70, color: "#fef08a", opacity: 0.85 },
+      { name: "Heavy Ash (>1m)", desc: "Structures collapse", ash_m: 1, major_km: 450, minor_km: 220, color: "#b91c1c", opacity: 0.55 },
+      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable", ash_cm: 10, major_km: 1100, minor_km: 500, color: "#ea580c", opacity: 0.30 },
+      { name: "Trace Ash (1cm+)", desc: "Health risk", ash_cm: 1, major_km: 2200, minor_km: 900, color: "#92400e", opacity: 0.18 },
     ],
   },
   {
@@ -126,10 +126,10 @@ const YELLOWSTONE_PRESETS = [
     vei: 8,
     color: "#a855f7",
     zones: [
-      { name: "Kill Zone", desc: "Total devastation", ash_m: 200, major_km: 300, minor_km: 180, color: "#7f1d1d", opacity: 0.6 },
-      { name: "Heavy Ash (>1m)", desc: "Structures collapse", ash_m: 1, major_km: 1200, minor_km: 600, color: "#dc2626", opacity: 0.35 },
-      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable", ash_cm: 10, major_km: 2800, minor_km: 1200, color: "#f97316", opacity: 0.2 },
-      { name: "Trace Ash (1cm+)", desc: "Health risk", ash_cm: 1, major_km: 5000, minor_km: 2200, color: "#fbbf24", opacity: 0.1 },
+      { name: "Kill Zone", desc: "Total devastation", ash_m: 200, major_km: 300, minor_km: 180, color: "#fef08a", opacity: 0.85 },
+      { name: "Heavy Ash (>1m)", desc: "Structures collapse", ash_m: 1, major_km: 1200, minor_km: 600, color: "#b91c1c", opacity: 0.55 },
+      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable", ash_cm: 10, major_km: 2800, minor_km: 1200, color: "#ea580c", opacity: 0.30 },
+      { name: "Trace Ash (1cm+)", desc: "Health risk", ash_cm: 1, major_km: 5000, minor_km: 2200, color: "#92400e", opacity: 0.18 },
     ],
   },
 ];
@@ -924,30 +924,30 @@ export default function HomePage() {
     const preset = YELLOWSTONE_PRESETS[presetIdx];
     const [cLng, cLat] = YELLOWSTONE_CENTER;
 
-    // Build features — outermost zone first (renders underneath)
-    const features = [...preset.zones].reverse().map((zone, i) => ({
+    // Build features largest to smallest — each inner zone renders on top
+    const features = preset.zones.map((zone, i) => ({
       ...buildAshEllipse(cLng, cLat, zone.major_km, zone.minor_km),
-      properties: { zoneIdx: preset.zones.length - 1 - i, ...zone },
+      properties: { zoneIdx: i, ...zone },
     }));
 
     try {
       map.addSource(YELLOWSTONE_SOURCE_ID, { type: "geojson", data: { type: "FeatureCollection", features } });
 
+      // Add layers largest first so smaller inner zones render on top
       preset.zones.forEach((zone, i) => {
-        const actualIdx = preset.zones.length - 1 - i;
         map.addLayer({
-          id: `${YELLOWSTONE_LAYER_PREFIX}-${actualIdx}`,
+          id: `${YELLOWSTONE_LAYER_PREFIX}-${i}`,
           type: "fill",
           source: YELLOWSTONE_SOURCE_ID,
-          filter: ["==", ["get", "zoneIdx"], actualIdx],
+          filter: ["==", ["get", "zoneIdx"], i],
           paint: { "fill-color": zone.color, "fill-opacity": zone.opacity },
         });
         map.addLayer({
-          id: `${YELLOWSTONE_LAYER_PREFIX}-line-${actualIdx}`,
+          id: `${YELLOWSTONE_LAYER_PREFIX}-line-${i}`,
           type: "line",
           source: YELLOWSTONE_SOURCE_ID,
-          filter: ["==", ["get", "zoneIdx"], actualIdx],
-          paint: { "line-color": zone.color, "line-width": actualIdx === 0 ? 2.5 : 1.5, "line-opacity": 0.8 },
+          filter: ["==", ["get", "zoneIdx"], i],
+          paint: { "line-color": zone.color, "line-width": i === 0 ? 2.0 : 1.2, "line-opacity": 0.8 },
         });
       });
 
