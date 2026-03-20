@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v82";
+const FRONTEND_BUILD_LABEL = "v84";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -85,6 +85,80 @@ const NUKE_PRESETS = [
   { label: "Tsar Bomba", yield_kt: 50000 },
 ];
 
+// ── Yellowstone eruption data ─────────────────────────────────────────────────
+// Based on USGS geological studies of the three caldera-forming eruptions.
+// Ash zones are approximate ellipses centered on Yellowstone caldera (44.4°N, 110.6°W)
+// Each zone: [major_km, minor_km, bearing_deg] — ash disperses ENE with jet stream
+
+const YELLOWSTONE_CENTER = [-110.6, 44.4];
+
+const YELLOWSTONE_PRESETS = [
+  {
+    label: "640k BP",
+    name: "Lava Creek (640,000 BP)",
+    desc: "Largest known — 1,000 km³ ejecta",
+    vei: 8,
+    color: "#ef4444",
+    zones: [
+      { name: "Kill Zone", desc: "Total devastation, pyroclastic flows", ash_m: 100, major_km: 200, minor_km: 120, color: "#7f1d1d", opacity: 0.85 },
+      { name: "Heavy Ash (>1m)", desc: "Structures collapse, crops destroyed", ash_m: 1, major_km: 800, minor_km: 400, color: "#dc2626", opacity: 0.55 },
+      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable, total crop failure", ash_cm: 10, major_km: 1800, minor_km: 800, color: "#f97316", opacity: 0.35 },
+      { name: "Trace Ash (1cm+)", desc: "Air travel disrupted, health risk", ash_cm: 1, major_km: 3500, minor_km: 1600, color: "#fbbf24", opacity: 0.18 },
+    ],
+  },
+  {
+    label: "1.3M BP",
+    name: "Mesa Falls (1.3M BP)",
+    desc: "Mid-size — 280 km³ ejecta",
+    vei: 8,
+    color: "#f97316",
+    zones: [
+      { name: "Kill Zone", desc: "Total devastation", ash_m: 50, major_km: 120, minor_km: 70, color: "#7f1d1d", opacity: 0.85 },
+      { name: "Heavy Ash (>1m)", desc: "Structures collapse", ash_m: 1, major_km: 450, minor_km: 220, color: "#dc2626", opacity: 0.55 },
+      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable", ash_cm: 10, major_km: 1100, minor_km: 500, color: "#f97316", opacity: 0.35 },
+      { name: "Trace Ash (1cm+)", desc: "Health risk", ash_cm: 1, major_km: 2200, minor_km: 900, color: "#fbbf24", opacity: 0.18 },
+    ],
+  },
+  {
+    label: "2.1M BP",
+    name: "Huckleberry Ridge (2.1M BP)",
+    desc: "First eruption — 2,450 km³ ejecta",
+    vei: 8,
+    color: "#a855f7",
+    zones: [
+      { name: "Kill Zone", desc: "Total devastation", ash_m: 200, major_km: 300, minor_km: 180, color: "#7f1d1d", opacity: 0.85 },
+      { name: "Heavy Ash (>1m)", desc: "Structures collapse", ash_m: 1, major_km: 1200, minor_km: 600, color: "#dc2626", opacity: 0.55 },
+      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable", ash_cm: 10, major_km: 2800, minor_km: 1200, color: "#f97316", opacity: 0.35 },
+      { name: "Trace Ash (1cm+)", desc: "Health risk", ash_cm: 1, major_km: 5000, minor_km: 2200, color: "#fbbf24", opacity: 0.18 },
+    ],
+  },
+];
+
+// Build ash ellipse GeoJSON — jet stream blows ENE so bearing ~70° from Yellowstone
+const buildAshEllipse = (centerLng, centerLat, majorKm, minorKm, bearingDeg = 70, steps = 96) => {
+  const kpLat = 110.574;
+  const kpLng = 111.32 * Math.cos((centerLat * Math.PI) / 180);
+  const bearingRad = (bearingDeg * Math.PI) / 180;
+  const dNorth = Math.cos(bearingRad);
+  const dEast  = Math.sin(bearingRad);
+  // Shift center downwind so Yellowstone sits at upwind edge
+  const cLat = centerLat + (dNorth * majorKm * 0.3) / kpLat;
+  const cLng = centerLng + (dEast  * majorKm * 0.3) / Math.max(kpLng, 0.0001);
+  const coords = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * Math.PI * 2;
+    const along = Math.cos(t) * majorKm;
+    const perp  = Math.sin(t) * minorKm;
+    const nKm = dNorth * along - dEast * perp;
+    const eKm = dEast  * along + dNorth * perp;
+    coords.push([cLng + eKm / Math.max(kpLng, 0.0001), cLat + nKm / kpLat]);
+  }
+  return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} };
+};
+
+const YELLOWSTONE_SOURCE_ID = "yellowstone-source";
+const YELLOWSTONE_LAYER_PREFIX = "yellowstone-layer";
+
 const safely = (fn) => {
   try { return fn(); } catch (e) { console.warn("Map operation skipped:", e); return null; }
 };
@@ -117,6 +191,9 @@ export default function HomePage() {
   const [scenarioMode, setScenarioMode] = useState("flood");
   const [impactDiameter, setImpactDiameter] = useState(1000);
   const [nukeYield, setNukeYield] = useState(15);
+  const [yellowstonePreset, setYellowstonePreset] = useState(0); // 0=640k, 1=1.3M, 2=2.1M
+  const [yellowstoneActive, setYellowstoneActive] = useState(false);
+  const yellowstonePopupRef = useRef(null);
   const [nukeBurst, setNukeBurst] = useState("airburst");
   const [nukeWindDeg, setNukeWindDeg] = useState(270);
   const [nukeResult, setNukeResult] = useState(null);
@@ -283,7 +360,6 @@ export default function HomePage() {
       closeOnClick: false,
       className: "elev-popup",
       maxWidth: "220px",
-      anchor: "bottom",
     });
 
     popup.setLngLat([lng, lat])
@@ -823,6 +899,108 @@ export default function HomePage() {
     return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} };
   };
 
+  const clearYellowstone = () => {
+    const map = mapRef.current;
+    if (map && map.isStyleLoaded()) {
+      // Remove all yellowstone layers
+      for (let i = 0; i < 4; i++) {
+        const id = `${YELLOWSTONE_LAYER_PREFIX}-${i}`;
+        const lineId = `${YELLOWSTONE_LAYER_PREFIX}-line-${i}`;
+        try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){}
+        try { if (map.getLayer(lineId)) map.removeLayer(lineId); } catch(e){}
+      }
+      try { if (map.getSource(YELLOWSTONE_SOURCE_ID)) map.removeSource(YELLOWSTONE_SOURCE_ID); } catch(e){}
+    }
+    if (yellowstonePopupRef.current) { yellowstonePopupRef.current.remove(); yellowstonePopupRef.current = null; }
+    setYellowstoneActive(false);
+    setStatus("Yellowstone cleared");
+  };
+
+  const drawYellowstone = (presetIdx) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    clearYellowstone();
+
+    const preset = YELLOWSTONE_PRESETS[presetIdx];
+    const [cLng, cLat] = YELLOWSTONE_CENTER;
+
+    // Build features — outermost zone first (renders underneath)
+    const features = [...preset.zones].reverse().map((zone, i) => ({
+      ...buildAshEllipse(cLng, cLat, zone.major_km, zone.minor_km),
+      properties: { zoneIdx: preset.zones.length - 1 - i, ...zone },
+    }));
+
+    try {
+      map.addSource(YELLOWSTONE_SOURCE_ID, { type: "geojson", data: { type: "FeatureCollection", features } });
+
+      preset.zones.forEach((zone, i) => {
+        const actualIdx = preset.zones.length - 1 - i;
+        map.addLayer({
+          id: `${YELLOWSTONE_LAYER_PREFIX}-${actualIdx}`,
+          type: "fill",
+          source: YELLOWSTONE_SOURCE_ID,
+          filter: ["==", ["get", "zoneIdx"], actualIdx],
+          paint: { "fill-color": zone.color, "fill-opacity": zone.opacity },
+        });
+        map.addLayer({
+          id: `${YELLOWSTONE_LAYER_PREFIX}-line-${actualIdx}`,
+          type: "line",
+          source: YELLOWSTONE_SOURCE_ID,
+          filter: ["==", ["get", "zoneIdx"], actualIdx],
+          paint: { "line-color": zone.color, "line-width": actualIdx === 0 ? 2.5 : 1.5, "line-opacity": 0.8 },
+        });
+      });
+
+      // Fly to Yellowstone
+      safely(() => map.flyTo({ center: YELLOWSTONE_CENTER, zoom: 3.5, duration: 1200 }));
+      safely(() => map.triggerRepaint());
+      setYellowstoneActive(true);
+      setStatus(`${preset.name} — ${preset.desc}`);
+    } catch(e) { console.error("Yellowstone draw error", e); }
+  };
+
+  // Click handler for ash zone info popup
+  const showYellowstonePopup = (lng, lat) => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (yellowstonePopupRef.current) { yellowstonePopupRef.current.remove(); yellowstonePopupRef.current = null; }
+
+    const preset = YELLOWSTONE_PRESETS[yellowstonePreset];
+    const [cLng, cLat] = YELLOWSTONE_CENTER;
+
+    // Find which zone this point is in
+    const distKm = Math.sqrt(
+      Math.pow((lat - cLat) * 110.574, 2) +
+      Math.pow((lng - cLng) * 111.32 * Math.cos(cLat * Math.PI / 180), 2)
+    );
+
+    let zoneInfo = null;
+    for (let i = 0; i < preset.zones.length; i++) {
+      const z = preset.zones[i];
+      // Rough check using minor axis as conservative estimate
+      if (distKm <= z.minor_km * 1.2) { zoneInfo = z; break; }
+    }
+
+    if (!zoneInfo && distKm <= preset.zones[preset.zones.length-1].major_km) {
+      zoneInfo = preset.zones[preset.zones.length-1];
+    }
+
+    const content = zoneInfo
+      ? `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+          <div style="color:#f97316;font-weight:700;margin-bottom:4px">🌋 ${zoneInfo.name}</div>
+          <div style="color:#e2e8f0">${zoneInfo.desc}</div>
+          <div style="color:#94a3b8;font-size:11px;margin-top:4px">${preset.name}</div>
+        </div>`
+      : `<div style="font-family:Arial,sans-serif;font-size:13px;padding:2px 4px">
+          <div style="color:#94a3b8">Outside ash fall zone</div>
+          <div style="color:#64748b;font-size:11px">${preset.name}</div>
+        </div>`;
+
+    const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: false, className: "elev-popup", maxWidth: "240px" });
+    popup.setLngLat([lng, lat]).setHTML(content).addTo(map);
+    yellowstonePopupRef.current = popup;
+  };
+
   const clearNuke = () => {
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
@@ -864,7 +1042,7 @@ export default function HomePage() {
       center: [-80.19, 25.76],
       zoom: 6.2,
       antialias: false,
-      attributionControl: false,
+      attributionControl: true,
       collectResourceTiming: false,
       transformRequest: (url) => ({ url }),
     });
@@ -872,7 +1050,6 @@ export default function HomePage() {
     mapRef.current = map;
     applyProjectionForMode("map");
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
-    map.addControl(new mapboxgl.AttributionControl({ compact: true }), "bottom-right");
     map.getCanvas().style.cursor = "crosshair";
 
     const handleError = (e) => {
@@ -941,6 +1118,10 @@ export default function HomePage() {
         return;
       }
 
+      if (scenarioModeRef.current === "yellowstone") {
+        showYellowstonePopup(lng, lat);
+        return;
+      }
       showElevPopup(lng, lat);
     };
 
@@ -1034,6 +1215,10 @@ export default function HomePage() {
               : "Impact preview ready"
           : "Click map to place impact point"
       );
+      return;
+    }
+    if (scenarioMode === "yellowstone") {
+      setStatus(yellowstoneActive ? `${YELLOWSTONE_PRESETS[yellowstonePreset].name} — click map for ash details` : "Click Erupt to show ash zones");
       return;
     }
     if (scenarioMode === "nuke") {
@@ -1207,13 +1392,13 @@ export default function HomePage() {
       <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Scenario Mode</div>
       <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
         <button
-          onClick={() => { if (scenarioModeRef.current === "nuke") clearNuke(); setScenarioMode("flood"); }}
+          onClick={() => { if (scenarioModeRef.current === "nuke") clearNuke(); if (scenarioModeRef.current === "yellowstone") clearYellowstone(); setScenarioMode("flood"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "flood" ? "#1e3a5f" : "#111827", color: scenarioMode === "flood" ? "#60a5fa" : "#94a3b8", border: scenarioMode === "flood" ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>Flood</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Sea level up / down</div>
         </button>
         <button
-          onClick={() => { if (scenarioModeRef.current === "nuke") clearNuke(); setScenarioMode("impact"); }}
+          onClick={() => { if (scenarioModeRef.current === "nuke") clearNuke(); if (scenarioModeRef.current === "yellowstone") clearYellowstone(); setScenarioMode("impact"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "impact" ? "#1e3a5f" : "#111827", color: scenarioMode === "impact" ? "#60a5fa" : "#94a3b8", border: scenarioMode === "impact" ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>Impact</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Click map to place impact point</div>
@@ -1223,6 +1408,12 @@ export default function HomePage() {
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "nuke" ? "#4c1d95" : "#111827", color: scenarioMode === "nuke" ? "#c4b5fd" : "#94a3b8", border: scenarioMode === "nuke" ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>☢️ Nuke</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Click map to place detonation point</div>
+        </button>
+        <button
+          onClick={() => { setScenarioMode("yellowstone"); clearImpactPreview(); clearNuke(); drawYellowstone(yellowstonePreset); }}
+          style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "yellowstone" ? "#431407" : "#111827", color: scenarioMode === "yellowstone" ? "#fb923c" : "#94a3b8", border: scenarioMode === "yellowstone" ? "1px solid #ea580c" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
+          <div style={{ fontSize: 15 }}>🌋 Yellowstone</div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Supervolcano eruption ash zones</div>
         </button>
       </div>
 
@@ -1337,6 +1528,41 @@ export default function HomePage() {
           </div>
 
           {nukeError && <div style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{nukeError}</div>}
+        </>
+      )}
+
+      {scenarioMode === "yellowstone" && (
+        <>
+          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#ea580c", textTransform: "uppercase" }}>Eruption</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+            {YELLOWSTONE_PRESETS.map((p, i) => (
+              <button key={p.label} onClick={() => { setYellowstonePreset(i); drawYellowstone(i); }}
+                style={{ padding: "10px 6px", minHeight: 52, border: yellowstonePreset === i ? "1px solid #ea580c" : "1px solid #1e2d45", background: yellowstonePreset === i ? "#431407" : "#111827", color: yellowstonePreset === i ? "#fb923c" : "#94a3b8", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 12, textAlign: "center" }}>
+                <div>{p.label}</div>
+                <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>VEI {p.vei}</div>
+              </button>
+            ))}
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            {YELLOWSTONE_PRESETS[yellowstonePreset].zones.map((z, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <div style={{ width: 12, height: 12, borderRadius: 3, background: z.color, flexShrink: 0 }} />
+                <div style={{ fontSize: 12, color: "#94a3b8" }}><span style={{ color: "#e2e8f0" }}>{z.name}</span> — {z.desc}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+            <button onClick={() => drawYellowstone(yellowstonePreset)}
+              style={{ flex: 1, padding: "12px", background: "#ea580c", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
+              🌋 Erupt
+            </button>
+            <button onClick={clearYellowstone}
+              style={{ flex: 1, padding: "12px", background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
+              Clear
+            </button>
+          </div>
+          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Click map to see ash depth and survival context</div>
+          <hr style={{ margin: "0 0 16px 0", borderColor: "#1e2d45" }} />
         </>
       )}
 
@@ -1484,7 +1710,7 @@ export default function HomePage() {
   );
 
   return (
-    <div style={{ position: "fixed", inset: 0, width: "100%", height: "100%", overflow: "hidden" }}>
+    <div style={{ width: "100%", height: "100vh", position: "relative", overflow: "hidden" }}>
       <style>{`
         /* ── Mapbox popup ── */
         /* ── Dark panel theme ── */
@@ -1657,7 +1883,7 @@ export default function HomePage() {
       )}
 
       <canvas id="star-canvas" className={viewMode === "globe" ? "visible" : ""} />
-      <div ref={mapContainerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0, overflow: "hidden" }} />
+      <div ref={mapContainerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0 }} />
       {/* Disaster Map wordmark — top center, unobtrusive */}
       <div style={{
         position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)",
