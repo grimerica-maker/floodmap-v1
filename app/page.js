@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v115";
+const FRONTEND_BUILD_LABEL = "v116";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1728,7 +1728,7 @@ export default function HomePage() {
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Click map to place detonation point</div>
         </button>
         <button
-          onClick={() => { setScenarioMode("yellowstone"); clearImpactPreview(); clearNuke(); drawYellowstone(yellowstonePreset); }}
+          onClick={() => { setScenarioMode("yellowstone"); clearImpactPreview(); clearNuke(); clearYellowstone(); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "yellowstone" ? "#431407" : "#111827", color: scenarioMode === "yellowstone" ? "#fb923c" : "#94a3b8", border: scenarioMode === "yellowstone" ? "1px solid #ea580c" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>🌋 Yellowstone</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Supervolcano eruption ash zones</div>
@@ -1860,7 +1860,7 @@ export default function HomePage() {
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#ea580c", textTransform: "uppercase" }}>Eruption</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
             {YELLOWSTONE_PRESETS.map((p, i) => (
-              <button key={p.label} onClick={() => { setYellowstonePreset(i); drawYellowstone(i); }}
+              <button key={p.label} onClick={() => { setYellowstonePreset(i); clearYellowstone(); }}
                 style={{ padding: "10px 6px", minHeight: 52, border: yellowstonePreset === i ? "1px solid #ea580c" : "1px solid #1e2d45", background: yellowstonePreset === i ? "#431407" : "#111827", color: yellowstonePreset === i ? "#fb923c" : "#94a3b8", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 12, textAlign: "center" }}>
                 <div>{p.label}</div>
                 <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>VEI {p.vei}</div>
