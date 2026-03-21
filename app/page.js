@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v116";
+const FRONTEND_BUILD_LABEL = "v117";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -155,6 +155,44 @@ const buildAshEllipse = (centerLng, centerLat, majorKm, minorKm, bearingDeg = 70
   }
   return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} };
 };
+
+// ── Toba supervolcano data ──────────────────────────────────────────────────
+const TOBA_CENTER = [98.83, 2.68]; // Sumatra, Indonesia
+
+const TOBA_PRESETS = [
+  {
+    label: "74k BP",
+    name: "Toba (74,000 BP)",
+    desc: "Largest eruption in 2M years — 2,800 km³ ejecta",
+    vei: 8,
+    color: "#ef4444",
+    zones: [
+      { name: "Kill Zone", desc: "Total devastation, pyroclastic flows", survival: "0%", survivalNote: "Pyroclastic flows 1000°C+. No survival possible.", major_km: 400, minor_km: 250, color: "#fef08a", opacity: 0.85 },
+      { name: "Heavy Ash (>1m)", desc: "Structures collapse, crops destroyed", survival: "2-5%", survivalNote: "Roof collapse, water contamination. Evacuation only hope.", major_km: 1600, minor_km: 900, color: "#b91c1c", opacity: 0.55 },
+      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable, total crop failure", survival: "30-50%", survivalNote: "Survivable with evacuation. Years of infrastructure loss.", major_km: 3500, minor_km: 1800, color: "#ea580c", opacity: 0.30 },
+      { name: "Trace Ash (1cm+)", desc: "Air travel disrupted, health risk", survival: "85-95%", survivalNote: "Most survive. Respiratory masks essential.", major_km: 6000, minor_km: 3000, color: "#92400e", opacity: 0.18 },
+    ],
+  },
+];
+
+// ── Campi Flegrei data ───────────────────────────────────────────────────────
+const CAMPI_CENTER = [14.14, 40.83]; // Naples, Italy
+
+const CAMPI_PRESETS = [
+  {
+    label: "Full",
+    name: "Campi Flegrei (Full Eruption)",
+    desc: "Caldera collapse — ~500 km³ ejecta, Naples direct hit",
+    vei: 8,
+    color: "#f97316",
+    zones: [
+      { name: "Kill Zone", desc: "Total devastation — Naples destroyed", survival: "0%", survivalNote: "Pyroclastic flows obliterate Naples and surrounding area.", major_km: 150, minor_km: 100, color: "#fef08a", opacity: 0.85 },
+      { name: "Heavy Ash (>1m)", desc: "Structures collapse across Italy", survival: "2-5%", survivalNote: "Roof collapse, water contamination. Immediate evacuation required.", major_km: 600, minor_km: 350, color: "#b91c1c", opacity: 0.55 },
+      { name: "Moderate Ash (10cm+)", desc: "Uninhabitable, Mediterranean disruption", survival: "30-50%", survivalNote: "Survivable with evacuation. Years of crop failure across S. Europe.", major_km: 1400, minor_km: 700, color: "#ea580c", opacity: 0.30 },
+      { name: "Trace Ash (1cm+)", desc: "Air travel across Europe disrupted", survival: "85-95%", survivalNote: "Most survive. Aviation halted across Europe for months.", major_km: 3000, minor_km: 1400, color: "#92400e", opacity: 0.18 },
+    ],
+  },
+];
 
 const YELLOWSTONE_SOURCE_ID = "yellowstone-source";
 const YELLOWSTONE_LAYER_PREFIX = "yellowstone-layer";
@@ -301,6 +339,7 @@ export default function HomePage() {
   const [impactDiameter, setImpactDiameter] = useState(1000);
   const [nukeYield, setNukeYield] = useState(15);
   const [yellowstonePreset, setYellowstonePreset] = useState(0);
+  const [volcanoType, setVolcanoType] = useState("yellowstone"); // "yellowstone" | "toba" | "campi"
   // Mega-Tsunami state
   const [tsunamiSource, setTsunamiSource] = useState(0);
   const tsunamiSourceRef = useRef(0);
@@ -1209,8 +1248,11 @@ export default function HomePage() {
     clearYellowstone();
 
     yellowstonePresetRef.current = presetIdx;
-    const preset = YELLOWSTONE_PRESETS[presetIdx];
-    const [cLng, cLat] = YELLOWSTONE_CENTER;
+    // Select correct data based on active volcano type
+    const activePresets = volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
+    const activeCenter = volcanoType === "toba" ? TOBA_CENTER : volcanoType === "campi" ? CAMPI_CENTER : YELLOWSTONE_CENTER;
+    const preset = activePresets[Math.min(presetIdx, activePresets.length - 1)];
+    const [cLng, cLat] = activeCenter;
 
     // Build features largest to smallest — each inner zone renders on top
     const features = preset.zones.map((zone, i) => ({
@@ -1240,7 +1282,7 @@ export default function HomePage() {
       });
 
       // Fly to Yellowstone
-      safely(() => map.flyTo({ center: YELLOWSTONE_CENTER, zoom: 3.5, duration: 1200 }));
+      safely(() => map.flyTo({ center: activeCenter, zoom: volcanoType === 'campi' ? 5 : 3.5, duration: 1200 }));
       safely(() => map.triggerRepaint());
       setYellowstoneActive(true);
       setYellowstoneResult(null);
@@ -1261,8 +1303,11 @@ export default function HomePage() {
     if (!map) return;
     if (yellowstonePopupRef.current) { yellowstonePopupRef.current.remove(); yellowstonePopupRef.current = null; }
 
-    const preset = YELLOWSTONE_PRESETS[yellowstonePresetRef.current];
-    const [cLng, cLat] = YELLOWSTONE_CENTER;
+    const activePresets = volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
+    const activeCenter = volcanoType === "toba" ? TOBA_CENTER : volcanoType === "campi" ? CAMPI_CENTER : YELLOWSTONE_CENTER;
+    const preset = activePresets[Math.min(yellowstonePresetRef.current, activePresets.length - 1)];
+    const [cLng, cLat] = activeCenter;
+
 
     // Point-in-ellipse test — same bearing and center shift as buildAshEllipse
     const kpLat = 110.574;
@@ -1536,7 +1581,7 @@ export default function HomePage() {
       return;
     }
     if (scenarioMode === "yellowstone") {
-      setStatus(yellowstoneActive ? `${YELLOWSTONE_PRESETS[yellowstonePreset].name} — click map for ash details` : "Click Erupt to show ash zones");
+      setStatus(yellowstoneActive ? `${(volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS)[Math.min(yellowstonePreset, (volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS).length - 1)].name} — click map for ash details` : "Click Erupt to show ash zones");
       return;
     }
     if (scenarioMode === "nuke") {
@@ -1730,8 +1775,8 @@ export default function HomePage() {
         <button
           onClick={() => { setScenarioMode("yellowstone"); clearImpactPreview(); clearNuke(); clearYellowstone(); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "yellowstone" ? "#431407" : "#111827", color: scenarioMode === "yellowstone" ? "#fb923c" : "#94a3b8", border: scenarioMode === "yellowstone" ? "1px solid #ea580c" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
-          <div style={{ fontSize: 15 }}>🌋 Yellowstone</div>
-          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Supervolcano eruption ash zones</div>
+          <div style={{ fontSize: 15 }}>🌋 Super Volcano</div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Supervolcano eruption scenarios</div>
         </button>
         <button
           onClick={() => { if (proTier === "free") { setPaywallModal("pro"); return; } scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); clearImpactPreview(); setImpactResult(null); setImpactError(""); clearNuke(); clearYellowstone(); }}
@@ -1857,9 +1902,23 @@ export default function HomePage() {
 
       {scenarioMode === "yellowstone" && (
         <>
-          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#ea580c", textTransform: "uppercase" }}>Eruption</div>
+          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#ea580c", textTransform: "uppercase" }}>Volcano</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
+            {[
+              { key: "yellowstone", label: "Yellowstone", sub: "Wyoming" },
+              { key: "toba", label: "Toba", sub: "Sumatra" },
+              { key: "campi", label: "Campi Flegrei", sub: "Naples" },
+            ].map(({ key, label, sub }) => (
+              <button key={key} onClick={() => { setVolcanoType(key); setYellowstonePreset(0); clearYellowstone(); }}
+                style={{ padding: "10px 6px", minHeight: 52, border: volcanoType === key ? "1px solid #ea580c" : "1px solid #1e2d45", background: volcanoType === key ? "#431407" : "#111827", color: volcanoType === key ? "#fb923c" : "#94a3b8", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 11, textAlign: "center" }}>
+                <div>{label}</div>
+                <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{sub}</div>
+              </button>
+            ))}
+          </div>
+          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#ea580c", textTransform: "uppercase" }}>Eruption</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
-            {YELLOWSTONE_PRESETS.map((p, i) => (
+            {(volcanoType === "yellowstone" ? YELLOWSTONE_PRESETS : volcanoType === "toba" ? TOBA_PRESETS : CAMPI_PRESETS).map((p, i) => (
               <button key={p.label} onClick={() => { setYellowstonePreset(i); clearYellowstone(); }}
                 style={{ padding: "10px 6px", minHeight: 52, border: yellowstonePreset === i ? "1px solid #ea580c" : "1px solid #1e2d45", background: yellowstonePreset === i ? "#431407" : "#111827", color: yellowstonePreset === i ? "#fb923c" : "#94a3b8", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 12, textAlign: "center" }}>
                 <div>{p.label}</div>
@@ -2041,9 +2100,9 @@ export default function HomePage() {
       {scenarioMode === "yellowstone" && yellowstoneActive && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>🌋 {YELLOWSTONE_PRESETS[yellowstonePreset].name}</div>
-          <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8 }}>{YELLOWSTONE_PRESETS[yellowstonePreset].desc}</div>
-          {YELLOWSTONE_PRESETS[yellowstonePreset].zones.map((z, i) => (
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>🌋 {(volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS)[Math.min(yellowstonePreset, (volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS).length - 1)].name}</div>
+          <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8 }}>{(volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS)[Math.min(yellowstonePreset, (volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS).length - 1)].desc}</div>
+          {(volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS)[Math.min(yellowstonePreset, (volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS).length - 1)].zones.map((z, i) => (
             <div key={i} style={{ marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -2116,7 +2175,7 @@ export default function HomePage() {
                 : (scenarioMode === "tsunami" && tsunamiActive)
                 ? `🌊 Just triggered the ${TSUNAMI_SOURCES[tsunamiSource].name} mega-tsunami on Disaster Map!${tsunamiResult ? " Est. " + tsunamiResult.total_deaths.toLocaleString() + " deaths." : ""} Try it: https://www.disastermap.ca`
                 : (scenarioMode === "yellowstone" && yellowstoneActive)
-                ? `🌋 Just simulated the Yellowstone ${YELLOWSTONE_PRESETS[yellowstonePreset].name} supervolcano on Disaster Map!${yellowstoneResult ? " Est. " + yellowstoneResult.total_deaths.toLocaleString() + " deaths." : ""} Ash covers most of North America. Try it: https://www.disastermap.ca`
+                ? `🌋 Just simulated the Yellowstone ${(volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS)[Math.min(yellowstonePreset, (volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS).length - 1)].name} supervolcano on Disaster Map!${yellowstoneResult ? " Est. " + yellowstoneResult.total_deaths.toLocaleString() + " deaths." : ""} Ash covers most of North America. Try it: https://www.disastermap.ca`
                 : `🌊 I just flooded the world ${seaLevel > 0 ? "+" : ""}${Math.round(seaLevel)}m on Disaster Map!${floodDisplaced ? " " + floodDisplaced.toLocaleString() + " people displaced." : ""} Try it: https://www.disastermap.ca`;
               window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(msg), "_blank");
             }} style={{ background: "#000", color: "#fff" }}>
