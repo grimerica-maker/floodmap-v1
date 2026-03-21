@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v101";
+const FRONTEND_BUILD_LABEL = "v106";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -178,7 +178,7 @@ const TSUNAMI_SOURCES = [
       { hours: 1,  major_km: 600,  minor_km: 400,  waveM: 100, label: "1 hr" },
       { hours: 2,  major_km: 1200, minor_km: 800,  waveM: 40, label: "2 hr" },
       { hours: 4,  major_km: 2400, minor_km: 1600, waveM: 25,  label: "4 hr" },
-      { hours: 8,  major_km: 4800, minor_km: 3200, waveM: 10,  label: "8 hr" },
+      { hours: 8,  major_km: 4320, minor_km: 2880, waveM: 10,  label: "8 hr" },
     ],
     inundation_km: 3,   // avg km inland at target coasts
   },
@@ -196,7 +196,7 @@ const TSUNAMI_SOURCES = [
       { hours: 1,  major_km: 700,  minor_km: 450,  waveM: 650, label: "1 hr" },
       { hours: 2,  major_km: 1400, minor_km: 900,  waveM: 80, label: "2 hr" },
       { hours: 4,  major_km: 2800, minor_km: 1800, waveM: 40, label: "4 hr" },
-      { hours: 9,  major_km: 5500, minor_km: 3500, waveM: 15,  label: "9 hr" },
+      { hours: 9,  major_km: 4675, minor_km: 2975, waveM: 15,  label: "9 hr" },
     ],
     inundation_km: 8,
   },
