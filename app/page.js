@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v111";
+const FRONTEND_BUILD_LABEL = "v112";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -247,7 +247,6 @@ const buildTsunamiEllipse = (originLng, originLat, majorKm, minorKm, bearingDeg,
   const bearingRad = (bearingDeg * Math.PI) / 180;
   const dNorth = Math.cos(bearingRad);
   const dEast  = Math.sin(bearingRad);
-  // Shift center in bearing direction so origin sits at upwind edge
   const cLat = originLat + (dNorth * majorKm * 0.85) / kpLat;
   const cLng = originLng + (dEast  * majorKm * 0.85) / Math.max(kpLng, 0.0001);
   const coords = [];
@@ -258,6 +257,13 @@ const buildTsunamiEllipse = (originLng, originLat, majorKm, minorKm, bearingDeg,
     const nKm = dNorth * along - dEast * perp;
     const eKm = dEast  * along + dNorth * perp;
     coords.push([cLng + eKm / Math.max(kpLng, 0.0001), cLat + nKm / kpLat]);
+  }
+  // Keep coords continuous — prevent jumps > 180 between consecutive points
+  // This tells Mapbox to draw across the antimeridian correctly
+  for (let i = 1; i < coords.length; i++) {
+    const diff = coords[i][0] - coords[i-1][0];
+    if (diff > 180) coords[i][0] -= 360;
+    else if (diff < -180) coords[i][0] += 360;
   }
   return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} };
 };
@@ -1949,7 +1955,7 @@ export default function HomePage() {
         </>
       )}
 
-      {impactResult && (
+      {impactResult && scenarioMode !== "tsunami" && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
           <div style={{ fontWeight: 700 }}>Impact Results</div>
