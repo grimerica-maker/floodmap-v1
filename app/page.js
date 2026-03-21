@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v99";
+const FRONTEND_BUILD_LABEL = "v100";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1092,10 +1092,11 @@ export default function HomePage() {
       safely(() => map.triggerRepaint());
       setTsunamiActive(true);
 
-      // Add bbox-masked flood tiles using outermost ring wave height
-      const outerWave = src.rings[src.rings.length - 1].waveM;
-      const bb = src.bbox;
-      const floodUrl = `${floodEngineUrlRef.current}/flood-bbox/${outerWave}/{z}/{x}/{y}.png?min_lat=${bb.minLat}&max_lat=${bb.maxLat}&min_lng=${bb.minLng}&max_lng=${bb.maxLng}`;
+      // Ellipse-masked flood tiles — same shape as outermost wave ring
+      const outerRing = src.rings[src.rings.length - 1];
+      const outerWave = outerRing.waveM;
+      const [oLng, oLat] = src.origin;
+      const floodUrl = `${floodEngineUrlRef.current}/flood-bbox/${outerWave}/{z}/{x}/{y}.png?origin_lat=${oLat}&origin_lng=${oLng}&major_km=${outerRing.major_km}&minor_km=${outerRing.minor_km}&bearing_deg=${src.bearing}&shift=0.85`;
       setTsunamiFloodLevel(outerWave);
 
       try {
