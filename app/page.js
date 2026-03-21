@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v103";
+const FRONTEND_BUILD_LABEL = "v104";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -193,10 +193,10 @@ const TSUNAMI_SOURCES = [
     maxWaveM: 650,
     bbox: { minLat: -35, maxLat: 65, minLng: -80, maxLng: 15 },
     rings: [
-      { hours: 1,  major_km: 700,  minor_km: 250,  waveM: 650, label: "1 hr" },
-      { hours: 2,  major_km: 1400, minor_km: 500,  waveM: 80, label: "2 hr" },
-      { hours: 4,  major_km: 2800, minor_km: 900, waveM: 40, label: "4 hr" },
-      { hours: 9,  major_km: 5500, minor_km: 1000, waveM: 15,  label: "9 hr" },
+      { hours: 1,  major_km: 630,  minor_km: 250,  waveM: 650, label: "1 hr" },
+      { hours: 2,  major_km: 1260, minor_km: 500,  waveM: 80, label: "2 hr" },
+      { hours: 4,  major_km: 2520, minor_km: 900, waveM: 40, label: "4 hr" },
+      { hours: 9,  major_km: 4950, minor_km: 1000, waveM: 15,  label: "9 hr" },
     ],
     inundation_km: 8,
   },
@@ -212,10 +212,10 @@ const TSUNAMI_SOURCES = [
     bbox: { minLat: 15, maxLat: 72, minLng: 130, maxLng: -110 },
     splitAntimeridian: true,
     rings: [
-      { hours: 0.5, major_km: 300,  minor_km: 150,  waveM: 30, label: "30 min" },
-      { hours: 1,   major_km: 600,  minor_km: 300,  waveM: 20, label: "1 hr" },
-      { hours: 3,   major_km: 1800, minor_km: 700, waveM: 10, label: "3 hr" },
-      { hours: 9,   major_km: 5400, minor_km: 1800, waveM: 5,  label: "9 hr" },
+      { hours: 0.5, major_km: 360,  minor_km: 180,  waveM: 30, label: "30 min" },
+      { hours: 1,   major_km: 720,  minor_km: 360,  waveM: 20, label: "1 hr" },
+      { hours: 3,   major_km: 2160, minor_km: 840, waveM: 10, label: "3 hr" },
+      { hours: 9,   major_km: 6480, minor_km: 2160, waveM: 5,  label: "9 hr" },
     ],
     inundation_km: 5,
   },
@@ -231,10 +231,10 @@ const TSUNAMI_SOURCES = [
     bbox: { minLat: -5, maxLat: 72, minLng: 120, maxLng: -100 },
     splitAntimeridian: true,
     rings: [
-      { hours: 1,  major_km: 500,  minor_km: 200,  waveM: 50, label: "1 hr" },
-      { hours: 2,  major_km: 1000, minor_km: 400,  waveM: 30, label: "2 hr" },
-      { hours: 5,  major_km: 2500, minor_km: 900, waveM: 15,  label: "5 hr" },
-      { hours: 10, major_km: 5000, minor_km: 1800, waveM: 5,  label: "10 hr" },
+      { hours: 1,  major_km: 600,  minor_km: 240,  waveM: 50, label: "1 hr" },
+      { hours: 2,  major_km: 1200, minor_km: 480,  waveM: 30, label: "2 hr" },
+      { hours: 5,  major_km: 3000, minor_km: 1080, waveM: 15,  label: "5 hr" },
+      { hours: 10, major_km: 6000, minor_km: 2160, waveM: 5,  label: "10 hr" },
     ],
     inundation_km: 2,
   },
@@ -1030,10 +1030,9 @@ export default function HomePage() {
     }
     if (tsunamiPopupRef.current) { tsunamiPopupRef.current.remove(); tsunamiPopupRef.current = null; }
     if (map && map.isStyleLoaded()) {
+      try { if (map.getLayer("tsunami-flood-layer-line")) map.removeLayer("tsunami-flood-layer-line"); } catch(e){}
       try { if (map.getLayer("tsunami-flood-layer")) map.removeLayer("tsunami-flood-layer"); } catch(e){}
       try { if (map.getSource("tsunami-flood-source")) map.removeSource("tsunami-flood-source"); } catch(e){}
-      try { if (map.getLayer("tsunami-flood-layer-2")) map.removeLayer("tsunami-flood-layer-2"); } catch(e){}
-      try { if (map.getSource("tsunami-flood-source-2")) map.removeSource("tsunami-flood-source-2"); } catch(e){}
     }
     setTsunamiActive(false);
     setTsunamiResult(null);
@@ -1080,6 +1079,8 @@ export default function HomePage() {
           filter: ["==", ["get", "ringIdx"], actualIdx],
           paint: { "fill-color": src.color, "fill-opacity": opacity },
         });
+        // Only show line on outermost ring — inner rings just fill, no visible border
+        const isOutermost = actualIdx === src.rings.length - 1;
         map.addLayer({
           id: `${TSUNAMI_LAYER_PREFIX}-line-${actualIdx}`,
           type: "line",
@@ -1087,9 +1088,9 @@ export default function HomePage() {
           filter: ["==", ["get", "ringIdx"], actualIdx],
           paint: {
             "line-color": src.color,
-            "line-width": actualIdx === 0 ? 2.5 : 1.5,
-            "line-opacity": 0.7,
-            "line-dasharray": [4, 2],
+            "line-width": 2.0,
+            "line-opacity": isOutermost ? 0.6 : 0,
+            "line-dasharray": [6, 3],
           },
         });
       });
@@ -1099,33 +1100,22 @@ export default function HomePage() {
       safely(() => map.triggerRepaint());
       setTsunamiActive(true);
 
-      // Ellipse-masked flood tiles — same shape as outermost wave ring
+      // GeoJSON flood overlay — outermost ellipse, no tile grid artifacts
       const outerRing = src.rings[src.rings.length - 1];
       const outerWave = outerRing.waveM;
-      const [oLng, oLat] = src.origin;
-      const floodUrl = `${floodEngineUrlRef.current}/flood-bbox/${outerWave}/{z}/{x}/{y}.png?origin_lat=${oLat}&origin_lng=${oLng}&major_km=${outerRing.major_km}&minor_km=${outerRing.minor_km}&bearing_deg=${src.bearing}&shift=0.85`;
-      // For Pacific sources crossing antimeridian, add second source shifted +360°
-      const floodUrl2 = src.splitAntimeridian
-        ? `${floodEngineUrlRef.current}/flood-bbox/${outerWave}/{z}/{x}/{y}.png?origin_lat=${oLat}&origin_lng=${oLng + 360}&major_km=${outerRing.major_km}&minor_km=${outerRing.minor_km}&bearing_deg=${src.bearing}&shift=0.85`
-        : null;
       setTsunamiFloodLevel(outerWave);
 
       try {
+        const floodEllipse = buildTsunamiEllipse(src.origin[0], src.origin[1], outerRing.major_km, outerRing.minor_km, src.bearing);
+        const floodGeoJSON = { type: "FeatureCollection", features: [{ ...floodEllipse, properties: {} }] };
         if (map.getSource("tsunami-flood-source")) {
-          map.getSource("tsunami-flood-source").setTiles([floodUrl]);
+          map.getSource("tsunami-flood-source").setData(floodGeoJSON);
         } else {
-          map.addSource("tsunami-flood-source", { type: "raster", tiles: [floodUrl], tileSize: 256 });
-          map.addLayer({ id: "tsunami-flood-layer", type: "raster", source: "tsunami-flood-source",
-            paint: { "raster-opacity": 0.75 } });
-        }
-        if (floodUrl2) {
-          if (map.getSource("tsunami-flood-source-2")) {
-            map.getSource("tsunami-flood-source-2").setTiles([floodUrl2]);
-          } else {
-            map.addSource("tsunami-flood-source-2", { type: "raster", tiles: [floodUrl2], tileSize: 256 });
-            map.addLayer({ id: "tsunami-flood-layer-2", type: "raster", source: "tsunami-flood-source-2",
-              paint: { "raster-opacity": 0.75 } });
-          }
+          map.addSource("tsunami-flood-source", { type: "geojson", data: floodGeoJSON });
+          map.addLayer({ id: "tsunami-flood-layer", type: "fill", source: "tsunami-flood-source",
+            paint: { "fill-color": src.color, "fill-opacity": 0.4 } });
+          map.addLayer({ id: "tsunami-flood-layer-line", type: "line", source: "tsunami-flood-source",
+            paint: { "line-color": src.color, "line-width": 1.5, "line-opacity": 0.6 } });
         }
       } catch(e) { console.warn("Tsunami flood layer error", e); }
       setStatus(`${src.name} — ${src.desc}`);
