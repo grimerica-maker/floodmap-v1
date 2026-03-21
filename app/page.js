@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v103";
+const FRONTEND_BUILD_LABEL = "v101";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -257,10 +257,7 @@ const buildTsunamiEllipse = (originLng, originLat, majorKm, minorKm, bearingDeg,
     const perp  = Math.sin(t) * minorKm;
     const nKm = dNorth * along - dEast * perp;
     const eKm = dEast  * along + dNorth * perp;
-    let lng = cLng + eKm / Math.max(kpLng, 0.0001);
-    while (lng > 180) lng -= 360;
-    while (lng < -180) lng += 360;
-    coords.push([lng, cLat + nKm / kpLat]);
+    coords.push([cLng + eKm / Math.max(kpLng, 0.0001), cLat + nKm / kpLat]);
   }
   return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} };
 };
@@ -1143,10 +1140,7 @@ export default function HomePage() {
       const eCLat = oLat + (dNorth * ring.major_km * 0.85) / kpLat;
       const eCLng = oLng + (dEast  * ring.major_km * 0.4) / Math.max(kpLng, 0.0001);
       const dLatKm = (lat - eCLat) * kpLat;
-      let rawDLng = lng - eCLng;
-      while (rawDLng > 180) rawDLng -= 360;
-      while (rawDLng < -180) rawDLng += 360;
-      const dLngKm = rawDLng * Math.max(kpLng, 0.0001);
+      const dLngKm = (lng - eCLng) * Math.max(kpLng, 0.0001);
       const along = dNorth * dLatKm + dEast * dLngKm;
       const perp  = -dEast * dLatKm + dNorth * dLngKm;
       if ((along / ring.major_km) ** 2 + (perp / ring.minor_km) ** 2 <= 1) {
@@ -1551,8 +1545,6 @@ export default function HomePage() {
     e.stopPropagation();
     if (scenarioMode === "impact") runImpact();
     else if (scenarioMode === "nuke") runNuke();
-    else if (scenarioMode === "yellowstone") drawYellowstone(yellowstonePresetRef.current);
-    else if (scenarioMode === "tsunami") { tsunamiSourceRef.current = tsunamiSource; drawTsunami(tsunamiSource); }
     else executeFlood();
   };
 
@@ -2497,12 +2489,12 @@ export default function HomePage() {
         {/* Center: big CTA button */}
         <button
           onClick={handleStripCTA}
-          disabled={(scenarioMode === "impact" && impactLoading) || (scenarioMode === "nuke" && (nukeLoading || !nukePointSet)) || (scenarioMode === "tsunami" && proTier === "free")}
+          disabled={(scenarioMode === "impact" && impactLoading) || (scenarioMode === "nuke" && (nukeLoading || !nukePointSet))}
           style={{
             flexShrink: 0,
             padding: "0 20px",
             height: 48,
-            background: scenarioMode === "impact" ? "#ef4444" : scenarioMode === "nuke" ? "#7c3aed" : scenarioMode === "yellowstone" ? "#ea580c" : scenarioMode === "tsunami" ? "#0ea5e9" : "#f97316",
+            background: scenarioMode === "impact" ? "#ef4444" : scenarioMode === "nuke" ? "#7c3aed" : "#f97316",
             color: "white",
             border: "none",
             borderRadius: 10,
@@ -2517,10 +2509,6 @@ export default function HomePage() {
             ? (impactLoading ? "Running…" : "Run Impact")
             : scenarioMode === "nuke"
             ? (nukeLoading ? "Detonating…" : "☢️ Detonate")
-            : scenarioMode === "yellowstone"
-            ? "🌋 Erupt"
-            : scenarioMode === "tsunami"
-            ? (proTier === "free" ? "🔒 Pro Only" : "🌊 Trigger")
             : "Execute Flood"}
         </button>
 
