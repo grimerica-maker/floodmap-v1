@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v113";
+const FRONTEND_BUILD_LABEL = "v114";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1033,6 +1033,8 @@ export default function HomePage() {
     if (map && map.isStyleLoaded()) {
       try { if (map.getLayer("tsunami-flood-layer")) map.removeLayer("tsunami-flood-layer"); } catch(e){}
       try { if (map.getSource("tsunami-flood-source")) map.removeSource("tsunami-flood-source"); } catch(e){}
+      try { if (map.getLayer("tsunami-flood-layer-2")) map.removeLayer("tsunami-flood-layer-2"); } catch(e){}
+      try { if (map.getSource("tsunami-flood-source-2")) map.removeSource("tsunami-flood-source-2"); } catch(e){}
     }
     setTsunamiActive(false);
     setTsunamiResult(null);
@@ -1102,7 +1104,11 @@ export default function HomePage() {
       const outerRing = src.rings[src.rings.length - 1];
       const outerWave = outerRing.waveM;
       const [oLng, oLat] = src.origin;
-      const floodUrl = `${floodEngineUrlRef.current}/flood-bbox/${outerWave}/{z}/{x}/{y}.png?origin_lat=${oLat}&origin_lng=${oLng}&major_km=${outerRing.major_km}&minor_km=${outerRing.minor_km}&bearing_deg=${src.bearing}&shift=0.85`;
+      const floodParams = `origin_lat=${oLat}&major_km=${outerRing.major_km}&minor_km=${outerRing.minor_km}&bearing_deg=${src.bearing}&shift=0.85`;
+      // Primary source — covers origin side of antimeridian
+      const floodUrl = `${floodEngineUrlRef.current}/flood-bbox/${outerWave}/{z}/{x}/{y}.png?origin_lng=${oLng}&${floodParams}`;
+      // Secondary source — shifted +360° to cover the other side of the antimeridian
+      const floodUrl2 = `${floodEngineUrlRef.current}/flood-bbox/${outerWave}/{z}/{x}/{y}.png?origin_lng=${oLng + 360}&${floodParams}`;
       setTsunamiFloodLevel(outerWave);
 
       try {
@@ -1111,6 +1117,14 @@ export default function HomePage() {
         } else {
           map.addSource("tsunami-flood-source", { type: "raster", tiles: [floodUrl], tileSize: 256 });
           map.addLayer({ id: "tsunami-flood-layer", type: "raster", source: "tsunami-flood-source",
+            paint: { "raster-opacity": 0.75 } });
+        }
+        // Second source for antimeridian coverage
+        if (map.getSource("tsunami-flood-source-2")) {
+          map.getSource("tsunami-flood-source-2").setTiles([floodUrl2]);
+        } else {
+          map.addSource("tsunami-flood-source-2", { type: "raster", tiles: [floodUrl2], tileSize: 256 });
+          map.addLayer({ id: "tsunami-flood-layer-2", type: "raster", source: "tsunami-flood-source-2",
             paint: { "raster-opacity": 0.75 } });
         }
       } catch(e) { console.warn("Tsunami flood layer error", e); }
