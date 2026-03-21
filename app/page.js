@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v100";
+const FRONTEND_BUILD_LABEL = "v101";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1714,7 +1714,7 @@ export default function HomePage() {
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Supervolcano eruption ash zones</div>
         </button>
         <button
-          onClick={() => { if (proTier === "free") { setPaywallModal("pro"); return; } scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); clearImpactPreview(); clearNuke(); clearYellowstone(); drawTsunami(tsunamiSource); }}
+          onClick={() => { if (proTier === "free") { setPaywallModal("pro"); return; } scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); clearImpactPreview(); clearNuke(); clearYellowstone(); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "tsunami" ? "#0c2a4a" : "#111827", color: scenarioMode === "tsunami" ? "#38bdf8" : "#94a3b8", border: scenarioMode === "tsunami" ? "1px solid #0ea5e9" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>🌊 Mega-Tsunami {proTier === "free" && <span style={{ fontSize: 10, color: "#f97316", marginLeft: 4 }}>🔒 Pro</span>}</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Ocean collapse wave propagation</div>
@@ -1867,7 +1867,7 @@ export default function HomePage() {
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#0ea5e9", textTransform: "uppercase" }}>Wave Source</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
             {TSUNAMI_SOURCES.map((s, i) => (
-              <button key={s.label} onClick={() => { setTsunamiSource(i); tsunamiSourceRef.current = i; drawTsunami(i); }}
+              <button key={s.label} onClick={() => { setTsunamiSource(i); tsunamiSourceRef.current = i; clearTsunami(); }}
                 style={{ padding: "10px 6px", minHeight: 52, border: tsunamiSource === i ? "1px solid #0ea5e9" : "1px solid #1e2d45", background: tsunamiSource === i ? "#0c2a4a" : "#111827", color: tsunamiSource === i ? "#38bdf8" : "#94a3b8", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 12, textAlign: "center" }}>
                 <div>{s.label}</div>
                 <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>Max {s.maxWaveM}m</div>
@@ -2257,6 +2257,7 @@ export default function HomePage() {
                 ✓ {PRO_SIM_PER_HOUR} simulations/hour, {PRO_SIM_PER_DAY}/day<br/>
                 ✓ Satellite + Globe view<br/>
                 ✓ Flood displaced counts<br/>
+                ✓ 🌊 Mega-Tsunami scenarios<br/>
                 ✓ No ads
               </div>
               <button onClick={() => { window.open("https://buy.stripe.com/8x200j7eEcIi8OydXTa3u07", "_blank"); }}
