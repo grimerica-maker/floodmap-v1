@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v106";
+const FRONTEND_BUILD_LABEL = "v108";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -187,7 +187,7 @@ const TSUNAMI_SOURCES = [
     name: "Cumbre Vieja Eruption",
     desc: "Full volcanic flank collapse — 1,500km³ ejecta",
     origin: [-17.84, 28.57],
-    bearing: 265,
+    bearing: 290,
     color: "#06b6d4",
     threat: "US East Coast, Brazil, Iberian Peninsula",
     maxWaveM: 650,
@@ -196,7 +196,7 @@ const TSUNAMI_SOURCES = [
       { hours: 1,  major_km: 700,  minor_km: 450,  waveM: 650, label: "1 hr" },
       { hours: 2,  major_km: 1400, minor_km: 900,  waveM: 80, label: "2 hr" },
       { hours: 4,  major_km: 2800, minor_km: 1800, waveM: 40, label: "4 hr" },
-      { hours: 9,  major_km: 4675, minor_km: 2975, waveM: 15,  label: "9 hr" },
+      { hours: 9,  major_km: 4348, minor_km: 2767, waveM: 15,  label: "9 hr" },
     ],
     inundation_km: 8,
   },
