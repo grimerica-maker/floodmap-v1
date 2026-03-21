@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v114";
+const FRONTEND_BUILD_LABEL = "v115";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1174,7 +1174,7 @@ export default function HomePage() {
           <div style="color:#e2e8f0;margin-bottom:4px">Wave arrives in <b>${ringInfo.label}</b></div>
           <div style="color:#94a3b8;margin-bottom:4px">Est. wave height: <b style="color:#e2e8f0">${ringInfo.waveM}m</b></div>
           <div style="color:#64748b;font-size:11px;font-style:italic">${ringInfo.waveM >= 100 ? "Unsurvivable near source. Total destruction." : ringInfo.waveM >= 20 ? "Unsurvivable. Evacuate immediately." : ringInfo.waveM >= 10 ? "Extremely dangerous. Evacuation essential." : ringInfo.waveM >= 5 ? "Deadly for coastal areas. Move inland now." : "Dangerous for coast. Move to high ground."}</div>
-          <div style="color:#334155;font-size:10px;margin-top:5px">⚠ Worst-case scenario — actual heights may be lower</div>
+          <div style="color:#94a3b8;font-size:10px;margin-top:5px;font-style:italic">⚠ Worst-case scenario — actual heights may be lower</div>
         </div>`
       : `<div style="font-family:Arial,sans-serif;font-size:13px;padding:2px 4px">
           <div style="color:#94a3b8">Outside propagation zone</div>
@@ -1959,8 +1959,8 @@ export default function HomePage() {
       <div>Mode: {viewMode === "map" ? "Standard Map" : viewMode === "satellite" ? "Satellite" : "Globe"}</div>
       <div>Status: {status}</div>
       <div>Scenario Mode: {scenarioMode}</div>
-      <div>Impact Point: {impactPointRef.current ? `${impactPointRef.current.lng.toFixed(3)}, ${impactPointRef.current.lat.toFixed(3)}` : "--"}</div>
-      <div>Asteroid Diameter: {impactDiameter.toLocaleString()} m</div>
+      {scenarioMode !== "tsunami" && <div>Impact Point: {impactPointRef.current ? `${impactPointRef.current.lng.toFixed(3)}, ${impactPointRef.current.lat.toFixed(3)}` : "--"}</div>}
+      {scenarioMode !== "tsunami" && <div>Asteroid Diameter: {impactDiameter.toLocaleString()} m</div>}
 
       {impactError && (
         <>
@@ -2008,7 +2008,7 @@ export default function HomePage() {
             <div style={{ fontWeight: 700, marginBottom: 4 }}>🌊 {TSUNAMI_SOURCES[tsunamiSource].name}</div>
             <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 6 }}>{TSUNAMI_SOURCES[tsunamiSource].desc}</div>
             <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>{TSUNAMI_SOURCES[tsunamiSource].threat}</div>
-            <div style={{ fontSize: 11, color: "#334155", marginBottom: 8, fontStyle: "italic" }}>⚠ Worst-case scenario estimates</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8, fontStyle: "italic" }}>⚠ Worst-case scenario estimates</div>
             {tsunamiFloodLevel && (
               <div style={{ fontSize: 12, color: "#0ea5e9", marginBottom: 6 }}>
                 🌊 Flood tiles: {tsunamiFloodLevel}m inundation zone
