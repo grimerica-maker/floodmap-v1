@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v112";
+const FRONTEND_BUILD_LABEL = "v113";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1720,7 +1720,7 @@ export default function HomePage() {
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Supervolcano eruption ash zones</div>
         </button>
         <button
-          onClick={() => { if (proTier === "free") { setPaywallModal("pro"); return; } scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); clearImpactPreview(); clearNuke(); clearYellowstone(); }}
+          onClick={() => { if (proTier === "free") { setPaywallModal("pro"); return; } scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); clearImpactPreview(); setImpactResult(null); setImpactError(""); clearNuke(); clearYellowstone(); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "tsunami" ? "#0c2a4a" : "#111827", color: scenarioMode === "tsunami" ? "#38bdf8" : "#94a3b8", border: scenarioMode === "tsunami" ? "1px solid #0ea5e9" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>🌊 Mega-Tsunami {proTier === "free" && <span style={{ fontSize: 10, color: "#f97316", marginLeft: 4 }}>🔒 Pro</span>}</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Ocean collapse wave propagation</div>
