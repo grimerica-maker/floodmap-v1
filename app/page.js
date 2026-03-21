@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v117";
+const FRONTEND_BUILD_LABEL = "v118";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -340,6 +340,7 @@ export default function HomePage() {
   const [nukeYield, setNukeYield] = useState(15);
   const [yellowstonePreset, setYellowstonePreset] = useState(0);
   const [volcanoType, setVolcanoType] = useState("yellowstone"); // "yellowstone" | "toba" | "campi"
+  const volcanoTypeRef = useRef("yellowstone");
   // Mega-Tsunami state
   const [tsunamiSource, setTsunamiSource] = useState(0);
   const tsunamiSourceRef = useRef(0);
@@ -1249,8 +1250,9 @@ export default function HomePage() {
 
     yellowstonePresetRef.current = presetIdx;
     // Select correct data based on active volcano type
-    const activePresets = volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
-    const activeCenter = volcanoType === "toba" ? TOBA_CENTER : volcanoType === "campi" ? CAMPI_CENTER : YELLOWSTONE_CENTER;
+    const vType = volcanoTypeRef.current;
+    const activePresets = vType === "toba" ? TOBA_PRESETS : vType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
+    const activeCenter = vType === "toba" ? TOBA_CENTER : vType === "campi" ? CAMPI_CENTER : YELLOWSTONE_CENTER;
     const preset = activePresets[Math.min(presetIdx, activePresets.length - 1)];
     const [cLng, cLat] = activeCenter;
 
@@ -1303,8 +1305,9 @@ export default function HomePage() {
     if (!map) return;
     if (yellowstonePopupRef.current) { yellowstonePopupRef.current.remove(); yellowstonePopupRef.current = null; }
 
-    const activePresets = volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
-    const activeCenter = volcanoType === "toba" ? TOBA_CENTER : volcanoType === "campi" ? CAMPI_CENTER : YELLOWSTONE_CENTER;
+    const vType = volcanoTypeRef.current;
+    const activePresets = vType === "toba" ? TOBA_PRESETS : vType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
+    const activeCenter = vType === "toba" ? TOBA_CENTER : vType === "campi" ? CAMPI_CENTER : YELLOWSTONE_CENTER;
     const preset = activePresets[Math.min(yellowstonePresetRef.current, activePresets.length - 1)];
     const [cLng, cLat] = activeCenter;
 
@@ -1909,7 +1912,7 @@ export default function HomePage() {
               { key: "toba", label: "Toba", sub: "Sumatra" },
               { key: "campi", label: "Campi Flegrei", sub: "Naples" },
             ].map(({ key, label, sub }) => (
-              <button key={key} onClick={() => { setVolcanoType(key); setYellowstonePreset(0); clearYellowstone(); }}
+              <button key={key} onClick={() => { volcanoTypeRef.current = key; setVolcanoType(key); setYellowstonePreset(0); clearYellowstone(); }}
                 style={{ padding: "10px 6px", minHeight: 52, border: volcanoType === key ? "1px solid #ea580c" : "1px solid #1e2d45", background: volcanoType === key ? "#431407" : "#111827", color: volcanoType === key ? "#fb923c" : "#94a3b8", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 11, textAlign: "center" }}>
                 <div>{label}</div>
                 <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{sub}</div>
