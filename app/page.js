@@ -1085,7 +1085,6 @@ export default function HomePage() {
         f.properties = props; features.push(f);
       });
     });
-    }));
 
     // Origin marker feature
     const originFeature = {
