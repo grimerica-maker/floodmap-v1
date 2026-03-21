@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v104";
+const FRONTEND_BUILD_LABEL = "v105";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -205,7 +205,7 @@ const TSUNAMI_SOURCES = [
     name: "Cascadia Subduction Zone",
     desc: "Mw 9.2 megathrust — entire 1,000km fault rupture",
     origin: [-125.0, 45.0],
-    bearing: 250,
+    bearing: 260,
     color: "#3b82f6",
     threat: "US/Canada West Coast, Hawaii, Japan, Alaska",
     maxWaveM: 30,
@@ -249,22 +249,50 @@ const buildTsunamiEllipse = (originLng, originLat, majorKm, minorKm, bearingDeg,
   const bearingRad = (bearingDeg * Math.PI) / 180;
   const dNorth = Math.cos(bearingRad);
   const dEast  = Math.sin(bearingRad);
-  // Shift center in bearing direction so origin sits at upwind edge
   const cLat = originLat + (dNorth * majorKm * 0.85) / kpLat;
   const cLng = originLng + (dEast  * majorKm * 0.85) / Math.max(kpLng, 0.0001);
-  const coords = [];
+
+  // Build raw coords without normalizing — keep continuous longitude values
+  const raw = [];
   for (let i = 0; i <= steps; i++) {
     const t = (i / steps) * Math.PI * 2;
     const along = Math.cos(t) * majorKm;
     const perp  = Math.sin(t) * minorKm;
     const nKm = dNorth * along - dEast * perp;
     const eKm = dEast  * along + dNorth * perp;
-    let lng = cLng + eKm / Math.max(kpLng, 0.0001);
-    while (lng > 180) lng -= 360;
-    while (lng < -180) lng += 360;
-    coords.push([lng, cLat + nKm / kpLat]);
+    raw.push([cLng + eKm / Math.max(kpLng, 0.0001), cLat + nKm / kpLat]);
   }
-  return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} };
+
+  const lngs = raw.map(c => c[0]);
+  const span = Math.max(...lngs) - Math.min(...lngs);
+
+  if (span <= 180) {
+    // No antimeridian crossing — normalize to [-180, 180]
+    const coords = raw.map(([lng, lat]) => {
+      let l = lng; while (l > 180) l -= 360; while (l < -180) l += 360;
+      return [l, lat];
+    });
+    return [{ type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} }];
+  }
+
+  // Crosses antimeridian — create two polygons
+  // West side: shift all points to be <= -180 range so they stay on west side
+  const westCoords = raw.map(([lng, lat]) => {
+    let l = lng;
+    while (l > 180) l -= 360;
+    return [l, lat];
+  });
+  // East side: shift all points to be >= 180 range so they stay on east side
+  const eastCoords = raw.map(([lng, lat]) => {
+    let l = lng;
+    while (l < -180) l += 360;
+    return [l, lat];
+  });
+
+  return [
+    { type: "Feature", geometry: { type: "Polygon", coordinates: [westCoords] }, properties: {} },
+    { type: "Feature", geometry: { type: "Polygon", coordinates: [eastCoords] }, properties: {} },
+  ];
 };
 
 const safely = (fn) => {
@@ -1050,9 +1078,13 @@ export default function HomePage() {
     const [oLng, oLat] = src.origin;
 
     // Build rings largest first (outermost renders underneath)
-    const features = [...src.rings].reverse().map((ring, i) => ({
-      ...buildTsunamiEllipse(oLng, oLat, ring.major_km, ring.minor_km, src.bearing),
-      properties: { ringIdx: src.rings.length - 1 - i, hours: ring.hours, waveM: ring.waveM, label: ring.label },
+    const features = [];
+    [...src.rings].reverse().forEach((ring, idx) => {
+      const props = { ringIdx: src.rings.length - 1 - idx, hours: ring.hours, waveM: ring.waveM, label: ring.label };
+      buildTsunamiEllipse(oLng, oLat, ring.major_km, ring.minor_km, src.bearing).forEach(f => {
+        f.properties = props; features.push(f);
+      });
+    });
     }));
 
     // Origin marker feature
@@ -1106,7 +1138,7 @@ export default function HomePage() {
       setTsunamiFloodLevel(outerWave);
 
       try {
-        const floodEllipse = buildTsunamiEllipse(src.origin[0], src.origin[1], outerRing.major_km, outerRing.minor_km, src.bearing);
+        const floodEllipse = buildTsunamiEllipse(src.origin[0], src.origin[1], outerRing.major_km, outerRing.minor_km, src.bearing)[0];
         const floodGeoJSON = { type: "FeatureCollection", features: [{ ...floodEllipse, properties: {} }] };
         if (map.getSource("tsunami-flood-source")) {
           map.getSource("tsunami-flood-source").setData(floodGeoJSON);
