@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v118";
+const FRONTEND_BUILD_LABEL = "v119";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -345,6 +345,10 @@ export default function HomePage() {
   const [tsunamiSource, setTsunamiSource] = useState(0);
   const tsunamiSourceRef = useRef(0);
   const [tsunamiActive, setTsunamiActive] = useState(false);
+  const [cataclysmModel, setCataclysmModel] = useState("davidson"); // "davidson" | "tes"
+  const [cataclysmActive, setCataclysmActive] = useState(false);
+  const [cataclysmAnimating, setCataclysmAnimating] = useState(false);
+  const cataclysmModelRef = useRef("davidson");
   const [tsunamiResult, setTsunamiResult] = useState(null);
   const [tsunamiFloodLevel, setTsunamiFloodLevel] = useState(null);
   const tsunamiPopupRef = useRef(null); // 0=640k, 1=1.3M, 2=2.1M
@@ -1359,6 +1363,62 @@ export default function HomePage() {
     yellowstonePopupRef.current = popup;
   };
 
+  const clearCataclysm = () => {
+    const map = mapRef.current;
+    setCataclysmActive(false);
+    setCataclysmAnimating(false);
+    if (map && map.isStyleLoaded()) {
+      try { if (map.getLayer("cataclysm-layer")) map.removeLayer("cataclysm-layer"); } catch(e){}
+      try { if (map.getSource("cataclysm-source")) map.removeSource("cataclysm-source"); } catch(e){}
+    }
+  };
+
+  const triggerCataclysm = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const model = cataclysmModelRef.current;
+    const info = model === "davidson"
+      ? { name: "Davidson / Suspicious Observers", rot: -40, tilt: 20 }
+      : { name: "The Ethical Skeptic ECDO", rot: -104, tilt: 30 };
+
+    clearCataclysm();
+    setCataclysmAnimating(true);
+
+    // Step 1: Switch to globe and fly out
+    setViewMode("globe");
+    safely(() => {
+      map.setProjection("globe");
+      map.flyTo({ zoom: 1.8, pitch: 0, bearing: 0, duration: 1500 });
+    });
+
+    // Step 2: After fly-out, start slow ominous rotation (8 seconds)
+    setTimeout(() => {
+      setStatus(`☄️ ${info.name} — crustal displacement initiating…`);
+      safely(() => map.rotateTo(info.rot, { duration: 8000, easing: t => t < 0.5 ? 2*t*t : -1+(4-2*t)*t }));
+    }, 1800);
+
+    // Step 3: After rotation, flood tiles fade in
+    setTimeout(() => {
+      setStatus(`☄️ ${info.name} — inundation calculated`);
+      setCataclysmAnimating(false);
+      setCataclysmActive(true);
+      const tileUrl = `${floodEngineUrlRef.current}/cataclysm/${model}/{z}/{x}/{y}.png`;
+      safely(() => {
+        if (map.getSource("cataclysm-source")) {
+          map.getSource("cataclysm-source").setTiles([tileUrl]);
+        } else {
+          map.addSource("cataclysm-source", { type: "raster", tiles: [tileUrl], tileSize: 256 });
+          map.addLayer({ id: "cataclysm-layer", type: "raster", source: "cataclysm-source",
+            paint: { "raster-opacity": 0, "raster-opacity-transition": { duration: 2000 } } });
+          // Fade in over 2 seconds
+          setTimeout(() => {
+            safely(() => map.setPaintProperty("cataclysm-layer", "raster-opacity", 0.82));
+          }, 100);
+        }
+      });
+    }, 10500);
+  };
+
   const clearNuke = () => {
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
@@ -1687,8 +1747,9 @@ export default function HomePage() {
       <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
         <button
           onClick={executeFlood}
-          style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "#f97316", color: "white", border: "none", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 15 }}>
-          Execute Flood
+          onClick={(e) => { e.stopPropagation(); if (scenarioMode === "cataclysm") triggerCataclysm(); else executeFlood(); }}
+          style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: scenarioMode === "cataclysm" ? "#dc2626" : "#f97316", color: "white", border: "none", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 15 }}>
+          {scenarioMode === "cataclysm" ? (cataclysmAnimating ? "Displacing…" : "☄️ Trigger") : "Execute Flood"}
         </button>
         <button
           onClick={clearFlood}
@@ -1786,6 +1847,17 @@ export default function HomePage() {
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "tsunami" ? "#0c2a4a" : "#111827", color: scenarioMode === "tsunami" ? "#38bdf8" : "#94a3b8", border: scenarioMode === "tsunami" ? "1px solid #0ea5e9" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>🌊 Mega-Tsunami {proTier === "free" && <span style={{ fontSize: 10, color: "#f97316", marginLeft: 4 }}>🔒 Pro</span>}</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Ocean collapse wave propagation</div>
+        </button>
+        <button
+          onClick={() => {
+            scenarioModeRef.current = "cataclysm";
+            setScenarioMode("cataclysm");
+            clearImpactPreview(); setImpactResult(null); setImpactError("");
+            clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm();
+          }}
+          style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "cataclysm" ? "#1a0505" : "#111827", color: scenarioMode === "cataclysm" ? "#ef4444" : "#94a3b8", border: scenarioMode === "cataclysm" ? "1px solid #dc2626" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
+          <div style={{ fontSize: 15 }}>☄️ Cataclysm</div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Pole shift inundation models</div>
         </button>
       </div>
 
@@ -1900,6 +1972,34 @@ export default function HomePage() {
           </div>
 
           {nukeError && <div style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{nukeError}</div>}
+        </>
+      )}
+
+      {/* Cataclysm controls */}
+      {scenarioMode === "cataclysm" && (
+        <>
+          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#ef4444", textTransform: "uppercase" }}>Model</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+            {[
+              { key: "davidson", label: "Ben Davidson", sub: "Suspicious Observers" },
+              { key: "tes", label: "Ethical Skeptic", sub: "ECDO Theory" },
+            ].map(({ key, label, sub }) => (
+              <button key={key}
+                onClick={() => { cataclysmModelRef.current = key; setCataclysmModel(key); clearCataclysm(); }}
+                style={{ padding: "10px 8px", minHeight: 56, border: cataclysmModel === key ? "1px solid #dc2626" : "1px solid #1e2d45", background: cataclysmModel === key ? "#1a0505" : "#111827", color: cataclysmModel === key ? "#f87171" : "#94a3b8", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 11, textAlign: "center" }}>
+                <div>{label}</div>
+                <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{sub}</div>
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12, fontStyle: "italic", lineHeight: 1.5 }}>
+            {cataclysmModel === "davidson"
+              ? "~40° crustal displacement. New pole: S. Pacific. Americas & Pacific inundated to 700m+."
+              : "104° rotation along 31st meridian. Global inundation 30-300m. Giza floods to 175m per pyramid evidence."}
+          </div>
+          <div style={{ fontSize: 11, color: "#475569", marginBottom: 4, lineHeight: 1.4 }}>
+            ⚠ Theoretical model. Globe rotates to show displacement, then flood tiles render.
+          </div>
         </>
       )}
 
@@ -2576,7 +2676,7 @@ export default function HomePage() {
             flexShrink: 0,
             padding: "0 20px",
             height: 48,
-            background: scenarioMode === "impact" ? "#ef4444" : scenarioMode === "nuke" ? "#7c3aed" : "#f97316",
+            background: scenarioMode === "impact" ? "#ef4444" : scenarioMode === "nuke" ? "#7c3aed" : scenarioMode === "yellowstone" ? "#ea580c" : scenarioMode === "tsunami" ? "#0ea5e9" : scenarioMode === "cataclysm" ? "#dc2626" : "#f97316",
             color: "white",
             border: "none",
             borderRadius: 10,
@@ -2591,6 +2691,12 @@ export default function HomePage() {
             ? (impactLoading ? "Running…" : "Run Impact")
             : scenarioMode === "nuke"
             ? (nukeLoading ? "Detonating…" : "☢️ Detonate")
+            : scenarioMode === "yellowstone"
+            ? "🌋 Erupt"
+            : scenarioMode === "tsunami"
+            ? (proTier === "free" ? "🔒 Pro Only" : "🌊 Trigger")
+            : scenarioMode === "cataclysm"
+            ? (cataclysmAnimating ? "Displacing…" : "☄️ Trigger")
             : "Execute Flood"}
         </button>
 
