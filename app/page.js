@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v98";
+const FRONTEND_BUILD_LABEL = "v99";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1095,7 +1095,7 @@ export default function HomePage() {
       // Add bbox-masked flood tiles using outermost ring wave height
       const outerWave = src.rings[src.rings.length - 1].waveM;
       const bb = src.bbox;
-      const floodUrl = `${floodEngineUrlRef.current}/flood-bbox/${outerWave}/${bb.minLat}/${bb.maxLat}/${bb.minLng}/${bb.maxLng}/{z}/{x}/{y}.png`;
+      const floodUrl = `${floodEngineUrlRef.current}/flood-bbox/${outerWave}/{z}/{x}/{y}.png?min_lat=${bb.minLat}&max_lat=${bb.maxLat}&min_lng=${bb.minLng}&max_lng=${bb.maxLng}`;
       setTsunamiFloodLevel(outerWave);
 
       try {
