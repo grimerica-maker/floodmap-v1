@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v105";
+const FRONTEND_BUILD_LABEL = "v103";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -177,8 +177,8 @@ const TSUNAMI_SOURCES = [
     rings: [
       { hours: 1,  major_km: 600,  minor_km: 400,  waveM: 100, label: "1 hr" },
       { hours: 2,  major_km: 1200, minor_km: 800,  waveM: 40, label: "2 hr" },
-      { hours: 4,  major_km: 2400, minor_km: 900, waveM: 25,  label: "4 hr" },
-      { hours: 8,  major_km: 4800, minor_km: 1600, waveM: 10,  label: "8 hr" },
+      { hours: 4,  major_km: 2400, minor_km: 1600, waveM: 25,  label: "4 hr" },
+      { hours: 8,  major_km: 4800, minor_km: 3200, waveM: 10,  label: "8 hr" },
     ],
     inundation_km: 3,   // avg km inland at target coasts
   },
@@ -187,16 +187,16 @@ const TSUNAMI_SOURCES = [
     name: "Cumbre Vieja Eruption",
     desc: "Full volcanic flank collapse — 1,500km³ ejecta",
     origin: [-17.84, 28.57],
-    bearing: 270,
+    bearing: 265,
     color: "#06b6d4",
     threat: "US East Coast, Brazil, Iberian Peninsula",
     maxWaveM: 650,
     bbox: { minLat: -35, maxLat: 65, minLng: -80, maxLng: 15 },
     rings: [
-      { hours: 1,  major_km: 630,  minor_km: 250,  waveM: 650, label: "1 hr" },
-      { hours: 2,  major_km: 1260, minor_km: 500,  waveM: 80, label: "2 hr" },
-      { hours: 4,  major_km: 2520, minor_km: 900, waveM: 40, label: "4 hr" },
-      { hours: 9,  major_km: 4950, minor_km: 1000, waveM: 15,  label: "9 hr" },
+      { hours: 1,  major_km: 700,  minor_km: 450,  waveM: 650, label: "1 hr" },
+      { hours: 2,  major_km: 1400, minor_km: 900,  waveM: 80, label: "2 hr" },
+      { hours: 4,  major_km: 2800, minor_km: 1800, waveM: 40, label: "4 hr" },
+      { hours: 9,  major_km: 5500, minor_km: 3500, waveM: 15,  label: "9 hr" },
     ],
     inundation_km: 8,
   },
@@ -205,17 +205,16 @@ const TSUNAMI_SOURCES = [
     name: "Cascadia Subduction Zone",
     desc: "Mw 9.2 megathrust — entire 1,000km fault rupture",
     origin: [-125.0, 45.0],
-    bearing: 260,
+    bearing: 250,
     color: "#3b82f6",
     threat: "US/Canada West Coast, Hawaii, Japan, Alaska",
     maxWaveM: 30,
     bbox: { minLat: 15, maxLat: 72, minLng: 130, maxLng: -110 },
-    splitAntimeridian: true,
     rings: [
-      { hours: 0.5, major_km: 360,  minor_km: 180,  waveM: 30, label: "30 min" },
-      { hours: 1,   major_km: 720,  minor_km: 360,  waveM: 20, label: "1 hr" },
-      { hours: 3,   major_km: 2160, minor_km: 840, waveM: 10, label: "3 hr" },
-      { hours: 9,   major_km: 6480, minor_km: 2160, waveM: 5,  label: "9 hr" },
+      { hours: 0.5, major_km: 300,  minor_km: 200,  waveM: 30, label: "30 min" },
+      { hours: 1,   major_km: 600,  minor_km: 400,  waveM: 20, label: "1 hr" },
+      { hours: 3,   major_km: 1800, minor_km: 1200, waveM: 10, label: "3 hr" },
+      { hours: 9,   major_km: 5400, minor_km: 3600, waveM: 5,  label: "9 hr" },
     ],
     inundation_km: 5,
   },
@@ -229,12 +228,11 @@ const TSUNAMI_SOURCES = [
     threat: "Hawaii, US West Coast, Japan, Pacific Islands",
     maxWaveM: 50,
     bbox: { minLat: -5, maxLat: 72, minLng: 120, maxLng: -100 },
-    splitAntimeridian: true,
     rings: [
-      { hours: 1,  major_km: 600,  minor_km: 240,  waveM: 50, label: "1 hr" },
-      { hours: 2,  major_km: 1200, minor_km: 480,  waveM: 30, label: "2 hr" },
-      { hours: 5,  major_km: 3000, minor_km: 1080, waveM: 15,  label: "5 hr" },
-      { hours: 10, major_km: 6000, minor_km: 2160, waveM: 5,  label: "10 hr" },
+      { hours: 1,  major_km: 500,  minor_km: 350,  waveM: 50, label: "1 hr" },
+      { hours: 2,  major_km: 1000, minor_km: 700,  waveM: 30, label: "2 hr" },
+      { hours: 5,  major_km: 2500, minor_km: 1750, waveM: 15,  label: "5 hr" },
+      { hours: 10, major_km: 5000, minor_km: 3500, waveM: 5,  label: "10 hr" },
     ],
     inundation_km: 2,
   },
@@ -249,50 +247,22 @@ const buildTsunamiEllipse = (originLng, originLat, majorKm, minorKm, bearingDeg,
   const bearingRad = (bearingDeg * Math.PI) / 180;
   const dNorth = Math.cos(bearingRad);
   const dEast  = Math.sin(bearingRad);
+  // Shift center in bearing direction so origin sits at upwind edge
   const cLat = originLat + (dNorth * majorKm * 0.85) / kpLat;
   const cLng = originLng + (dEast  * majorKm * 0.85) / Math.max(kpLng, 0.0001);
-
-  // Build raw coords without normalizing — keep continuous longitude values
-  const raw = [];
+  const coords = [];
   for (let i = 0; i <= steps; i++) {
     const t = (i / steps) * Math.PI * 2;
     const along = Math.cos(t) * majorKm;
     const perp  = Math.sin(t) * minorKm;
     const nKm = dNorth * along - dEast * perp;
     const eKm = dEast  * along + dNorth * perp;
-    raw.push([cLng + eKm / Math.max(kpLng, 0.0001), cLat + nKm / kpLat]);
+    let lng = cLng + eKm / Math.max(kpLng, 0.0001);
+    while (lng > 180) lng -= 360;
+    while (lng < -180) lng += 360;
+    coords.push([lng, cLat + nKm / kpLat]);
   }
-
-  const lngs = raw.map(c => c[0]);
-  const span = Math.max(...lngs) - Math.min(...lngs);
-
-  if (span <= 180) {
-    // No antimeridian crossing — normalize to [-180, 180]
-    const coords = raw.map(([lng, lat]) => {
-      let l = lng; while (l > 180) l -= 360; while (l < -180) l += 360;
-      return [l, lat];
-    });
-    return [{ type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} }];
-  }
-
-  // Crosses antimeridian — create two polygons
-  // West side: shift all points to be <= -180 range so they stay on west side
-  const westCoords = raw.map(([lng, lat]) => {
-    let l = lng;
-    while (l > 180) l -= 360;
-    return [l, lat];
-  });
-  // East side: shift all points to be >= 180 range so they stay on east side
-  const eastCoords = raw.map(([lng, lat]) => {
-    let l = lng;
-    while (l < -180) l += 360;
-    return [l, lat];
-  });
-
-  return [
-    { type: "Feature", geometry: { type: "Polygon", coordinates: [westCoords] }, properties: {} },
-    { type: "Feature", geometry: { type: "Polygon", coordinates: [eastCoords] }, properties: {} },
-  ];
+  return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} };
 };
 
 const safely = (fn) => {
@@ -1058,7 +1028,6 @@ export default function HomePage() {
     }
     if (tsunamiPopupRef.current) { tsunamiPopupRef.current.remove(); tsunamiPopupRef.current = null; }
     if (map && map.isStyleLoaded()) {
-      try { if (map.getLayer("tsunami-flood-layer-line")) map.removeLayer("tsunami-flood-layer-line"); } catch(e){}
       try { if (map.getLayer("tsunami-flood-layer")) map.removeLayer("tsunami-flood-layer"); } catch(e){}
       try { if (map.getSource("tsunami-flood-source")) map.removeSource("tsunami-flood-source"); } catch(e){}
     }
@@ -1078,13 +1047,10 @@ export default function HomePage() {
     const [oLng, oLat] = src.origin;
 
     // Build rings largest first (outermost renders underneath)
-    const features = [];
-    [...src.rings].reverse().forEach((ring, idx) => {
-      const props = { ringIdx: src.rings.length - 1 - idx, hours: ring.hours, waveM: ring.waveM, label: ring.label };
-      buildTsunamiEllipse(oLng, oLat, ring.major_km, ring.minor_km, src.bearing).forEach(f => {
-        f.properties = props; features.push(f);
-      });
-    });
+    const features = [...src.rings].reverse().map((ring, i) => ({
+      ...buildTsunamiEllipse(oLng, oLat, ring.major_km, ring.minor_km, src.bearing),
+      properties: { ringIdx: src.rings.length - 1 - i, hours: ring.hours, waveM: ring.waveM, label: ring.label },
+    }));
 
     // Origin marker feature
     const originFeature = {
@@ -1110,8 +1076,6 @@ export default function HomePage() {
           filter: ["==", ["get", "ringIdx"], actualIdx],
           paint: { "fill-color": src.color, "fill-opacity": opacity },
         });
-        // Only show line on outermost ring — inner rings just fill, no visible border
-        const isOutermost = actualIdx === src.rings.length - 1;
         map.addLayer({
           id: `${TSUNAMI_LAYER_PREFIX}-line-${actualIdx}`,
           type: "line",
@@ -1119,9 +1083,9 @@ export default function HomePage() {
           filter: ["==", ["get", "ringIdx"], actualIdx],
           paint: {
             "line-color": src.color,
-            "line-width": 2.0,
-            "line-opacity": isOutermost ? 0.6 : 0,
-            "line-dasharray": [6, 3],
+            "line-width": actualIdx === 0 ? 2.5 : 1.5,
+            "line-opacity": 0.7,
+            "line-dasharray": [4, 2],
           },
         });
       });
@@ -1131,22 +1095,20 @@ export default function HomePage() {
       safely(() => map.triggerRepaint());
       setTsunamiActive(true);
 
-      // GeoJSON flood overlay — outermost ellipse, no tile grid artifacts
+      // Ellipse-masked flood tiles — same shape as outermost wave ring
       const outerRing = src.rings[src.rings.length - 1];
       const outerWave = outerRing.waveM;
+      const [oLng, oLat] = src.origin;
+      const floodUrl = `${floodEngineUrlRef.current}/flood-bbox/${outerWave}/{z}/{x}/{y}.png?origin_lat=${oLat}&origin_lng=${oLng}&major_km=${outerRing.major_km}&minor_km=${outerRing.minor_km}&bearing_deg=${src.bearing}&shift=0.85`;
       setTsunamiFloodLevel(outerWave);
 
       try {
-        const floodEllipse = buildTsunamiEllipse(src.origin[0], src.origin[1], outerRing.major_km, outerRing.minor_km, src.bearing)[0];
-        const floodGeoJSON = { type: "FeatureCollection", features: [{ ...floodEllipse, properties: {} }] };
         if (map.getSource("tsunami-flood-source")) {
-          map.getSource("tsunami-flood-source").setData(floodGeoJSON);
+          map.getSource("tsunami-flood-source").setTiles([floodUrl]);
         } else {
-          map.addSource("tsunami-flood-source", { type: "geojson", data: floodGeoJSON });
-          map.addLayer({ id: "tsunami-flood-layer", type: "fill", source: "tsunami-flood-source",
-            paint: { "fill-color": src.color, "fill-opacity": 0.4 } });
-          map.addLayer({ id: "tsunami-flood-layer-line", type: "line", source: "tsunami-flood-source",
-            paint: { "line-color": src.color, "line-width": 1.5, "line-opacity": 0.6 } });
+          map.addSource("tsunami-flood-source", { type: "raster", tiles: [floodUrl], tileSize: 256 });
+          map.addLayer({ id: "tsunami-flood-layer", type: "raster", source: "tsunami-flood-source",
+            paint: { "raster-opacity": 0.75 } });
         }
       } catch(e) { console.warn("Tsunami flood layer error", e); }
       setStatus(`${src.name} — ${src.desc}`);
@@ -1995,7 +1957,7 @@ export default function HomePage() {
         </>
       )}
 
-      {impactResult && scenarioMode !== "tsunami" && (
+      {impactResult && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
           <div style={{ fontWeight: 700 }}>Impact Results</div>
