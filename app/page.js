@@ -210,6 +210,7 @@ const TSUNAMI_SOURCES = [
     threat: "US/Canada West Coast, Hawaii, Japan, Alaska",
     maxWaveM: 30,
     bbox: { minLat: 15, maxLat: 72, minLng: 130, maxLng: -110 },
+    splitAntimeridian: true,
     rings: [
       { hours: 0.5, major_km: 300,  minor_km: 200,  waveM: 30, label: "30 min" },
       { hours: 1,   major_km: 600,  minor_km: 400,  waveM: 20, label: "1 hr" },
@@ -228,6 +229,7 @@ const TSUNAMI_SOURCES = [
     threat: "Hawaii, US West Coast, Japan, Pacific Islands",
     maxWaveM: 50,
     bbox: { minLat: -5, maxLat: 72, minLng: 120, maxLng: -100 },
+    splitAntimeridian: true,
     rings: [
       { hours: 1,  major_km: 500,  minor_km: 350,  waveM: 50, label: "1 hr" },
       { hours: 2,  major_km: 1000, minor_km: 700,  waveM: 30, label: "2 hr" },
@@ -1030,6 +1032,8 @@ export default function HomePage() {
     if (map && map.isStyleLoaded()) {
       try { if (map.getLayer("tsunami-flood-layer")) map.removeLayer("tsunami-flood-layer"); } catch(e){}
       try { if (map.getSource("tsunami-flood-source")) map.removeSource("tsunami-flood-source"); } catch(e){}
+      try { if (map.getLayer("tsunami-flood-layer-2")) map.removeLayer("tsunami-flood-layer-2"); } catch(e){}
+      try { if (map.getSource("tsunami-flood-source-2")) map.removeSource("tsunami-flood-source-2"); } catch(e){}
     }
     setTsunamiActive(false);
     setTsunamiResult(null);
@@ -1100,6 +1104,10 @@ export default function HomePage() {
       const outerWave = outerRing.waveM;
       const [oLng, oLat] = src.origin;
       const floodUrl = `${floodEngineUrlRef.current}/flood-bbox/${outerWave}/{z}/{x}/{y}.png?origin_lat=${oLat}&origin_lng=${oLng}&major_km=${outerRing.major_km}&minor_km=${outerRing.minor_km}&bearing_deg=${src.bearing}&shift=0.85`;
+      // For Pacific sources crossing antimeridian, add second source shifted +360°
+      const floodUrl2 = src.splitAntimeridian
+        ? `${floodEngineUrlRef.current}/flood-bbox/${outerWave}/{z}/{x}/{y}.png?origin_lat=${oLat}&origin_lng=${oLng + 360}&major_km=${outerRing.major_km}&minor_km=${outerRing.minor_km}&bearing_deg=${src.bearing}&shift=0.85`
+        : null;
       setTsunamiFloodLevel(outerWave);
 
       try {
@@ -1109,6 +1117,15 @@ export default function HomePage() {
           map.addSource("tsunami-flood-source", { type: "raster", tiles: [floodUrl], tileSize: 256 });
           map.addLayer({ id: "tsunami-flood-layer", type: "raster", source: "tsunami-flood-source",
             paint: { "raster-opacity": 0.75 } });
+        }
+        if (floodUrl2) {
+          if (map.getSource("tsunami-flood-source-2")) {
+            map.getSource("tsunami-flood-source-2").setTiles([floodUrl2]);
+          } else {
+            map.addSource("tsunami-flood-source-2", { type: "raster", tiles: [floodUrl2], tileSize: 256 });
+            map.addLayer({ id: "tsunami-flood-layer-2", type: "raster", source: "tsunami-flood-source-2",
+              paint: { "raster-opacity": 0.75 } });
+          }
         }
       } catch(e) { console.warn("Tsunami flood layer error", e); }
       setStatus(`${src.name} — ${src.desc}`);
@@ -1957,7 +1974,7 @@ export default function HomePage() {
         </>
       )}
 
-      {impactResult && (
+      {impactResult && scenarioMode !== "tsunami" && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
           <div style={{ fontWeight: 700 }}>Impact Results</div>
