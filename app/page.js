@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v97";
+const FRONTEND_BUILD_LABEL = "v98";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1024,7 +1024,6 @@ export default function HomePage() {
       });
     }
     if (tsunamiPopupRef.current) { tsunamiPopupRef.current.remove(); tsunamiPopupRef.current = null; }
-    const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
       try { if (map.getLayer("tsunami-flood-layer")) map.removeLayer("tsunami-flood-layer"); } catch(e){}
       try { if (map.getSource("tsunami-flood-source")) map.removeSource("tsunami-flood-source"); } catch(e){}
