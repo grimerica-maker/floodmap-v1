@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v108";
+const FRONTEND_BUILD_LABEL = "v111";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -186,8 +186,8 @@ const TSUNAMI_SOURCES = [
     label: "Cumbre Vieja",
     name: "Cumbre Vieja Eruption",
     desc: "Full volcanic flank collapse — 1,500km³ ejecta",
-    origin: [-17.84, 28.57],
-    bearing: 290,
+    origin: [-17.84, 36.07],
+    bearing: 265,
     color: "#06b6d4",
     threat: "US East Coast, Brazil, Iberian Peninsula",
     maxWaveM: 650,
@@ -1138,7 +1138,7 @@ export default function HomePage() {
     for (let i = 0; i < src.rings.length; i++) {
       const ring = src.rings[i];
       const eCLat = oLat + (dNorth * ring.major_km * 0.85) / kpLat;
-      const eCLng = oLng + (dEast  * ring.major_km * 0.4) / Math.max(kpLng, 0.0001);
+      const eCLng = oLng + (dEast  * ring.major_km * 0.85) / Math.max(kpLng, 0.0001);
       const dLatKm = (lat - eCLat) * kpLat;
       const dLngKm = (lng - eCLng) * Math.max(kpLng, 0.0001);
       const along = dNorth * dLatKm + dEast * dLngKm;
