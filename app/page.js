@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v96";
+const FRONTEND_BUILD_LABEL = "v97";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -173,6 +173,7 @@ const TSUNAMI_SOURCES = [
     color: "#0ea5e9",
     threat: "US East Coast, Caribbean, NW Africa, W Europe",
     maxWaveM: 100,
+    bbox: { minLat: 5, maxLat: 65, minLng: -85, maxLng: 20 },
     rings: [
       { hours: 1,  major_km: 600,  minor_km: 400,  waveM: 100, label: "1 hr" },
       { hours: 2,  major_km: 1200, minor_km: 800,  waveM: 40, label: "2 hr" },
@@ -190,6 +191,7 @@ const TSUNAMI_SOURCES = [
     color: "#06b6d4",
     threat: "US East Coast, Brazil, Iberian Peninsula",
     maxWaveM: 650,
+    bbox: { minLat: -35, maxLat: 65, minLng: -80, maxLng: 15 },
     rings: [
       { hours: 1,  major_km: 700,  minor_km: 450,  waveM: 650, label: "1 hr" },
       { hours: 2,  major_km: 1400, minor_km: 900,  waveM: 80, label: "2 hr" },
@@ -207,6 +209,7 @@ const TSUNAMI_SOURCES = [
     color: "#3b82f6",
     threat: "US/Canada West Coast, Hawaii, Japan, Alaska",
     maxWaveM: 30,
+    bbox: { minLat: 15, maxLat: 72, minLng: 130, maxLng: -110 },
     rings: [
       { hours: 0.5, major_km: 300,  minor_km: 200,  waveM: 30, label: "30 min" },
       { hours: 1,   major_km: 600,  minor_km: 400,  waveM: 20, label: "1 hr" },
@@ -224,6 +227,7 @@ const TSUNAMI_SOURCES = [
     color: "#8b5cf6",
     threat: "Hawaii, US West Coast, Japan, Pacific Islands",
     maxWaveM: 50,
+    bbox: { minLat: -5, maxLat: 72, minLng: 120, maxLng: -100 },
     rings: [
       { hours: 1,  major_km: 500,  minor_km: 350,  waveM: 50, label: "1 hr" },
       { hours: 2,  major_km: 1000, minor_km: 700,  waveM: 30, label: "2 hr" },
@@ -296,6 +300,7 @@ export default function HomePage() {
   const tsunamiSourceRef = useRef(0);
   const [tsunamiActive, setTsunamiActive] = useState(false);
   const [tsunamiResult, setTsunamiResult] = useState(null);
+  const [tsunamiFloodLevel, setTsunamiFloodLevel] = useState(null);
   const tsunamiPopupRef = useRef(null); // 0=640k, 1=1.3M, 2=2.1M
   const yellowstonePresetRef = useRef(0);
   const [yellowstoneActive, setYellowstoneActive] = useState(false);
@@ -1019,8 +1024,14 @@ export default function HomePage() {
       });
     }
     if (tsunamiPopupRef.current) { tsunamiPopupRef.current.remove(); tsunamiPopupRef.current = null; }
+    const map = mapRef.current;
+    if (map && map.isStyleLoaded()) {
+      try { if (map.getLayer("tsunami-flood-layer")) map.removeLayer("tsunami-flood-layer"); } catch(e){}
+      try { if (map.getSource("tsunami-flood-source")) map.removeSource("tsunami-flood-source"); } catch(e){}
+    }
     setTsunamiActive(false);
     setTsunamiResult(null);
+    setTsunamiFloodLevel(null);
     setStatus("Tsunami cleared");
   };
 
@@ -1081,6 +1092,22 @@ export default function HomePage() {
       safely(() => map.flyTo({ center: src.origin, zoom: 3, duration: 1200 }));
       safely(() => map.triggerRepaint());
       setTsunamiActive(true);
+
+      // Add bbox-masked flood tiles using outermost ring wave height
+      const outerWave = src.rings[src.rings.length - 1].waveM;
+      const bb = src.bbox;
+      const floodUrl = `${floodEngineUrlRef.current}/flood-bbox/${outerWave}/${bb.minLat}/${bb.maxLat}/${bb.minLng}/${bb.maxLng}/{z}/{x}/{y}.png`;
+      setTsunamiFloodLevel(outerWave);
+
+      try {
+        if (map.getSource("tsunami-flood-source")) {
+          map.getSource("tsunami-flood-source").setTiles([floodUrl]);
+        } else {
+          map.addSource("tsunami-flood-source", { type: "raster", tiles: [floodUrl], tileSize: 256 });
+          map.addLayer({ id: "tsunami-flood-layer", type: "raster", source: "tsunami-flood-source",
+            paint: { "raster-opacity": 0.75 } });
+        }
+      } catch(e) { console.warn("Tsunami flood layer error", e); }
       setStatus(`${src.name} — ${src.desc}`);
 
       // Fetch casualties
@@ -1962,6 +1989,11 @@ export default function HomePage() {
             <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 6 }}>{TSUNAMI_SOURCES[tsunamiSource].desc}</div>
             <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>{TSUNAMI_SOURCES[tsunamiSource].threat}</div>
             <div style={{ fontSize: 11, color: "#334155", marginBottom: 8, fontStyle: "italic" }}>⚠ Worst-case scenario estimates</div>
+            {tsunamiFloodLevel && (
+              <div style={{ fontSize: 12, color: "#0ea5e9", marginBottom: 6 }}>
+                🌊 Flood tiles: {tsunamiFloodLevel}m inundation zone
+              </div>
+            )}
             {tsunamiResult ? (
               <div style={{ padding: "8px 10px", background: "#0c1a2e", borderRadius: 8, border: "1px solid #0ea5e9", marginBottom: 6 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
