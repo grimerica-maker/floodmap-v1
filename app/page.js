@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v170";
+const FRONTEND_BUILD_LABEL = "v171";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -406,26 +406,20 @@ export default function HomePage() {
     }
   }, [isSignedIn, user]);
 
-  // Verify Stripe purchase session on landing
+  // Simple pro unlock: if ?pro=1 in URL after Stripe redirect, set pro and prompt sign-in
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const sessionId = params.get("session_id");
-    if (!sessionId) return;
-    // Clean URL immediately
-    window.history.replaceState({}, "", window.location.pathname);
-    fetch(`/api/verify-purchase?session_id=${encodeURIComponent(sessionId)}`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.success) {
-          try { localStorage.setItem("dm_pro_tier", "pro"); } catch(e) {}
-          setProTier("pro");
-          proTierRef.current = "pro";
-          setStatus("✓ Pro unlocked! Welcome to Disaster Map Pro.");
-          setTimeout(() => setStatus(""), 5000);
-        }
-      })
-      .catch(() => {});
+    if (params.get("pro") === "1") {
+      try { localStorage.setItem("dm_pro_tier", "pro"); } catch(e) {}
+      setProTier("pro");
+      proTierRef.current = "pro";
+      window.history.replaceState({}, "", window.location.pathname);
+      setStatus("✓ Pro unlocked! Sign in to save access across devices.");
+      setTimeout(() => setStatus(""), 6000);
+    }
   }, []);
+
+
 
   // Set isMobile after mount (avoids SSR hydration mismatch) + keep in sync on resize
   useEffect(() => {
