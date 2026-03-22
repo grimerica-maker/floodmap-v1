@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v156";
+const FRONTEND_BUILD_LABEL = "v157";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1089,6 +1089,12 @@ export default function HomePage() {
     setTsunamiResult(null);
     setTsunamiFloodLevel(null);
     setStatus("Tsunami cleared");
+    safely(() => {
+      map.dragPan.enable();
+      map.scrollZoom.enable();
+      map.doubleClickZoom.enable();
+      map.touchZoomRotate.enable();
+    });
   };
 
   const drawTsunami = (sourceIdx) => {
@@ -1185,6 +1191,26 @@ export default function HomePage() {
         .then(r => r.json())
         .then(d => { if (d.total_deaths != null) setTsunamiResult(d); })
         .catch(e => console.warn("Tsunami population fetch failed", e));
+
+      // Free tier: lock interaction, show upgrade modal on interact
+      const isFree = (proTierRef.current ?? proTier ?? "free") === "free";
+      if (isFree) {
+        safely(() => {
+          map.dragPan.disable();
+          map.scrollZoom.disable();
+          map.doubleClickZoom.disable();
+          map.touchZoomRotate.disable();
+        });
+        const tsunamiUpgrade = () => {
+          map.off("mousedown", tsunamiUpgrade);
+          map.off("touchstart", tsunamiUpgrade);
+          map.off("wheel", tsunamiUpgrade);
+          setPaywallModal("pro");
+        };
+        map.on("mousedown", tsunamiUpgrade);
+        map.on("touchstart", tsunamiUpgrade);
+        map.on("wheel", tsunamiUpgrade);
+      }
 
     } catch(e) { console.error("Tsunami draw error", e); }
   };
@@ -2783,6 +2809,8 @@ export default function HomePage() {
               <div style={{ color: "#64748b", fontSize: 13, textAlign: "center", marginBottom: 20, lineHeight: 1.6 }}>
                 {paywallModal === "pro" && scenarioMode === "cataclysm"
                   ? <>Upgrade to <strong style={{ color: "#f97316" }}>Pro or Ultra</strong> to zoom, pan and explore the post-cataclysm world.</>
+                  : paywallModal === "pro" && scenarioMode === "tsunami"
+                  ? <>Upgrade to <strong style={{ color: "#f97316" }}>Pro or Ultra</strong> to zoom, pan and explore the tsunami inundation zone.</>
                   : "This feature requires a Pro subscription."}
               </div>
             </>)}
