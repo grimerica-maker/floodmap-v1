@@ -201,7 +201,11 @@ export default function Homepage() {
               ))}
               {isSignedIn
                 ? <UserButton afterSignOutUrl="/" />
-                : <SignInButton mode="modal"><button style={{ background: "transparent", color: "#94a3b8", border: "1px solid #1e2d45", padding: "8px 16px", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer", marginRight: 8 }}>Sign In</button></SignInButton>
+                : <SignInButton mode="modal" afterSignInUrl="/map" afterSignUpUrl="/map">
+                    <button style={{ background: "transparent", color: "#94a3b8", border: "1px solid #64748b", padding: "8px 16px", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer", marginRight: 8 }}>
+                      Sign In
+                    </button>
+                  </SignInButton>
               }
               <Link href="/map" style={{ background: "#f97316", color: "#fff", padding: "9px 20px", borderRadius: 8, textDecoration: "none", fontWeight: 700, fontSize: 14 }}>Launch App →</Link>
             </div>
@@ -228,6 +232,16 @@ export default function Homepage() {
                 Explore Scenarios
               </a>
             </div>
+            {!isSignedIn && (
+              <div style={{ marginTop: 20, fontSize: 14, color: "#64748b", fontFamily: "sans-serif" }}>
+                Already have Pro?{" "}
+                <SignInButton mode="modal" afterSignInUrl="/map" afterSignUpUrl="/map">
+                  <span style={{ color: "#f97316", cursor: "pointer", fontWeight: 700, textDecoration: "underline" }}>
+                    Sign in to restore access →
+                  </span>
+                </SignInButton>
+              </div>
+            )}
           </section>
 
           {/* AD SLOT 1 */}
@@ -362,7 +376,16 @@ export default function Homepage() {
                     ))}
                   </ul>
                   {p.cta
-                    ? <a href={p.cta} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: p.color, color: "#fff", padding: "13px", borderRadius: 8, textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: 14 }}>{p.ctaLabel} →</a>
+                    ? <>
+                        <a href={p.cta} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: p.color, color: "#fff", padding: "13px", borderRadius: 8, textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: 14, marginBottom: 8 }}>{p.ctaLabel} →</a>
+                        {!isSignedIn && (
+                          <SignInButton mode="modal" afterSignInUrl="/map" afterSignUpUrl="/map">
+                            <button style={{ width: "100%", padding: "10px", background: "transparent", color: "#94a3b8", border: "1px solid #475569", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "sans-serif" }}>
+                              Already purchased? Sign in →
+                            </button>
+                          </SignInButton>
+                        )}
+                      </>
                     : <Link href="/map" style={{ display: "block", border: `1px solid ${p.color}44`, color: p.color, padding: "13px", borderRadius: 8, textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: 14 }}>{p.ctaLabel} →</Link>
                   }
                 </div>
