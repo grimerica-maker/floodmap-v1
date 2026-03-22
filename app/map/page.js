@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v171";
+const FRONTEND_BUILD_LABEL = "v172";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -2841,6 +2841,38 @@ export default function HomePage() {
       `}</style>
 
       {/* ── Map canvas ── */}
+      {/* ── Sign-in sync prompt ── */}
+      {showSignInPrompt && !isSignedIn && (
+        <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 9999, width: 300,
+          background: "#0c1a2e", border: "1px solid #1e3a5f", borderRadius: 14,
+          padding: "20px", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}>
+          <div style={{ fontSize: 20, marginBottom: 8 }}>🔐</div>
+          <div style={{ color: "#e2e8f0", fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
+            Save Pro across devices
+          </div>
+          <div style={{ color: "#64748b", fontSize: 13, lineHeight: 1.6, marginBottom: 16 }}>
+            Sign in to sync your Pro access. Without an account it only works on this browser.
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <SignInButton mode="modal">
+              <button style={{ width: "100%", padding: "10px", background: "#f97316",
+                color: "#fff", border: "none", borderRadius: 8,
+                fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+                Sign In / Create Account
+              </button>
+            </SignInButton>
+            <button onClick={() => {
+              setShowSignInPrompt(false);
+              try { localStorage.setItem("dm_signin_prompt_dismissed", "1"); } catch(e) {}
+            }} style={{ width: "100%", padding: "8px", background: "transparent",
+              color: "#475569", border: "1px solid #1e2d45", borderRadius: 8,
+              fontSize: 13, cursor: "pointer" }}>
+              Don't show again
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Paywall modal ── */}
       {paywallModal && (
         <div onPointerDown={(e) => e.stopPropagation()} onClick={() => setPaywallModal(null)} style={{
