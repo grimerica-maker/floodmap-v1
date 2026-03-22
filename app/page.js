@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v165";
+const FRONTEND_BUILD_LABEL = "v169";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -401,11 +401,31 @@ export default function HomePage() {
   useEffect(() => {
     const effective = getEffectiveTier();
     setProTier(effective);
-    // Also persist to localStorage so it survives signed-out sessions
     if (isSignedIn && user?.publicMetadata?.tier) {
       try { localStorage.setItem("dm_pro_tier", user.publicMetadata.tier); } catch {}
     }
   }, [isSignedIn, user]);
+
+  // Verify Stripe purchase session on landing
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session_id");
+    if (!sessionId) return;
+    // Clean URL immediately
+    window.history.replaceState({}, "", window.location.pathname);
+    fetch(`/api/verify-purchase?session_id=${encodeURIComponent(sessionId)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          try { localStorage.setItem("dm_pro_tier", "pro"); } catch(e) {}
+          setProTier("pro");
+          proTierRef.current = "pro";
+          setStatus("✓ Pro unlocked! Welcome to Disaster Map Pro.");
+          setTimeout(() => setStatus(""), 5000);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Set isMobile after mount (avoids SSR hydration mismatch) + keep in sync on resize
   useEffect(() => {
@@ -1468,13 +1488,18 @@ export default function HomePage() {
     const map = mapRef.current;
     setCataclysmActive(false);
     setCataclysmAnimating(false);
+    setViewMode("map");
     // Stop spin animation
     if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
     if (map && map.isStyleLoaded()) {
       // Re-enable map interaction in case it was locked for free tier
       try { map.dragPan.enable(); map.scrollZoom.enable(); map.doubleClickZoom.enable(); map.touchZoomRotate.enable(); } catch(e){}
-      // Reset bearing, pitch and position back to normal map view
+      // Reset bearing, pitch and revert to standard map
       safely(() => map.easeTo({ bearing: 0, pitch: 0, duration: 800 }));
+      safely(() => {
+        map.setProjection("mercator");
+        map.setStyle("mapbox://styles/mapbox/streets-v12");
+      });
       try { if (map.getLayer("cataclysm-layer")) map.removeLayer("cataclysm-layer"); } catch(e){}
       try { if (map.getSource("cataclysm-source")) map.removeSource("cataclysm-source"); } catch(e){}
       try { if (map.getLayer("cataclysm-pole-marker")) map.removeLayer("cataclysm-pole-marker"); } catch(e){}
@@ -2039,7 +2064,7 @@ export default function HomePage() {
             </div>
             <button onClick={() => setPaywallModal("pro")}
               style={{ width: "100%", padding: "8px", background: "#f97316", color: "white", border: "none", borderRadius: 7, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-              ⚡ Upgrade to Pro — $4.99/mo
+              ⚡ Unlock Pro — $18.99
             </button>
           </div>
         </div>
@@ -2047,7 +2072,7 @@ export default function HomePage() {
         <div style={{ marginBottom: 14, padding: "8px 12px", borderRadius: 10, background: "#0f2d1a", border: "1px solid #166534" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ fontSize: 12, color: "#4ade80", fontWeight: 700 }}>
-              {proTier === "ultra" ? "⚡ Ultra" : "✓ Pro"} — {proTier === "ultra" ? "Unlimited" : `${rlStatus.hourCount}/${PRO_SIM_PER_HOUR}/hr`}
+              ✓ Pro — {rlStatus.hourCount}/{PRO_SIM_PER_HOUR}/hr
             </div>
             <a href="https://billing.stripe.com/p/login/00w28rcyY4bM8Oy1b7a3u00" target="_blank"
               style={{ fontSize: 11, color: "#4ade80", opacity: 0.7, textDecoration: "none", cursor: "pointer" }}>
@@ -2112,7 +2137,7 @@ export default function HomePage() {
           <>
             <div style={{ fontSize: 12, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 }}>
               {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || "Account"}
-              {proTier !== "free" && <span style={{ marginLeft: 6, color: "#f97316", fontWeight: 700 }}>{proTier === "ultra" ? "⚡" : "✓"}</span>}
+              {proTier !== "free" && <span style={{ marginLeft: 6, color: "#f97316", fontWeight: 700 }}>✓</span>}
             </div>
             <UserButton afterSignOutUrl="/" />
           </>
@@ -2845,14 +2870,14 @@ export default function HomePage() {
               </div>
             </>) : (<>
               <div style={{ textAlign: "center", color: "#e2e8f0", fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
-                {paywallModal === "ultra" ? "Ultra" : "Pro"} Feature
+                Pro Feature
               </div>
               <div style={{ color: "#64748b", fontSize: 13, textAlign: "center", marginBottom: 20, lineHeight: 1.6 }}>
                 {paywallModal === "pro" && scenarioMode === "cataclysm"
-                  ? <>Upgrade to <strong style={{ color: "#f97316" }}>Pro or Ultra</strong> to zoom, pan and explore the post-cataclysm world.</>
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the post-cataclysm world. One-time $18.99.</>
                   : paywallModal === "pro" && scenarioMode === "tsunami"
-                  ? <>Upgrade to <strong style={{ color: "#f97316" }}>Pro or Ultra</strong> to zoom, pan and explore the tsunami inundation zone.</>
-                  : "This feature requires a Pro subscription."}
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the tsunami inundation zone. One-time $18.99.</>
+                  : "This feature requires Pro. One-time $18.99 — no subscription."}
               </div>
             </>)}
 
@@ -2860,10 +2885,11 @@ export default function HomePage() {
             <div style={{ background: "#111827", border: "1px solid #1e3a5f", borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <span style={{ color: "#60a5fa", fontWeight: 700, fontSize: 15 }}>⚡ Pro</span>
-                <span style={{ color: "#f97316", fontWeight: 700, fontSize: 15 }}>$4.99/mo</span>
+                <span style={{ color: "#f97316", fontWeight: 700, fontSize: 15 }}>$18.99 one-time</span>
               </div>
               <div style={{ color: "#94a3b8", fontSize: 12, lineHeight: 1.7 }}>
                 ✓ {PRO_SIM_PER_HOUR} simulations/hour, {PRO_SIM_PER_DAY}/day<br/>
+                ✓ One-time payment, no subscription<br/>
                 ✓ Satellite + Globe view<br/>
                 ✓ Flood displaced counts<br/>
                 ✓ 🌊 Mega-Tsunami scenarios<br/>
@@ -2871,26 +2897,15 @@ export default function HomePage() {
               </div>
               <button onClick={() => { window.open("https://buy.stripe.com/8x200j7eEcIi8OydXTa3u07", "_blank"); }}
                 style={{ width: "100%", marginTop: 12, padding: "10px", background: "#f97316", color: "white", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
-                Subscribe to Pro →
+                Unlock Pro — $18.99 →
               </button>
             </div>
 
-            {/* Ultra tier */}
-            <div style={{ background: "#111827", border: "1px solid #4c1d95", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <span style={{ color: "#c4b5fd", fontWeight: 700, fontSize: 15 }}>🔮 Ultra</span>
-                <span style={{ color: "#f97316", fontWeight: 700, fontSize: 15 }}>$8.88/mo</span>
+            {/* Developer Kit teaser */}
+            <div style={{ background: "#0a0f1e", border: "1px solid #1e2d45", borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
+              <div style={{ color: "#334155", fontSize: 12, textAlign: "center" }}>
+                🛠️ Developer Kit — coming soon
               </div>
-              <div style={{ color: "#94a3b8", fontSize: 12, lineHeight: 1.7 }}>
-                ✓ Everything in Pro<br/>
-                ✓ Unlimited simulations<br/>
-                ✓ Embeddable iframe *(coming soon)*<br/>
-                ✓ Feature request priority
-              </div>
-              <button onClick={() => { window.open("https://buy.stripe.com/5kQ00j9mM8s20i22fba3u08", "_blank"); }}
-                style={{ width: "100%", marginTop: 12, padding: "10px", background: "#7c3aed", color: "white", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
-                Subscribe to Ultra →
-              </button>
             </div>
 
             <button onClick={() => setPaywallModal(null)}
