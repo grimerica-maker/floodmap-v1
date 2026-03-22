@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v140";
+const FRONTEND_BUILD_LABEL = "v141";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1569,15 +1569,13 @@ export default function HomePage() {
       map.flyTo({ zoom: 1.5, pitch: 0, bearing: 0, duration: 1500 });
     });
 
-    // Step 2: Start slow eastward spin (real Earth rotation feel)
-    let bearing = 0;
-    let spinLng = map.getCenter().lng;
+    // Step 2: Start slow spin via setBearing so it doesn't conflict with rotateTo later
+    let preBearing = map.getBearing();
     let lastT = null;
     const spin = (t) => {
       if (lastT !== null) {
-        const dt = t - lastT;
-        spinLng -= dt * 0.018; // ~12 deg/sec eastward
-        safely(() => map.setCenter([spinLng, map.getCenter().lat]));
+        preBearing -= (t - lastT) * 0.018; // spin at ~18°/sec
+        safely(() => map.setBearing(preBearing));
       }
       lastT = t;
       cataclysmSpinRef.current = requestAnimationFrame(spin);
@@ -1656,20 +1654,20 @@ export default function HomePage() {
           map.touchZoomRotate.enable();
         });
       }
-      // Spin continues — cancel fast spin, restart slower
+      // Post-flip spin: rotate bearing (not longitude) to spin around new pole axis
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-      let lng2 = map.getCenter().lng;
+      let spinBearing = map.getBearing();
       let lt2 = null;
       const spin2 = (t) => {
         if (lt2 !== null) {
-          lng2 -= (t - lt2) * 0.006;
-          safely(() => map.setCenter([lng2, map.getCenter().lat]));
+          spinBearing -= (t - lt2) * 0.006; // rotate around new axis
+          safely(() => map.setBearing(spinBearing));
         }
         lt2 = t;
         cataclysmSpinRef.current = requestAnimationFrame(spin2);
       };
       cataclysmSpinRef.current = requestAnimationFrame(spin2);
-      // Stop spin on user interaction — registered ONCE outside the loop
+      // Stop spin on user interaction — registered ONCE
       const stopSpin = () => {
         if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
         map.off("mousedown", stopSpin);
