@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v181";
+const FRONTEND_BUILD_LABEL = "v182";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -2179,25 +2179,27 @@ export default function HomePage() {
 
       <hr style={{ margin: "0 0 16px 0", borderColor: "#1e2d45" }} />
 
-      {/* ── PRESETS ── */}
-      <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Presets</div>
-      <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"}>
-        {PRESETS.map((preset) => {
-          const active = Math.round(inputLevel) === Math.round(preset.value);
-          const lbl = unitMode === "ft"
-            ? `${Math.round(metersToFeet(preset.value)) > 0 ? "+" : ""}${Math.round(metersToFeet(preset.value))}ft`
-            : `${preset.value > 0 ? "+" : ""}${preset.value}m`;
-          return (
-            <button
-              key={preset.label}
-              onClick={() => { setInputLevel(preset.value); setInputText(formatInputTextFromMeters(preset.value, unitMode)); }}
-              style={{ padding: "12px 10px", minHeight: 56, border: "1px solid #d1d5db", background: active ? "#1e3a5f" : "#111827", color: active ? "#60a5fa" : "#94a3b8", border: active ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, whiteSpace: "nowrap" }}>
-              <div style={{ fontSize: 14 }}>{preset.label}</div>
-              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>{lbl}</div>
-            </button>
-          );
-        })}
-      </div>}
+      {/* ── PRESETS — flood mode only ── */}
+      {scenarioMode === "flood" && <>
+        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Presets</div>
+        <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"}>
+          {PRESETS.map((preset) => {
+            const active = Math.round(inputLevel) === Math.round(preset.value);
+            const lbl = unitMode === "ft"
+              ? `${Math.round(metersToFeet(preset.value)) > 0 ? "+" : ""}${Math.round(metersToFeet(preset.value))}ft`
+              : `${preset.value > 0 ? "+" : ""}${preset.value}m`;
+            return (
+              <button
+                key={preset.label}
+                onClick={() => { setInputLevel(preset.value); setInputText(formatInputTextFromMeters(preset.value, unitMode)); }}
+                style={{ padding: "12px 10px", minHeight: 56, border: "1px solid #d1d5db", background: active ? "#1e3a5f" : "#111827", color: active ? "#60a5fa" : "#94a3b8", border: active ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: 14 }}>{preset.label}</div>
+                <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>{lbl}</div>
+              </button>
+            );
+          })}
+        </div>
+      </>}
 
       <hr style={{ margin: "0 0 16px 0", borderColor: "#1e2d45" }} />
 
