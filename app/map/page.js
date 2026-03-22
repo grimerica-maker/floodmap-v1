@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v173";
+const FRONTEND_BUILD_LABEL = "v175";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1811,6 +1811,13 @@ export default function HomePage() {
     setStatus("Flood cleared");
   };
 
+  // Register service worker for tile caching
+  useEffect(() => {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  }, []);
+
   useEffect(() => {
     if (mapRef.current || !floodEngineUrl) return;
 
@@ -2929,11 +2936,25 @@ export default function HomePage() {
             </div>
 
             {/* Developer Kit teaser */}
-            <div style={{ background: "#0a0f1e", border: "1px solid #1e2d45", borderRadius: 12, padding: "12px 16px", marginBottom: 16 }}>
+            <div style={{ background: "#0a0f1e", border: "1px solid #1e2d45", borderRadius: 12, padding: "12px 16px", marginBottom: 10 }}>
               <div style={{ color: "#334155", fontSize: 12, textAlign: "center" }}>
                 🛠️ Developer Kit — coming soon
               </div>
             </div>
+
+            {/* Already have Pro? Sign in */}
+            {!isSignedIn && (
+              <div style={{ borderTop: "1px solid #1e2d45", paddingTop: 14, marginBottom: 10, textAlign: "center" }}>
+                <div style={{ color: "#475569", fontSize: 12, marginBottom: 8 }}>Already purchased? Sign in to restore access.</div>
+                <SignInButton mode="modal">
+                  <button style={{ padding: "8px 20px", background: "transparent", color: "#f97316",
+                    border: "1px solid #f97316", borderRadius: 8, fontWeight: 700,
+                    fontSize: 13, cursor: "pointer", width: "100%" }}>
+                    Sign In
+                  </button>
+                </SignInButton>
+              </div>
+            )}
 
             <button onClick={() => setPaywallModal(null)}
               style={{ width: "100%", padding: "8px", background: "transparent", color: "#475569", border: "1px solid #1e2d45", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
