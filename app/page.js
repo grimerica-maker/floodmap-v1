@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v169";
+const FRONTEND_BUILD_LABEL = "v170";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -2895,7 +2895,7 @@ export default function HomePage() {
                 ✓ 🌊 Mega-Tsunami scenarios<br/>
                 ✓ No ads
               </div>
-              <button onClick={() => { window.open("https://buy.stripe.com/8x200j7eEcIi8OydXTa3u07", "_blank"); }}
+              <button onClick={() => { window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank"); }}
                 style={{ width: "100%", marginTop: 12, padding: "10px", background: "#f97316", color: "white", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
                 Unlock Pro — $18.99 →
               </button>
