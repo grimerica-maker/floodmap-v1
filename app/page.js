@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v141";
+const FRONTEND_BUILD_LABEL = "v142";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1569,13 +1569,13 @@ export default function HomePage() {
       map.flyTo({ zoom: 1.5, pitch: 0, bearing: 0, duration: 1500 });
     });
 
-    // Step 2: Start slow spin via setBearing so it doesn't conflict with rotateTo later
-    let preBearing = map.getBearing();
+    // Step 2: Natural Earth rotation — longitude moves W→E via setCenter
+    let spinLng = map.getCenter().lng;
     let lastT = null;
     const spin = (t) => {
       if (lastT !== null) {
-        preBearing -= (t - lastT) * 0.018; // spin at ~18°/sec
-        safely(() => map.setBearing(preBearing));
+        spinLng -= (t - lastT) * 0.018; // W→E: longitude decreases
+        safely(() => map.setCenter([spinLng, 20]));
       }
       lastT = t;
       cataclysmSpinRef.current = requestAnimationFrame(spin);
@@ -1654,29 +1654,44 @@ export default function HomePage() {
           map.touchZoomRotate.enable();
         });
       }
-      // Post-flip spin: rotate bearing (not longitude) to spin around new pole axis
+      // Post-flip spin: setCenter longitude on new axis orientation
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-      let spinBearing = map.getBearing();
+      let lng2 = map.getCenter().lng;
       let lt2 = null;
       const spin2 = (t) => {
         if (lt2 !== null) {
-          spinBearing -= (t - lt2) * 0.006; // rotate around new axis
-          safely(() => map.setBearing(spinBearing));
+          lng2 -= (t - lt2) * 0.005; // slow continuous rotation on new axis
+          safely(() => map.setCenter([lng2, map.getCenter().lat]));
         }
         lt2 = t;
         cataclysmSpinRef.current = requestAnimationFrame(spin2);
       };
       cataclysmSpinRef.current = requestAnimationFrame(spin2);
-      // Stop spin on user interaction — registered ONCE
-      const stopSpin = () => {
-        if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-        map.off("mousedown", stopSpin);
-        map.off("touchstart", stopSpin);
-        map.off("wheel", stopSpin);
-      };
-      map.on("mousedown", stopSpin);
-      map.on("touchstart", stopSpin);
-      map.on("wheel", stopSpin);
+
+      const currentTier = eQ.current ?? "free";
+      if (currentTier === "free") {
+        // Free: clear everything on any interaction
+        const clearOnInteract = () => {
+          clearCataclysm();
+          map.off("mousedown", clearOnInteract);
+          map.off("touchstart", clearOnInteract);
+          map.off("wheel", clearOnInteract);
+        };
+        map.on("mousedown", clearOnInteract);
+        map.on("touchstart", clearOnInteract);
+        map.on("wheel", clearOnInteract);
+      } else {
+        // Pro/Ultra: stop spin on interaction, keep map unlocked for exploration
+        const stopSpin = () => {
+          if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
+          map.off("mousedown", stopSpin);
+          map.off("touchstart", stopSpin);
+          map.off("wheel", stopSpin);
+        };
+        map.on("mousedown", stopSpin);
+        map.on("touchstart", stopSpin);
+        map.on("wheel", stopSpin);
+      }
     }, 14000);
   };
 
