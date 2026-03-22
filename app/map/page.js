@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v185";
+const FRONTEND_BUILD_LABEL = "v186";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1683,7 +1683,8 @@ export default function HomePage() {
     setViewMode("globe");
     safely(() => {
       map.setProjection("globe");
-      map.flyTo({ zoom: 1.5, pitch: 0, bearing: 0, duration: 1500 });
+      const isMobileCat = window.innerWidth <= 640;
+      map.flyTo({ zoom: isMobileCat ? 0.8 : 1.5, pitch: 0, bearing: 0, duration: 1500 });
     });
 
     // Step 2: Natural Earth rotation — longitude moves W→E via setCenter
@@ -1781,7 +1782,18 @@ export default function HomePage() {
         });
       }
 
-      // Stop spin on first interaction (pro: keep map, free: clear)
+      // Free mobile: spin 10 more seconds then show paywall
+      const isFreeUser = (proTierRef.current ?? proTier ?? "free") === "free";
+      const isMobileUser = window.innerWidth <= 640;
+      if (isFreeUser && isMobileUser) {
+        setTimeout(() => {
+          spinActive = false;
+          if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
+          setPaywallModal("pro");
+        }, 10000);
+      }
+
+      // Stop spin on first interaction (pro: keep map, free: show paywall)
       const stopSpin = () => {
         spinActive = false;
         if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
@@ -1791,7 +1803,6 @@ export default function HomePage() {
         map.off("dragstart", stopSpin);
         map.off("zoomstart", stopSpin);
         if ((proTierRef.current ?? proTier ?? "free") === "free") {
-          // Show upgrade modal instead of clearing
           setPaywallModal("pro");
         } else {
           safely(() => {
