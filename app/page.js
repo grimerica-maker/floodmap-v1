@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v124";
+const FRONTEND_BUILD_LABEL = "v125";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1486,12 +1486,13 @@ export default function HomePage() {
 
     // Step 2: Start slow eastward spin (real Earth rotation feel)
     let bearing = 0;
+    let spinLng = map.getCenter().lng;
     let lastT = null;
     const spin = (t) => {
       if (lastT !== null) {
         const dt = t - lastT;
-        bearing -= dt * 0.012; // ~12 deg/sec eastward
-        safely(() => map.setBearing(bearing % 360));
+        spinLng -= dt * 0.018; // ~12 deg/sec eastward
+        safely(() => map.setCenter([spinLng, map.getCenter().lat]));
       }
       lastT = t;
       cataclysmSpinRef.current = requestAnimationFrame(spin);
@@ -1504,7 +1505,7 @@ export default function HomePage() {
     // Step 3: After 4s of spin, execute the flip (8 seconds, ominous)
     setTimeout(() => {
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-      const startBearing = bearing;
+      const startBearing = map.getBearing();
       const endBearing = startBearing + info.flipBearing;
       safely(() => map.rotateTo(endBearing, {
         duration: 8000,
@@ -1562,11 +1563,12 @@ export default function HomePage() {
           map.touchZoomRotate.disable();
         });
         let b2 = map.getBearing();
+        let lng2 = map.getCenter().lng;
         let lt2 = null;
         const spin2 = (t) => {
           if (lt2 !== null) {
             b2 -= (t - lt2) * 0.005;
-            safely(() => map.setBearing(b2 % 360));
+            safely(() => map.setCenter([lng2, map.getCenter().lat]));
           }
           lt2 = t;
           cataclysmSpinRef.current = requestAnimationFrame(spin2);
