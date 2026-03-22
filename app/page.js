@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v125";
+const FRONTEND_BUILD_LABEL = "v126";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1417,6 +1417,7 @@ export default function HomePage() {
         [0,1,2].forEach(ri => {
           try { if (map.getLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-fill-${ri}`)) map.removeLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-fill-${ri}`); } catch(e){}
           try { if (map.getLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-line-${ri}`)) map.removeLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-line-${ri}`); } catch(e){}
+          try { if (map.getLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-label-${ri}`)) map.removeLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-label-${ri}`); } catch(e){}
         });
         try { if (map.getSource(`${CATACLYSM_WIND_SOURCE}-${ci}`)) map.removeSource(`${CATACLYSM_WIND_SOURCE}-${ci}`); } catch(e){}
       });
@@ -1459,7 +1460,7 @@ export default function HomePage() {
     // Show/hide wind layers
     [0, 1].forEach(ci => {
       [0,1,2].forEach(ri => {
-        ["fill","line"].forEach(t => {
+        ["fill","line","label"].forEach(t => {
           try { if (map.getLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-${t}-${ri}`)) map.setLayoutProperty(`${CATACLYSM_WIND_PREFIX}-${ci}-${t}-${ri}`, "visibility", showWind ? "visible" : "none"); } catch(e){}
         });
       });
