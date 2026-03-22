@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
 
 // ── JSON-LD structured data ───────────────────────────────────────────────────
 const JSONLD_WEBAPP = {
@@ -31,8 +32,8 @@ const JSONLD_WEBAPP = {
   ],
   offers: [
     { "@type": "Offer", price: "0", priceCurrency: "USD", name: "Free" },
-    { "@type": "Offer", price: "4.99", priceCurrency: "USD", name: "Pro", billingIncrement: "Month" },
-    { "@type": "Offer", price: "8.88", priceCurrency: "USD", name: "Ultra", billingIncrement: "Month" },
+    { "@type": "Offer", price: "18.99", priceCurrency: "USD", name: "Pro", description: "One-time payment" },
+    { "@type": "Offer", price: "18.99", priceCurrency: "USD", name: "Pro", description: "One-time payment, no subscription" },
   ],
   author: { "@type": "Person", name: "Grimerica", url: "https://x.com/grimerica", sameAs: ["https://x.com/grimerica"] },
   dateCreated: "2025-01-01",
@@ -46,7 +47,7 @@ const JSONLD_FAQ = {
     { "@type": "Question", name: "How accurate is Disaster Map's flood simulation?", acceptedAnswer: { "@type": "Answer", text: "Flood inundation is calculated in real time using ETOPO1 global elevation data (NOAA, 1 arc-minute resolution). Each map tile calculates terrain elevation versus requested sea level, yielding pixel-accurate static inundation. Dynamic effects like storm surge or erosion are not modeled." } },
     { "@type": "Question", name: "What physics model is used for asteroid impacts?", acceptedAnswer: { "@type": "Answer", text: "Crater scaling uses Melosh (1989) impact cratering laws. Blast and thermal radii derive from Collins et al. (2005) Earth Impact Effects Program. Tsunami generation uses geometric spreading decay from Satake (2012)." } },
     { "@type": "Question", name: "What is the ECDO pole shift theory?", acceptedAnswer: { "@type": "Answer", text: "ECDO (Exothermic Core-Mantle Decoupling Oscillation) is a theoretical model by The Ethical Skeptic proposing a 104 degree crustal displacement event. Ben Davidson (Suspicious Observers) proposes a 90 degree displacement linked to solar micronova cycles. Both are theoretical, clearly labeled, and simulated as presented by their authors." } },
-    { "@type": "Question", name: "Is Disaster Map free to use?", acceptedAnswer: { "@type": "Answer", text: "Yes. The free tier allows 10 simulations per hour and 30 per day across all 6 scenarios. Pro ($4.99/mo) and Ultra ($8.88/mo) unlock higher limits, globe view, and full map interaction." } },
+    { "@type": "Question", name: "Is Disaster Map free to use?", acceptedAnswer: { "@type": "Answer", text: "Yes. The free tier allows 10 simulations per hour and 30 per day across all 6 scenarios. Pro ($18.99 one-time) unlocks higher limits, globe view, and full map interaction." } },
     { "@type": "Question", name: "How are casualty estimates calculated?", acceptedAnswer: { "@type": "Answer", text: "Casualty estimates use GPW v4 (Gridded Population of the World, CIESIN 2018). Deaths are estimated by applying zone-specific mortality rates against exposed population counts within each impact zone." } },
   ],
 };
@@ -136,7 +137,7 @@ const FAQS = [
   { q: "What physics model powers the asteroid impact calculator?", a: "Crater scaling uses Melosh (1989) transient-to-final diameter ratios. Blast and thermal radii use Collins et al. (2005) Earth Impact Effects Program methodology. Casualty estimates combine GPW v4 population data with zone-specific mortality rates (100% fireball, declining through blast and thermal zones)." },
   { q: "What is the ECDO / pole shift theory?", a: "ECDO (Exothermic Core-Mantle Decoupling Oscillation) is a theoretical model by The Ethical Skeptic proposing a 104° crustal displacement event driven by core-mantle thermal dynamics. Ben Davidson (Suspicious Observers) proposes a 90° displacement linked to solar micronova cycles. Both are theoretical — clearly labeled throughout the app — and simulated as presented by their authors. Disaster Map does not endorse or refute these theories." },
   { q: "How are casualty estimates calculated?", a: "Population exposure uses GPW v4 (Gridded Population of the World v4, CIESIN 2018). Deaths are estimated by applying zone-specific mortality rates against exposed population counts. These are rough educational approximations — not suitable for emergency planning or public health use." },
-  { q: "Is Disaster Map free to use?", a: "Yes. The free tier provides access to all 6 scenarios with 10 simulations per hour and 30 per day. The map locks after triggering a catastrophe — upgrade to Pro ($4.99/mo) to unlock full pan, zoom, and higher limits. Ultra ($8.88/mo) adds unlimited simulations and embeddable iframe access." },
+  { q: "Is Disaster Map free to use?", a: "Yes. The free tier provides access to all 6 scenarios with 10 simulations per hour and 30 per day. The map locks after triggering a catastrophe — unlock Pro ($18.99 one-time) for full pan, zoom, and higher limits." },
   { q: "What supervolcano data is used?", a: "Ash dispersal ellipses use VEI-scaled major axis lengths from Mastin et al. (2009), oriented at 70° bearing to reflect prevailing jet stream. Survival thresholds and mortality estimates calibrate to Self (2006) for Yellowstone-scale events and Ambrose (1998) for Toba (VEI-8) supervolcano research." },
 ];
 
@@ -144,6 +145,7 @@ const FAQS = [
 export default function Homepage() {
   const canvasRef = useRef(null);
   const [openFaq, setOpenFaq] = useState(null);
+  const { isSignedIn } = useUser();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -177,7 +179,7 @@ export default function Homepage() {
     return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
   }, []);
 
-  const S = { fontFamily: "'Georgia','Times New Roman',serif", background: "#020817", color: "#e2e8f0", minHeight: "100vh", position: "relative", overflowX: "hidden" };
+  const S = { fontFamily: "'Georgia','Times New Roman',serif", background: "#020817", color: "#e2e8f0", minHeight: "100vh", position: "relative" };
 
   return (
     <>
@@ -194,9 +196,13 @@ export default function Homepage() {
             <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: "0.08em", color: "#fff" }}>☄️&nbsp;DISASTER MAP</div>
             <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
               {[["Scenarios","#scenarios"],["Science","#science"],["Pricing","#pricing"],["FAQ","#faq"]].map(([l,h]) => (
-                <a key={l} href={h} style={{ color: "#475569", textDecoration: "none", fontSize: 14 }}
-                  onMouseEnter={e=>e.currentTarget.style.color="#e2e8f0"} onMouseLeave={e=>e.currentTarget.style.color="#475569"}>{l}</a>
+                <a key={l} href={h} style={{ color: "#94a3b8", textDecoration: "none", fontSize: 14 }}
+                  onMouseEnter={e=>e.currentTarget.style.color="#e2e8f0"} onMouseLeave={e=>e.currentTarget.style.color="#94a3b8"}>{l}</a>
               ))}
+              {isSignedIn
+                ? <UserButton afterSignOutUrl="/" />
+                : <SignInButton mode="modal"><button style={{ background: "transparent", color: "#94a3b8", border: "1px solid #1e2d45", padding: "8px 16px", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer", marginRight: 8 }}>Sign In</button></SignInButton>
+              }
               <Link href="/map" style={{ background: "#f97316", color: "#fff", padding: "9px 20px", borderRadius: 8, textDecoration: "none", fontWeight: 700, fontSize: 14 }}>Launch App →</Link>
             </div>
           </nav>
@@ -209,7 +215,7 @@ export default function Homepage() {
             <h1 style={{ fontSize: "clamp(44px,8vw,88px)", fontWeight: 700, lineHeight: 1.05, margin: "0 0 28px", color: "#fff", fontStyle: "italic", letterSpacing: "-0.02em" }}>
               Simulate Earth's<br />Greatest Threats
             </h1>
-            <p style={{ fontSize: 20, color: "#475569", maxWidth: 640, margin: "0 auto 44px", lineHeight: 1.8 }}>
+            <p style={{ fontSize: 20, color: "#94a3b8", maxWidth: 640, margin: "0 auto 44px", lineHeight: 1.8 }}>
               Asteroid impacts. Nuclear detonations. Mega-tsunamis. Supervolcano eruptions.
               Sea level rise. Crustal displacement. All on a live 3D globe —
               powered by peer-reviewed physics and real terrain data.
@@ -235,7 +241,7 @@ export default function Homepage() {
               {[["6","Disaster Scenarios"],["ETOPO1","Global Terrain"],["GPW v4","Population Data"],["Real-time","Tile Rendering"],["3D Globe","WebGL Powered"],["Free","To Start"]].map(([v,l]) => (
                 <div key={v}>
                   <div style={{ fontSize: 22, fontWeight: 700, color: "#f97316", fontStyle: "italic" }}>{v}</div>
-                  <div style={{ fontSize: 11, color: "#334155", marginTop: 4, letterSpacing: "0.06em", textTransform: "uppercase" }}>{l}</div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, letterSpacing: "0.06em", textTransform: "uppercase" }}>{l}</div>
                 </div>
               ))}
             </div>
@@ -244,7 +250,7 @@ export default function Homepage() {
           {/* SCENARIOS */}
           <section id="scenarios" style={{ maxWidth: 1120, margin: "0 auto", padding: "80px 40px" }}>
             <h2 style={{ fontSize: 38, fontWeight: 700, textAlign: "center", marginBottom: 10, fontStyle: "italic" }}>Six Catastrophe Scenarios</h2>
-            <p style={{ textAlign: "center", color: "#334155", marginBottom: 56, fontSize: 16, lineHeight: 1.7 }}>
+            <p style={{ textAlign: "center", color: "#64748b", marginBottom: 56, fontSize: 16, lineHeight: 1.7 }}>
               Each model uses peer-reviewed science, real terrain data, and published casualty frameworks.
               Theoretical models are clearly labeled.
             </p>
@@ -257,8 +263,8 @@ export default function Homepage() {
                     <div style={{ fontSize: 34, marginBottom: 14 }}>{s.emoji}</div>
                     <h3 style={{ fontSize: 17, fontWeight: 700, color: "#fff", margin: "0 0 4px" }}>{s.name}</h3>
                     <div style={{ fontSize: 11, color: s.color, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>{s.tagline}</div>
-                    <p style={{ fontSize: 14, color: "#475569", lineHeight: 1.75, margin: "0 0 14px" }}>{s.desc}</p>
-                    <div style={{ fontSize: 11, color: "#1e3a5f", letterSpacing: "0.04em" }}>📚 {s.science}</div>
+                    <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.75, margin: "0 0 14px" }}>{s.desc}</p>
+                    <div style={{ fontSize: 11, color: "#475569", letterSpacing: "0.04em" }}>📚 {s.science}</div>
                   </article>
                 </Link>
               ))}
@@ -274,11 +280,11 @@ export default function Homepage() {
           <section id="science" style={{ background: "rgba(255,255,255,0.015)", borderTop: "1px solid rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
             <div style={{ maxWidth: 1120, margin: "0 auto", padding: "80px 40px" }}>
               <h2 style={{ fontSize: 38, fontWeight: 700, textAlign: "center", marginBottom: 10, fontStyle: "italic" }}>Models, Papers & Sources</h2>
-              <p style={{ textAlign: "center", color: "#334155", marginBottom: 8, fontSize: 16, maxWidth: 640, margin: "0 auto 8px" }}>
+              <p style={{ textAlign: "center", color: "#64748b", marginBottom: 8, fontSize: 16, maxWidth: 640, margin: "0 auto 8px" }}>
                 Disaster Map is built on peer-reviewed science, established datasets, and clearly-labeled theoretical models.
                 Full source list below for transparency and reproducibility.
               </p>
-              <p style={{ textAlign: "center", color: "#1e3a5f", marginBottom: 56, fontSize: 13 }}>
+              <p style={{ textAlign: "center", color: "#475569", marginBottom: 56, fontSize: 13 }}>
                 This page is structured for indexing by search engines and AI systems to accurately represent our scientific methodology.
               </p>
 
@@ -297,10 +303,10 @@ export default function Homepage() {
                             onMouseLeave={e=>e.currentTarget.style.color="#c7d2e0"}>
                             {item.name} ↗
                           </a>
-                          <div style={{ fontSize: 13, color: "#334155", fontStyle: "italic", marginBottom: 4 }}>{item.title}</div>
-                          <div style={{ fontSize: 12, color: "#1e3a5f" }}>{item.publisher}</div>
-                          <div style={{ fontSize: 12, color: "#1e3a5f", marginTop: 6, lineHeight: 1.6 }}>
-                            <strong style={{ color: "#2d4a6e" }}>Used for:</strong> {item.use}
+                          <div style={{ fontSize: 13, color: "#64748b", fontStyle: "italic", marginBottom: 4 }}>{item.title}</div>
+                          <div style={{ fontSize: 12, color: "#475569" }}>{item.publisher}</div>
+                          <div style={{ fontSize: 12, color: "#475569", marginTop: 6, lineHeight: 1.6 }}>
+                            <strong style={{ color: "#60a5fa" }}>Used for:</strong> {item.use}
                           </div>
                         </div>
                       ))}
@@ -315,9 +321,9 @@ export default function Homepage() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 18 }}>
                   {EQUATIONS.map(m => (
                     <div key={m.name} style={{ background: "#040a14", border: "1px solid #0f1e30", borderRadius: 10, padding: "18px 20px" }}>
-                      <div style={{ fontSize: 11, color: "#334155", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>{m.name}</div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>{m.name}</div>
                       <code style={{ fontSize: 15, color: "#f97316", fontFamily: "'Courier New',monospace", display: "block", marginBottom: 10 }}>{m.eq}</code>
-                      <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.65 }}>{m.desc}</div>
+                      <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.65 }}>{m.desc}</div>
                     </div>
                   ))}
                 </div>
@@ -325,7 +331,7 @@ export default function Homepage() {
 
               {/* Disclaimer */}
               <div style={{ marginTop: 40, padding: "20px 24px", background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.15)", borderRadius: 10 }}>
-                <p style={{ fontSize: 13, color: "#475569", margin: 0, lineHeight: 1.85 }}>
+                <p style={{ fontSize: 13, color: "#94a3b8", margin: 0, lineHeight: 1.85 }}>
                   <strong style={{ color: "#dc2626" }}>⚠ Disclaimer:</strong> The Pole Shift / ECDO scenarios are <strong>theoretical models</strong> presented for educational and exploratory purposes, clearly labeled as theoretical throughout the application. They are reproduced as presented by Ben Davidson (Suspicious Observers) and The Ethical Skeptic. Disaster Map does not endorse or refute these theories. All other scenarios use peer-reviewed physics and verified terrain data. Casualty estimates are rough educational approximations only — not suitable for emergency planning, insurance, or engineering use.
                 </p>
               </div>
@@ -335,22 +341,22 @@ export default function Homepage() {
           {/* PRICING */}
           <section id="pricing" style={{ maxWidth: 940, margin: "0 auto", padding: "80px 40px" }}>
             <h2 style={{ fontSize: 38, fontWeight: 700, textAlign: "center", marginBottom: 10, fontStyle: "italic" }}>Simple Pricing</h2>
-            <p style={{ textAlign: "center", color: "#334155", marginBottom: 52, fontSize: 16 }}>Start free with all 6 scenarios. Upgrade to explore without limits.</p>
+            <p style={{ textAlign: "center", color: "#64748b", marginBottom: 52, fontSize: 16 }}>Start free with all 6 scenarios. Upgrade to explore without limits.</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(255px,1fr))", gap: 24 }}>
               {[
-                { tier: "Free", price: "$0", period: "forever", color: "#334155", features: ["All 6 disaster scenarios","10 simulations / hour","30 simulations / day","Standard map view","Map locked after trigger","Casualty estimates"], cta: null, ctaLabel: "Launch Free" },
-                { tier: "Pro", price: "$4.99", period: "per month", color: "#f97316", features: ["All 6 disaster scenarios","50 simulations / hour","200 simulations / day","Globe + Satellite view","Full pan, zoom & explore","Priority support"], cta: "https://buy.stripe.com/8x200j7eEcIi8OydXTa3u07", ctaLabel: "Subscribe to Pro" },
-                { tier: "Ultra", price: "$8.88", period: "per month", color: "#a78bfa", features: ["Everything in Pro","Unlimited simulations","Embeddable iframe (coming)","Feature request priority","Early access to new models"], cta: "https://buy.stripe.com/5kQ00j9mM8s20i22fba3u08", ctaLabel: "Subscribe to Ultra" },
+                { tier: "Free", price: "$0", period: "forever", color: "#64748b", features: ["All 6 disaster scenarios","10 simulations / hour","30 simulations / day","Standard map view","Map locked after trigger","Casualty estimates"], cta: null, ctaLabel: "Launch Free" },
+                { tier: "Pro", price: "$18.99", period: "one-time", color: "#f97316", features: ["All 6 disaster scenarios","50 simulations / hour","200 simulations / day","Globe + Satellite view","Full pan, zoom & explore","No subscription — pay once"], cta: "https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", ctaLabel: "Unlock Pro" },
+                { tier: "Developer Kit", price: "Soon", period: "", color: "#a78bfa", features: ["Self-hosted backend","All scenario APIs","Your Mapbox key","Your server, your costs","Single license"], cta: null, ctaLabel: "Coming Soon" },
               ].map(p => (
                 <div key={p.tier} style={{ border: `1px solid ${p.color}33`, borderRadius: 14, padding: "30px 26px", background: "rgba(255,255,255,0.018)", display: "flex", flexDirection: "column" }}>
                   <div style={{ fontSize: 11, letterSpacing: "0.15em", color: p.color, textTransform: "uppercase", marginBottom: 10 }}>{p.tier}</div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 24 }}>
                     <span style={{ fontSize: 32, fontWeight: 700, color: "#fff", fontStyle: "italic" }}>{p.price}</span>
-                    <span style={{ fontSize: 13, color: "#334155" }}>{p.period}</span>
+                    <span style={{ fontSize: 13, color: "#64748b" }}>{p.period}</span>
                   </div>
                   <ul style={{ listStyle: "none", padding: 0, margin: "0 0 28px", flex: 1, display: "flex", flexDirection: "column", gap: 11 }}>
                     {p.features.map(f => (
-                      <li key={f} style={{ fontSize: 14, color: "#475569", display: "flex", gap: 10, alignItems: "flex-start", lineHeight: 1.5 }}>
+                      <li key={f} style={{ fontSize: 14, color: "#94a3b8", display: "flex", gap: 10, alignItems: "flex-start", lineHeight: 1.5 }}>
                         <span style={{ color: p.color, flexShrink: 0, marginTop: 1 }}>✓</span>{f}
                       </li>
                     ))}
@@ -382,7 +388,7 @@ export default function Homepage() {
                       <span style={{ color: "#f97316", fontSize: 22, flexShrink: 0, marginLeft: 16 }}>{openFaq === i ? "−" : "+"}</span>
                     </button>
                     {openFaq === i && (
-                      <div style={{ padding: "4px 22px 20px", fontSize: 14, color: "#475569", lineHeight: 1.85 }}>{faq.a}</div>
+                      <div style={{ padding: "4px 22px 20px", fontSize: 14, color: "#94a3b8", lineHeight: 1.85 }}>{faq.a}</div>
                     )}
                   </div>
                 ))}
@@ -393,7 +399,7 @@ export default function Homepage() {
           {/* CTA */}
           <section style={{ maxWidth: 720, margin: "0 auto", padding: "80px 40px", textAlign: "center" }}>
             <h2 style={{ fontSize: 42, fontWeight: 700, marginBottom: 18, fontStyle: "italic", color: "#fff", lineHeight: 1.1 }}>Ready to Simulate<br />the Apocalypse?</h2>
-            <p style={{ color: "#334155", marginBottom: 40, fontSize: 18, lineHeight: 1.75 }}>Free to start. No account required.<br />Drop an asteroid, flood a continent, or watch a pole shift unfold.</p>
+            <p style={{ color: "#64748b", marginBottom: 40, fontSize: 18, lineHeight: 1.75 }}>Free to start. No account required.<br />Drop an asteroid, flood a continent, or watch a pole shift unfold.</p>
             <Link href="/map" style={{ background: "#f97316", color: "#fff", padding: "19px 56px", borderRadius: 10, textDecoration: "none", fontWeight: 700, fontSize: 20, boxShadow: "0 0 60px rgba(249,115,22,0.4)", display: "inline-block" }}>
               Launch Disaster Map →
             </Link>
@@ -401,14 +407,14 @@ export default function Homepage() {
 
           {/* FOOTER */}
           <footer style={{ borderTop: "1px solid rgba(255,255,255,0.05)", padding: "36px 40px", textAlign: "center" }}>
-            <div style={{ marginBottom: 14, fontWeight: 700, fontSize: 16, letterSpacing: "0.08em", color: "#1e2d45" }}>☄️ DISASTER MAP</div>
-            <div style={{ color: "#1e2d45", fontSize: 13, marginBottom: 18 }}>
+            <div style={{ marginBottom: 14, fontWeight: 700, fontSize: 16, letterSpacing: "0.08em", color: "#334155" }}>☄️ DISASTER MAP</div>
+            <div style={{ color: "#334155", fontSize: 13, marginBottom: 18 }}>
               © 2025 DisasterMap.ca · Built by <a href="https://x.com/grimerica" target="_blank" rel="noopener noreferrer" style={{ color: "#f97316", textDecoration: "none" }}>@grimerica</a>
             </div>
             <div style={{ display: "flex", gap: 28, justifyContent: "center", flexWrap: "wrap" }}>
               {[["Launch App","/map"],["Privacy Policy","/privacy"],["Terms of Use","/terms"],["Contact","https://x.com/grimerica"],["Manage Billing","https://billing.stripe.com/p/login/00w28rcyY4bM8Oy1b7a3u00"]].map(([l,h]) => (
-                <a key={l} href={h} style={{ color: "#1e3a5f", fontSize: 13, textDecoration: "none" }}
-                  onMouseEnter={e=>e.currentTarget.style.color="#f97316"} onMouseLeave={e=>e.currentTarget.style.color="#1e3a5f"}>{l}</a>
+                <a key={l} href={h} style={{ color: "#475569", fontSize: 13, textDecoration: "none" }}
+                  onMouseEnter={e=>e.currentTarget.style.color="#f97316"} onMouseLeave={e=>e.currentTarget.style.color="#475569"}>{l}</a>
               ))}
             </div>
           </footer>
