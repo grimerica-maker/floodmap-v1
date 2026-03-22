@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v165";
+const FRONTEND_BUILD_LABEL = "v166";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1468,13 +1468,18 @@ export default function HomePage() {
     const map = mapRef.current;
     setCataclysmActive(false);
     setCataclysmAnimating(false);
+    setViewMode("map");
     // Stop spin animation
     if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
     if (map && map.isStyleLoaded()) {
       // Re-enable map interaction in case it was locked for free tier
       try { map.dragPan.enable(); map.scrollZoom.enable(); map.doubleClickZoom.enable(); map.touchZoomRotate.enable(); } catch(e){}
-      // Reset bearing, pitch and position back to normal map view
+      // Reset bearing, pitch and revert to standard map
       safely(() => map.easeTo({ bearing: 0, pitch: 0, duration: 800 }));
+      safely(() => {
+        map.setProjection("mercator");
+        map.setStyle("mapbox://styles/mapbox/streets-v12");
+      });
       try { if (map.getLayer("cataclysm-layer")) map.removeLayer("cataclysm-layer"); } catch(e){}
       try { if (map.getSource("cataclysm-source")) map.removeSource("cataclysm-source"); } catch(e){}
       try { if (map.getLayer("cataclysm-pole-marker")) map.removeLayer("cataclysm-pole-marker"); } catch(e){}
