@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v151";
+const FRONTEND_BUILD_LABEL = "v152";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1644,51 +1644,42 @@ export default function HomePage() {
       };
       cataclysmSpinRef.current = requestAnimationFrame(spin2);
 
-      const currentTier = eQ.current ?? "free";
-      if (currentTier === "free") {
-        // Free: clear on any interaction
-        const clearOnInteract = () => {
-          if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-          map.off("mousedown", clearOnInteract);
-          map.off("touchstart", clearOnInteract);
-          map.off("wheel", clearOnInteract);
-          clearCataclysm();
-        };
-        map.on("mousedown", clearOnInteract);
-        map.on("touchstart", clearOnInteract);
-        map.on("wheel", clearOnInteract);
-      } else {
-        // Pro/Ultra: enable interaction, stop RAF spin the instant user touches map
+      // Enable interaction for pro, lock for free
+      const isFree = (proTierRef.current ?? proTier ?? "free") === "free";
+      if (!isFree) {
         safely(() => {
           map.dragPan.enable();
           map.scrollZoom.enable();
           map.doubleClickZoom.enable();
           map.touchZoomRotate.enable();
         });
-        const stopSpin = () => {
-          spinActive = false; // stop loop immediately on next frame
-          if (cataclysmSpinRef.current) {
-            cancelAnimationFrame(cataclysmSpinRef.current);
-            cataclysmSpinRef.current = null;
-          }
-          map.off("mousedown", stopSpin);
-          map.off("touchstart", stopSpin);
-          map.off("wheel", stopSpin);
-          map.off("dragstart", stopSpin);
-          map.off("zoomstart", stopSpin);
+      }
+
+      // Stop spin on first interaction (pro: keep map, free: clear)
+      const stopSpin = () => {
+        spinActive = false;
+        if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
+        map.off("mousedown", stopSpin);
+        map.off("touchstart", stopSpin);
+        map.off("wheel", stopSpin);
+        map.off("dragstart", stopSpin);
+        map.off("zoomstart", stopSpin);
+        if ((proTierRef.current ?? proTier ?? "free") === "free") {
+          clearCataclysm();
+        } else {
           safely(() => {
             map.dragPan.enable();
             map.scrollZoom.enable();
             map.doubleClickZoom.enable();
             map.touchZoomRotate.enable();
           });
-        };
-        map.on("mousedown", stopSpin);
-        map.on("touchstart", stopSpin);
-        map.on("wheel", stopSpin);
-        map.once("dragstart", stopSpin);
-        map.once("zoomstart", stopSpin);
-      }
+        }
+      };
+      map.on("mousedown", stopSpin);
+      map.on("touchstart", stopSpin);
+      map.on("wheel", stopSpin);
+      map.once("dragstart", stopSpin);
+      map.once("zoomstart", stopSpin);
     }, 14000);
   };
 
