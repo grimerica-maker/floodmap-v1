@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v172";
+const FRONTEND_BUILD_LABEL = "v173";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -389,6 +389,7 @@ export default function HomePage() {
   // keep ref in sync
   useEffect(() => { proTierRef.current = proTier; }, [proTier]);
   const [paywallModal, setPaywallModal] = useState(null); // null | "pro" | "ultra" | "ratelimit"
+  const [showSignInPrompt, setShowSignInPrompt] = useState(false);
   const [rlStatus, setRlStatus] = useState(() => getRLStatus());
 
   // Mobile-only UI state — purely cosmetic, zero effect on map/engine logic
