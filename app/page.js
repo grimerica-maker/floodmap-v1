@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v134";
+const FRONTEND_BUILD_LABEL = "v135";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1611,9 +1611,7 @@ export default function HomePage() {
             paint: { "raster-opacity": 0, "raster-opacity-transition": { duration: 2000 } } });
           setTimeout(() => safely(() => map.setPaintProperty("cataclysm-layer", "raster-opacity", 0.82)), 100);
         }
-        // Wind zones
-        drawCataclysmWindZones(map, model);
-        // Apply current overlay setting
+        // Apply current overlay setting (flood tiles)
         setTimeout(() => applyCataclysmOverlay(map, model, cataclysmOverlay), 500);
 
         // New north pole marker
@@ -2251,28 +2249,7 @@ export default function HomePage() {
           <div style={{ fontSize: 11, color: "#475569", marginBottom: 10, lineHeight: 1.4 }}>
             ⚠ Theoretical model. Globe rotates to show displacement, then flood tiles render.
           </div>
-          {cataclysmActive && (
-            <>
-              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#ef4444", textTransform: "uppercase" }}>Overlay</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
-                {[
-                  { key: "flood", label: "🌊 Flood" },
-                  { key: "wind",  label: "💨 Wind" },
-                  { key: "both",  label: "⚡ Both" },
-                ].map(({ key, label }) => (
-                  <button key={key}
-                    onClick={() => {
-                      setCataclysmOverlay(key);
-                      const map = mapRef.current;
-                      if (map) applyCataclysmOverlay(map, cataclysmModelRef.current, key);
-                    }}
-                    style={{ padding: "8px 4px", border: cataclysmOverlay === key ? "1px solid #dc2626" : "1px solid #1e2d45", background: cataclysmOverlay === key ? "#1a0505" : "#111827", color: cataclysmOverlay === key ? "#f87171" : "#64748b", cursor: "pointer", borderRadius: 8, fontWeight: 700, fontSize: 12 }}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+
           {cataclysmActive && proTier === "free" && (
             <div style={{ fontSize: 11, color: "#f97316", marginBottom: 8, textAlign: "center", padding: "6px 8px", border: "1px solid #431407", borderRadius: 6, background: "#1a0a02" }}>
               🔒 <strong>Pro</strong> — unlock zoom &amp; pan to explore the new world
@@ -2466,7 +2443,7 @@ export default function HomePage() {
               ? "~90° crustal displacement · New pole: Siberia · 12hr event"
               : "104° due-south rotation · New pole: S. Pacific · 8hr event"}
           </div>
-          {(cataclysmOverlay === "wind" || cataclysmOverlay === "both") && CATACLYSM_WIND[cataclysmModel] && (
+          {CATACLYSM_WIND[cataclysmModel] && (
             <>
               {CATACLYSM_WIND[cataclysmModel].zones.map((z, i) => (
                 <div key={i} style={{ marginBottom: 8 }}>
