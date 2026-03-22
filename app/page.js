@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v126";
+const FRONTEND_BUILD_LABEL = "v127";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1532,10 +1532,8 @@ export default function HomePage() {
             paint: { "raster-opacity": 0, "raster-opacity-transition": { duration: 2000 } } });
           setTimeout(() => safely(() => map.setPaintProperty("cataclysm-layer", "raster-opacity", 0.82)), 100);
         }
-        // Wind zones
-        drawCataclysmWindZones(map, model);
-        // Apply current overlay setting
-        setTimeout(() => applyCataclysmOverlay(map, model, cataclysmOverlay), 500);
+        // Apply current overlay setting (flood only for now)
+        setTimeout(() => applyCataclysmOverlay(map, model, "flood"), 500);
 
         // New north pole marker
         const poleMarkerId = "cataclysm-pole-marker";
