@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v128";
+const FRONTEND_BUILD_LABEL = "v129";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1376,9 +1376,8 @@ export default function HomePage() {
       center2: [0, -90],
       // Wind speeds from 90° rotation in 12hrs: ~3,700 km/h peak at equator
       zones: [
-        { name: "Instant Death", desc: "Hypersonic winds 3,700+ km/h — total annihilation", survival: "0%", survivalNote: "No structure survives. Ground-level pressure wave equivalent to multiple nuclear detonations.", major_km: 1500, minor_km: 900,  color: "#ef4444", opacity: 0.75 },
-        { name: "Severe",        desc: "Supersonic winds 1,500-3,700 km/h", survival: "1-3%", survivalNote: "Only deepest underground bunkers have any chance. Complete surface destruction.", major_km: 3500, minor_km: 2100, color: "#f97316", opacity: 0.45 },
-        { name: "Survivable",    desc: "Extreme winds 300-1,500 km/h", survival: "15-35%", survivalNote: "Deep reinforced shelter required. Most buildings destroyed. High elevation with natural wind shelter critical.", major_km: 7000, minor_km: 4200, color: "#fbbf24", opacity: 0.25 },
+        { name: "Instant Death", speedLabel: "3,700+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "No structure survives. Ground-level pressure wave equivalent to multiple nuclear detonations.", major_km: 800, minor_km: 500, color: "#ef4444", opacity: 0.70 },
+        { name: "Severe", speedLabel: "1,500-3,700 km/h", desc: "Supersonic winds — catastrophic", survival: "1-3%", survivalNote: "Only deepest underground bunkers. Complete surface destruction.", major_km: 1800, minor_km: 1100, color: "#f97316", opacity: 0.40 },
       ],
     },
     tes: {
@@ -1389,9 +1388,8 @@ export default function HomePage() {
       center2: [10, 180],  // Central Pacific — maximum basin resonance
       // TES 104° rotation in 8hrs: ~5,800 km/h peak at equator
       zones: [
-        { name: "Instant Death", desc: "Hypersonic winds 5,800+ km/h — total annihilation", survival: "0%", survivalNote: "Complete atmospheric scouring. Ground-level pressure equivalent to nuclear detonation. No survival.", major_km: 2000, minor_km: 1200, color: "#ef4444", opacity: 0.75 },
-        { name: "Severe",        desc: "Supersonic winds 2,500-5,800 km/h — catastrophic", survival: "1-2%", survivalNote: "Only deepest underground bunkers. All surface structures obliterated. Mountain regions only partial shelter.", major_km: 5000, minor_km: 3000, color: "#f97316", opacity: 0.45 },
-        { name: "Survivable",    desc: "Extreme winds 400-2,500 km/h", survival: "10-25%", survivalNote: "Deep reinforced underground shelter essential. High Andes/Rockies/Himalayas provide best natural shelter.", major_km: 9000, minor_km: 5400, color: "#fbbf24", opacity: 0.25 },
+        { name: "Instant Death", speedLabel: "5,800+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "Complete atmospheric scouring. No survival possible.", major_km: 1000, minor_km: 600, color: "#ef4444", opacity: 0.70 },
+        { name: "Severe", speedLabel: "2,500-5,800 km/h", desc: "Supersonic winds — catastrophic", survival: "1-2%", survivalNote: "Only deepest underground bunkers. All surface structures obliterated.", major_km: 2500, minor_km: 1500, color: "#f97316", opacity: 0.40 },
       ],
     },
   };
