@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v178";
+const FRONTEND_BUILD_LABEL = "v179";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1176,15 +1176,18 @@ export default function HomePage() {
       // Fly to origin
       // Zoom out to fit entire outermost ring, then lock zoom
       const outerKm = src.rings[src.rings.length - 1].major_km;
-      // Mobile needs extra zoom-out to see full extent
       const isMobileView = window.innerWidth <= 640;
-      const fitZoom = Math.max(0.8, Math.log2(40075 / (outerKm * (isMobileView ? 1.4 : 2.8))));
+      const fitZoom = Math.max(0.8, Math.log2(40075 / (outerKm * 2.8)));
       safely(() => map.flyTo({ center: src.origin, zoom: fitZoom, duration: 1200 }));
-      // Only lock zoom for free users
+      // Free users: allow pan but lock zoom so they can't zoom in to explore
       if ((proTierRef.current ?? "free") === "free") {
         safely(() => {
-          map.setMinZoom(fitZoom - 0.5);
+          map.setMinZoom(isMobileView ? 0.5 : fitZoom - 0.5);
           map.setMaxZoom(fitZoom + 0.3);
+          // Enable pan only on mobile so they can see full extent
+          if (isMobileView) {
+            map.dragPan.enable();
+          }
         });
       }
       safely(() => map.triggerRepaint());
