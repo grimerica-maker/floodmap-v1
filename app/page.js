@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v136";
+const FRONTEND_BUILD_LABEL = "v137";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1584,14 +1584,14 @@ export default function HomePage() {
       cataclysmSpinRef.current = requestAnimationFrame(spin);
     }, 1600);
 
-    // Step 3: After 4s of spin, execute the flip (8 seconds, ominous)
+    // Step 3: After 4s of spin, execute the flip — spin CONTINUES through it
     setTimeout(() => {
-      if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
+      // Don't stop spin — let longitude continue moving during bearing flip
       const startBearing = map.getBearing();
       const endBearing = startBearing + info.flipBearing;
       safely(() => map.rotateTo(endBearing, {
         duration: 8000,
-        easing: t => t < 0.3 ? t / 0.3 * 0.1 : 0.1 + (t - 0.3) / 0.7 * 0.9, // slow start, accelerate
+        easing: t => t < 0.3 ? t / 0.3 * 0.1 : 0.1 + (t - 0.3) / 0.7 * 0.9,
       }));
       setStatus(`☄️ ${info.name} — CRUSTAL DISPLACEMENT IN PROGRESS`);
     }, 5600);
@@ -1634,30 +1634,16 @@ export default function HomePage() {
         });
       });
 
-      // Post-flip behavior based on tier
+      // Post-flip: spin continues for all tiers — pro gets zoom/pan too
       const tier = proTierRef.current ?? proTier;
       if (tier === "free") {
-        // Free: keep spinning, lock map interaction
         safely(() => {
           map.dragPan.disable();
           map.scrollZoom.disable();
           map.doubleClickZoom.disable();
           map.touchZoomRotate.disable();
         });
-        let b2 = map.getBearing();
-        let lng2 = map.getCenter().lng;
-        let lt2 = null;
-        const spin2 = (t) => {
-          if (lt2 !== null) {
-            b2 -= (t - lt2) * 0.005;
-            safely(() => map.setCenter([lng2, map.getCenter().lat]));
-          }
-          lt2 = t;
-          cataclysmSpinRef.current = requestAnimationFrame(spin2);
-        };
-        cataclysmSpinRef.current = requestAnimationFrame(spin2);
       } else {
-        // Pro/Ultra: stop spin, unlock map
         safely(() => {
           map.dragPan.enable();
           map.scrollZoom.enable();
@@ -1665,6 +1651,20 @@ export default function HomePage() {
           map.touchZoomRotate.enable();
         });
       }
+      // Spin continues — just update the speed to slower post-flip
+      // Cancel existing fast spin and restart at slower speed
+      if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
+      let lng2 = map.getCenter().lng;
+      let lt2 = null;
+      const spin2 = (t) => {
+        if (lt2 !== null) {
+          lng2 -= (t - lt2) * 0.006; // W→E slower continuous spin
+          safely(() => map.setCenter([lng2, map.getCenter().lat]));
+        }
+        lt2 = t;
+        cataclysmSpinRef.current = requestAnimationFrame(spin2);
+      };
+      cataclysmSpinRef.current = requestAnimationFrame(spin2);
     }, 14000);
   };
 
