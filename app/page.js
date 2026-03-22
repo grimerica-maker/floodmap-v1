@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v138";
+const FRONTEND_BUILD_LABEL = "v140";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1587,14 +1587,15 @@ export default function HomePage() {
       cataclysmSpinRef.current = requestAnimationFrame(spin);
     }, 1600);
 
-    // Step 3: After 4s of spin, execute the flip — spin CONTINUES through it
+    // Step 3: Stop spin, then execute the bearing flip (crustal displacement)
     setTimeout(() => {
-      // Don't stop spin — let longitude continue moving during bearing flip
+      // MUST stop setCenter loop before rotateTo — they conflict
+      if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
       const startBearing = map.getBearing();
       const endBearing = startBearing + info.flipBearing;
       safely(() => map.rotateTo(endBearing, {
         duration: 8000,
-        easing: t => t < 0.3 ? t / 0.3 * 0.1 : 0.1 + (t - 0.3) / 0.7 * 0.9,
+        easing: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t, // ease in-out
       }));
       setStatus(`☄️ ${info.name} — CRUSTAL DISPLACEMENT IN PROGRESS`);
     }, 5600);
@@ -1655,20 +1656,20 @@ export default function HomePage() {
           map.touchZoomRotate.enable();
         });
       }
-      // Spin continues — just update the speed to slower post-flip
-      // Cancel existing fast spin and restart at slower speed
+      // Spin continues — cancel fast spin, restart slower
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
       let lng2 = map.getCenter().lng;
       let lt2 = null;
       const spin2 = (t) => {
         if (lt2 !== null) {
-          lng2 -= (t - lt2) * 0.006; // W→E slower continuous spin
+          lng2 -= (t - lt2) * 0.006;
           safely(() => map.setCenter([lng2, map.getCenter().lat]));
         }
         lt2 = t;
         cataclysmSpinRef.current = requestAnimationFrame(spin2);
-
-      // Stop spin on user interaction
+      };
+      cataclysmSpinRef.current = requestAnimationFrame(spin2);
+      // Stop spin on user interaction — registered ONCE outside the loop
       const stopSpin = () => {
         if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
         map.off("mousedown", stopSpin);
@@ -1678,8 +1679,6 @@ export default function HomePage() {
       map.on("mousedown", stopSpin);
       map.on("touchstart", stopSpin);
       map.on("wheel", stopSpin);
-      };
-      cataclysmSpinRef.current = requestAnimationFrame(spin2);
     }, 14000);
   };
 
