@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v135";
+const FRONTEND_BUILD_LABEL = "v136";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1374,11 +1374,11 @@ export default function HomePage() {
       center2: [0, 90],
       // Wind speeds from 90° rotation in 12hrs: ~3,700 km/h peak at equator
       zones: [
-        { name: "Instant Death", speedLabel: "3,700+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "No structure survives. Ground-level pressure wave equivalent to multiple nuclear detonations.", major_km: 800, minor_km: 500, color: "#ef4444", opacity: 0.55 },
-        { name: "Severe", speedLabel: "1,500-3,700 km/h", desc: "Supersonic winds — catastrophic", survival: "1-3%", survivalNote: "Only deepest underground bunkers. Complete surface destruction.", major_km: 1800, minor_km: 1100, color: "#f97316", opacity: 0.30 },
-        { name: "Dangerous", speedLabel: "500-1,500 km/h", desc: "Extreme winds — reinforced shelter required", survival: "10-20%", survivalNote: "Underground or heavily reinforced structure required. Most buildings destroyed.", major_km: 3500, minor_km: 2100, color: "#fbbf24", opacity: 0.18 },
-        { name: "Hazardous", speedLabel: "150-500 km/h", desc: "Super-hurricane force winds", survival: "30-55%", survivalNote: "Strong shelter needed. Equivalent to EF5 tornado. Widespread structural damage.", major_km: 6000, minor_km: 3600, color: "#a3e635", opacity: 0.10 },
-        { name: "Survivable", speedLabel: "50-150 km/h", desc: "Severe storm-force winds", survival: "60-80%", survivalNote: "Most people survive in sturdy buildings. Flying debris is main hazard.", major_km: 9000, minor_km: 5400, color: "#38bdf8", opacity: 0.06 },
+        { name: "Instant Death", speedLabel: "3,700+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "No structure survives. Ground-level pressure wave equivalent to multiple nuclear detonations.", major_km: 2000, minor_km: 1200, color: "#ef4444", opacity: 0.55 },
+        { name: "Severe", speedLabel: "1,500-3,700 km/h", desc: "Supersonic winds — catastrophic", survival: "1-3%", survivalNote: "Only deepest underground bunkers. Complete surface destruction.", major_km: 4500, minor_km: 2700, color: "#f97316", opacity: 0.30 },
+        { name: "Dangerous", speedLabel: "500-1,500 km/h", desc: "Extreme winds — reinforced shelter required", survival: "10-20%", survivalNote: "Underground or heavily reinforced structure required. Most buildings destroyed.", major_km: 7500, minor_km: 4500, color: "#fbbf24", opacity: 0.18 },
+        { name: "Hazardous", speedLabel: "150-500 km/h", desc: "Super-hurricane force winds", survival: "30-55%", survivalNote: "Strong shelter needed. Equivalent to EF5 tornado. Widespread structural damage.", major_km: 12000, minor_km: 7200, color: "#a3e635", opacity: 0.10 },
+        { name: "Survivable", speedLabel: "50-150 km/h", desc: "Severe storm-force winds", survival: "60-80%", survivalNote: "Most people survive in sturdy buildings. Flying debris is main hazard.", major_km: 18000, minor_km: 10800, color: "#38bdf8", opacity: 0.06 },
       ],
     },
     tes: {
@@ -1388,11 +1388,11 @@ export default function HomePage() {
       center2: [0, 121],
       // TES 104° rotation in 8hrs: ~5,800 km/h peak at equator
       zones: [
-        { name: "Instant Death", speedLabel: "5,800+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "Complete atmospheric scouring. No survival possible.", major_km: 1000, minor_km: 600, color: "#ef4444", opacity: 0.55 },
-        { name: "Severe", speedLabel: "2,500-5,800 km/h", desc: "Supersonic winds — catastrophic", survival: "1-2%", survivalNote: "Only deepest underground bunkers. All surface structures obliterated.", major_km: 2500, minor_km: 1500, color: "#f97316", opacity: 0.30 },
-        { name: "Dangerous", speedLabel: "800-2,500 km/h", desc: "Extreme winds — reinforced shelter required", survival: "5-15%", survivalNote: "Only deepest underground bunkers. Mountain barriers offer partial protection.", major_km: 5000, minor_km: 3000, color: "#fbbf24", opacity: 0.18 },
-        { name: "Hazardous", speedLabel: "200-800 km/h", desc: "Super-hurricane force winds", survival: "20-40%", survivalNote: "Strong underground shelter needed. Equivalent to multiple EF5 tornadoes simultaneously.", major_km: 9000, minor_km: 5400, color: "#a3e635", opacity: 0.10 },
-        { name: "Survivable", speedLabel: "50-200 km/h", desc: "Severe storm-force winds", survival: "50-70%", survivalNote: "Sturdy buildings provide shelter. Flying debris and flooding are main hazards.", major_km: 14000, minor_km: 8400, color: "#38bdf8", opacity: 0.06 },
+        { name: "Instant Death", speedLabel: "5,800+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "Complete atmospheric scouring. No survival possible.", major_km: 2500, minor_km: 1500, color: "#ef4444", opacity: 0.55 },
+        { name: "Severe", speedLabel: "2,500-5,800 km/h", desc: "Supersonic winds — catastrophic", survival: "1-2%", survivalNote: "Only deepest underground bunkers. All surface structures obliterated.", major_km: 5500, minor_km: 3300, color: "#f97316", opacity: 0.30 },
+        { name: "Dangerous", speedLabel: "800-2,500 km/h", desc: "Extreme winds — reinforced shelter required", survival: "5-15%", survivalNote: "Only deepest underground bunkers. Mountain barriers offer partial protection.", major_km: 9000, minor_km: 5400, color: "#fbbf24", opacity: 0.18 },
+        { name: "Hazardous", speedLabel: "200-800 km/h", desc: "Super-hurricane force winds", survival: "20-40%", survivalNote: "Strong underground shelter needed. Equivalent to multiple EF5 tornadoes simultaneously.", major_km: 14000, minor_km: 8400, color: "#a3e635", opacity: 0.10 },
+        { name: "Survivable", speedLabel: "50-200 km/h", desc: "Severe storm-force winds", survival: "50-70%", survivalNote: "Sturdy buildings provide shelter. Flying debris and flooding are main hazards.", major_km: 20000, minor_km: 12000, color: "#38bdf8", opacity: 0.06 },
       ],
     },
   };
@@ -1431,7 +1431,7 @@ export default function HomePage() {
     const centers = [windData.center1, windData.center2];
     centers.forEach(([cLng, cLat], ci) => {
       const features = [...windData.zones].reverse().map((zone, i) => ({
-        ...buildAshEllipse(cLng, cLat, zone.major_km, zone.major_km, 0),
+        ...buildAshEllipse(cLng, cLat, zone.major_km, zone.minor_km),
         properties: { zoneIdx: windData.zones.length - 1 - i, ...zone },
       }));
       try {
@@ -1504,14 +1504,16 @@ export default function HomePage() {
       // Iterate outermost→innermost — last match wins
       for (let i = windData.zones.length - 1; i >= 0; i--) {
         const z = windData.zones[i];
-        // Simple great-circle distance test for circular zones
-        const dLatKm2 = (lat - cLat) * kpLat;
-        let rawDLng2 = lng - cLng;
-        while (rawDLng2 > 180) rawDLng2 -= 360;
-        while (rawDLng2 < -180) rawDLng2 += 360;
-        const dLngKm2 = rawDLng2 * kpLng;
-        const distKm = Math.sqrt(dLatKm2 * dLatKm2 + dLngKm2 * dLngKm2);
-        if (distKm <= z.major_km) {
+        const eCLat = cLat + (dNorth * z.major_km * 0.3) / kpLat;
+        const eCLng = cLng + (dEast  * z.major_km * 0.3) / Math.max(kpLng, 0.0001);
+        const dLatKm = (lat - eCLat) * kpLat;
+        let rawDLng = lng - eCLng;
+        while (rawDLng > 180) rawDLng -= 360;
+        while (rawDLng < -180) rawDLng += 360;
+        const dLngKm = rawDLng * Math.max(kpLng, 0.0001);
+        const along = dNorth * dLatKm + dEast * dLngKm;
+        const perp  = -dEast * dLatKm + dNorth * dLngKm;
+        if ((along / z.major_km) ** 2 + (perp / z.minor_km) ** 2 <= 1.0) {
           zoneInfo = z;
           centerLabel = centerNames[ci];
           // keep going — inner zones may also match
@@ -1611,7 +1613,9 @@ export default function HomePage() {
             paint: { "raster-opacity": 0, "raster-opacity-transition": { duration: 2000 } } });
           setTimeout(() => safely(() => map.setPaintProperty("cataclysm-layer", "raster-opacity", 0.82)), 100);
         }
-        // Apply current overlay setting (flood tiles)
+        // Wind zones (ellipses)
+        drawCataclysmWindZones(map, model);
+        // Apply current overlay setting
         setTimeout(() => applyCataclysmOverlay(map, model, cataclysmOverlay), 500);
 
         // New north pole marker
@@ -2250,6 +2254,28 @@ export default function HomePage() {
             ⚠ Theoretical model. Globe rotates to show displacement, then flood tiles render.
           </div>
 
+          {cataclysmActive && (
+            <>
+              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#ef4444", textTransform: "uppercase" }}>Overlay</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
+                {[
+                  { key: "flood", label: "🌊 Flood" },
+                  { key: "wind",  label: "💨 Wind" },
+                  { key: "both",  label: "⚡ Both" },
+                ].map(({ key, label }) => (
+                  <button key={key}
+                    onClick={() => {
+                      setCataclysmOverlay(key);
+                      const map = mapRef.current;
+                      if (map) applyCataclysmOverlay(map, cataclysmModelRef.current, key);
+                    }}
+                    style={{ padding: "8px 4px", border: cataclysmOverlay === key ? "1px solid #dc2626" : "1px solid #1e2d45", background: cataclysmOverlay === key ? "#1a0505" : "#111827", color: cataclysmOverlay === key ? "#f87171" : "#64748b", cursor: "pointer", borderRadius: 8, fontWeight: 700, fontSize: 12 }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           {cataclysmActive && proTier === "free" && (
             <div style={{ fontSize: 11, color: "#f97316", marginBottom: 8, textAlign: "center", padding: "6px 8px", border: "1px solid #431407", borderRadius: 6, background: "#1a0a02" }}>
               🔒 <strong>Pro</strong> — unlock zoom &amp; pan to explore the new world
