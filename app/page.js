@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v150";
+const FRONTEND_BUILD_LABEL = "v151";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1626,17 +1626,16 @@ export default function HomePage() {
       // Interaction already handled below with currentTier check
       // Post-flip: same left-to-right longitude spin as before
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-      // Post-flip spin: move lat+lng blended to match actual flip angle
-      // Davidson=90°: pure lat. TES=104°: mostly lat + small lng correction
-      // Post-flip: lat + small opposite-direction lng offset (10°) for TES correction
       let lat2 = map.getCenter().lat;
       let lng2p = map.getCenter().lng;
       let lt2 = null;
+      let spinActive = true; // flag — set false to stop immediately
       const spin2 = (t) => {
+        if (!spinActive) return; // bail out — don't reschedule
         if (lt2 !== null) {
           const delta = (t - lt2) * 0.005;
-          lat2 -= delta * 0.985;   // cos(10°)
-          lng2p += delta * 0.174;  // sin(10°) — opposite direction to last attempt
+          lat2 -= delta * 0.985;
+          lng2p += delta * 0.174;
           if (lat2 < -85) lat2 = 85;
           safely(() => map.setCenter([lng2p, lat2]));
         }
@@ -1667,6 +1666,7 @@ export default function HomePage() {
           map.touchZoomRotate.enable();
         });
         const stopSpin = () => {
+          spinActive = false; // stop loop immediately on next frame
           if (cataclysmSpinRef.current) {
             cancelAnimationFrame(cataclysmSpinRef.current);
             cataclysmSpinRef.current = null;
@@ -1674,7 +1674,8 @@ export default function HomePage() {
           map.off("mousedown", stopSpin);
           map.off("touchstart", stopSpin);
           map.off("wheel", stopSpin);
-          // Ensure all controls stay enabled after spin stops
+          map.off("dragstart", stopSpin);
+          map.off("zoomstart", stopSpin);
           safely(() => {
             map.dragPan.enable();
             map.scrollZoom.enable();
@@ -1682,7 +1683,6 @@ export default function HomePage() {
             map.touchZoomRotate.enable();
           });
         };
-        // Use dragstart too — catches the moment pan begins
         map.on("mousedown", stopSpin);
         map.on("touchstart", stopSpin);
         map.on("wheel", stopSpin);
