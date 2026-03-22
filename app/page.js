@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v143";
+const FRONTEND_BUILD_LABEL = "v144";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1654,16 +1654,14 @@ export default function HomePage() {
           map.touchZoomRotate.enable();
         });
       }
-      // Post-flip spin: increment bearing continuously to rotate around new axis
-      // Using setBearing delta from current post-flip bearing keeps rotation on new pole
+      // Post-flip: same left-to-right longitude spin as before
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-      const postFlipBearing = map.getBearing();
-      let bearingOffset = 0;
+      let lng2 = map.getCenter().lng;
       let lt2 = null;
       const spin2 = (t) => {
         if (lt2 !== null) {
-          bearingOffset += (t - lt2) * 0.005; // accumulate offset
-          safely(() => map.setBearing(postFlipBearing + bearingOffset));
+          lng2 -= (t - lt2) * 0.005;
+          safely(() => map.setCenter([lng2, 10]));
         }
         lt2 = t;
         cataclysmSpinRef.current = requestAnimationFrame(spin2);
@@ -1672,18 +1670,20 @@ export default function HomePage() {
 
       const currentTier = eQ.current ?? "free";
       if (currentTier === "free") {
-        // Free: clear everything on any interaction
+        // Free: clear on any interaction
         const clearOnInteract = () => {
-          clearCataclysm();
+          if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
           map.off("mousedown", clearOnInteract);
           map.off("touchstart", clearOnInteract);
           map.off("wheel", clearOnInteract);
+          clearCataclysm();
         };
         map.on("mousedown", clearOnInteract);
         map.on("touchstart", clearOnInteract);
         map.on("wheel", clearOnInteract);
       } else {
-        // Pro/Ultra: stop spin on interaction, keep map unlocked for exploration
+        // Pro: enable interaction, stop spin on first touch/zoom
+        safely(() => { map.dragPan.enable(); map.scrollZoom.enable(); map.doubleClickZoom.enable(); map.touchZoomRotate.enable(); });
         const stopSpin = () => {
           if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
           map.off("mousedown", stopSpin);
