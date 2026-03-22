@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v142";
+const FRONTEND_BUILD_LABEL = "v143";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1654,14 +1654,16 @@ export default function HomePage() {
           map.touchZoomRotate.enable();
         });
       }
-      // Post-flip spin: setCenter longitude on new axis orientation
+      // Post-flip spin: increment bearing continuously to rotate around new axis
+      // Using setBearing delta from current post-flip bearing keeps rotation on new pole
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-      let lng2 = map.getCenter().lng;
+      const postFlipBearing = map.getBearing();
+      let bearingOffset = 0;
       let lt2 = null;
       const spin2 = (t) => {
         if (lt2 !== null) {
-          lng2 -= (t - lt2) * 0.005; // slow continuous rotation on new axis
-          safely(() => map.setCenter([lng2, map.getCenter().lat]));
+          bearingOffset += (t - lt2) * 0.005; // accumulate offset
+          safely(() => map.setBearing(postFlipBearing + bearingOffset));
         }
         lt2 = t;
         cataclysmSpinRef.current = requestAnimationFrame(spin2);
