@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v133";
+const FRONTEND_BUILD_LABEL = "v134";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1368,12 +1368,10 @@ export default function HomePage() {
   // Wind kill zone data — centered on max displacement point and new equator midpoint
   const CATACLYSM_WIND = {
     davidson: {
-      // Center 1: Point of max crustal displacement (~90° from rotation axis)
-      // Rotation axis runs E-W, max displacement at ~40N 0E (Europe/Atlantic)
-      center1: [40, -30],
-      // Center 2: New equator midpoint — max rotational velocity zone
-      // New equator runs through ~45N Americas → across Atlantic → Europe
-      center2: [0, -90],
+      // Center 1: Max rotational velocity — equatorial zone facing displacement
+      center1: [0, -90],
+      // Center 2: Secondary — opposite side
+      center2: [0, 90],
       // Wind speeds from 90° rotation in 12hrs: ~3,700 km/h peak at equator
       zones: [
         { name: "Instant Death", speedLabel: "3,700+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "No structure survives. Ground-level pressure wave equivalent to multiple nuclear detonations.", major_km: 800, minor_km: 500, color: "#ef4444", opacity: 0.55 },
@@ -1384,11 +1382,10 @@ export default function HomePage() {
       ],
     },
     tes: {
-      // Center 1: Maximum displacement point — 90° from rotation axis
-      // TES rotation axis runs along 31E meridian, max displacement at 90° from it
-      center1: [0, -59],   // New equator, S. Atlantic — max inertial surge zone
-      // Center 2: Pacific basin resonance center — spec says Pacific strongest
-      center2: [10, 180],  // Central Pacific — maximum basin resonance
+      // Center 1: Max rotational velocity — equatorial zone
+      center1: [0, -59],
+      // Center 2: Pacific basin resonance
+      center2: [0, 121],
       // TES 104° rotation in 8hrs: ~5,800 km/h peak at equator
       zones: [
         { name: "Instant Death", speedLabel: "5,800+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "Complete atmospheric scouring. No survival possible.", major_km: 1000, minor_km: 600, color: "#ef4444", opacity: 0.55 },
@@ -1434,7 +1431,7 @@ export default function HomePage() {
     const centers = [windData.center1, windData.center2];
     centers.forEach(([cLng, cLat], ci) => {
       const features = [...windData.zones].reverse().map((zone, i) => ({
-        ...buildAshEllipse(cLng, cLat, zone.major_km, zone.minor_km),
+        ...buildAshEllipse(cLng, cLat, zone.major_km, zone.major_km, 0),
         properties: { zoneIdx: windData.zones.length - 1 - i, ...zone },
       }));
       try {
@@ -1507,16 +1504,14 @@ export default function HomePage() {
       // Iterate outermost→innermost — last match wins
       for (let i = windData.zones.length - 1; i >= 0; i--) {
         const z = windData.zones[i];
-        const eCLat = cLat + (dNorth * z.major_km * 0.3) / kpLat;
-        const eCLng = cLng + (dEast  * z.major_km * 0.3) / Math.max(kpLng, 0.0001);
-        const dLatKm = (lat - eCLat) * kpLat;
-        let rawDLng = lng - eCLng;
-        while (rawDLng > 180) rawDLng -= 360;
-        while (rawDLng < -180) rawDLng += 360;
-        const dLngKm = rawDLng * Math.max(kpLng, 0.0001);
-        const along = dNorth * dLatKm + dEast * dLngKm;
-        const perp  = -dEast * dLatKm + dNorth * dLngKm;
-        if ((along / z.major_km) ** 2 + (perp / z.minor_km) ** 2 <= 1.0) {
+        // Simple great-circle distance test for circular zones
+        const dLatKm2 = (lat - cLat) * kpLat;
+        let rawDLng2 = lng - cLng;
+        while (rawDLng2 > 180) rawDLng2 -= 360;
+        while (rawDLng2 < -180) rawDLng2 += 360;
+        const dLngKm2 = rawDLng2 * kpLng;
+        const distKm = Math.sqrt(dLatKm2 * dLatKm2 + dLngKm2 * dLngKm2);
+        if (distKm <= z.major_km) {
           zoneInfo = z;
           centerLabel = centerNames[ci];
           // keep going — inner zones may also match
