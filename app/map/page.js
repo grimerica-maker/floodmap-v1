@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v175";
+const FRONTEND_BUILD_LABEL = "v176";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -2972,6 +2972,7 @@ export default function HomePage() {
 
       <canvas id="star-canvas" className={viewMode === "globe" ? "visible" : ""} />
       <div ref={mapContainerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0 }} />
+      <style>{`html, body { overflow: hidden !important; height: 100% !important; }`}</style>
       {/* Disaster Map wordmark — top center, unobtrusive */}
       <div style={{
         position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)",
