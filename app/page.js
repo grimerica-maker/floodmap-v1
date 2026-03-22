@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v161";
+const FRONTEND_BUILD_LABEL = "v162";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1094,6 +1094,8 @@ export default function HomePage() {
       map.scrollZoom.enable();
       map.doubleClickZoom.enable();
       map.touchZoomRotate.enable();
+      map.setMinZoom(0);
+      map.setMaxZoom(22);
     });
   };
 
@@ -1151,7 +1153,15 @@ export default function HomePage() {
       });
 
       // Fly to origin
-      safely(() => map.flyTo({ center: src.origin, zoom: 3, duration: 1200 }));
+      // Zoom out to fit entire outermost ring, then lock zoom
+      const outerKm = src.rings[src.rings.length - 1].major_km;
+      const fitZoom = Math.max(1.2, Math.log2(40075 / (outerKm * 2.8)));
+      safely(() => map.flyTo({ center: src.origin, zoom: fitZoom, duration: 1200 }));
+      // Lock at this zoom so free users see the full picture
+      safely(() => {
+        map.setMinZoom(fitZoom - 0.3);
+        map.setMaxZoom(fitZoom + 0.3);
+      });
       safely(() => map.triggerRepaint());
       setTsunamiActive(true);
 
@@ -1224,6 +1234,8 @@ export default function HomePage() {
       map.scrollZoom.enable();
       map.doubleClickZoom.enable();
       map.touchZoomRotate.enable();
+      map.setMinZoom(0);
+      map.setMaxZoom(22);
     });
   };
 
@@ -2163,7 +2175,7 @@ export default function HomePage() {
         <button
           onClick={() => { if (scenarioModeRef.current === "cataclysm") clearCataclysm(); unlockMapControls(); scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); clearImpactPreview(); setImpactResult(null); setImpactError(""); clearNuke(); clearYellowstone(); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "tsunami" ? "#0c2a4a" : "#111827", color: scenarioMode === "tsunami" ? "#38bdf8" : "#94a3b8", border: scenarioMode === "tsunami" ? "1px solid #0ea5e9" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
-          <div style={{ fontSize: 15 }}>🌊 Mega-Tsunami {proTier === "free" && <span style={{ fontSize: 10, color: "#f97316", marginLeft: 4 }}>🔒 Pro</span>}</div>
+          <div style={{ fontSize: 15 }}>🌊 Mega-Tsunami</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Ocean collapse wave propagation</div>
         </button>
         <button
