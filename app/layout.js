@@ -36,17 +36,15 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <ClerkProvider>
-      <html lang="en" style={{ margin: 0, padding: 0, overflow: "hidden", height: "100%" }}>
-        <body style={{ margin: 0, padding: 0, overflow: "hidden", height: "100%", display: "contents" }}>
-          
-          {/* ✅ AdSense Script */}
+      {/* overflow removed — each page controls its own scroll */}
+      <html lang="en" style={{ margin: 0, padding: 0 }}>
+        <body style={{ margin: 0, padding: 0 }}>
           <Script
             async
             src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3953836356769269"
             strategy="afterInteractive"
             crossOrigin="anonymous"
           />
-
           {children}
         </body>
       </html>
