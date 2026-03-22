@@ -24,11 +24,11 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v153";
+const FRONTEND_BUILD_LABEL = "v154";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
-const FREE_SIM_PER_HOUR = 20;
-const FREE_SIM_PER_DAY  = 50;
+const FREE_SIM_PER_HOUR = 10;
+const FREE_SIM_PER_DAY  = 30;
 const PRO_SIM_PER_HOUR  = 50;
 const PRO_SIM_PER_DAY   = 200;
 
@@ -1626,6 +1626,15 @@ export default function HomePage() {
       // Interaction already handled below with currentTier check
       // Post-flip: same left-to-right longitude spin as before
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
+      // Free: lock interaction during post-flip spin
+      if ((proTierRef.current ?? proTier ?? "free") === "free") {
+        safely(() => {
+          map.dragPan.disable();
+          map.scrollZoom.disable();
+          map.doubleClickZoom.disable();
+          map.touchZoomRotate.disable();
+        });
+      }
       let lat2 = map.getCenter().lat;
       let lng2p = map.getCenter().lng;
       let lt2 = null;
