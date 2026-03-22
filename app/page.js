@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v164";
+const FRONTEND_BUILD_LABEL = "v165";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1163,11 +1163,13 @@ export default function HomePage() {
       const outerKm = src.rings[src.rings.length - 1].major_km;
       const fitZoom = Math.max(1.2, Math.log2(40075 / (outerKm * 2.8)));
       safely(() => map.flyTo({ center: src.origin, zoom: fitZoom, duration: 1200 }));
-      // Lock at this zoom so free users see the full picture
-      safely(() => {
-        map.setMinZoom(fitZoom - 0.3);
-        map.setMaxZoom(fitZoom + 0.3);
-      });
+      // Only lock zoom for free users
+      if ((proTierRef.current ?? "free") === "free") {
+        safely(() => {
+          map.setMinZoom(fitZoom - 0.3);
+          map.setMaxZoom(fitZoom + 0.3);
+        });
+      }
       safely(() => map.triggerRepaint());
       setTsunamiActive(true);
 
