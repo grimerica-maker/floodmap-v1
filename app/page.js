@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v132";
+const FRONTEND_BUILD_LABEL = "v133";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1503,9 +1503,9 @@ export default function HomePage() {
       const bearingRad = (70 * Math.PI) / 180;
       const dNorth = Math.cos(bearingRad);
       const dEast  = Math.sin(bearingRad);
-      // Test from innermost to outermost — first match wins (most severe zone)
-      // Add 5% tolerance to catch clicks on ring borders
-      for (let i = 0; i < windData.zones.length; i++) {
+      // Test ALL zones, keep the innermost (most severe) match
+      // Iterate outermost→innermost — last match wins
+      for (let i = windData.zones.length - 1; i >= 0; i--) {
         const z = windData.zones[i];
         const eCLat = cLat + (dNorth * z.major_km * 0.3) / kpLat;
         const eCLng = cLng + (dEast  * z.major_km * 0.3) / Math.max(kpLng, 0.0001);
@@ -1516,11 +1516,10 @@ export default function HomePage() {
         const dLngKm = rawDLng * Math.max(kpLng, 0.0001);
         const along = dNorth * dLatKm + dEast * dLngKm;
         const perp  = -dEast * dLatKm + dNorth * dLngKm;
-        // 1.05 tolerance catches clicks on ring borders
-        if ((along / z.major_km) ** 2 + (perp / z.minor_km) ** 2 <= 1.05) {
+        if ((along / z.major_km) ** 2 + (perp / z.minor_km) ** 2 <= 1.0) {
           zoneInfo = z;
           centerLabel = centerNames[ci];
-          break;
+          // keep going — inner zones may also match
         }
       }
     }
