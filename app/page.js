@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v121";
+const FRONTEND_BUILD_LABEL = "v123";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1368,25 +1368,30 @@ export default function HomePage() {
   // Wind kill zone data — centered on max displacement point and new equator midpoint
   const CATACLYSM_WIND = {
     davidson: {
-      // Max displacement point: 90° from rotation axis (near equatorial Pacific)
-      center1: [-20, -70],
-      // New equator midpoint (max rotational velocity zone)
-      center2: [0, -160],
-      // Wind speeds from 40° rotation in 12hrs: ~1,850 km/h peak
+      // Center 1: Point of max crustal displacement (~90° from rotation axis)
+      // Rotation axis runs E-W, max displacement at ~40N 0E (Europe/Atlantic)
+      center1: [40, -30],
+      // Center 2: New equator midpoint — max rotational velocity zone
+      // New equator runs through ~45N Americas → across Atlantic → Europe
+      center2: [0, -90],
+      // Wind speeds from 90° rotation in 12hrs: ~3,700 km/h peak at equator
       zones: [
-        { name: "Instant Death", desc: "Hypersonic winds 1,800+ km/h — total destruction", survival: "0%", survivalNote: "No structure survives. Equivalent to point-blank nuclear blast overpressure.", major_km: 800,  minor_km: 500,  color: "#ef4444", opacity: 0.75 },
-        { name: "Severe",        desc: "Supersonic winds 800-1,800 km/h — catastrophic", survival: "2-5%", survivalNote: "Deep underground bunkers only. Surface survival essentially zero.", major_km: 2000, minor_km: 1200, color: "#f97316", opacity: 0.45 },
-        { name: "Survivable",    desc: "Hurricane-force winds 200-800 km/h", survival: "20-40%", survivalNote: "Reinforced underground shelter required. Most surface structures destroyed.", major_km: 4000, minor_km: 2400, color: "#fbbf24", opacity: 0.25 },
+        { name: "Instant Death", desc: "Hypersonic winds 3,700+ km/h — total annihilation", survival: "0%", survivalNote: "No structure survives. Ground-level pressure wave equivalent to multiple nuclear detonations.", major_km: 1500, minor_km: 900,  color: "#ef4444", opacity: 0.75 },
+        { name: "Severe",        desc: "Supersonic winds 1,500-3,700 km/h", survival: "1-3%", survivalNote: "Only deepest underground bunkers have any chance. Complete surface destruction.", major_km: 3500, minor_km: 2100, color: "#f97316", opacity: 0.45 },
+        { name: "Survivable",    desc: "Extreme winds 300-1,500 km/h", survival: "15-35%", survivalNote: "Deep reinforced shelter required. Most buildings destroyed. High elevation with natural wind shelter critical.", major_km: 7000, minor_km: 4200, color: "#fbbf24", opacity: 0.25 },
       ],
     },
     tes: {
-      center1: [-14, 31],   // New pole — Euler axis point
-      center2: [0, -59],    // New equator max velocity point
-      // TES 104° rotation in 12hrs: ~4,800 km/h peak
+      // Center 1: Maximum displacement point — 90° from rotation axis
+      // TES rotation axis runs along 31E meridian, max displacement at 90° from it
+      center1: [0, -59],   // New equator, S. Atlantic — max inertial surge zone
+      // Center 2: Pacific basin resonance center — spec says Pacific strongest
+      center2: [10, 180],  // Central Pacific — maximum basin resonance
+      // TES 104° rotation in 8hrs: ~5,800 km/h peak at equator
       zones: [
-        { name: "Instant Death", desc: "Hypersonic winds 4,800+ km/h — total annihilation", survival: "0%", survivalNote: "Atmospheric pressure wave destroys everything. No survival possible.", major_km: 1200, minor_km: 700,  color: "#ef4444", opacity: 0.75 },
-        { name: "Severe",        desc: "Supersonic winds 2,000-4,800 km/h", survival: "1-3%", survivalNote: "Only deepest bunkers. Complete surface destruction across affected zones.", major_km: 3000, minor_km: 1800, color: "#f97316", opacity: 0.45 },
-        { name: "Survivable",    desc: "Extreme winds 500-2,000 km/h", survival: "15-30%", survivalNote: "Deep underground shelter required. Equivalent to multiple EF5 tornadoes simultaneously.", major_km: 6000, minor_km: 3600, color: "#fbbf24", opacity: 0.25 },
+        { name: "Instant Death", desc: "Hypersonic winds 5,800+ km/h — total annihilation", survival: "0%", survivalNote: "Complete atmospheric scouring. Ground-level pressure equivalent to nuclear detonation. No survival.", major_km: 2000, minor_km: 1200, color: "#ef4444", opacity: 0.75 },
+        { name: "Severe",        desc: "Supersonic winds 2,500-5,800 km/h — catastrophic", survival: "1-2%", survivalNote: "Only deepest underground bunkers. All surface structures obliterated. Mountain regions only partial shelter.", major_km: 5000, minor_km: 3000, color: "#f97316", opacity: 0.45 },
+        { name: "Survivable",    desc: "Extreme winds 400-2,500 km/h", survival: "10-25%", survivalNote: "Deep reinforced underground shelter essential. High Andes/Rockies/Himalayas provide best natural shelter.", major_km: 9000, minor_km: 5400, color: "#fbbf24", opacity: 0.25 },
       ],
     },
   };
@@ -1405,6 +1410,8 @@ export default function HomePage() {
       try { map.dragPan.enable(); map.scrollZoom.enable(); map.doubleClickZoom.enable(); map.touchZoomRotate.enable(); } catch(e){}
       try { if (map.getLayer("cataclysm-layer")) map.removeLayer("cataclysm-layer"); } catch(e){}
       try { if (map.getSource("cataclysm-source")) map.removeSource("cataclysm-source"); } catch(e){}
+      try { if (map.getLayer("cataclysm-pole-marker")) map.removeLayer("cataclysm-pole-marker"); } catch(e){}
+      try { if (map.getSource("cataclysm-pole-marker-src")) map.removeSource("cataclysm-pole-marker-src"); } catch(e){}
       // Clear wind layers
       [0, 1].forEach(ci => {
         [0,1,2].forEach(ri => {
@@ -1464,8 +1471,8 @@ export default function HomePage() {
     if (!map) return;
     const model = cataclysmModelRef.current;
     const info = model === "davidson"
-      ? { name: "Davidson / Suspicious Observers", flipBearing: -40 }
-      : { name: "The Ethical Skeptic ECDO", flipBearing: -104 };
+      ? { name: "Davidson / Suspicious Observers", flipBearing: -90, newPoleLat: 78, newPoleLng: 96, newPoleLabel: "New N. Pole (Siberia)" }
+      : { name: "The Ethical Skeptic ECDO", flipBearing: -104, newPoleLat: -40, newPoleLng: -130, newPoleLabel: "New N. Pole (S. Pacific)" };
 
     clearCataclysm();
     setCataclysmAnimating(true);
@@ -1527,6 +1534,21 @@ export default function HomePage() {
         drawCataclysmWindZones(map, model);
         // Apply current overlay setting
         setTimeout(() => applyCataclysmOverlay(map, model, cataclysmOverlay), 500);
+
+        // New north pole marker
+        const poleMarkerId = "cataclysm-pole-marker";
+        try { map.removeLayer(poleMarkerId); map.removeSource(poleMarkerId + "-src"); } catch(e){}
+        safely(() => {
+          map.addSource(poleMarkerId + "-src", { type: "geojson", data: {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [info.newPoleLng, info.newPoleLat] },
+            properties: { label: info.newPoleLabel }
+          }});
+          map.addLayer({ id: poleMarkerId, type: "symbol", source: poleMarkerId + "-src",
+            layout: { "text-field": ["concat", "❄️ ", ["get", "label"]], "text-size": 13, "text-anchor": "bottom", "text-offset": [0, -0.5] },
+            paint: { "text-color": "#e0f2fe", "text-halo-color": "#0c1a2e", "text-halo-width": 2 }
+          });
+        });
       });
 
       // Post-flip behavior based on tier
@@ -2137,8 +2159,8 @@ export default function HomePage() {
           </div>
           <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12, fontStyle: "italic", lineHeight: 1.5 }}>
             {cataclysmModel === "davidson"
-              ? "~40° crustal displacement. New pole: S. Pacific. Americas & Pacific inundated to 700m+."
-              : "104° rotation along 31st meridian. Global inundation 30-300m. Giza floods to 175m per pyramid evidence."}
+              ? "~90° crustal displacement. New pole: S. Pacific. Americas flood 500-800m. Siberia becomes new polar region."
+              : "104° due-south rotation in 8hrs. Global inundation 120-1200m. Pacific basin max resonance. Based on TES ECDO Theory."}
           </div>
           <div style={{ fontSize: 11, color: "#475569", marginBottom: 10, lineHeight: 1.4 }}>
             ⚠ Theoretical model. Globe rotates to show displacement, then flood tiles render.
