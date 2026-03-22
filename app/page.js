@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v118";
+const FRONTEND_BUILD_LABEL = "v121";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -345,6 +345,12 @@ export default function HomePage() {
   const [tsunamiSource, setTsunamiSource] = useState(0);
   const tsunamiSourceRef = useRef(0);
   const [tsunamiActive, setTsunamiActive] = useState(false);
+  const [cataclysmModel, setCataclysmModel] = useState("davidson"); // "davidson" | "tes"
+  const [cataclysmActive, setCataclysmActive] = useState(false);
+  const [cataclysmAnimating, setCataclysmAnimating] = useState(false);
+  const cataclysmModelRef = useRef("davidson");
+  const [cataclysmOverlay, setCataclysmOverlay] = useState("flood"); // "flood" | "wind" | "both"
+  const cataclysmSpinRef = useRef(null);
   const [tsunamiResult, setTsunamiResult] = useState(null);
   const [tsunamiFloodLevel, setTsunamiFloodLevel] = useState(null);
   const tsunamiPopupRef = useRef(null); // 0=640k, 1=1.3M, 2=2.1M
@@ -1359,6 +1365,203 @@ export default function HomePage() {
     yellowstonePopupRef.current = popup;
   };
 
+  // Wind kill zone data — centered on max displacement point and new equator midpoint
+  const CATACLYSM_WIND = {
+    davidson: {
+      // Max displacement point: 90° from rotation axis (near equatorial Pacific)
+      center1: [-20, -70],
+      // New equator midpoint (max rotational velocity zone)
+      center2: [0, -160],
+      // Wind speeds from 40° rotation in 12hrs: ~1,850 km/h peak
+      zones: [
+        { name: "Instant Death", desc: "Hypersonic winds 1,800+ km/h — total destruction", survival: "0%", survivalNote: "No structure survives. Equivalent to point-blank nuclear blast overpressure.", major_km: 800,  minor_km: 500,  color: "#ef4444", opacity: 0.75 },
+        { name: "Severe",        desc: "Supersonic winds 800-1,800 km/h — catastrophic", survival: "2-5%", survivalNote: "Deep underground bunkers only. Surface survival essentially zero.", major_km: 2000, minor_km: 1200, color: "#f97316", opacity: 0.45 },
+        { name: "Survivable",    desc: "Hurricane-force winds 200-800 km/h", survival: "20-40%", survivalNote: "Reinforced underground shelter required. Most surface structures destroyed.", major_km: 4000, minor_km: 2400, color: "#fbbf24", opacity: 0.25 },
+      ],
+    },
+    tes: {
+      center1: [-14, 31],   // New pole — Euler axis point
+      center2: [0, -59],    // New equator max velocity point
+      // TES 104° rotation in 12hrs: ~4,800 km/h peak
+      zones: [
+        { name: "Instant Death", desc: "Hypersonic winds 4,800+ km/h — total annihilation", survival: "0%", survivalNote: "Atmospheric pressure wave destroys everything. No survival possible.", major_km: 1200, minor_km: 700,  color: "#ef4444", opacity: 0.75 },
+        { name: "Severe",        desc: "Supersonic winds 2,000-4,800 km/h", survival: "1-3%", survivalNote: "Only deepest bunkers. Complete surface destruction across affected zones.", major_km: 3000, minor_km: 1800, color: "#f97316", opacity: 0.45 },
+        { name: "Survivable",    desc: "Extreme winds 500-2,000 km/h", survival: "15-30%", survivalNote: "Deep underground shelter required. Equivalent to multiple EF5 tornadoes simultaneously.", major_km: 6000, minor_km: 3600, color: "#fbbf24", opacity: 0.25 },
+      ],
+    },
+  };
+
+  const CATACLYSM_WIND_SOURCE = "cataclysm-wind-source";
+  const CATACLYSM_WIND_PREFIX = "cataclysm-wind";
+
+  const clearCataclysm = () => {
+    const map = mapRef.current;
+    setCataclysmActive(false);
+    setCataclysmAnimating(false);
+    // Stop spin animation
+    if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
+    if (map && map.isStyleLoaded()) {
+      // Re-enable map interaction in case it was locked for free tier
+      try { map.dragPan.enable(); map.scrollZoom.enable(); map.doubleClickZoom.enable(); map.touchZoomRotate.enable(); } catch(e){}
+      try { if (map.getLayer("cataclysm-layer")) map.removeLayer("cataclysm-layer"); } catch(e){}
+      try { if (map.getSource("cataclysm-source")) map.removeSource("cataclysm-source"); } catch(e){}
+      // Clear wind layers
+      [0, 1].forEach(ci => {
+        [0,1,2].forEach(ri => {
+          try { if (map.getLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-fill-${ri}`)) map.removeLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-fill-${ri}`); } catch(e){}
+          try { if (map.getLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-line-${ri}`)) map.removeLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-line-${ri}`); } catch(e){}
+        });
+        try { if (map.getSource(`${CATACLYSM_WIND_SOURCE}-${ci}`)) map.removeSource(`${CATACLYSM_WIND_SOURCE}-${ci}`); } catch(e){}
+      });
+    }
+  };
+
+  const drawCataclysmWindZones = (map, model) => {
+    const windData = CATACLYSM_WIND[model];
+    if (!windData) return;
+    const centers = [windData.center1, windData.center2];
+    centers.forEach(([cLng, cLat], ci) => {
+      const features = [...windData.zones].reverse().map((zone, i) => ({
+        ...buildAshEllipse(cLng, cLat, zone.major_km, zone.minor_km),
+        properties: { zoneIdx: windData.zones.length - 1 - i, ...zone },
+      }));
+      try {
+        const srcId = `${CATACLYSM_WIND_SOURCE}-${ci}`;
+        if (map.getSource(srcId)) {
+          map.getSource(srcId).setData({ type: "FeatureCollection", features });
+        } else {
+          map.addSource(srcId, { type: "geojson", data: { type: "FeatureCollection", features } });
+          windData.zones.forEach((zone, i) => {
+            map.addLayer({ id: `${CATACLYSM_WIND_PREFIX}-${ci}-fill-${i}`, type: "fill", source: srcId,
+              filter: ["==", ["get", "zoneIdx"], i],
+              paint: { "fill-color": zone.color, "fill-opacity": zone.opacity } });
+            map.addLayer({ id: `${CATACLYSM_WIND_PREFIX}-${ci}-line-${i}`, type: "line", source: srcId,
+              filter: ["==", ["get", "zoneIdx"], i],
+              paint: { "line-color": zone.color, "line-width": 1.5, "line-opacity": 0.9 } });
+          });
+        }
+      } catch(e) { console.warn("Wind zone error", e); }
+    });
+  };
+
+  const applyCataclysmOverlay = (map, model, overlay) => {
+    // Show/hide flood tiles
+    const showFlood = overlay === "flood" || overlay === "both";
+    const showWind  = overlay === "wind"  || overlay === "both";
+    try { if (map.getLayer("cataclysm-layer")) map.setPaintProperty("cataclysm-layer", "raster-opacity", showFlood ? 0.82 : 0); } catch(e){}
+    // Show/hide wind layers
+    [0, 1].forEach(ci => {
+      [0,1,2].forEach(ri => {
+        ["fill","line"].forEach(t => {
+          try { if (map.getLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-${t}-${ri}`)) map.setLayoutProperty(`${CATACLYSM_WIND_PREFIX}-${ci}-${t}-${ri}`, "visibility", showWind ? "visible" : "none"); } catch(e){}
+        });
+      });
+    });
+  };
+
+  const triggerCataclysm = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const model = cataclysmModelRef.current;
+    const info = model === "davidson"
+      ? { name: "Davidson / Suspicious Observers", flipBearing: -40 }
+      : { name: "The Ethical Skeptic ECDO", flipBearing: -104 };
+
+    clearCataclysm();
+    setCataclysmAnimating(true);
+
+    // Step 1: Switch to globe, fly out
+    setViewMode("globe");
+    safely(() => {
+      map.setProjection("globe");
+      map.flyTo({ zoom: 1.5, pitch: 0, bearing: 0, duration: 1500 });
+    });
+
+    // Step 2: Start slow eastward spin (real Earth rotation feel)
+    let bearing = 0;
+    let lastT = null;
+    const spin = (t) => {
+      if (lastT !== null) {
+        const dt = t - lastT;
+        bearing += dt * 0.012; // ~12 deg/sec eastward
+        safely(() => map.setBearing(bearing % 360));
+      }
+      lastT = t;
+      cataclysmSpinRef.current = requestAnimationFrame(spin);
+    };
+    setTimeout(() => {
+      setStatus(`☄️ ${info.name} — crustal displacement initiating…`);
+      cataclysmSpinRef.current = requestAnimationFrame(spin);
+    }, 1600);
+
+    // Step 3: After 4s of spin, execute the flip (8 seconds, ominous)
+    setTimeout(() => {
+      if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
+      const startBearing = bearing;
+      const endBearing = startBearing + info.flipBearing;
+      safely(() => map.rotateTo(endBearing, {
+        duration: 8000,
+        easing: t => t < 0.3 ? t / 0.3 * 0.1 : 0.1 + (t - 0.3) / 0.7 * 0.9, // slow start, accelerate
+      }));
+      setStatus(`☄️ ${info.name} — CRUSTAL DISPLACEMENT IN PROGRESS`);
+    }, 5600);
+
+    // Step 4: Flip complete — render overlays and restart gentle spin
+    setTimeout(() => {
+      setStatus(`☄️ ${info.name} — inundation calculated`);
+      setCataclysmAnimating(false);
+      setCataclysmActive(true);
+      const tileUrl = `${floodEngineUrlRef.current}/cataclysm/${model}/{z}/{x}/{y}.png`;
+
+      safely(() => {
+        // Flood tiles
+        if (map.getSource("cataclysm-source")) {
+          map.getSource("cataclysm-source").setTiles([tileUrl]);
+        } else {
+          map.addSource("cataclysm-source", { type: "raster", tiles: [tileUrl], tileSize: 256 });
+          map.addLayer({ id: "cataclysm-layer", type: "raster", source: "cataclysm-source",
+            paint: { "raster-opacity": 0, "raster-opacity-transition": { duration: 2000 } } });
+          setTimeout(() => safely(() => map.setPaintProperty("cataclysm-layer", "raster-opacity", 0.82)), 100);
+        }
+        // Wind zones
+        drawCataclysmWindZones(map, model);
+        // Apply current overlay setting
+        setTimeout(() => applyCataclysmOverlay(map, model, cataclysmOverlay), 500);
+      });
+
+      // Post-flip behavior based on tier
+      const tier = proTierRef.current ?? proTier;
+      if (tier === "free") {
+        // Free: keep spinning, lock map interaction
+        safely(() => {
+          map.dragPan.disable();
+          map.scrollZoom.disable();
+          map.doubleClickZoom.disable();
+          map.touchZoomRotate.disable();
+        });
+        let b2 = map.getBearing();
+        let lt2 = null;
+        const spin2 = (t) => {
+          if (lt2 !== null) {
+            b2 += (t - lt2) * 0.005;
+            safely(() => map.setBearing(b2 % 360));
+          }
+          lt2 = t;
+          cataclysmSpinRef.current = requestAnimationFrame(spin2);
+        };
+        cataclysmSpinRef.current = requestAnimationFrame(spin2);
+      } else {
+        // Pro/Ultra: stop spin, unlock map
+        safely(() => {
+          map.dragPan.enable();
+          map.scrollZoom.enable();
+          map.doubleClickZoom.enable();
+          map.touchZoomRotate.enable();
+        });
+      }
+    }, 14000);
+  };
+
   const clearNuke = () => {
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
@@ -1687,6 +1890,7 @@ export default function HomePage() {
       <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
         <button
           onClick={executeFlood}
+          onClick={(e) => { e.stopPropagation(); executeFlood(); }}
           style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "#f97316", color: "white", border: "none", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 15 }}>
           Execute Flood
         </button>
@@ -1786,6 +1990,17 @@ export default function HomePage() {
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "tsunami" ? "#0c2a4a" : "#111827", color: scenarioMode === "tsunami" ? "#38bdf8" : "#94a3b8", border: scenarioMode === "tsunami" ? "1px solid #0ea5e9" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>🌊 Mega-Tsunami {proTier === "free" && <span style={{ fontSize: 10, color: "#f97316", marginLeft: 4 }}>🔒 Pro</span>}</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Ocean collapse wave propagation</div>
+        </button>
+        <button
+          onClick={() => {
+            scenarioModeRef.current = "cataclysm";
+            setScenarioMode("cataclysm");
+            clearImpactPreview(); setImpactResult(null); setImpactError("");
+            clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm();
+          }}
+          style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "cataclysm" ? "#1a0505" : "#111827", color: scenarioMode === "cataclysm" ? "#ef4444" : "#94a3b8", border: scenarioMode === "cataclysm" ? "1px solid #dc2626" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
+          <div style={{ fontSize: 15 }}>☄️ Cataclysm</div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Pole shift inundation models</div>
         </button>
       </div>
 
@@ -1900,6 +2115,74 @@ export default function HomePage() {
           </div>
 
           {nukeError && <div style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{nukeError}</div>}
+        </>
+      )}
+
+      {/* Cataclysm controls */}
+      {scenarioMode === "cataclysm" && (
+        <>
+          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#ef4444", textTransform: "uppercase" }}>Model</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+            {[
+              { key: "davidson", label: "Ben Davidson", sub: "Suspicious Observers" },
+              { key: "tes", label: "Ethical Skeptic", sub: "ECDO Theory" },
+            ].map(({ key, label, sub }) => (
+              <button key={key}
+                onClick={() => { cataclysmModelRef.current = key; setCataclysmModel(key); clearCataclysm(); }}
+                style={{ padding: "10px 8px", minHeight: 56, border: cataclysmModel === key ? "1px solid #dc2626" : "1px solid #1e2d45", background: cataclysmModel === key ? "#1a0505" : "#111827", color: cataclysmModel === key ? "#f87171" : "#94a3b8", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 11, textAlign: "center" }}>
+                <div>{label}</div>
+                <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{sub}</div>
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12, fontStyle: "italic", lineHeight: 1.5 }}>
+            {cataclysmModel === "davidson"
+              ? "~40° crustal displacement. New pole: S. Pacific. Americas & Pacific inundated to 700m+."
+              : "104° rotation along 31st meridian. Global inundation 30-300m. Giza floods to 175m per pyramid evidence."}
+          </div>
+          <div style={{ fontSize: 11, color: "#475569", marginBottom: 10, lineHeight: 1.4 }}>
+            ⚠ Theoretical model. Globe rotates to show displacement, then flood tiles render.
+          </div>
+          {cataclysmActive && (
+            <>
+              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#ef4444", textTransform: "uppercase" }}>Overlay</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
+                {[
+                  { key: "flood", label: "🌊 Flood" },
+                  { key: "wind",  label: "💨 Wind" },
+                  { key: "both",  label: "⚡ Both" },
+                ].map(({ key, label }) => (
+                  <button key={key}
+                    onClick={() => {
+                      setCataclysmOverlay(key);
+                      const map = mapRef.current;
+                      if (map) applyCataclysmOverlay(map, cataclysmModelRef.current, key);
+                    }}
+                    style={{ padding: "8px 4px", border: cataclysmOverlay === key ? "1px solid #dc2626" : "1px solid #1e2d45", background: cataclysmOverlay === key ? "#1a0505" : "#111827", color: cataclysmOverlay === key ? "#f87171" : "#64748b", cursor: "pointer", borderRadius: 8, fontWeight: 700, fontSize: 12 }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {cataclysmActive && proTier === "free" && (
+            <div style={{ fontSize: 11, color: "#f97316", marginBottom: 8, textAlign: "center", padding: "6px 8px", border: "1px solid #431407", borderRadius: 6, background: "#1a0a02" }}>
+              🔒 <strong>Pro</strong> — unlock zoom &amp; pan to explore the new world
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+            <button
+              onClick={triggerCataclysm}
+              disabled={cataclysmAnimating}
+              style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "#dc2626", color: "white", border: "none", fontWeight: 700, cursor: cataclysmAnimating ? "not-allowed" : "pointer", borderRadius: 8, fontSize: 15, opacity: cataclysmAnimating ? 0.65 : 1 }}>
+              {cataclysmAnimating ? "Displacing…" : "☄️ Trigger"}
+            </button>
+            <button
+              onClick={clearCataclysm}
+              style={{ padding: "13px 16px", minHeight: 48, background: "transparent", color: "#64748b", border: "1px solid #1e2d45", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 15 }}>
+              Clear
+            </button>
+          </div>
         </>
       )}
 
@@ -2576,7 +2859,7 @@ export default function HomePage() {
             flexShrink: 0,
             padding: "0 20px",
             height: 48,
-            background: scenarioMode === "impact" ? "#ef4444" : scenarioMode === "nuke" ? "#7c3aed" : "#f97316",
+            background: scenarioMode === "impact" ? "#ef4444" : scenarioMode === "nuke" ? "#7c3aed" : scenarioMode === "yellowstone" ? "#ea580c" : scenarioMode === "tsunami" ? "#0ea5e9" : scenarioMode === "cataclysm" ? "#dc2626" : "#f97316",
             color: "white",
             border: "none",
             borderRadius: 10,
@@ -2591,6 +2874,12 @@ export default function HomePage() {
             ? (impactLoading ? "Running…" : "Run Impact")
             : scenarioMode === "nuke"
             ? (nukeLoading ? "Detonating…" : "☢️ Detonate")
+            : scenarioMode === "yellowstone"
+            ? "🌋 Erupt"
+            : scenarioMode === "tsunami"
+            ? (proTier === "free" ? "🔒 Pro Only" : "🌊 Trigger")
+            : scenarioMode === "cataclysm"
+            ? (cataclysmAnimating ? "Displacing…" : "☄️ Trigger")
             : "Execute Flood"}
         </button>
 
