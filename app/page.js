@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v129";
+const FRONTEND_BUILD_LABEL = "v130";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1376,8 +1376,9 @@ export default function HomePage() {
       center2: [0, -90],
       // Wind speeds from 90° rotation in 12hrs: ~3,700 km/h peak at equator
       zones: [
-        { name: "Instant Death", speedLabel: "3,700+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "No structure survives. Ground-level pressure wave equivalent to multiple nuclear detonations.", major_km: 800, minor_km: 500, color: "#ef4444", opacity: 0.70 },
-        { name: "Severe", speedLabel: "1,500-3,700 km/h", desc: "Supersonic winds — catastrophic", survival: "1-3%", survivalNote: "Only deepest underground bunkers. Complete surface destruction.", major_km: 1800, minor_km: 1100, color: "#f97316", opacity: 0.40 },
+        { name: "Instant Death", speedLabel: "3,700+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "No structure survives. Ground-level pressure wave equivalent to multiple nuclear detonations.", major_km: 800, minor_km: 500, color: "#ef4444", opacity: 0.55 },
+        { name: "Severe", speedLabel: "1,500-3,700 km/h", desc: "Supersonic winds — catastrophic", survival: "1-3%", survivalNote: "Only deepest underground bunkers. Complete surface destruction.", major_km: 1800, minor_km: 1100, color: "#f97316", opacity: 0.30 },
+        { name: "Survivable", speedLabel: "300-1,500 km/h", desc: "Extreme winds — deep shelter required", survival: "15-35%", survivalNote: "Deep reinforced underground shelter required. High elevation with natural wind barriers critical.", major_km: 3500, minor_km: 2100, color: "#fbbf24", opacity: 0.12 },
       ],
     },
     tes: {
@@ -1388,8 +1389,9 @@ export default function HomePage() {
       center2: [10, 180],  // Central Pacific — maximum basin resonance
       // TES 104° rotation in 8hrs: ~5,800 km/h peak at equator
       zones: [
-        { name: "Instant Death", speedLabel: "5,800+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "Complete atmospheric scouring. No survival possible.", major_km: 1000, minor_km: 600, color: "#ef4444", opacity: 0.70 },
-        { name: "Severe", speedLabel: "2,500-5,800 km/h", desc: "Supersonic winds — catastrophic", survival: "1-2%", survivalNote: "Only deepest underground bunkers. All surface structures obliterated.", major_km: 2500, minor_km: 1500, color: "#f97316", opacity: 0.40 },
+        { name: "Instant Death", speedLabel: "5,800+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "Complete atmospheric scouring. No survival possible.", major_km: 1000, minor_km: 600, color: "#ef4444", opacity: 0.55 },
+        { name: "Severe", speedLabel: "2,500-5,800 km/h", desc: "Supersonic winds — catastrophic", survival: "1-2%", survivalNote: "Only deepest underground bunkers. All surface structures obliterated.", major_km: 2500, minor_km: 1500, color: "#f97316", opacity: 0.30 },
+        { name: "Survivable", speedLabel: "400-2,500 km/h", desc: "Extreme winds — deep shelter required", survival: "10-25%", survivalNote: "Deep reinforced underground shelter essential. High Andes/Rockies/Himalayas provide best natural shelter.", major_km: 5000, minor_km: 3000, color: "#fbbf24", opacity: 0.12 },
       ],
     },
   };
@@ -2243,21 +2245,6 @@ export default function HomePage() {
           <div style={{ fontSize: 11, color: "#475569", marginBottom: 10, lineHeight: 1.4 }}>
             ⚠ Theoretical model. Globe rotates to show displacement, then flood tiles render.
           </div>
-          {cataclysmActive && cataclysmOverlay !== "flood" && (
-            <>
-              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#ef4444", textTransform: "uppercase" }}>Wind Zones</div>
-              {CATACLYSM_WIND[cataclysmModel]?.zones.map((z, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <div style={{ width: 12, height: 12, borderRadius: 2, background: z.color, flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontSize: 11, color: z.color, fontWeight: 700 }}>{z.name}</div>
-                    <div style={{ fontSize: 10, color: "#64748b" }}>{z.speedLabel} — Survival: {z.survival}</div>
-                  </div>
-                </div>
-              ))}
-              <div style={{ fontSize: 10, color: "#475569", marginBottom: 8, fontStyle: "italic" }}>Click inside zone for survival info</div>
-            </>
-          )}
           {cataclysmActive && (
             <>
               <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#ef4444", textTransform: "uppercase" }}>Overlay</div>
@@ -2462,7 +2449,42 @@ export default function HomePage() {
         </>
       )}
 
-        {scenarioMode === "tsunami" && tsunamiActive && (
+        {scenarioMode === "cataclysm" && cataclysmActive && (
+        <>
+          <hr style={{ margin: "10px 0", opacity: 0.25 }} />
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>
+            ☄️ {cataclysmModel === "davidson" ? "Davidson Pole Shift" : "TES ECDO Theory"}
+          </div>
+          <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8 }}>
+            {cataclysmModel === "davidson"
+              ? "~90° crustal displacement · New pole: Siberia · 12hr event"
+              : "104° due-south rotation · New pole: S. Pacific · 8hr event"}
+          </div>
+          {(cataclysmOverlay === "wind" || cataclysmOverlay === "both") && CATACLYSM_WIND[cataclysmModel] && (
+            <>
+              {CATACLYSM_WIND[cataclysmModel].zones.map((z, i) => (
+                <div key={i} style={{ marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: 2, background: z.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: z.color, fontWeight: 700 }}>{z.name}</span>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: z.survival === "0%" ? "#ef4444" : "#f97316" }}>
+                      {z.survival} survival
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#475569", marginTop: 2, paddingLeft: 16 }}>{z.speedLabel} — {z.desc}</div>
+                </div>
+              ))}
+            </>
+          )}
+          <div style={{ fontSize: 11, color: "#475569", marginTop: 4, fontStyle: "italic" }}>
+            ⚠ Theoretical model · Click map for zone details
+          </div>
+        </>
+      )}
+
+      {scenarioMode === "tsunami" && tsunamiActive && (
           <>
             <hr style={{ margin: "10px 0", opacity: 0.25 }} />
             <div style={{ fontWeight: 700, marginBottom: 4 }}>🌊 {TSUNAMI_SOURCES[tsunamiSource].name}</div>
@@ -2563,7 +2585,7 @@ export default function HomePage() {
         </>
       )}
 
-      {(impactResult || nukeResult || (scenarioMode === "flood" && seaLevel !== 0) || (scenarioMode === "yellowstone" && yellowstoneActive) || (scenarioMode === "tsunami" && tsunamiActive)) && (
+      {(impactResult || nukeResult || (scenarioMode === "flood" && seaLevel !== 0) || (scenarioMode === "yellowstone" && yellowstoneActive) || (scenarioMode === "tsunami" && tsunamiActive) || (scenarioMode === "cataclysm" && cataclysmActive)) && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.2 }} />
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#f97316" }}>SHARE</div>
