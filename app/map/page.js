@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v179";
+const FRONTEND_BUILD_LABEL = "v180";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1176,9 +1176,19 @@ export default function HomePage() {
       // Fly to origin
       // Zoom out to fit entire outermost ring, then lock zoom
       const outerKm = src.rings[src.rings.length - 1].major_km;
-      const isMobileView = window.innerWidth <= 640;
       const fitZoom = Math.max(0.8, Math.log2(40075 / (outerKm * 2.8)));
-      safely(() => map.flyTo({ center: src.origin, zoom: fitZoom, duration: 1200 }));
+      // Fly to center of outermost ellipse, not the origin/collapse point
+      const [oLngF, oLatF] = src.origin;
+      const bearRad = (src.bearing * Math.PI) / 180;
+      const shiftKm = outerKm * 0.85 * 0.85;
+      const R = 6371;
+      const d = shiftKm / R;
+      const lat1 = oLatF * Math.PI / 180;
+      const lng1 = oLngF * Math.PI / 180;
+      const lat2 = Math.asin(Math.sin(lat1)*Math.cos(d) + Math.cos(lat1)*Math.sin(d)*Math.cos(bearRad));
+      const lng2 = lng1 + Math.atan2(Math.sin(bearRad)*Math.sin(d)*Math.cos(lat1), Math.cos(d)-Math.sin(lat1)*Math.sin(lat2));
+      const ellipseCenter = [lng2 * 180/Math.PI, lat2 * 180/Math.PI];
+      safely(() => map.flyTo({ center: ellipseCenter, zoom: fitZoom, duration: 1200 }));
       // Free users: allow pan but lock zoom so they can't zoom in to explore
       if ((proTierRef.current ?? "free") === "free") {
         safely(() => {
