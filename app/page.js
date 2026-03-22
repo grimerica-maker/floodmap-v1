@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v146";
+const FRONTEND_BUILD_LABEL = "v147";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1620,21 +1620,7 @@ export default function HomePage() {
         // Apply current overlay setting
         setTimeout(() => applyCataclysmOverlay(map, model, cataclysmOverlay), 500);
 
-        // New north pole marker
-        const poleMarkerId = "cataclysm-pole-marker";
-        try { if (map.getLayer(poleMarkerId)) map.removeLayer(poleMarkerId); } catch(e){}
-        try { if (map.getSource(poleMarkerId + "-src")) map.removeSource(poleMarkerId + "-src"); } catch(e){}
-        safely(() => {
-          map.addSource(poleMarkerId + "-src", { type: "geojson", data: {
-            type: "Feature",
-            geometry: { type: "Point", coordinates: [info.newPoleLng, info.newPoleLat] },
-            properties: { label: info.newPoleLabel }
-          }});
-          map.addLayer({ id: poleMarkerId, type: "symbol", source: poleMarkerId + "-src",
-            layout: { "text-field": ["concat", "❄️ ", ["get", "label"]], "text-size": 13, "text-anchor": "bottom", "text-offset": [0, -0.5] },
-            paint: { "text-color": "#e0f2fe", "text-halo-color": "#0c1a2e", "text-halo-width": 2 }
-          });
-        });
+        // Pole marker removed — position unreliable after bearing flip
       });
 
       // Post-flip: spin continues for all tiers — pro gets zoom/pan too
@@ -1658,20 +1644,16 @@ export default function HomePage() {
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
       // Post-flip spin: move lat+lng blended to match actual flip angle
       // Davidson=90°: pure lat. TES=104°: mostly lat + small lng correction
-      const flipDeg = Math.abs(info.flipBearing);
-      const extraRad = (flipDeg - 90) * Math.PI / 180; // 0 for Davidson, 0.244 for TES
-      const latComponent = Math.cos(extraRad);   // 1.0 for Davidson, 0.97 for TES
-      const lngComponent = Math.sin(extraRad);   // 0.0 for Davidson, 0.24 for TES
+      // Post-flip: pure lat movement regardless of model
+      // The bearing flip rotates the view ~90°+ so moving lat = left-right on screen
       let lat2 = map.getCenter().lat;
-      let lng2 = map.getCenter().lng;
+      const lng2fixed = map.getCenter().lng;
       let lt2 = null;
       const spin2 = (t) => {
         if (lt2 !== null) {
-          const delta = (t - lt2) * 0.005;
-          lat2 -= delta * latComponent;
-          lng2 -= delta * lngComponent;
+          lat2 -= (t - lt2) * 0.005;
           if (lat2 < -85) lat2 = 85;
-          safely(() => map.setCenter([lng2, lat2]));
+          safely(() => map.setCenter([lng2fixed, lat2]));
         }
         lt2 = t;
         cataclysmSpinRef.current = requestAnimationFrame(spin2);
