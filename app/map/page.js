@@ -365,6 +365,7 @@ export default function HomePage() {
   const [cataclysmActive, setCataclysmActive] = useState(false);
   const [cataclysmAnimating, setCataclysmAnimating] = useState(false);
   const cataclysmModelRef = useRef("davidson");
+  const cataclysmOverlayRef = useRef("flood");
   const proTierRef = useRef("free");
   const [cataclysmOverlay, setCataclysmOverlay] = useState("flood"); // "flood" | "wind" | "both"
   const cataclysmSpinRef = useRef(null);
@@ -404,6 +405,7 @@ export default function HomePage() {
   const [proTier, setProTier] = useState("free"); // set after mount in useEffect
   // keep ref in sync
   useEffect(() => { proTierRef.current = proTier; }, [proTier]);
+  useEffect(() => { cataclysmOverlayRef.current = cataclysmOverlay; }, [cataclysmOverlay]);
   const [paywallModal, setPaywallModal] = useState(null); // null | "pro" | "ultra" | "ratelimit"
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
   const [rlStatus, setRlStatus] = useState(() => getRLStatus());
@@ -1665,6 +1667,60 @@ export default function HomePage() {
     cataclysmWindPopupRef.current = popup;
   };
 
+  const showCataclysmFloodPopup = async (lng, lat) => {
+    const map = mapRef.current;
+    if (!map) return;
+    // Reuse elev popup infrastructure
+    closeElevPopup();
+    const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: false, maxWidth: "240px" });
+    popup.setLngLat([lng, lat])
+      .setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px;padding:4px 6px;color:#94a3b8">Loading depth...</div>`)
+      .addTo(map);
+    elevPopupRef.current = popup;
+    try {
+      const res = await fetch(
+        `${floodEngineUrlRef.current}/elevation?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`,
+        { cache: "no-store" }
+      );
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const elevM = data.elevation_m;
+      if (elevPopupRef.current !== popup) return;
+      const model = cataclysmModelRef.current;
+      const modelLabel = model === "davidson" ? "Ben Davidson 90°" : "TES ECDO 104°";
+      // We don't know exact flood depth at this point without tile data,
+      // but we can show terrain elevation and whether it's likely flooded
+      const isLikelyFlooded = elevM < 500; // rough threshold for cataclysm
+      const elevDisplay = `${Math.round(elevM)} m`;
+      let status = "";
+      if (elevM <= 0) {
+        status = `<div style="color:#f87171;margin-top:6px;font-weight:700">⚠ Below sea level — deep inundation</div>`;
+      } else if (elevM < 100) {
+        status = `<div style="color:#f87171;margin-top:6px">🌊 Very likely flooded (${elevDisplay} terrain)</div>`;
+      } else if (elevM < 300) {
+        status = `<div style="color:#fb923c;margin-top:6px">🌊 Likely flooded in ${modelLabel}</div>`;
+      } else if (elevM < 600) {
+        status = `<div style="color:#fbbf24;margin-top:6px">⚠ Possible inundation risk</div>`;
+      } else if (elevM < 1200) {
+        status = `<div style="color:#86efac;margin-top:6px">✓ Above typical flood level</div>`;
+      } else {
+        status = `<div style="color:#86efac;margin-top:6px">✓ High ground — likely safe</div>`;
+      }
+      popup.setHTML(`
+        <div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 6px">
+          <div style="color:#94a3b8;font-size:11px;margin-bottom:4px">${lat.toFixed(4)}, ${lng.toFixed(4)}</div>
+          <div style="color:#e2e8f0">Terrain: <b>${elevDisplay}</b></div>
+          ${status}
+          <div style="color:#475569;font-size:10px;margin-top:6px">${modelLabel} · Cataclysm flood mode</div>
+        </div>
+      `);
+    } catch(e) {
+      if (elevPopupRef.current === popup) {
+        popup.setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px;padding:4px 6px;color:#94a3b8">Elevation unavailable</div>`);
+      }
+    }
+  };
+
   const triggerCataclysm = () => {
     const rl = checkAndIncrementRL(proTierRef.current !== "free");
     if (!rl.allowed) { setPaywallModal("ratelimit"); setRlStatus(getRLStatus()); return; }
@@ -1963,7 +2019,15 @@ export default function HomePage() {
         return;
       }
       if (scenarioModeRef.current === "cataclysm") {
-        showCataclysmWindPopup(lng, lat);
+        const overlay = cataclysmOverlayRef.current ?? "flood";
+        if (overlay === "wind") {
+          showCataclysmWindPopup(lng, lat);
+        } else if (overlay === "flood") {
+          showCataclysmFloodPopup(lng, lat);
+        } else {
+          // "both" — show wind popup (wind data is more unique)
+          showCataclysmWindPopup(lng, lat);
+        }
         return;
       }
       showElevPopup(lng, lat);
