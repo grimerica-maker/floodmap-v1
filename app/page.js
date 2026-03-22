@@ -179,7 +179,7 @@ export default function Homepage() {
     return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
   }, []);
 
-  const S = { fontFamily: "'Georgia','Times New Roman',serif", background: "#020817", color: "#e2e8f0", minHeight: "100vh", position: "relative" };
+  const S = { fontFamily: "'Georgia','Times New Roman',serif", background: "#020817", color: "#e2e8f0", minHeight: "100vh" };
 
   return (
     <>
@@ -187,9 +187,9 @@ export default function Homepage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSONLD_FAQ) }} />
 
       <div style={S}>
-        <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, width: "100%", height: "100%", zIndex: 0, pointerEvents: "none", opacity: 0.75 }} />
+        <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh", zIndex: 0, pointerEvents: "none", opacity: 0.75 }} />
 
-        <div style={{ position: "relative", zIndex: 1 }}>
+        <div style={{ position: "relative", zIndex: 1, minHeight: "100vh" }}>
 
           {/* NAV */}
           <nav style={{ position: "sticky", top: 0, zIndex: 100, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 40px", background: "rgba(2,8,23,0.88)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
