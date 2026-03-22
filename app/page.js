@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v147";
+const FRONTEND_BUILD_LABEL = "v148";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1644,16 +1644,17 @@ export default function HomePage() {
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
       // Post-flip spin: move lat+lng blended to match actual flip angle
       // Davidson=90°: pure lat. TES=104°: mostly lat + small lng correction
-      // Post-flip: pure lat movement regardless of model
-      // The bearing flip rotates the view ~90°+ so moving lat = left-right on screen
+      // Post-flip: lat + small opposite-direction lng offset (10°) for TES correction
       let lat2 = map.getCenter().lat;
-      const lng2fixed = map.getCenter().lng;
+      let lng2p = map.getCenter().lng;
       let lt2 = null;
       const spin2 = (t) => {
         if (lt2 !== null) {
-          lat2 -= (t - lt2) * 0.005;
+          const delta = (t - lt2) * 0.005;
+          lat2 -= delta * 0.985;   // cos(10°)
+          lng2p += delta * 0.174;  // sin(10°) — opposite direction to last attempt
           if (lat2 < -85) lat2 = 85;
-          safely(() => map.setCenter([lng2fixed, lat2]));
+          safely(() => map.setCenter([lng2p, lat2]));
         }
         lt2 = t;
         cataclysmSpinRef.current = requestAnimationFrame(spin2);
