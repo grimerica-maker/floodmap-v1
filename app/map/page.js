@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v177";
+const FRONTEND_BUILD_LABEL = "v178";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -2536,8 +2536,8 @@ export default function HomePage() {
       <div>Mode: {viewMode === "map" ? "Standard Map" : viewMode === "satellite" ? "Satellite" : "Globe"}</div>
       <div>Status: {status}</div>
       <div>Scenario Mode: {scenarioMode}</div>
-      {scenarioMode !== "tsunami" && scenarioMode !== "cataclysm" && <div>Impact Point: {impactPointRef.current ? `${impactPointRef.current.lng.toFixed(3)}, ${impactPointRef.current.lat.toFixed(3)}` : "--"}</div>}
-      {scenarioMode !== "tsunami" && scenarioMode !== "cataclysm" && <div>Asteroid Diameter: {impactDiameter.toLocaleString()} m</div>}
+      {scenarioMode === "impact" && <div>Impact Point: {impactPointRef.current ? `${impactPointRef.current.lng.toFixed(3)}, ${impactPointRef.current.lat.toFixed(3)}` : "--"}</div>}
+      {scenarioMode === "impact" && <div>Asteroid Diameter: {impactDiameter.toLocaleString()} m</div>}
 
       {impactError && (
         <>
