@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v148";
+const FRONTEND_BUILD_LABEL = "v149";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1623,23 +1623,7 @@ export default function HomePage() {
         // Pole marker removed — position unreliable after bearing flip
       });
 
-      // Post-flip: spin continues for all tiers — pro gets zoom/pan too
-      const tier = proTierRef.current ?? proTier;
-      if (tier === "free") {
-        safely(() => {
-          map.dragPan.disable();
-          map.scrollZoom.disable();
-          map.doubleClickZoom.disable();
-          map.touchZoomRotate.disable();
-        });
-      } else {
-        safely(() => {
-          map.dragPan.enable();
-          map.scrollZoom.enable();
-          map.doubleClickZoom.enable();
-          map.touchZoomRotate.enable();
-        });
-      }
+      // Interaction already handled below with currentTier check
       // Post-flip: same left-to-right longitude spin as before
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
       // Post-flip spin: move lat+lng blended to match actual flip angle
@@ -1675,10 +1659,22 @@ export default function HomePage() {
         map.on("touchstart", clearOnInteract);
         map.on("wheel", clearOnInteract);
       } else {
-        // Pro: enable interaction, stop spin on first touch/zoom
-        safely(() => { map.dragPan.enable(); map.scrollZoom.enable(); map.doubleClickZoom.enable(); map.touchZoomRotate.enable(); });
+        // Pro: enable all interaction immediately, stop spin on first interact
+        safely(() => {
+          map.dragPan.enable();
+          map.scrollZoom.enable();
+          map.doubleClickZoom.enable();
+          map.touchZoomRotate.enable();
+        });
         const stopSpin = () => {
           if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
+          // Re-enable everything cleanly after spin stops
+          safely(() => {
+            map.dragPan.enable();
+            map.scrollZoom.enable();
+            map.doubleClickZoom.enable();
+            map.touchZoomRotate.enable();
+          });
           map.off("mousedown", stopSpin);
           map.off("touchstart", stopSpin);
           map.off("wheel", stopSpin);
