@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v154";
+const FRONTEND_BUILD_LABEL = "v156";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1674,7 +1674,8 @@ export default function HomePage() {
         map.off("dragstart", stopSpin);
         map.off("zoomstart", stopSpin);
         if ((proTierRef.current ?? proTier ?? "free") === "free") {
-          clearCataclysm();
+          // Show upgrade modal instead of clearing
+          setPaywallModal("pro");
         } else {
           safely(() => {
             map.dragPan.enable();
@@ -2780,7 +2781,9 @@ export default function HomePage() {
                 {paywallModal === "ultra" ? "Ultra" : "Pro"} Feature
               </div>
               <div style={{ color: "#64748b", fontSize: 13, textAlign: "center", marginBottom: 20, lineHeight: 1.6 }}>
-                This feature requires a Pro subscription.
+                {paywallModal === "pro" && scenarioMode === "cataclysm"
+                  ? <>Upgrade to <strong style={{ color: "#f97316" }}>Pro or Ultra</strong> to zoom, pan and explore the post-cataclysm world.</>
+                  : "This feature requires a Pro subscription."}
               </div>
             </>)}
 
