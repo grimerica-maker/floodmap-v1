@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v152";
+const FRONTEND_BUILD_LABEL = "v153";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -2430,8 +2430,8 @@ export default function HomePage() {
       <div>Mode: {viewMode === "map" ? "Standard Map" : viewMode === "satellite" ? "Satellite" : "Globe"}</div>
       <div>Status: {status}</div>
       <div>Scenario Mode: {scenarioMode}</div>
-      {scenarioMode !== "tsunami" && <div>Impact Point: {impactPointRef.current ? `${impactPointRef.current.lng.toFixed(3)}, ${impactPointRef.current.lat.toFixed(3)}` : "--"}</div>}
-      {scenarioMode !== "tsunami" && <div>Asteroid Diameter: {impactDiameter.toLocaleString()} m</div>}
+      {scenarioMode !== "tsunami" && scenarioMode !== "cataclysm" && <div>Impact Point: {impactPointRef.current ? `${impactPointRef.current.lng.toFixed(3)}, ${impactPointRef.current.lat.toFixed(3)}` : "--"}</div>}
+      {scenarioMode !== "tsunami" && scenarioMode !== "cataclysm" && <div>Asteroid Diameter: {impactDiameter.toLocaleString()} m</div>}
 
       {impactError && (
         <>
@@ -2623,6 +2623,8 @@ export default function HomePage() {
                 ? `🌊 Just triggered the ${TSUNAMI_SOURCES[tsunamiSource].name} mega-tsunami on Disaster Map!${tsunamiResult ? " Est. " + tsunamiResult.total_deaths.toLocaleString() + " deaths." : ""} Try it: https://www.disastermap.ca`
                 : (scenarioMode === "yellowstone" && yellowstoneActive)
                 ? `🌋 Just simulated the Yellowstone ${(volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS)[Math.min(yellowstonePreset, (volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS).length - 1)].name} supervolcano on Disaster Map!${yellowstoneResult ? " Est. " + yellowstoneResult.total_deaths.toLocaleString() + " deaths." : ""} Ash covers most of North America. Try it: https://www.disastermap.ca`
+                : (scenarioMode === "cataclysm" && cataclysmActive)
+                ? `☄️ Just simulated a ${cataclysmModel === "davidson" ? "90° Ben Davidson / Suspicious Observers" : "104° TES ECDO Theory"} pole shift on Disaster Map! Global inundation ${cataclysmModel === "davidson" ? "500-800m Americas, 300-500m Europe" : "120-1200m global"}. Try it: https://www.disastermap.ca`
                 : `🌊 I just flooded the world ${seaLevel > 0 ? "+" : ""}${Math.round(seaLevel)}m on Disaster Map!${floodDisplaced ? " " + floodDisplaced.toLocaleString() + " people displaced." : ""} Try it: https://www.disastermap.ca`;
               window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(msg), "_blank");
             }} style={{ background: "#000", color: "#fff" }}>
