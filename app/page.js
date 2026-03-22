@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v130";
+const FRONTEND_BUILD_LABEL = "v131";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1378,7 +1378,9 @@ export default function HomePage() {
       zones: [
         { name: "Instant Death", speedLabel: "3,700+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "No structure survives. Ground-level pressure wave equivalent to multiple nuclear detonations.", major_km: 800, minor_km: 500, color: "#ef4444", opacity: 0.55 },
         { name: "Severe", speedLabel: "1,500-3,700 km/h", desc: "Supersonic winds — catastrophic", survival: "1-3%", survivalNote: "Only deepest underground bunkers. Complete surface destruction.", major_km: 1800, minor_km: 1100, color: "#f97316", opacity: 0.30 },
-        { name: "Survivable", speedLabel: "300-1,500 km/h", desc: "Extreme winds — deep shelter required", survival: "15-35%", survivalNote: "Deep reinforced underground shelter required. High elevation with natural wind barriers critical.", major_km: 3500, minor_km: 2100, color: "#fbbf24", opacity: 0.12 },
+        { name: "Dangerous", speedLabel: "500-1,500 km/h", desc: "Extreme winds — reinforced shelter required", survival: "10-20%", survivalNote: "Underground or heavily reinforced structure required. Most buildings destroyed.", major_km: 3500, minor_km: 2100, color: "#fbbf24", opacity: 0.18 },
+        { name: "Hazardous", speedLabel: "150-500 km/h", desc: "Super-hurricane force winds", survival: "30-55%", survivalNote: "Strong shelter needed. Equivalent to EF5 tornado. Widespread structural damage.", major_km: 6000, minor_km: 3600, color: "#a3e635", opacity: 0.10 },
+        { name: "Survivable", speedLabel: "50-150 km/h", desc: "Severe storm-force winds", survival: "60-80%", survivalNote: "Most people survive in sturdy buildings. Flying debris is main hazard.", major_km: 9000, minor_km: 5400, color: "#38bdf8", opacity: 0.06 },
       ],
     },
     tes: {
@@ -1391,7 +1393,9 @@ export default function HomePage() {
       zones: [
         { name: "Instant Death", speedLabel: "5,800+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "Complete atmospheric scouring. No survival possible.", major_km: 1000, minor_km: 600, color: "#ef4444", opacity: 0.55 },
         { name: "Severe", speedLabel: "2,500-5,800 km/h", desc: "Supersonic winds — catastrophic", survival: "1-2%", survivalNote: "Only deepest underground bunkers. All surface structures obliterated.", major_km: 2500, minor_km: 1500, color: "#f97316", opacity: 0.30 },
-        { name: "Survivable", speedLabel: "400-2,500 km/h", desc: "Extreme winds — deep shelter required", survival: "10-25%", survivalNote: "Deep reinforced underground shelter essential. High Andes/Rockies/Himalayas provide best natural shelter.", major_km: 5000, minor_km: 3000, color: "#fbbf24", opacity: 0.12 },
+        { name: "Dangerous", speedLabel: "800-2,500 km/h", desc: "Extreme winds — reinforced shelter required", survival: "5-15%", survivalNote: "Only deepest underground bunkers. Mountain barriers offer partial protection.", major_km: 5000, minor_km: 3000, color: "#fbbf24", opacity: 0.18 },
+        { name: "Hazardous", speedLabel: "200-800 km/h", desc: "Super-hurricane force winds", survival: "20-40%", survivalNote: "Strong underground shelter needed. Equivalent to multiple EF5 tornadoes simultaneously.", major_km: 9000, minor_km: 5400, color: "#a3e635", opacity: 0.10 },
+        { name: "Survivable", speedLabel: "50-200 km/h", desc: "Severe storm-force winds", survival: "50-70%", survivalNote: "Sturdy buildings provide shelter. Flying debris and flooding are main hazards.", major_km: 14000, minor_km: 8400, color: "#38bdf8", opacity: 0.06 },
       ],
     },
   };
@@ -1414,7 +1418,7 @@ export default function HomePage() {
       try { if (map.getSource("cataclysm-pole-marker-src")) map.removeSource("cataclysm-pole-marker-src"); } catch(e){}
       // Clear wind layers
       [0, 1].forEach(ci => {
-        [0,1,2].forEach(ri => {
+        [0,1,2,3,4].forEach(ri => {
           try { if (map.getLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-fill-${ri}`)) map.removeLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-fill-${ri}`); } catch(e){}
           try { if (map.getLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-line-${ri}`)) map.removeLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-line-${ri}`); } catch(e){}
           try { if (map.getLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-label-${ri}`)) map.removeLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-label-${ri}`); } catch(e){}
@@ -1465,7 +1469,7 @@ export default function HomePage() {
     try { if (map.getLayer("cataclysm-layer")) map.setPaintProperty("cataclysm-layer", "raster-opacity", showFlood ? 0.82 : 0); } catch(e){}
     // Show/hide wind layers
     [0, 1].forEach(ci => {
-      [0,1,2].forEach(ri => {
+      [0,1,2,3,4].forEach(ri => {
         ["fill","line","label"].forEach(t => {
           try { if (map.getLayer(`${CATACLYSM_WIND_PREFIX}-${ci}-${t}-${ri}`)) map.setLayoutProperty(`${CATACLYSM_WIND_PREFIX}-${ci}-${t}-${ri}`, "visibility", showWind ? "visible" : "none"); } catch(e){}
         });
@@ -1523,20 +1527,21 @@ export default function HomePage() {
       : zoneInfo.survival.startsWith("1") ? "#f97316"
       : "#fbbf24";
 
+    const modelLabel = model === "davidson" ? "Davidson Pole Shift" : "TES ECDO Theory";
     const content = zoneInfo
       ? `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
           <div style="color:${zoneInfo.color};font-weight:700;margin-bottom:4px">💨 ${zoneInfo.name}</div>
-          <div style="color:#94a3b8;font-size:10px;margin-bottom:6px">${centerLabel}</div>
-          <div style="color:#e2e8f0;margin-bottom:6px">${zoneInfo.speedLabel}</div>
-          <div style="color:#e2e8f0;margin-bottom:4px;font-size:12px">${zoneInfo.desc}</div>
+          <div style="color:#e2e8f0;margin-bottom:4px">${zoneInfo.desc}</div>
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
             <span style="color:#94a3b8;font-size:11px">Survival odds:</span>
             <span style="color:${survivalColor};font-weight:700;font-size:13px">${zoneInfo.survival}</span>
           </div>
           <div style="color:#64748b;font-size:11px;font-style:italic">${zoneInfo.survivalNote}</div>
+          <div style="color:#475569;font-size:10px;margin-top:4px">${modelLabel} · ${centerLabel}</div>
         </div>`
       : `<div style="font-family:Arial,sans-serif;font-size:13px;padding:2px 4px">
           <div style="color:#94a3b8">Outside wind kill zone</div>
+          <div style="color:#64748b;font-size:11px">${modelLabel}</div>
         </div>`;
 
     const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: false, className: "elev-popup", maxWidth: "260px" });
@@ -1787,6 +1792,10 @@ export default function HomePage() {
       }
       if (scenarioModeRef.current === "tsunami") {
         showTsunamiPopup(lng, lat);
+        return;
+      }
+      if (scenarioModeRef.current === "cataclysm") {
+        showCataclysmWindPopup(lng, lat);
         return;
       }
       showElevPopup(lng, lat);
