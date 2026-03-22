@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v123";
+const FRONTEND_BUILD_LABEL = "v124";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1490,7 +1490,7 @@ export default function HomePage() {
     const spin = (t) => {
       if (lastT !== null) {
         const dt = t - lastT;
-        bearing += dt * 0.012; // ~12 deg/sec eastward
+        bearing -= dt * 0.012; // ~12 deg/sec eastward
         safely(() => map.setBearing(bearing % 360));
       }
       lastT = t;
@@ -1565,7 +1565,7 @@ export default function HomePage() {
         let lt2 = null;
         const spin2 = (t) => {
           if (lt2 !== null) {
-            b2 += (t - lt2) * 0.005;
+            b2 -= (t - lt2) * 0.005;
             safely(() => map.setBearing(b2 % 360));
           }
           lt2 = t;
