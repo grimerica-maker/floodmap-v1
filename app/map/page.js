@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v183";
+const FRONTEND_BUILD_LABEL = "v184";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -335,7 +335,7 @@ export default function HomePage() {
   const [inputText, setInputText] = useState("0");
   const [seaLevel, setSeaLevel] = useState(0);
   const [viewMode, setViewMode] = useState("map");
-  const [scenarioMode, setScenarioMode] = useState("flood");
+  const [scenarioMode, setScenarioMode] = useState(null);
   const [impactDiameter, setImpactDiameter] = useState(1000);
   const [nukeYield, setNukeYield] = useState(15);
   const [yellowstonePreset, setYellowstonePreset] = useState(0);
@@ -2001,7 +2001,7 @@ export default function HomePage() {
   }, [impactDiameter, scenarioMode]);
 
   useEffect(() => {
-    if (!isMapReady() || scenarioMode !== "flood") return;
+    if (!isMapReady() || scenarioMode !== "flood" || !scenarioMode) return;
     syncFloodScenario();
   }, [seaLevel, viewMode, scenarioMode]);
 
@@ -2099,51 +2099,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ── FLOOD CONTROLS — only in flood mode ── */}
-      {scenarioMode === "flood" && <>
-        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Sea Level</div>
-        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 10, color: seaLevel > 0 ? "#3b82f6" : seaLevel < 0 ? "#f97316" : "#94a3b8" }}>
-          {formatLevelForDisplay(seaLevel)}
-        </div>
-        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-          <button
-            onClick={() => setUnitMode("m")}
-            style={{ flex: 1, padding: "12px 8px", minHeight: 44, background: unitMode === "m" ? "#f97316" : "#1e293b", color: "white", border: unitMode === "m" ? "1px solid #f97316" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 15 }}>
-            Meters
-          </button>
-          <button
-            onClick={() => setUnitMode("ft")}
-            style={{ flex: 1, padding: "12px 8px", minHeight: 44, background: unitMode === "ft" ? "#f97316" : "#1e293b", color: "white", border: unitMode === "ft" ? "1px solid #f97316" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 15 }}>
-            Feet
-          </button>
-        </div>
-        <input
-          type="text"
-          inputMode="decimal"
-          placeholder={unitMode === "ft" ? "Enter sea level in feet" : "Enter sea level in meters"}
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onBlur={() => { const c = commitInputText(inputText, unitMode); if (c !== null) setInputLevel(c); }}
-          onKeyDown={(e) => { if (e.key === "Enter") executeFlood(); }}
-          style={{ width: "100%", padding: "12px 14px", fontSize: 17, border: "1px solid #1e2d45", marginBottom: 10, boxSizing: "border-box", borderRadius: 8, minHeight: 48, background: "#111827", color: "#e2e8f0" }}
-        />
-        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-          <button
-            onClick={(e) => { e.stopPropagation(); executeFlood(); }}
-            style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "#f97316", color: "white", border: "none", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 15 }}>
-            Execute Flood
-          </button>
-          <button
-            onClick={clearFlood}
-            style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 15 }}>
-            Clear
-          </button>
-        </div>
-        <div style={{ fontSize: 13, marginBottom: 20, color: "#475569" }}>
-          Custom input supports positive and negative values in {unitMode === "ft" ? "feet" : "meters"}
-        </div>
-      </>}
-
       {/* Auth — sign in/up or user account */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, padding: "8px 12px", background: "#111827", borderRadius: 10, border: "1px solid #1e2d45" }}>
         {isSignedIn ? (
@@ -2172,29 +2127,6 @@ export default function HomePage() {
           </>
         )}
       </div>
-
-      {/* ── PRESETS — flood mode only ── */}
-      {scenarioMode === "flood" && <>
-        <hr style={{ margin: "0 0 16px 0", borderColor: "#1e2d45" }} />
-        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Presets</div>
-        <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"}>
-          {PRESETS.map((preset) => {
-            const active = Math.round(inputLevel) === Math.round(preset.value);
-            const lbl = unitMode === "ft"
-              ? `${Math.round(metersToFeet(preset.value)) > 0 ? "+" : ""}${Math.round(metersToFeet(preset.value))}ft`
-              : `${preset.value > 0 ? "+" : ""}${preset.value}m`;
-            return (
-              <button
-                key={preset.label}
-                onClick={() => { setInputLevel(preset.value); setInputText(formatInputTextFromMeters(preset.value, unitMode)); }}
-                style={{ padding: "12px 10px", minHeight: 56, border: "1px solid #d1d5db", background: active ? "#1e3a5f" : "#111827", color: active ? "#60a5fa" : "#94a3b8", border: active ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, whiteSpace: "nowrap" }}>
-                <div style={{ fontSize: 14 }}>{preset.label}</div>
-                <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>{lbl}</div>
-              </button>
-            );
-          })}
-        </div>
-      </>}
 
       <hr style={{ margin: "0 0 16px 0", borderColor: "#1e2d45" }} />
 
@@ -2274,6 +2206,63 @@ export default function HomePage() {
           </div>
         </>
       )}
+
+      {/* ── FLOOD CONTROLS — below scenario buttons ── */}
+      {scenarioMode === "flood" && <>
+        <hr style={{ margin: "0 0 16px 0", borderColor: "#1e2d45" }} />
+        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Sea Level</div>
+        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 10, color: seaLevel > 0 ? "#3b82f6" : seaLevel < 0 ? "#f97316" : "#94a3b8" }}>
+          {formatLevelForDisplay(seaLevel)}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <button onClick={() => setUnitMode("m")}
+            style={{ flex: 1, padding: "12px 8px", minHeight: 44, background: unitMode === "m" ? "#f97316" : "#1e293b", color: "white", border: unitMode === "m" ? "1px solid #f97316" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 15 }}>
+            Meters
+          </button>
+          <button onClick={() => setUnitMode("ft")}
+            style={{ flex: 1, padding: "12px 8px", minHeight: 44, background: unitMode === "ft" ? "#f97316" : "#1e293b", color: "white", border: unitMode === "ft" ? "1px solid #f97316" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 15 }}>
+            Feet
+          </button>
+        </div>
+        <input type="text" inputMode="decimal"
+          placeholder={unitMode === "ft" ? "Enter sea level in feet" : "Enter sea level in meters"}
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          onBlur={() => { const c = commitInputText(inputText, unitMode); if (c !== null) setInputLevel(c); }}
+          onKeyDown={(e) => { if (e.key === "Enter") executeFlood(); }}
+          style={{ width: "100%", padding: "12px 14px", fontSize: 17, border: "1px solid #1e2d45", marginBottom: 10, boxSizing: "border-box", borderRadius: 8, minHeight: 48, background: "#111827", color: "#e2e8f0" }}
+        />
+        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+          <button onClick={(e) => { e.stopPropagation(); executeFlood(); }}
+            style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "#f97316", color: "white", border: "none", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 15 }}>
+            Execute Flood
+          </button>
+          <button onClick={clearFlood}
+            style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 15 }}>
+            Clear
+          </button>
+        </div>
+        <div style={{ fontSize: 13, marginBottom: 16, color: "#475569" }}>
+          Custom input supports positive and negative values in {unitMode === "ft" ? "feet" : "meters"}
+        </div>
+        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Presets</div>
+        <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"}>
+          {PRESETS.map((preset) => {
+            const active = Math.round(inputLevel) === Math.round(preset.value);
+            const lbl = unitMode === "ft"
+              ? `${Math.round(metersToFeet(preset.value)) > 0 ? "+" : ""}${Math.round(metersToFeet(preset.value))}ft`
+              : `${preset.value > 0 ? "+" : ""}${preset.value}m`;
+            return (
+              <button key={preset.label}
+                onClick={() => { setInputLevel(preset.value); setInputText(formatInputTextFromMeters(preset.value, unitMode)); }}
+                style={{ padding: "12px 10px", minHeight: 56, background: active ? "#1e3a5f" : "#111827", color: active ? "#60a5fa" : "#94a3b8", border: active ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: 14 }}>{preset.label}</div>
+                <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>{lbl}</div>
+              </button>
+            );
+          })}
+        </div>
+      </>}
 
       <hr style={{ margin: "0 0 16px 0", borderColor: "#1e2d45" }} />
 
