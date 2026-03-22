@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v186";
+const FRONTEND_BUILD_LABEL = "v187";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1721,6 +1721,10 @@ export default function HomePage() {
       setStatus(`☄️ ${info.name} — inundation calculated`);
       setCataclysmAnimating(false);
       setCataclysmActive(true);
+      // Force zoom out on mobile so full globe is visible
+      if (window.innerWidth <= 640) {
+        safely(() => map.easeTo({ zoom: 0.8, duration: 600 }));
+      }
       const tileUrl = `${floodEngineUrlRef.current}/cataclysm/${model}/{z}/{x}/{y}.png`;
 
       safely(() => {
