@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v144";
+const FRONTEND_BUILD_LABEL = "v145";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1656,12 +1656,15 @@ export default function HomePage() {
       }
       // Post-flip: same left-to-right longitude spin as before
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-      let lng2 = map.getCenter().lng;
+      // After bearing flip ~90°, moving lat now appears as left-to-right rotation
+      let lat2 = map.getCenter().lat;
+      let lng2fixed = map.getCenter().lng;
       let lt2 = null;
       const spin2 = (t) => {
         if (lt2 !== null) {
-          lng2 -= (t - lt2) * 0.005;
-          safely(() => map.setCenter([lng2, 10]));
+          lat2 -= (t - lt2) * 0.005;
+          if (lat2 < -85) lat2 = 85; // wrap poles
+          safely(() => map.setCenter([lng2fixed, lat2]));
         }
         lt2 = t;
         cataclysmSpinRef.current = requestAnimationFrame(spin2);
