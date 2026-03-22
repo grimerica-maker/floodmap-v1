@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v180";
+const FRONTEND_BUILD_LABEL = "v181";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -2128,9 +2128,9 @@ export default function HomePage() {
         onBlur={() => { const c = commitInputText(inputText, unitMode); if (c !== null) setInputLevel(c); }}
         onKeyDown={(e) => { if (e.key === "Enter") executeFlood(); }}
         style={{ width: "100%", padding: "12px 14px", fontSize: 17, border: "1px solid #1e2d45", marginBottom: 10, boxSizing: "border-box", borderRadius: 8, minHeight: 48, background: "#111827", color: "#e2e8f0" }}
-      />
+      />}
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+      {scenarioMode === "flood" && <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
         <button
           onClick={executeFlood}
           onClick={(e) => { e.stopPropagation(); executeFlood(); }}
@@ -2142,11 +2142,11 @@ export default function HomePage() {
           style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 15 }}>
           Clear
         </button>
-      </div>
+      </div>}
 
-      <div style={{ fontSize: 13, marginBottom: 20, color: "#475569" }}>
+      {scenarioMode === "flood" && <div style={{ fontSize: 13, marginBottom: 20, color: "#475569" }}>
         Custom input supports positive and negative values in {unitMode === "ft" ? "feet" : "meters"}
-      </div>
+      </div>}
 
       {/* Auth — sign in/up or user account */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, padding: "8px 12px", background: "#111827", borderRadius: 10, border: "1px solid #1e2d45" }}>
@@ -2197,7 +2197,7 @@ export default function HomePage() {
             </button>
           );
         })}
-      </div>
+      </div>}
 
       <hr style={{ margin: "0 0 16px 0", borderColor: "#1e2d45" }} />
 
