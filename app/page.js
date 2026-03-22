@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v127";
+const FRONTEND_BUILD_LABEL = "v128";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -1447,6 +1447,12 @@ export default function HomePage() {
               filter: ["==", ["get", "zoneIdx"], i],
               paint: { "line-color": zone.color, "line-width": 1.5, "line-opacity": 0.9 } });
           });
+            map.addLayer({ id: `${CATACLYSM_WIND_PREFIX}-${ci}-label-${i}`, type: "symbol", source: srcId,
+              filter: ["==", ["get", "zoneIdx"], i],
+              layout: { "symbol-placement": "line", "text-field": ["get", "speedLabel"],
+                        "text-size": 11, "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+                        "text-offset": [0, -0.8], "symbol-spacing": 350 },
+              paint: { "text-color": ["get", "color"], "text-halo-color": "#0a0f1e", "text-halo-width": 2 } });
         }
       } catch(e) { console.warn("Wind zone error", e); }
     });
@@ -1465,6 +1471,77 @@ export default function HomePage() {
         });
       });
     });
+  };
+
+  const cataclysmWindPopupRef = useRef(null);
+
+  const showCataclysmWindPopup = (lng, lat) => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (cataclysmWindPopupRef.current) { cataclysmWindPopupRef.current.remove(); cataclysmWindPopupRef.current = null; }
+    const model = cataclysmModelRef.current;
+    const windData = CATACLYSM_WIND[model];
+    if (!windData) return;
+
+    let zoneInfo = null;
+    let centerLabel = null;
+
+    // Check both centers
+    const centers = [windData.center1, windData.center2];
+    const centerNames = model === "davidson"
+      ? ["Max Displacement Zone", "New Equator Zone"]
+      : ["New Equator / S. Atlantic", "Pacific Basin Resonance"];
+
+    for (let ci = 0; ci < centers.length && !zoneInfo; ci++) {
+      const [cLng, cLat] = centers[ci];
+      const kpLat = 110.574;
+      const kpLng = 111.32 * Math.cos((cLat * Math.PI) / 180);
+      const bearingRad = (70 * Math.PI) / 180;
+      const dNorth = Math.cos(bearingRad);
+      const dEast  = Math.sin(bearingRad);
+      for (let i = 0; i < windData.zones.length; i++) {
+        const z = windData.zones[i];
+        const eCLat = cLat + (dNorth * z.major_km * 0.3) / kpLat;
+        const eCLng = cLng + (dEast  * z.major_km * 0.3) / Math.max(kpLng, 0.0001);
+        const dLatKm = (lat - eCLat) * kpLat;
+        let rawDLng = lng - eCLng;
+        while (rawDLng > 180) rawDLng -= 360;
+        while (rawDLng < -180) rawDLng += 360;
+        const dLngKm = rawDLng * Math.max(kpLng, 0.0001);
+        const along = dNorth * dLatKm + dEast * dLngKm;
+        const perp  = -dEast * dLatKm + dNorth * dLngKm;
+        if ((along / z.major_km) ** 2 + (perp / z.minor_km) ** 2 <= 1) {
+          zoneInfo = z;
+          centerLabel = centerNames[ci];
+          break;
+        }
+      }
+    }
+
+    const survivalColor = !zoneInfo ? "#94a3b8"
+      : zoneInfo.survival === "0%" ? "#ef4444"
+      : zoneInfo.survival.startsWith("1") ? "#f97316"
+      : "#fbbf24";
+
+    const content = zoneInfo
+      ? `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+          <div style="color:${zoneInfo.color};font-weight:700;margin-bottom:4px">💨 ${zoneInfo.name}</div>
+          <div style="color:#94a3b8;font-size:10px;margin-bottom:6px">${centerLabel}</div>
+          <div style="color:#e2e8f0;margin-bottom:6px">${zoneInfo.speedLabel}</div>
+          <div style="color:#e2e8f0;margin-bottom:4px;font-size:12px">${zoneInfo.desc}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span style="color:#94a3b8;font-size:11px">Survival odds:</span>
+            <span style="color:${survivalColor};font-weight:700;font-size:13px">${zoneInfo.survival}</span>
+          </div>
+          <div style="color:#64748b;font-size:11px;font-style:italic">${zoneInfo.survivalNote}</div>
+        </div>`
+      : `<div style="font-family:Arial,sans-serif;font-size:13px;padding:2px 4px">
+          <div style="color:#94a3b8">Outside wind kill zone</div>
+        </div>`;
+
+    const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: false, className: "elev-popup", maxWidth: "260px" });
+    popup.setLngLat([lng, lat]).setHTML(content).addTo(map);
+    cataclysmWindPopupRef.current = popup;
   };
 
   const triggerCataclysm = () => {
@@ -1532,8 +1609,10 @@ export default function HomePage() {
             paint: { "raster-opacity": 0, "raster-opacity-transition": { duration: 2000 } } });
           setTimeout(() => safely(() => map.setPaintProperty("cataclysm-layer", "raster-opacity", 0.82)), 100);
         }
-        // Apply current overlay setting (flood only for now)
-        setTimeout(() => applyCataclysmOverlay(map, model, "flood"), 500);
+        // Wind zones
+        drawCataclysmWindZones(map, model);
+        // Apply current overlay setting
+        setTimeout(() => applyCataclysmOverlay(map, model, cataclysmOverlay), 500);
 
         // New north pole marker
         const poleMarkerId = "cataclysm-pole-marker";
@@ -2166,6 +2245,21 @@ export default function HomePage() {
           <div style={{ fontSize: 11, color: "#475569", marginBottom: 10, lineHeight: 1.4 }}>
             ⚠ Theoretical model. Globe rotates to show displacement, then flood tiles render.
           </div>
+          {cataclysmActive && cataclysmOverlay !== "flood" && (
+            <>
+              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#ef4444", textTransform: "uppercase" }}>Wind Zones</div>
+              {CATACLYSM_WIND[cataclysmModel]?.zones.map((z, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <div style={{ width: 12, height: 12, borderRadius: 2, background: z.color, flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 11, color: z.color, fontWeight: 700 }}>{z.name}</div>
+                    <div style={{ fontSize: 10, color: "#64748b" }}>{z.speedLabel} — Survival: {z.survival}</div>
+                  </div>
+                </div>
+              ))}
+              <div style={{ fontSize: 10, color: "#475569", marginBottom: 8, fontStyle: "italic" }}>Click inside zone for survival info</div>
+            </>
+          )}
           {cataclysmActive && (
             <>
               <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#ef4444", textTransform: "uppercase" }}>Overlay</div>
