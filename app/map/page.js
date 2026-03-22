@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v184";
+const FRONTEND_BUILD_LABEL = "v185";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -75,6 +75,22 @@ const PRESETS = [
   { label: "All Ice Melted", value: 70 },
   { label: "Biblical Flood", value: 3048 },
   { label: "Fully Drained", value: -11000 },
+];
+
+const IMPACT_PRESETS = [
+  // Historical events
+  { label: "Chelyabinsk", sub: "2013 · Russia", diameter: 20, category: "historical" },
+  { label: "Tunguska", sub: "1908 · Siberia", diameter: 60, category: "historical" },
+  { label: "Barringer", sub: "50,000 BP · Arizona", diameter: 50, category: "historical" },
+  { label: "Chicxulub", sub: "66M BP · K-Pg", diameter: 12000, category: "historical" },
+  // Near-Earth threats
+  { label: "2024 YR4", sub: "2032 threat · 1:83", diameter: 65, category: "threat" },
+  { label: "Apophis", sub: "2029 flyby", diameter: 370, category: "threat" },
+  { label: "Bennu", sub: "2182 threat", diameter: 490, category: "threat" },
+  // Scale references
+  { label: "City Killer", sub: "~150m", diameter: 150, category: "scale" },
+  { label: "Regional", sub: "~1km", diameter: 1000, category: "scale" },
+  { label: "Global", sub: "~10km", diameter: 10000, category: "scale" },
 ];
 
 const NUKE_PRESETS = [
@@ -2180,7 +2196,25 @@ export default function HomePage() {
       {/* ── IMPACT CONTROLS ── */}
       {scenarioMode === "impact" && (
         <>
-          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Asteroid Size</div>
+          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Presets</div>
+          {["historical", "threat", "scale"].map(cat => (
+            <div key={cat}>
+              <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "#475569", textTransform: "uppercase", marginBottom: 6 }}>
+                {cat === "historical" ? "⚡ Historical" : cat === "threat" ? "⚠️ Known Threats" : "📏 Scale"}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
+                {IMPACT_PRESETS.filter(p => p.category === cat).map(p => (
+                  <button key={p.label}
+                    onClick={() => setImpactDiameter(p.diameter)}
+                    style={{ padding: "8px 10px", background: impactDiameter === p.diameter ? "#7f1d1d" : "#111827", color: impactDiameter === p.diameter ? "#fca5a5" : "#94a3b8", border: impactDiameter === p.diameter ? "1px solid #ef4444" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, textAlign: "left" }}>
+                    <div style={{ fontSize: 12 }}>{p.label}</div>
+                    <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{p.sub}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, marginTop: 4, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Custom Size</div>
           <input
             type="range" min="50" max="20000" step="50" value={impactDiameter}
             onChange={(e) => setImpactDiameter(Number(e.target.value))}
