@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v137";
+const FRONTEND_BUILD_LABEL = "v138";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 20;
@@ -349,6 +349,7 @@ export default function HomePage() {
   const [cataclysmActive, setCataclysmActive] = useState(false);
   const [cataclysmAnimating, setCataclysmAnimating] = useState(false);
   const cataclysmModelRef = useRef("davidson");
+  const proTierRef = useRef("free");
   const [cataclysmOverlay, setCataclysmOverlay] = useState("flood"); // "flood" | "wind" | "both"
   const cataclysmSpinRef = useRef(null);
   const [tsunamiResult, setTsunamiResult] = useState(null);
@@ -385,6 +386,8 @@ export default function HomePage() {
   };
 
   const [proTier, setProTier] = useState("free"); // set after mount in useEffect
+  // keep ref in sync
+  useEffect(() => { proTierRef.current = proTier; }, [proTier]);
   const [paywallModal, setPaywallModal] = useState(null); // null | "pro" | "ultra" | "ratelimit"
   const [rlStatus, setRlStatus] = useState(() => getRLStatus());
 
@@ -1447,13 +1450,13 @@ export default function HomePage() {
             map.addLayer({ id: `${CATACLYSM_WIND_PREFIX}-${ci}-line-${i}`, type: "line", source: srcId,
               filter: ["==", ["get", "zoneIdx"], i],
               paint: { "line-color": zone.color, "line-width": 1.5, "line-opacity": 0.9 } });
-          });
             map.addLayer({ id: `${CATACLYSM_WIND_PREFIX}-${ci}-label-${i}`, type: "symbol", source: srcId,
               filter: ["==", ["get", "zoneIdx"], i],
               layout: { "symbol-placement": "line", "text-field": ["get", "speedLabel"],
                         "text-size": 11, "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
                         "text-offset": [0, -0.8], "symbol-spacing": 350 },
               paint: { "text-color": ["get", "color"], "text-halo-color": "#0a0f1e", "text-halo-width": 2 } });
+          });
         }
       } catch(e) { console.warn("Wind zone error", e); }
     });
@@ -1620,7 +1623,8 @@ export default function HomePage() {
 
         // New north pole marker
         const poleMarkerId = "cataclysm-pole-marker";
-        try { map.removeLayer(poleMarkerId); map.removeSource(poleMarkerId + "-src"); } catch(e){}
+        try { if (map.getLayer(poleMarkerId)) map.removeLayer(poleMarkerId); } catch(e){}
+        try { if (map.getSource(poleMarkerId + "-src")) map.removeSource(poleMarkerId + "-src"); } catch(e){}
         safely(() => {
           map.addSource(poleMarkerId + "-src", { type: "geojson", data: {
             type: "Feature",
@@ -1663,6 +1667,17 @@ export default function HomePage() {
         }
         lt2 = t;
         cataclysmSpinRef.current = requestAnimationFrame(spin2);
+
+      // Stop spin on user interaction
+      const stopSpin = () => {
+        if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
+        map.off("mousedown", stopSpin);
+        map.off("touchstart", stopSpin);
+        map.off("wheel", stopSpin);
+      };
+      map.on("mousedown", stopSpin);
+      map.on("touchstart", stopSpin);
+      map.on("wheel", stopSpin);
       };
       cataclysmSpinRef.current = requestAnimationFrame(spin2);
     }, 14000);
