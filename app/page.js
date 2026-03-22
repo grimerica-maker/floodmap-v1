@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v162";
+const FRONTEND_BUILD_LABEL = "v164";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -848,6 +848,9 @@ export default function HomePage() {
   };
 
   const executeFlood = () => {
+    const rl = checkAndIncrementRL(proTierRef.current !== "free");
+    if (!rl.allowed) { setPaywallModal("ratelimit"); setRlStatus(getRLStatus()); return; }
+    setRlStatus(getRLStatus());
     cancelPendingImpactRequest();
     impactRunSeqRef.current += 1;
     setImpactLoading(false);
@@ -1100,6 +1103,9 @@ export default function HomePage() {
   };
 
   const drawTsunami = (sourceIdx) => {
+    const rl = checkAndIncrementRL(proTierRef.current !== "free");
+    if (!rl.allowed) { setPaywallModal("ratelimit"); setRlStatus(getRLStatus()); return; }
+    setRlStatus(getRLStatus());
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
     clearTsunami();
@@ -1303,6 +1309,9 @@ export default function HomePage() {
   };
 
   const drawYellowstone = (presetIdx) => {
+    const rl = checkAndIncrementRL(proTierRef.current !== "free");
+    if (!rl.allowed) { setPaywallModal("ratelimit"); setRlStatus(getRLStatus()); return; }
+    setRlStatus(getRLStatus());
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
     clearYellowstone();
@@ -1604,6 +1613,9 @@ export default function HomePage() {
   };
 
   const triggerCataclysm = () => {
+    const rl = checkAndIncrementRL(proTierRef.current !== "free");
+    if (!rl.allowed) { setPaywallModal("ratelimit"); setRlStatus(getRLStatus()); return; }
+    setRlStatus(getRLStatus());
     const map = mapRef.current;
     if (!map) return;
     const model = cataclysmModelRef.current;
