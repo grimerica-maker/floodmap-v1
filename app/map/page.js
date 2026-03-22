@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v187";
+const FRONTEND_BUILD_LABEL = "v189";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1681,11 +1681,16 @@ export default function HomePage() {
 
     // Step 1: Switch to globe, fly out
     setViewMode("globe");
-    safely(() => {
-      map.setProjection("globe");
-      const isMobileCat = window.innerWidth <= 640;
-      map.flyTo({ zoom: isMobileCat ? 0.8 : 1.5, pitch: 0, bearing: 0, duration: 1500 });
-    });
+    const _isMobileCat = window.innerWidth <= 640;
+    const _catZoom = _isMobileCat ? 0.8 : 1.5;
+    safely(() => { map.setProjection("globe"); });
+    // Use jumpTo immediately then flyTo — ensures zoom takes effect even on slow devices
+    setTimeout(() => {
+      safely(() => map.jumpTo({ zoom: _catZoom, pitch: 0, bearing: 0 }));
+    }, 100);
+    setTimeout(() => {
+      safely(() => map.flyTo({ zoom: _catZoom, pitch: 0, bearing: 0, duration: 1200 }));
+    }, 300);
 
     // Step 2: Natural Earth rotation — longitude moves W→E via setCenter
     let spinLng = map.getCenter().lng;
@@ -1794,7 +1799,7 @@ export default function HomePage() {
           spinActive = false;
           if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
           setPaywallModal("pro");
-        }, 10000);
+        }, 20000);
       }
 
       // Stop spin on first interaction (pro: keep map, free: show paywall)
