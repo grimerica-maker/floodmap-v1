@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v213";
+const FRONTEND_BUILD_LABEL = "v214";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -3132,7 +3132,7 @@ export default function HomePage() {
         </>
       )}
 
-      {(impactResult || nukeResult || (scenarioMode === "flood" && seaLevel !== 0) || (scenarioMode === "yellowstone" && yellowstoneActive) || (scenarioMode === "tsunami" && tsunamiActive) || (scenarioMode === "cataclysm" && cataclysmActive)) && (
+      {(impactResult || nukeResult || (scenarioMode === "flood" && seaLevel !== 0) || (scenarioMode === "climate" && seaLevel !== 0) || (scenarioMode === "yellowstone" && yellowstoneActive) || (scenarioMode === "tsunami" && tsunamiActive) || (scenarioMode === "cataclysm" && cataclysmActive)) && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.2 }} />
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#f97316" }}>SHARE</div>
@@ -3148,6 +3148,8 @@ export default function HomePage() {
                 ? `🌋 Just simulated the Yellowstone ${(volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS)[Math.min(yellowstonePreset, (volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS).length - 1)].name} supervolcano on Disaster Map!${yellowstoneResult ? " Est. " + yellowstoneResult.total_deaths.toLocaleString() + " deaths." : ""} Ash covers most of North America. Try it: https://www.disastermap.ca`
                 : (scenarioMode === "cataclysm" && cataclysmActive)
                 ? `☄️ Just simulated a ${cataclysmModel === "davidson" ? "90° Ben Davidson / Suspicious Observers" : "104° TES ECDO Theory"} pole shift on Disaster Map! Global inundation ${cataclysmModel === "davidson" ? "500-800m Americas, 300-500m Europe" : "120-1200m global"}. Try it: https://www.disastermap.ca`
+                : (scenarioMode === "climate" && seaLevel !== 0)
+                ? `🌍 Just modeled ${activeWarmingLevel ? activeWarmingLevel + "°C warming" : seaLevel + "m sea level rise"} on Disaster Map Climate Change mode!${floodDisplaced ? " " + floodDisplaced.toLocaleString() + " people displaced." : ""} Wildfire zones + sea level rise visualized. Try it: https://www.disastermap.ca`
                 : `🌊 I just flooded the world ${seaLevel > 0 ? "+" : ""}${Math.round(seaLevel)}m on Disaster Map!${floodDisplaced ? " " + floodDisplaced.toLocaleString() + " people displaced." : ""} Try it: https://www.disastermap.ca`;
               window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(msg), "_blank");
             }} style={{ background: "#000", color: "#fff" }}>
