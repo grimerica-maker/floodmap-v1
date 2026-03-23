@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v195";
+const FRONTEND_BUILD_LABEL = "v198";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -75,6 +75,63 @@ const PRESETS = [
   { label: "All Ice Melted", value: 70 },
   { label: "Biblical Flood", value: 3048 },
   { label: "Fully Drained", value: -11000 },
+];
+
+const WILDFIRE_ZONES = [
+  // 1.5°C zones — current trajectory
+  { name: "California", center: [-120.5, 37.5], major_km: 500, minor_km: 280, bearing: 150, minLevel: 1.5, color: "#f97316" },
+  { name: "Oregon/Washington", center: [-121.0, 45.5], major_km: 380, minor_km: 200, bearing: 160, minLevel: 1.5, color: "#f97316" },
+  { name: "S. Australia", center: [144.0, -36.0], major_km: 600, minor_km: 320, bearing: 70, minLevel: 1.5, color: "#f97316" },
+  { name: "Mediterranean", center: [-5.0, 38.5], major_km: 900, minor_km: 280, bearing: 80, minLevel: 1.5, color: "#f97316" },
+  { name: "Portugal/Spain", center: [-7.5, 39.5], major_km: 400, minor_km: 180, bearing: 30, minLevel: 1.5, color: "#f97316" },
+  { name: "British Columbia", center: [-123.0, 51.5], major_km: 420, minor_km: 220, bearing: 150, minLevel: 1.5, color: "#f97316" },
+  { name: "Greece/Turkey", center: [28.0, 38.5], major_km: 500, minor_km: 220, bearing: 70, minLevel: 1.5, color: "#f97316" },
+
+  // 2°C zones — new additions
+  { name: "Amazon S. Fringe", center: [-58.0, -12.0], major_km: 700, minor_km: 350, bearing: 80, minLevel: 2.0, color: "#ef4444" },
+  { name: "Central Chile", center: [-71.0, -34.0], major_km: 350, minor_km: 160, bearing: 170, minLevel: 2.0, color: "#ef4444" },
+  { name: "S. Africa Cape", center: [20.0, -33.0], major_km: 400, minor_km: 200, bearing: 60, minLevel: 2.0, color: "#ef4444" },
+  { name: "W. Siberia", center: [68.0, 57.0], major_km: 800, minor_km: 380, bearing: 90, minLevel: 2.0, color: "#ef4444" },
+  { name: "SE Australia", center: [149.0, -33.0], major_km: 500, minor_km: 260, bearing: 60, minLevel: 2.0, color: "#ef4444" },
+  { name: "SW USA", center: [-111.0, 34.0], major_km: 600, minor_km: 300, bearing: 120, minLevel: 2.0, color: "#ef4444" },
+
+  // 3°C zones — new additions
+  { name: "C. Europe", center: [12.0, 47.5], major_km: 700, minor_km: 300, bearing: 80, minLevel: 3.0, color: "#dc2626" },
+  { name: "Kazakhstan", center: [68.0, 47.0], major_km: 600, minor_km: 280, bearing: 90, minLevel: 3.0, color: "#dc2626" },
+  { name: "Alaska S.", center: [-151.0, 62.0], major_km: 500, minor_km: 250, bearing: 100, minLevel: 3.0, color: "#dc2626" },
+  { name: "N. India/Pakistan", center: [72.0, 28.0], major_km: 600, minor_km: 280, bearing: 80, minLevel: 3.0, color: "#dc2626" },
+  { name: "E. Australia", center: [150.0, -28.0], major_km: 650, minor_km: 320, bearing: 50, minLevel: 3.0, color: "#dc2626" },
+  { name: "Amazon C.", center: [-55.0, -5.0], major_km: 800, minor_km: 400, bearing: 80, minLevel: 3.0, color: "#dc2626" },
+
+  // 4°C zones — new additions
+  { name: "Amazon Core", center: [-62.0, -3.0], major_km: 1200, minor_km: 600, bearing: 80, minLevel: 4.0, color: "#b91c1c" },
+  { name: "Congo Fringe", center: [22.0, 2.0], major_km: 700, minor_km: 350, bearing: 70, minLevel: 4.0, color: "#b91c1c" },
+  { name: "Scandinavia", center: [18.0, 64.0], major_km: 600, minor_km: 280, bearing: 30, minLevel: 4.0, color: "#b91c1c" },
+  { name: "UK/Ireland", center: [-3.0, 53.5], major_km: 400, minor_km: 180, bearing: 50, minLevel: 4.0, color: "#b91c1c" },
+  { name: "NZ South Island", center: [170.0, -44.5], major_km: 350, minor_km: 160, bearing: 40, minLevel: 4.0, color: "#b91c1c" },
+  { name: "C. Canada", center: [-105.0, 54.0], major_km: 900, minor_km: 450, bearing: 90, minLevel: 4.0, color: "#b91c1c" },
+  { name: "C. Asia", center: [58.0, 40.0], major_km: 700, minor_km: 320, bearing: 80, minLevel: 4.0, color: "#b91c1c" },
+];
+
+const WILDFIRE_SOURCE = "wildfire-source";
+const WILDFIRE_PREFIX = "wildfire-zone";
+
+const CLIMATE_PRESETS = [
+  // Warming scenarios
+  { label: "1.5°C Target", sub: "+0.3m · Paris Goal", level: 0.3, city: [-4.9, 52.4], cityName: "Amsterdam", zoom: 8, category: "warming" },
+  { label: "2°C Scenario", sub: "+0.5m · Moderate", level: 0.5, city: [-80.19, 25.76], cityName: "Miami", zoom: 9, category: "warming" },
+  { label: "3°C Scenario", sub: "+1.0m · High", level: 1.0, city: [-90.07, 29.95], cityName: "New Orleans", zoom: 9, category: "warming" },
+  { label: "4°C Scenario", sub: "+1.5m · Extreme", level: 1.5, city: [90.36, 23.82], cityName: "Dhaka", zoom: 9, category: "warming" },
+  // IPCC projections
+  { label: "2050 Low", sub: "+0.3m · SSP1-2.6", level: 0.3, city: [-74.0, 40.71], cityName: "New York", zoom: 9, category: "ipcc" },
+  { label: "2050 High", sub: "+0.6m · SSP5-8.5", level: 0.6, city: [121.47, 31.23], cityName: "Shanghai", zoom: 9, category: "ipcc" },
+  { label: "2100 Low", sub: "+0.6m · SSP1-2.6", level: 0.6, city: [-0.08, 51.5], cityName: "London", zoom: 9, category: "ipcc" },
+  { label: "2100 High", sub: "+1.1m · SSP5-8.5", level: 1.1, city: [72.88, 19.08], cityName: "Mumbai", zoom: 9, category: "ipcc" },
+  { label: "2100 Extreme", sub: "+2.0m · Worst Case", level: 2.0, city: [106.83, -6.21], cityName: "Jakarta", zoom: 9, category: "ipcc" },
+  // Ice sheet collapse
+  { label: "W. Antarctic", sub: "+3.3m · Collapse", level: 3.3, city: [-80.19, 25.76], cityName: "Miami", zoom: 8, category: "ice" },
+  { label: "Greenland", sub: "+7m · Full Melt", level: 7, city: [4.9, 52.37], cityName: "Amsterdam", zoom: 7, category: "ice" },
+  { label: "Both Sheets", sub: "+10m · Catastrophic", level: 10, city: [-118.24, 34.05], cityName: "Los Angeles", zoom: 7, category: "ice" },
 ];
 
 const IMPACT_PRESETS = [
@@ -1563,6 +1620,38 @@ export default function HomePage() {
     }
   };
 
+  const drawWildfireZones = (map, warmingLevel) => {
+    // Show all zones up to and including current warming level (cumulative)
+    const activeZones = WILDFIRE_ZONES.filter(z => z.minLevel <= warmingLevel);
+    const features = activeZones.map((z, i) => ({
+      ...buildAshEllipse(z.center[0], z.center[1], z.major_km, z.minor_km, z.bearing),
+      properties: { name: z.name, color: z.color, idx: i },
+    }));
+    try {
+      if (map.getSource(WILDFIRE_SOURCE)) {
+        map.getSource(WILDFIRE_SOURCE).setData({ type: "FeatureCollection", features });
+      } else {
+        map.addSource(WILDFIRE_SOURCE, { type: "geojson", data: { type: "FeatureCollection", features } });
+        map.addLayer({ id: `${WILDFIRE_PREFIX}-fill`, type: "fill", source: WILDFIRE_SOURCE,
+          paint: { "fill-color": ["get", "color"], "fill-opacity": 0.25 } });
+        map.addLayer({ id: `${WILDFIRE_PREFIX}-line`, type: "line", source: WILDFIRE_SOURCE,
+          paint: { "line-color": ["get", "color"], "line-width": 1.5, "line-opacity": 0.8 } });
+        map.addLayer({ id: `${WILDFIRE_PREFIX}-label`, type: "symbol", source: WILDFIRE_SOURCE,
+          layout: { "symbol-placement": "line", "text-field": ["get", "name"],
+                    "text-size": 11, "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+                    "text-offset": [0, -0.8], "symbol-spacing": 400 },
+          paint: { "text-color": ["get", "color"], "text-halo-color": "#0a0f1e", "text-halo-width": 2 } });
+      }
+    } catch(e) { console.warn("Wildfire zone error", e); }
+  };
+
+  const clearWildfireZones = (map) => {
+    try { if (map.getLayer(`${WILDFIRE_PREFIX}-label`)) map.removeLayer(`${WILDFIRE_PREFIX}-label`); } catch(e){}
+    try { if (map.getLayer(`${WILDFIRE_PREFIX}-line`)) map.removeLayer(`${WILDFIRE_PREFIX}-line`); } catch(e){}
+    try { if (map.getLayer(`${WILDFIRE_PREFIX}-fill`)) map.removeLayer(`${WILDFIRE_PREFIX}-fill`); } catch(e){}
+    try { if (map.getSource(WILDFIRE_SOURCE)) map.removeSource(WILDFIRE_SOURCE); } catch(e){}
+  };
+
   const drawCataclysmWindZones = (map, model) => {
     const windData = CATACLYSM_WIND[model];
     if (!windData) return;
@@ -1945,6 +2034,8 @@ export default function HomePage() {
   };
 
   const clearFlood = () => {
+    const map = mapRef.current;
+    if (map && map.isStyleLoaded()) { try { clearWildfireZones(map); } catch(e){} try { clearIceSheets(map); } catch(e){} }
     cancelPendingImpactRequest();
     impactRunSeqRef.current += 1;
     setImpactLoading(false);
@@ -2310,6 +2401,19 @@ export default function HomePage() {
           <div style={{ fontSize: 15 }}>☄️ Cataclysm</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Pole shift inundation models</div>
         </button>
+        <button
+          onClick={() => {
+            if (scenarioModeRef.current === "nuke") clearNuke();
+            if (scenarioModeRef.current === "yellowstone") clearYellowstone();
+            if (scenarioModeRef.current === "tsunami") clearTsunami();
+            if (scenarioModeRef.current === "cataclysm") clearCataclysm();
+            unlockMapControls();
+            setScenarioMode("climate");
+          }}
+          style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "climate" ? "#052e16" : "#111827", color: scenarioMode === "climate" ? "#4ade80" : "#94a3b8", border: scenarioMode === "climate" ? "1px solid #22c55e" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
+          <div style={{ fontSize: 15 }}>🌍 Climate Change</div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Sea level rise projections</div>
+        </button>
       </div>
 
       {/* ── IMPACT CONTROLS ── */}
@@ -2415,6 +2519,63 @@ export default function HomePage() {
             );
           })}
         </div>
+      </>}
+
+      {/* ── CLIMATE CONTROLS ── */}
+      {scenarioMode === "climate" && <>
+        <hr style={{ margin: "0 0 16px 0", borderColor: "#1e2d45" }} />
+        {["warming", "ipcc", "ice"].map(cat => (
+          <div key={cat}>
+            <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "#64748b", textTransform: "uppercase", marginBottom: 6 }}>
+              {cat === "warming" ? "🌡️ Warming Scenarios" : cat === "ipcc" ? "📊 IPCC Projections" : "🧊 Ice Sheet Collapse"}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 12 }}>
+              {CLIMATE_PRESETS.filter(p => p.category === cat).map(p => {
+                const active = Math.abs((inputLevel || 0) - p.level) < 0.01;
+                return (
+                  <button key={p.label}
+                    onClick={() => {
+                      setInputLevel(p.level);
+                      setInputText(String(p.level));
+                      setSeaLevel(p.level);
+                      setScenarioMode("climate");
+                      const map = mapRef.current;
+                      if (map) {
+                        applyFloodTiles(map, p.level, {});
+                        // Draw wildfire zones for warming presets
+                        const warmingMap = { 0.3: 1.5, 0.5: 2.0, 1.0: 3.0, 1.5: 4.0 };
+                        const warmingLevel = warmingMap[p.level];
+                        if (warmingLevel) {
+                          setTimeout(() => safely(() => drawWildfireZones(map, warmingLevel)), 400);
+                        } else {
+                          clearWildfireZones(map);
+                        }
+                        setTimeout(() => {
+                          safely(() => map.flyTo({ center: p.city, zoom: p.zoom, duration: 1800 }));
+                        }, 300);
+                      }
+                    }}
+                    style={{ padding: "8px 10px", background: active ? "#052e16" : "#111827", color: active ? "#4ade80" : "#94a3b8", border: active ? "1px solid #22c55e" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, textAlign: "left" }}>
+                    <div style={{ fontSize: 12 }}>{p.label}</div>
+                    <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{p.sub}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+          <button onClick={clearFlood}
+            style={{ flex: 1, padding: "11px 10px", minHeight: 44, background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 14 }}>
+            Clear
+          </button>
+        </div>
+        {(proTierRef.current ?? proTier ?? "free") !== "free" && floodDisplaced !== null && (
+          <div style={{ background: "#111827", border: "1px solid #22c55e", borderRadius: 10, padding: "10px 14px", marginBottom: 12 }}>
+            <div style={{ fontSize: 11, color: "#22c55e", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Displaced Population</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#e2e8f0" }}>{floodDisplaced.toLocaleString()}</div>
+          </div>
+        )}
       </>}
 
       <hr style={{ margin: "0 0 16px 0", borderColor: "#1e2d45" }} />
@@ -2672,8 +2833,8 @@ export default function HomePage() {
     <>
       <div style={{ fontWeight: 700, marginBottom: 8 }}>Current Scenario</div>
       <div style={{ color: "#facc15", fontWeight: 700 }}>Frontend build: {FRONTEND_BUILD_LABEL}</div>
-      <div>Sea level: {formatLevelForDisplay(seaLevel)}</div>
-      {scenarioMode === "flood" && seaLevel !== 0 && (
+      {(scenarioMode === "flood" || scenarioMode === "climate") && <div>Sea level: {formatLevelForDisplay(seaLevel)}</div>}
+      {(scenarioMode === "flood" || scenarioMode === "climate") && seaLevel !== 0 && (
         <div style={{ fontWeight: 700, marginTop: 2 }}>
           {proTier !== "free"
             ? floodDisplaced != null
