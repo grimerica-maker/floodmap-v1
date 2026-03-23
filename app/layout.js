@@ -2,6 +2,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import Script from "next/script";
 import "./globals.css";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata = {
   title: "Disaster Map — Simulate Floods, Asteroid Impacts & Nuclear Detonations",
@@ -36,7 +37,6 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <ClerkProvider>
-      {/* overflow removed — each page controls its own scroll */}
       <html lang="en" style={{ margin: 0, padding: 0 }}>
         <body style={{ margin: 0, padding: 0 }}>
           <Script
@@ -46,6 +46,7 @@ export default function RootLayout({ children }) {
             crossOrigin="anonymous"
           />
           {children}
+          <Analytics />
         </body>
       </html>
     </ClerkProvider>
