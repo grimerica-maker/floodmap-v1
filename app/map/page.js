@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v190";
+const FRONTEND_BUILD_LABEL = "v191";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -3131,47 +3131,52 @@ export default function HomePage() {
       {/* ═══════════════════════════════════════════════
           DESKTOP: right stats panel — collapsible slide-in
       ═══════════════════════════════════════════════ */}
-      {!isMobile && (
-        <div style={{ position: "absolute", right: 0, top: 10, zIndex: 1000, display: "flex", alignItems: "flex-start" }}>
-          {/* Toggle tab */}
-          <button
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => { e.stopPropagation(); setDesktopStatsOpen(v => !v); }}
-            style={{
-              background: "#1e3a5f", color: "white", border: "none",
-              borderRadius: "8px 0 0 8px", padding: "10px 6px",
-              cursor: "pointer", fontSize: 14, lineHeight: 1,
-              boxShadow: "-2px 2px 8px rgba(0,0,0,0.4)",
-              marginTop: 8, flexShrink: 0,
-              writingMode: "vertical-rl",
-              display: "flex", alignItems: "center", gap: 6,
-            }}
-          >
-            <span style={{ fontSize: 12, opacity: 0.8 }}>{desktopStatsOpen ? "▶" : "◀"}</span>
-          </button>
-          {/* Sliding panel */}
-          <div
-            className="fm-desktop-stats"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "#1e3a5f", color: "white",
-              padding: 16, borderRadius: "12px 0 0 12px",
-              fontSize: 14, lineHeight: 1.45,
-              minWidth: 320, maxWidth: 340,
-              maxHeight: "calc(100vh - 20px)",
-              overflowY: "auto",
-              transition: "transform 0.25s ease, opacity 0.25s ease",
-              transform: desktopStatsOpen ? "translateX(0)" : "translateX(100%)",
-              opacity: desktopStatsOpen ? 1 : 0,
-              pointerEvents: desktopStatsOpen ? "auto" : "none",
-              boxShadow: "-4px 0 20px rgba(0,0,0,0.3)",
-            }}
-          >
-            {statsContent}
-          </div>
+      {!isMobile && (<>
+        {/* Toggle tab — always pinned to right edge */}
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); setDesktopStatsOpen(v => !v); }}
+          style={{
+            position: "absolute",
+            right: desktopStatsOpen ? 340 : 0,
+            top: "50%",
+            transform: "translateY(-50%)",
+            zIndex: 1001,
+            background: "#1e3a5f", color: "white", border: "none",
+            borderRadius: "8px 0 0 8px",
+            padding: "14px 7px",
+            cursor: "pointer",
+            boxShadow: "-2px 2px 8px rgba(0,0,0,0.4)",
+            transition: "right 0.25s ease",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+          }}
+        >
+          <span style={{ fontSize: 11, opacity: 0.7, writingMode: "vertical-rl", letterSpacing: "0.05em" }}>
+            {desktopStatsOpen ? "STATS" : "STATS"}
+          </span>
+          <span style={{ fontSize: 13 }}>{desktopStatsOpen ? "▶" : "◀"}</span>
+        </button>
+        {/* Sliding panel */}
+        <div
+          className="fm-desktop-stats"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "absolute", right: 0, top: 10,
+            background: "#1e3a5f", color: "white",
+            padding: 16, borderRadius: "12px 0 0 12px",
+            fontSize: 14, lineHeight: 1.45,
+            width: 340, maxHeight: "calc(100vh - 20px)",
+            overflowY: "auto",
+            zIndex: 1000,
+            transition: "transform 0.25s ease",
+            transform: desktopStatsOpen ? "translateX(0)" : "translateX(100%)",
+            boxShadow: "-4px 0 20px rgba(0,0,0,0.3)",
+          }}
+        >
+          {statsContent}
         </div>
-      )}
+      </>)}
 
       {/* ═══════════════════════════════════════════════
           MOBILE: stats pill — top center, tap to expand
