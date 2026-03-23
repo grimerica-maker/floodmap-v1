@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v218";
+const FRONTEND_BUILD_LABEL = "v219";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -2420,7 +2420,7 @@ export default function HomePage() {
             </div>
             <button onClick={() => setPaywallModal("pro")}
               style={{ width: "100%", padding: "8px", background: "#f97316", color: "white", border: "none", borderRadius: 7, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-              ⚡ Unlock Pro — $18.99
+              ⚡ Founders Price — $18.99 Lifetime
             </button>
           </div>
         </div>
@@ -3432,30 +3432,44 @@ export default function HomePage() {
               </div>
               <div style={{ color: "#64748b", fontSize: 13, textAlign: "center", marginBottom: 20, lineHeight: 1.6 }}>
                 {paywallModal === "pro" && scenarioMode === "cataclysm"
-                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the post-cataclysm world. One-time $18.99.</>
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the post-cataclysm world. Founders price $18.99 lifetime or $6.99/month.</>
                   : paywallModal === "pro" && scenarioMode === "tsunami"
-                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the tsunami inundation zone. One-time $18.99.</>
-                  : "This feature requires Pro. One-time $18.99 — no subscription."}
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the tsunami inundation zone. Founders price $18.99 lifetime or $6.99/month.</>
+                  : "This feature requires Pro. Founders price $18.99 lifetime or $6.99/month."}
               </div>
             </>)}
 
-            {/* Pro tier */}
-            <div style={{ background: "#111827", border: "1px solid #1e3a5f", borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <span style={{ color: "#60a5fa", fontWeight: 700, fontSize: 15 }}>⚡ Pro</span>
-                <span style={{ color: "#f97316", fontWeight: 700, fontSize: 15 }}>$18.99 one-time</span>
+            {/* Pro tier — Founders Lifetime */}
+            <div style={{ background: "#111827", border: "1px solid #f97316", borderRadius: 12, padding: "14px 16px", marginBottom: 8, position: "relative" }}>
+              <div style={{ position: "absolute", top: -10, right: 12, background: "#f97316", color: "white", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, letterSpacing: "0.08em" }}>FOUNDERS PRICE</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <span style={{ color: "#60a5fa", fontWeight: 700, fontSize: 15 }}>⚡ Pro Lifetime</span>
+                <span style={{ color: "#f97316", fontWeight: 700, fontSize: 15 }}>$18.99 once</span>
               </div>
+              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>Locked in forever — price increases after launch</div>
               <div style={{ color: "#94a3b8", fontSize: 12, lineHeight: 1.7 }}>
                 ✓ {PRO_SIM_PER_HOUR} simulations/hour, {PRO_SIM_PER_DAY}/day<br/>
-                ✓ One-time payment, no subscription<br/>
                 ✓ Satellite + Globe view<br/>
                 ✓ Flood displaced counts<br/>
                 ✓ 🌊 Mega-Tsunami scenarios<br/>
-                ✓ No ads
+                ✓ No ads · No subscription ever
               </div>
               <button onClick={() => { window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank"); }}
                 style={{ width: "100%", marginTop: 12, padding: "10px", background: "#f97316", color: "white", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
-                Unlock Pro — $18.99 →
+                Lock in Founders Price — $18.99 →
+              </button>
+            </div>
+
+            {/* Pro Monthly */}
+            <div style={{ background: "#111827", border: "1px solid #1e3a5f", borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <span style={{ color: "#94a3b8", fontWeight: 700, fontSize: 15 }}>Pro Monthly</span>
+                <span style={{ color: "#94a3b8", fontWeight: 700, fontSize: 15 }}>$6.99/mo</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#475569", marginBottom: 8 }}>Same features, cancel anytime</div>
+              <button onClick={() => { window.open("https://buy.stripe.com/6oU5kDcyYbEe4yi6vra3u0a", "_blank"); }}
+                style={{ width: "100%", padding: "9px", background: "transparent", color: "#94a3b8", border: "1px solid #1e3a5f", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+                Subscribe Monthly — $6.99 →
               </button>
             </div>
 
