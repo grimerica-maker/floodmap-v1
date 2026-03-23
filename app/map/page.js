@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v203";
+const FRONTEND_BUILD_LABEL = "v205";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -2504,6 +2504,13 @@ export default function HomePage() {
         <div style={{ fontSize: 13, marginBottom: 16, color: "#475569" }}>
           Custom input supports positive and negative values in {unitMode === "ft" ? "feet" : "meters"}
         </div>
+        {(proTierRef.current ?? proTier ?? "free") === "free" && seaLevel !== 0 && (
+          <div onClick={() => setPaywallModal("pro")} style={{ background: "#111827", border: "1px solid #1e3a5f", borderRadius: 10, padding: "10px 14px", marginBottom: 12, cursor: "pointer" }}>
+            <div style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Displaced Population</div>
+            <div style={{ fontSize: 14, color: "#334155", fontWeight: 700 }}>🔒 Unlock with Pro</div>
+            <div style={{ fontSize: 11, color: "#1e3a5f", marginTop: 3 }}>See how many are displaced · $18.99 one-time</div>
+          </div>
+        )}
         <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Presets</div>
         <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"}>
           {PRESETS.map((preset) => {
@@ -2556,7 +2563,6 @@ export default function HomePage() {
                       setSeaLevel(p.level);
                       seaLevelRef.current = p.level;
                       scenarioModeRef.current = "climate";
-                      setTimeout(() => executeFlood(), 50);
                       const warmingMap = { 0.3: 1.5, 0.5: 2.0, 1.0: 3.0, 1.5: 4.0 };
                       const warmingLevel = warmingMap[p.level];
                       const map = mapRef.current;
@@ -2581,6 +2587,13 @@ export default function HomePage() {
           <div style={{ background: "#111827", border: "1px solid #22c55e", borderRadius: 10, padding: "10px 14px", marginBottom: 12, marginTop: 8 }}>
             <div style={{ fontSize: 11, color: "#22c55e", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Displaced Population</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: "#e2e8f0" }}>{floodDisplaced.toLocaleString()}</div>
+          </div>
+        )}
+        {(proTierRef.current ?? proTier ?? "free") === "free" && seaLevel !== 0 && (
+          <div onClick={() => setPaywallModal("pro")} style={{ background: "#111827", border: "1px solid #1e3a5f", borderRadius: 10, padding: "10px 14px", marginBottom: 12, marginTop: 8, cursor: "pointer" }}>
+            <div style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Displaced Population</div>
+            <div style={{ fontSize: 14, color: "#334155", fontWeight: 700 }}>🔒 Unlock with Pro</div>
+            <div style={{ fontSize: 11, color: "#1e3a5f", marginTop: 3 }}>See how many are displaced · $18.99 one-time</div>
           </div>
         )}
       </>}
