@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v199";
+const FRONTEND_BUILD_LABEL = "v200";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -118,20 +118,20 @@ const WILDFIRE_PREFIX = "wildfire-zone";
 
 const CLIMATE_PRESETS = [
   // Warming scenarios
-  { label: "1.5°C Target", sub: "+0.3m · Paris Goal", level: 0.3, city: [-4.9, 52.4], cityName: "Amsterdam", zoom: 8, category: "warming" },
-  { label: "2°C Scenario", sub: "+0.5m · Moderate", level: 0.5, city: [-80.19, 25.76], cityName: "Miami", zoom: 9, category: "warming" },
-  { label: "3°C Scenario", sub: "+1.0m · High", level: 1.0, city: [-90.07, 29.95], cityName: "New Orleans", zoom: 9, category: "warming" },
-  { label: "4°C Scenario", sub: "+1.5m · Extreme", level: 1.5, city: [90.36, 23.82], cityName: "Dhaka", zoom: 9, category: "warming" },
+  { label: "1.5°C Target", sub: "+0.3m · Paris Goal", level: 0.3, category: "warming" },
+  { label: "2°C Scenario", sub: "+0.5m · Moderate", level: 0.5, category: "warming" },
+  { label: "3°C Scenario", sub: "+1.0m · High", level: 1.0, category: "warming" },
+  { label: "4°C Scenario", sub: "+1.5m · Extreme", level: 1.5, category: "warming" },
   // IPCC projections
-  { label: "2050 Low", sub: "+0.3m · SSP1-2.6", level: 0.3, city: [-74.0, 40.71], cityName: "New York", zoom: 9, category: "ipcc" },
-  { label: "2050 High", sub: "+0.6m · SSP5-8.5", level: 0.6, city: [121.47, 31.23], cityName: "Shanghai", zoom: 9, category: "ipcc" },
-  { label: "2100 Low", sub: "+0.6m · SSP1-2.6", level: 0.6, city: [-0.08, 51.5], cityName: "London", zoom: 9, category: "ipcc" },
-  { label: "2100 High", sub: "+1.1m · SSP5-8.5", level: 1.1, city: [72.88, 19.08], cityName: "Mumbai", zoom: 9, category: "ipcc" },
-  { label: "2100 Extreme", sub: "+2.0m · Worst Case", level: 2.0, city: [106.83, -6.21], cityName: "Jakarta", zoom: 9, category: "ipcc" },
+  { label: "2050 Low", sub: "+0.3m · SSP1-2.6", level: 0.3, category: "ipcc" },
+  { label: "2050 High", sub: "+0.6m · SSP5-8.5", level: 0.6, category: "ipcc" },
+  { label: "2100 Low", sub: "+0.6m · SSP1-2.6", level: 0.6, category: "ipcc" },
+  { label: "2100 High", sub: "+1.1m · SSP5-8.5", level: 1.1, category: "ipcc" },
+  { label: "2100 Extreme", sub: "+2.0m · Worst Case", level: 2.0, category: "ipcc" },
   // Ice sheet collapse
-  { label: "W. Antarctic", sub: "+3.3m · Collapse", level: 3.3, city: [-80.19, 25.76], cityName: "Miami", zoom: 8, category: "ice" },
-  { label: "Greenland", sub: "+7m · Full Melt", level: 7, city: [4.9, 52.37], cityName: "Amsterdam", zoom: 7, category: "ice" },
-  { label: "Both Sheets", sub: "+10m · Catastrophic", level: 10, city: [-118.24, 34.05], cityName: "Los Angeles", zoom: 7, category: "ice" },
+  { label: "W. Antarctic", sub: "+3.3m · Collapse", level: 3.3, category: "ice" },
+  { label: "Greenland", sub: "+7m · Full Melt", level: 7, category: "ice" },
+  { label: "Both Sheets", sub: "+10m · Catastrophic", level: 10, category: "ice" },
 ];
 
 const IMPACT_PRESETS = [
@@ -2553,9 +2553,6 @@ export default function HomePage() {
                         } else {
                           safely(() => clearWildfireZones(map));
                         }
-                        setTimeout(() => {
-                          safely(() => map.flyTo({ center: p.city, zoom: p.zoom, duration: 1800 }));
-                        }, 400);
                       }
                     }}
                     style={{ padding: "8px 10px", background: active ? "#052e16" : "#111827", color: active ? "#4ade80" : "#94a3b8", border: active ? "1px solid #22c55e" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, textAlign: "left" }}>
