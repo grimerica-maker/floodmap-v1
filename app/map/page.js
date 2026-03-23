@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v215";
+const FRONTEND_BUILD_LABEL = "v216";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -2099,6 +2099,17 @@ export default function HomePage() {
     }
   }, []);
 
+  // Read permalink params on load and auto-trigger scenario
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const scenario = params.get("scenario");
+    if (!scenario) return;
+    // Clean URL immediately
+    window.history.replaceState({}, "", window.location.pathname);
+    // Store params for map-ready trigger
+    window._permalinkParams = { scenario, params };
+  }, []);
+
   useEffect(() => {
     if (mapRef.current || !floodEngineUrl) return;
 
@@ -2110,6 +2121,7 @@ export default function HomePage() {
       antialias: false,
       attributionControl: true,
       collectResourceTiming: false,
+      preserveDrawingBuffer: true,
       transformRequest: (url) => ({ url }),
     });
 
@@ -2205,6 +2217,63 @@ export default function HomePage() {
 
     map.on("error", handleError);
     map.on("load", handleLoad);
+    map.on("load", () => {
+      // Auto-trigger from permalink
+      const pp = window._permalinkParams;
+      if (!pp) return;
+      window._permalinkParams = null;
+      const { scenario, params } = pp;
+      setTimeout(() => {
+        try {
+          if (scenario === "flood") {
+            const level = parseFloat(params.get("level") || "0");
+            setInputLevel(level); setInputText(String(level)); setSeaLevel(level); seaLevelRef.current = level;
+            setScenarioMode("flood"); scenarioModeRef.current = "flood";
+            setTimeout(() => executeFlood(), 100);
+          } else if (scenario === "climate") {
+            const level = parseFloat(params.get("level") || "0");
+            const warming = parseFloat(params.get("warming") || "0");
+            setInputLevel(level); setInputText(String(level)); setSeaLevel(level); seaLevelRef.current = level;
+            setScenarioMode("climate"); scenarioModeRef.current = "climate";
+            if (warming) setActiveWarmingLevel(warming);
+            setTimeout(() => { executeFlood(); if (warming) setTimeout(() => safely(() => drawWildfireZones(mapRef.current, warming)), 600); }, 100);
+          } else if (scenario === "impact") {
+            const lat = parseFloat(params.get("lat")); const lng = parseFloat(params.get("lng"));
+            const diameter = parseInt(params.get("diameter") || "1000");
+            setScenarioMode("impact"); scenarioModeRef.current = "impact";
+            setImpactDiameter(diameter); impactDiameterRef.current = diameter;
+            if (!isNaN(lat) && !isNaN(lng)) {
+              impactPointRef.current = { lat, lng };
+              setTimeout(() => runImpact(), 200);
+            }
+          } else if (scenario === "nuke") {
+            const lat = parseFloat(params.get("lat")); const lng = parseFloat(params.get("lng"));
+            const yieldKt = parseInt(params.get("yield") || "1000");
+            const burst = params.get("burst") || "airburst";
+            setScenarioMode("nuke"); scenarioModeRef.current = "nuke";
+            setNukeYield(yieldKt); setNukeBurst(burst);
+            nukePointRef.current = { lat, lng }; setNukePointSet(true);
+            setTimeout(() => executeNuke(), 200);
+          } else if (scenario === "volcano") {
+            const type = params.get("type") || "yellowstone";
+            const preset = parseInt(params.get("preset") || "0");
+            setScenarioMode("yellowstone"); scenarioModeRef.current = "yellowstone";
+            setVolcanoType(type); setYellowstonePreset(preset);
+            setTimeout(() => executeYellowstone(), 200);
+          } else if (scenario === "tsunami") {
+            const source = parseInt(params.get("source") || "0");
+            setScenarioMode("tsunami"); scenarioModeRef.current = "tsunami";
+            setTsunamiSource(source); tsunamiSourceRef.current = source;
+            setTimeout(() => drawTsunami(), 200);
+          } else if (scenario === "cataclysm") {
+            const model = params.get("model") || "davidson";
+            setScenarioMode("cataclysm"); scenarioModeRef.current = "cataclysm";
+            setCataclysmModel(model); cataclysmModelRef.current = model;
+            setTimeout(() => triggerCataclysm(), 500);
+          }
+        } catch(e) { console.warn("Permalink trigger failed", e); }
+      }, 800);
+    });
     map.on("style.load", handleStyleLoad);
     map.on("mousedown", handleMouseDown);
     map.on("click", handleClick);
@@ -3129,6 +3198,37 @@ export default function HomePage() {
         </>
       )}
 
+      {/* ── Share helpers ── */}
+      {(() => {
+        window.buildPermalink = () => {
+          const base = "https://www.disastermap.ca/map";
+          const m = scenarioModeRef.current;
+          if (m === "flood") return `${base}?scenario=flood&level=${seaLevel}`;
+          if (m === "climate") return `${base}?scenario=climate&level=${seaLevel}${activeWarmingLevel ? "&warming=" + activeWarmingLevel : ""}`;
+          if (m === "impact" && impactPointRef.current) return `${base}?scenario=impact&lat=${impactPointRef.current.lat.toFixed(4)}&lng=${impactPointRef.current.lng.toFixed(4)}&diameter=${impactDiameter}`;
+          if (m === "nuke" && nukePointRef.current) return `${base}?scenario=nuke&lat=${nukePointRef.current.lat.toFixed(4)}&lng=${nukePointRef.current.lng.toFixed(4)}&yield=${nukeYield}&burst=${nukeBurst}`;
+          if (m === "yellowstone") return `${base}?scenario=volcano&type=${volcanoType}&preset=${yellowstonePreset}`;
+          if (m === "tsunami") return `${base}?scenario=tsunami&source=${tsunamiSource}`;
+          if (m === "cataclysm") return `${base}?scenario=cataclysm&model=${cataclysmModelRef.current}`;
+          return base;
+        };
+        window.saveScreenshot = () => {
+          const map = mapRef.current;
+          if (!map) return;
+          map.getCanvas().toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `disastermap-${scenarioModeRef.current || "map"}-${Date.now()}.png`;
+            a.click();
+            URL.revokeObjectURL(url);
+          });
+        };
+        const buildPermalink = window.buildPermalink;
+        const saveScreenshot = window.saveScreenshot;
+        return null;
+      })()}
+
       {(impactResult || nukeResult || (scenarioMode === "flood" && seaLevel !== 0) || (scenarioMode === "climate" && seaLevel !== 0) || (scenarioMode === "yellowstone" && yellowstoneActive) || (scenarioMode === "tsunami" && tsunamiActive) || (scenarioMode === "cataclysm" && cataclysmActive)) && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.2 }} />
@@ -3148,19 +3248,25 @@ export default function HomePage() {
                 : (scenarioMode === "climate" && seaLevel !== 0)
                 ? `🌍 Just modeled ${activeWarmingLevel ? activeWarmingLevel + "°C warming" : seaLevel + "m sea level rise"} on Disaster Map Climate Change mode!${floodDisplaced ? " " + floodDisplaced.toLocaleString() + " people displaced." : ""} Wildfire zones + sea level rise visualized. Try it: https://www.disastermap.ca`
                 : `🌊 I just flooded the world ${seaLevel > 0 ? "+" : ""}${Math.round(seaLevel)}m on Disaster Map!${floodDisplaced ? " " + floodDisplaced.toLocaleString() + " people displaced." : ""} Try it: https://www.disastermap.ca`;
-              window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(msg), "_blank");
+              const url = window.buildPermalink();
+              window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(msg + " " + url), "_blank");
             }} style={{ background: "#000", color: "#fff" }}>
               𝕏 Tweet
             </button>
             <button className="share-btn" onClick={() => {
-              window.open("https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(window.location.href), "_blank");
+              window.open("https://www.facebook.com/sharer/sharer.php?u=" + encodeURIComponent(window.buildPermalink()), "_blank");
             }} style={{ background: "#1877f2", color: "#fff" }}>
               f Share
             </button>
             <button className="share-btn" onClick={() => {
-              navigator.clipboard.writeText(window.location.href).then(() => { setStatus("Link copied!"); setTimeout(() => setStatus(""), 2000); });
+              const url = window.buildPermalink();
+              navigator.clipboard.writeText(url).then(() => { setStatus("Link copied!"); setTimeout(() => setStatus(""), 2000); });
             }} style={{ background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45" }}>
               🔗 Copy Link
+            </button>
+            <button className="share-btn" onClick={window.saveScreenshot}
+              style={{ background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45" }}>
+              📷 Save Image
             </button>
           </div>
           <div style={{ marginTop: 10 }}>
