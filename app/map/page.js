@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v208";
+const FRONTEND_BUILD_LABEL = "v212";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -76,6 +76,20 @@ const PRESETS = [
   { label: "Biblical Flood", value: 3048 },
   { label: "Fully Drained", value: -11000 },
 ];
+
+const ICE_SHEET_ZONES = [
+  { name: "Laurentide", center: [-90.0, 55.0], major_km: 2550, minor_km: 1870, bearing: 10, color: "#bfdbfe" },
+  { name: "Fennoscandian", center: [18.0, 65.0], major_km: 1530, minor_km: 1020, bearing: 20, color: "#bfdbfe" },
+  { name: "British-Irish", center: [-3.5, 56.0], major_km: 510, minor_km: 323, bearing: 10, color: "#bfdbfe" },
+  { name: "Patagonian", center: [-70.0, -48.0], major_km: 765, minor_km: 272, bearing: 170, color: "#bfdbfe" },
+  { name: "Greenland (Extended)", center: [-42.0, 72.0], major_km: 1020, minor_km: 595, bearing: 10, color: "#e0f2fe" },
+  { name: "Antarctic (Extended)", center: [0.0, -82.0], major_km: 2380, minor_km: 2380, bearing: 0, color: "#e0f2fe" },
+  { name: "Barents-Kara", center: [55.0, 74.0], major_km: 1190, minor_km: 765, bearing: 80, color: "#bfdbfe" },
+  { name: "Cordilleran", center: [-126.0, 56.0], major_km: 1020, minor_km: 510, bearing: 160, color: "#bfdbfe" },
+];
+
+const ICE_SHEET_SOURCE = "ice-sheet-source";
+const ICE_SHEET_PREFIX = "ice-sheet-zone";
 
 const WILDFIRE_ZONES = [
   // 1.5°C zones — current trajectory
@@ -479,6 +493,7 @@ export default function HomePage() {
   useEffect(() => { cataclysmOverlayRef.current = cataclysmOverlay; }, [cataclysmOverlay]);
   const [paywallModal, setPaywallModal] = useState(null); // null | "pro" | "ultra" | "ratelimit"
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
+  const [activeWarmingLevel, setActiveWarmingLevel] = useState(null);
   const [rlStatus, setRlStatus] = useState(() => getRLStatus());
 
   // Mobile-only UI state — purely cosmetic, zero effect on map/engine logic
@@ -1622,6 +1637,36 @@ export default function HomePage() {
     }
   };
 
+  const drawIceSheets = (map) => {
+    const features = ICE_SHEET_ZONES.map((z, i) => ({
+      ...buildAshEllipse(z.center[0], z.center[1], z.major_km, z.minor_km, z.bearing),
+      properties: { name: z.name, color: z.color, idx: i },
+    }));
+    try {
+      if (map.getSource(ICE_SHEET_SOURCE)) {
+        map.getSource(ICE_SHEET_SOURCE).setData({ type: "FeatureCollection", features });
+      } else {
+        map.addSource(ICE_SHEET_SOURCE, { type: "geojson", data: { type: "FeatureCollection", features } });
+        map.addLayer({ id: `${ICE_SHEET_PREFIX}-fill`, type: "fill", source: ICE_SHEET_SOURCE,
+          paint: { "fill-color": ["get", "color"], "fill-opacity": 0.45 } });
+        map.addLayer({ id: `${ICE_SHEET_PREFIX}-line`, type: "line", source: ICE_SHEET_SOURCE,
+          paint: { "line-color": "#93c5fd", "line-width": 1.5, "line-opacity": 0.9 } });
+        map.addLayer({ id: `${ICE_SHEET_PREFIX}-label`, type: "symbol", source: ICE_SHEET_SOURCE,
+          layout: { "symbol-placement": "line", "text-field": ["get", "name"],
+                    "text-size": 11, "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+                    "text-offset": [0, -0.8], "symbol-spacing": 400 },
+          paint: { "text-color": "#bfdbfe", "text-halo-color": "#0a0f1e", "text-halo-width": 2 } });
+      }
+    } catch(e) { console.warn("Ice sheet error", e); }
+  };
+
+  const clearIceSheets = (map) => {
+    try { if (map.getLayer(`${ICE_SHEET_PREFIX}-label`)) map.removeLayer(`${ICE_SHEET_PREFIX}-label`); } catch(e){}
+    try { if (map.getLayer(`${ICE_SHEET_PREFIX}-line`)) map.removeLayer(`${ICE_SHEET_PREFIX}-line`); } catch(e){}
+    try { if (map.getLayer(`${ICE_SHEET_PREFIX}-fill`)) map.removeLayer(`${ICE_SHEET_PREFIX}-fill`); } catch(e){}
+    try { if (map.getSource(ICE_SHEET_SOURCE)) map.removeSource(ICE_SHEET_SOURCE); } catch(e){}
+  };
+
   const drawWildfireZones = (map, warmingLevel) => {
     // Show all zones up to and including current warming level (cumulative)
     const activeZones = WILDFIRE_ZONES.filter(z => z.minLevel <= warmingLevel);
@@ -2037,7 +2082,7 @@ export default function HomePage() {
 
   const clearFlood = () => {
     const map = mapRef.current;
-    if (map && map.isStyleLoaded()) { try { clearWildfireZones(map); } catch(e){} try { clearIceSheets(map); } catch(e){} }
+    if (map && map.isStyleLoaded()) { try { clearWildfireZones(map); } catch(e){} try { clearIceSheets(map); } catch(e){} } setActiveWarmingLevel(null);
     cancelPendingImpactRequest();
     impactRunSeqRef.current += 1;
     setImpactLoading(false);
@@ -2520,7 +2565,18 @@ export default function HomePage() {
               : `${preset.value > 0 ? "+" : ""}${preset.value}m`;
             return (
               <button key={preset.label}
-                onClick={() => { setInputLevel(preset.value); setInputText(formatInputTextFromMeters(preset.value, unitMode)); }}
+                onClick={() => {
+                  setInputLevel(preset.value);
+                  setInputText(formatInputTextFromMeters(preset.value, unitMode));
+                  const map = mapRef.current;
+                  if (map && map.isStyleLoaded()) {
+                    if (preset.label === "Ice Age") {
+                      setTimeout(() => safely(() => drawIceSheets(map)), 400);
+                    } else {
+                      safely(() => clearIceSheets(map));
+                    }
+                  }
+                }}
                 style={{ padding: "12px 10px", minHeight: 56, background: active ? "#1e3a5f" : "#111827", color: active ? "#60a5fa" : "#94a3b8", border: active ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, whiteSpace: "nowrap" }}>
                 <div style={{ fontSize: 14 }}>{preset.label}</div>
                 <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>{lbl}</div>
@@ -2538,7 +2594,22 @@ export default function HomePage() {
           {seaLevel > 0 ? `+${seaLevel}m` : `${seaLevel}m`}
         </div>
         <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-          <button onClick={(e) => { e.stopPropagation(); executeFlood(); }}
+          <button onClick={(e) => {
+              e.stopPropagation();
+              executeFlood();
+              const warmingMap = { 0.3: 1.5, 0.5: 2.0, 1.0: 3.0, 1.5: 4.0 };
+              const warmingLevel = warmingMap[inputLevel];
+              const map = mapRef.current;
+              if (map) {
+                if (warmingLevel) {
+                  setActiveWarmingLevel(warmingLevel);
+                  setTimeout(() => safely(() => drawWildfireZones(map, warmingLevel)), 400);
+                } else {
+                  setActiveWarmingLevel(null);
+                  safely(() => clearWildfireZones(map));
+                }
+              }
+            }}
             style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "#14532d", color: "white", border: "1px solid #22c55e", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 15 }}>
             Apply
           </button>
@@ -2563,16 +2634,7 @@ export default function HomePage() {
                       setSeaLevel(p.level);
                       seaLevelRef.current = p.level;
                       scenarioModeRef.current = "climate";
-                      const warmingMap = { 0.3: 1.5, 0.5: 2.0, 1.0: 3.0, 1.5: 4.0 };
-                      const warmingLevel = warmingMap[p.level];
-                      const map = mapRef.current;
-                      if (map) {
-                        if (warmingLevel) {
-                          setTimeout(() => safely(() => drawWildfireZones(map, warmingLevel)), 600);
-                        } else {
-                          safely(() => clearWildfireZones(map));
-                        }
-                      }
+                      // Wildfire zones drawn on Apply, not on preset select
                     }}
                     style={{ padding: "10px 10px", minHeight: 52, background: active ? "#052e16" : "#111827", color: active ? "#4ade80" : "#94a3b8", border: active ? "1px solid #22c55e" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
                     <div style={{ fontSize: 13 }}>{p.label}</div>
@@ -2873,7 +2935,7 @@ export default function HomePage() {
       {scenarioMode === "impact" && <div>Asteroid Diameter: {impactDiameter.toLocaleString()} m</div>}
 
       {/* Wildfire legend in right panel — climate mode only */}
-      {scenarioMode === "climate" && WILDFIRE_ZONES.some(z => z.minLevel <= (inputLevel || 0)) && (
+      {scenarioMode === "climate" && activeWarmingLevel && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
           <div style={{ fontWeight: 700, marginBottom: 6 }}>🔥 Wildfire Risk Zones</div>
@@ -2884,8 +2946,7 @@ export default function HomePage() {
             { color: "#b91c1c", label: "4°C", desc: "Catastrophic" },
           ].filter(l => {
             const levelMap = { "#f97316": 1.5, "#ef4444": 2.0, "#dc2626": 3.0, "#b91c1c": 4.0 };
-            const warmingMap = { 0.3: 1.5, 0.5: 2.0, 1.0: 3.0, 1.5: 4.0 };
-            return levelMap[l.color] <= (warmingMap[inputLevel] || 0);
+            return levelMap[l.color] <= (activeWarmingLevel || 0);
           }).map(l => (
             <div key={l.color} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
               <div style={{ width: 12, height: 12, borderRadius: 2, background: l.color, opacity: 0.8, flexShrink: 0 }} />
