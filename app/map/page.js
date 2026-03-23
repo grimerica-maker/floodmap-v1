@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v216";
+const FRONTEND_BUILD_LABEL = "v218";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1845,7 +1845,7 @@ export default function HomePage() {
 
       // Calculate flood depth client-side — same math as tile server
       const CPARAMS = {
-        davidson: { npLat:-45, npLng:-90, maxF:1700, rotDeg:90, rotHrs:12, maxDyn:0 },
+        davidson: { npLat:22, npLng:90, maxF:1700, rotDeg:90, rotHrs:12, maxDyn:0 },
         tes:      { npLat:-40, npLng:-130, maxF:1200, rotDeg:104, rotHrs:8, maxDyn:1100 },
       };
       const p = CPARAMS[model];
@@ -1904,7 +1904,7 @@ export default function HomePage() {
     if (!map) return;
     const model = cataclysmModelRef.current;
     const info = model === "davidson"
-      ? { name: "Davidson / Suspicious Observers", flipBearing: -90, newPoleLat: 78, newPoleLng: 96, newPoleLabel: "New N. Pole (Siberia)" }
+      ? { name: "Davidson / Suspicious Observers", flipBearing: -90, newPoleLat: 22, newPoleLng: 90, newPoleLabel: "New N. Pole (Bay of Bengal)" }
       : { name: "The Ethical Skeptic ECDO", flipBearing: -104, newPoleLat: -40, newPoleLng: -130, newPoleLabel: "New N. Pole (S. Pacific)" };
 
     clearCataclysm();
@@ -2829,7 +2829,7 @@ export default function HomePage() {
           </div>
           <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12, fontStyle: "italic", lineHeight: 1.5 }}>
             {cataclysmModel === "davidson"
-              ? "~90° crustal displacement. New pole: S. Pacific. Americas flood 500-800m. Siberia becomes new polar region."
+              ? "~90° crustal displacement. New pole: Bay of Bengal. Americas flood 500-800m. Himalayas become new polar region."
               : "104° due-south rotation in 8hrs. Global inundation 120-1200m. Pacific basin max resonance. Based on TES ECDO Theory."}
           </div>
           <div style={{ fontSize: 11, color: "#475569", marginBottom: 10, lineHeight: 1.4 }}>
@@ -3070,7 +3070,7 @@ export default function HomePage() {
           </div>
           <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8 }}>
             {cataclysmModel === "davidson"
-              ? "~90° crustal displacement · New pole: Siberia · 12hr event"
+              ? "~90° crustal displacement · New pole: Bay of Bengal · 12hr event"
               : "104° due-south rotation · New pole: S. Pacific · 8hr event"}
           </div>
           {CATACLYSM_WIND[cataclysmModel] && (
