@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v219";
+const FRONTEND_BUILD_LABEL = "v220";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -2422,6 +2422,10 @@ export default function HomePage() {
               style={{ width: "100%", padding: "8px", background: "#f97316", color: "white", border: "none", borderRadius: 7, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
               ⚡ Founders Price — $18.99 Lifetime
             </button>
+            <div style={{ textAlign: "center", marginTop: 6, fontSize: 11, color: "#475569" }}>
+              or <span onClick={() => window.open("https://buy.stripe.com/6oU5kDcyYbEe4yi6vra3u0a", "_blank")}
+                style={{ color: "#60a5fa", cursor: "pointer", textDecoration: "underline" }}>$6.99/month</span>
+            </div>
           </div>
         </div>
       ) : (
