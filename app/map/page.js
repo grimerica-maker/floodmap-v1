@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v205";
+const FRONTEND_BUILD_LABEL = "v206";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -2583,6 +2583,29 @@ export default function HomePage() {
             </div>
           </div>
         ))}
+        {/* Wildfire legend */}
+        {WILDFIRE_ZONES.some(z => z.minLevel <= (inputLevel || 0)) && (
+          <div style={{ background: "#111827", border: "1px solid #1e2d45", borderRadius: 10, padding: "10px 14px", marginBottom: 12, marginTop: 4 }}>
+            <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>🔥 Wildfire Risk Zones</div>
+            {[
+              { color: "#f97316", label: "1.5°C", desc: "Current trajectory" },
+              { color: "#ef4444", label: "2°C", desc: "Moderate warming" },
+              { color: "#dc2626", label: "3°C", desc: "High warming" },
+              { color: "#b91c1c", label: "4°C", desc: "Catastrophic" },
+            ].filter(l => {
+              const levelMap = { "#f97316": 1.5, "#ef4444": 2.0, "#dc2626": 3.0, "#b91c1c": 4.0 };
+              const warmingMap = { 0.3: 1.5, 0.5: 2.0, 1.0: 3.0, 1.5: 4.0 };
+              const activeWarming = warmingMap[inputLevel] || 0;
+              return levelMap[l.color] <= activeWarming;
+            }).map(l => (
+              <div key={l.color} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                <div style={{ width: 14, height: 14, borderRadius: 3, background: l.color, opacity: 0.7, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: "#64748b" }}><b style={{ color: "#94a3b8" }}>{l.label}</b> — {l.desc}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {(proTierRef.current ?? proTier ?? "free") !== "free" && floodDisplaced !== null && (
           <div style={{ background: "#111827", border: "1px solid #22c55e", borderRadius: 10, padding: "10px 14px", marginBottom: 12, marginTop: 8 }}>
             <div style={{ fontSize: 11, color: "#22c55e", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Displaced Population</div>
