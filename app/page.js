@@ -264,7 +264,7 @@ export default function Homepage() {
           {/* TRUST BAR */}
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(255,255,255,0.015)" }}>
             <div style={{ maxWidth: 960, margin: "0 auto", padding: "32px 40px", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 24, textAlign: "center" }}>
-              {[["8","Disaster Scenarios"],["ETOPO1","Global Terrain"],["GPW v4","Population Data"],["Real-time","Tile Rendering"],["3D Globe","WebGL Powered"],["Free","To Start"]].map(([v,l]) => (
+              {[["7","Disaster Scenarios"],["ETOPO1","Global Terrain"],["GPW v4","Population Data"],["Real-time","Tile Rendering"],["3D Globe","WebGL Powered"],["Free","To Start"]].map(([v,l]) => (
                 <div key={v}>
                   <div style={{ fontSize: 22, fontWeight: 700, color: "#f97316", fontStyle: "italic" }}>{v}</div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, letterSpacing: "0.06em", textTransform: "uppercase" }}>{l}</div>
