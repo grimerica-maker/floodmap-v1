@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v198";
+const FRONTEND_BUILD_LABEL = "v199";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -2227,7 +2227,7 @@ export default function HomePage() {
   }, [impactDiameter, scenarioMode]);
 
   useEffect(() => {
-    if (!isMapReady() || scenarioMode !== "flood" || !scenarioMode) return;
+    if (!isMapReady() || (scenarioModeRef.current !== "flood" && scenarioModeRef.current !== "climate")) return;
     syncFloodScenario();
   }, [seaLevel, viewMode, scenarioMode]);
 
@@ -2538,21 +2538,24 @@ export default function HomePage() {
                       setInputLevel(p.level);
                       setInputText(String(p.level));
                       setSeaLevel(p.level);
+                      seaLevelRef.current = p.level;
                       setScenarioMode("climate");
+                      scenarioModeRef.current = "climate";
+                      // Trigger flood via executeFlood after state settles
+                      setTimeout(() => executeFlood(), 50);
+                      // Draw wildfire zones for warming presets
+                      const warmingMap = { 0.3: 1.5, 0.5: 2.0, 1.0: 3.0, 1.5: 4.0 };
+                      const warmingLevel = warmingMap[p.level];
                       const map = mapRef.current;
                       if (map) {
-                        applyFloodTiles(map, p.level, {});
-                        // Draw wildfire zones for warming presets
-                        const warmingMap = { 0.3: 1.5, 0.5: 2.0, 1.0: 3.0, 1.5: 4.0 };
-                        const warmingLevel = warmingMap[p.level];
                         if (warmingLevel) {
-                          setTimeout(() => safely(() => drawWildfireZones(map, warmingLevel)), 400);
+                          setTimeout(() => safely(() => drawWildfireZones(map, warmingLevel)), 600);
                         } else {
-                          clearWildfireZones(map);
+                          safely(() => clearWildfireZones(map));
                         }
                         setTimeout(() => {
                           safely(() => map.flyTo({ center: p.city, zoom: p.zoom, duration: 1800 }));
-                        }, 300);
+                        }, 400);
                       }
                     }}
                     style={{ padding: "8px 10px", background: active ? "#052e16" : "#111827", color: active ? "#4ade80" : "#94a3b8", border: active ? "1px solid #22c55e" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, textAlign: "left" }}>
