@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v193";
+const FRONTEND_BUILD_LABEL = "v194";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1688,47 +1688,70 @@ export default function HomePage() {
     closeElevPopup();
     const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: false, maxWidth: "260px" });
     popup.setLngLat([lng, lat])
-      .setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px;padding:4px 6px;color:#94a3b8">Loading flood depth...</div>`)
+      .setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px;padding:4px 6px;color:#94a3b8">Loading...</div>`)
       .addTo(map);
     elevPopupRef.current = popup;
     const model = cataclysmModelRef.current;
     const modelLabel = model === "davidson" ? "Ben Davidson 90°" : "TES ECDO 104°";
     try {
       const res = await fetch(
-        `${floodEngineUrlRef.current}/cataclysm-depth?model=${model}&lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`,
+        `${floodEngineUrlRef.current}/elevation?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`,
         { cache: "no-store" }
       );
       if (!res.ok) throw new Error();
       const data = await res.json();
       if (elevPopupRef.current !== popup) return;
+      const terrainM = data.elevation_m ?? 0;
 
-      const terrainM = data.terrain_m ?? 0;
-      const floodM = data.flood_depth_m ?? 0;
-      const waterM = data.water_depth_m ?? 0;
-      const isFlooded = data.is_flooded;
-
-      const terrainDisplay = `${Math.round(terrainM)} m`;
-      const floodDisplay = `${Math.round(floodM)} m`;
-      const waterDisplay = `${Math.round(waterM)} m`;
-
-      let statusColor = isFlooded ? "#f87171" : "#86efac";
-      let statusIcon = isFlooded ? "🌊" : "✓";
-      let statusText = isFlooded
-        ? `Water depth: <b style="color:#f87171">${waterDisplay}</b>`
-        : `Above flood level by <b style="color:#86efac">${Math.round(terrainM - floodM)} m</b>`;
+      // Calculate flood depth client-side — same math as tile server
+      const CPARAMS = {
+        davidson: { npLat:-45, npLng:-90, maxF:1700, rotDeg:90, rotHrs:12, maxDyn:0 },
+        tes:      { npLat:-40, npLng:-130, maxF:1200, rotDeg:104, rotHrs:8, maxDyn:1100 },
+      };
+      const p = CPARAMS[model];
+      const latR = lat*Math.PI/180, lngR = lng*Math.PI/180;
+      const cosD = Math.sin(latR)*Math.sin(p.npLat*Math.PI/180)+Math.cos(latR)*Math.cos(p.npLat*Math.PI/180)*Math.cos(lngR-p.npLng*Math.PI/180);
+      const npDist = Math.acos(Math.max(-1,Math.min(1,cosD)))*180/Math.PI;
+      const delta = Math.abs(npDist-90)-Math.abs(lat);
+      const staticM = delta<0 ? Math.min(1,Math.abs(delta)/p.rotDeg)*p.maxF : 0;
+      const vel = (p.rotDeg*Math.PI/180/(p.rotHrs*3600))*6371000*Math.cos(latR);
+      let dynM = 0;
+      if (p.maxDyn>0) {
+        const le = ((lng%360)+360)%360;
+        const b = le>=120&&le<=290?1.8:(le>=290||le<=20?1.3:(le>=20&&le<=80?1.1:1.0));
+        dynM = Math.min(p.maxDyn, vel*0.75*b);
+      } else { dynM = vel*0.15; }
+      let surge = 0;
+      if (model==="davidson") {
+        if (lat>=35&&lat<=58&&lng>=-15&&lng<=25) surge+=150;
+        if (lat>=15&&lat<=38&&lng>=-10&&lng<=40) surge+=200;
+        if (lat<=-35&&lat<=15&&lng>=-90&&lng<=-35) surge+=180;
+        if (lat>=10&&lat<=30&&lng>=-100&&lng<=-60) surge+=120;
+        if (lat>=-35&&lat<=15&&lng>=-20&&lng<=55) surge+=350;
+        if (lat>=5&&lat<=45&&lng>=55&&lng<=145) surge+=300;
+      }
+      if (model==="tes") {
+        if (lat>=-35&&lat<=38&&lng>=-20&&lng<=55) surge+=400;
+        if (lat>=38&&lat<=72&&lng>=-15&&lng<=45) surge+=350;
+        if (lat>=5&&lat<=55&&lng>=45&&lng<=150) surge+=380;
+      }
+      const floodM = Math.min(1200,Math.max(0,staticM+dynM+surge));
+      const waterM = Math.max(0,floodM-terrainM);
+      const isFlooded = terrainM<=floodM && terrainM<1200;
+      const col = isFlooded?"#f87171":"#86efac";
 
       popup.setHTML(`
         <div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.7;padding:2px 6px">
           <div style="color:#94a3b8;font-size:11px;margin-bottom:6px">${lat.toFixed(4)}, ${lng.toFixed(4)}</div>
-          <div style="color:#e2e8f0;margin-bottom:2px">Elevation: <b>${terrainDisplay}</b></div>
-          <div style="color:#e2e8f0;margin-bottom:6px">Inundation depth: <b style="color:#38bdf8">${floodDisplay}</b></div>
-          <div style="color:${statusColor};font-weight:700">${statusIcon} ${isFlooded ? `Flooded — ${waterDisplay} deep` : `Safe — ${Math.round(terrainM - floodM)}m above flood`}</div>
+          <div style="color:#e2e8f0;margin-bottom:2px">Elevation: <b>${Math.round(terrainM)} m</b></div>
+          <div style="color:#e2e8f0;margin-bottom:6px">Inundation level: <b style="color:#38bdf8">${Math.round(floodM)} m</b></div>
+          <div style="color:${col};font-weight:700">${isFlooded?"🌊":"✓"} ${isFlooded?`Flooded — ${Math.round(waterM)}m deep`:`Safe — ${Math.round(terrainM-floodM)}m above flood`}</div>
           <div style="color:#475569;font-size:10px;margin-top:6px">☄️ ${modelLabel}</div>
         </div>
       `);
     } catch(e) {
       if (elevPopupRef.current === popup) {
-        popup.setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px;padding:4px 6px;color:#94a3b8">Depth unavailable</div>`);
+        popup.setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px;padding:4px 6px;color:#94a3b8">Elevation unavailable</div>`);
       }
     }
   };
