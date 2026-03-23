@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v214";
+const FRONTEND_BUILD_LABEL = "v215";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1984,10 +1984,10 @@ export default function HomePage() {
       // Interaction already handled below with currentTier check
       // Post-flip: same left-to-right longitude spin as before
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-      // Free: lock interaction during post-flip spin
+      // Free: allow pan but lock zoom — can explore but not zoom in
       if ((proTierRef.current ?? proTier ?? "free") === "free") {
         safely(() => {
-          map.dragPan.disable();
+          map.dragPan.enable();
           map.scrollZoom.disable();
           map.doubleClickZoom.disable();
           map.touchZoomRotate.disable();
@@ -2037,13 +2037,13 @@ export default function HomePage() {
       const stopSpin = () => {
         spinActive = false;
         if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-        map.off("mousedown", stopSpin);
-        map.off("touchstart", stopSpin);
         map.off("wheel", stopSpin);
-        map.off("dragstart", stopSpin);
         map.off("zoomstart", stopSpin);
         if ((proTierRef.current ?? proTier ?? "free") === "free") {
-          setPaywallModal("pro");
+          // Free: pan allowed, zoom triggers paywall
+          safely(() => { map.dragPan.enable(); });
+          map.on("wheel", () => setPaywallModal("pro"));
+          map.on("zoomstart", () => setPaywallModal("pro"));
         } else {
           safely(() => {
             map.dragPan.enable();
@@ -2053,10 +2053,7 @@ export default function HomePage() {
           });
         }
       };
-      map.on("mousedown", stopSpin);
-      map.on("touchstart", stopSpin);
       map.on("wheel", stopSpin);
-      map.once("dragstart", stopSpin);
       map.once("zoomstart", stopSpin);
     }, 14000);
   };
