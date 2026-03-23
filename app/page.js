@@ -275,7 +275,7 @@ export default function Homepage() {
 
           {/* SCENARIOS */}
           <section id="scenarios" style={{ maxWidth: 1120, margin: "0 auto", padding: "80px 40px" }}>
-            <h2 style={{ fontSize: 38, fontWeight: 700, textAlign: "center", marginBottom: 10, fontStyle: "italic" }}>Six Catastrophe Scenarios</h2>
+            <h2 style={{ fontSize: 38, fontWeight: 700, textAlign: "center", marginBottom: 10, fontStyle: "italic" }}>Seven Catastrophe Scenarios</h2>
             <p style={{ textAlign: "center", color: "#64748b", marginBottom: 56, fontSize: 16, lineHeight: 1.7 }}>
               Each model uses peer-reviewed science, real terrain data, and published casualty frameworks.
               Theoretical models are clearly labeled.
