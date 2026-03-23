@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v201";
+const FRONTEND_BUILD_LABEL = "v203";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -408,7 +408,7 @@ export default function HomePage() {
 
   const seaLevelRef = useRef(0);
   const viewModeRef = useRef("map");
-  const scenarioModeRef = useRef("flood");
+  const scenarioModeRef = useRef(null);
   const impactDiameterRef = useRef(1000);
   const floodEngineUrlRef = useRef(FLOOD_ENGINE_PROXY_PATH);
 
@@ -959,11 +959,13 @@ export default function HomePage() {
     cancelPendingImpactRequest();
     impactRunSeqRef.current += 1;
     setImpactLoading(false);
-    const parsedLevel = commitInputText(inputText, unitMode);
+    const parsedLevel = scenarioModeRef.current === "climate"
+      ? String(seaLevelRef.current)
+      : commitInputText(inputText, unitMode);
     if (parsedLevel === null) { setStatus("Enter a valid sea level first"); return; }
     const level = Number(parsedLevel);
     setSeaLevel(level); seaLevelRef.current = level; setInputLevel(level);
-    setScenarioMode("flood");
+    if (scenarioModeRef.current !== "climate") setScenarioMode("flood");
     if (!floodAllowedInCurrentView()) { removeFloodLayer(); setStatus("Switch to a supported view mode"); return; }
     if (level === 0) { removeFloodLayer(); setStatus("Flood cleared"); return; }
     if (!mapRef.current) { setStatus("Map not ready"); return; }
@@ -2042,10 +2044,10 @@ export default function HomePage() {
     setInputLevel(0); setInputText("0"); setSeaLevel(0); seaLevelRef.current = 0;
     removeFloodLayer(); removeImpactPoint(); clearImpactPreview();
     setImpactResult(null); setImpactError("");
-    setScenarioMode("flood");
+    if (scenarioModeRef.current !== "climate") setScenarioMode("flood");
     setFloodDisplaced(null);
     closeElevPopup();
-    setStatus("Flood cleared");
+    setStatus(scenarioModeRef.current === "climate" ? "Climate cleared" : "Flood cleared");
   };
 
   // Register service worker for tile caching
@@ -2082,7 +2084,7 @@ export default function HomePage() {
     const handleStyleLoad = () => {
       applyProjectionForMode(viewModeRef.current);
       activeFloodLevelRef.current = null;
-      if (scenarioModeRef.current === "flood" && Number(seaLevelRef.current) !== 0 && floodAllowedInCurrentView()) {
+      if ((scenarioModeRef.current === "flood" || scenarioModeRef.current === "climate") && Number(seaLevelRef.current) !== 0 && floodAllowedInCurrentView()) {
         setTimeout(() => { syncFloodScenario(); }, 50);
       } else { removeFloodLayer(); }
       if (scenarioModeRef.current === "impact" && impactPointRef.current && impactResultRef.current) {
