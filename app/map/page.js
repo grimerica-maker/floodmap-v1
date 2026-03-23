@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v206";
+const FRONTEND_BUILD_LABEL = "v207";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -2374,6 +2374,19 @@ export default function HomePage() {
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Click map to place impact point</div>
         </button>
         <button
+          onClick={() => {
+            if (scenarioModeRef.current === "nuke") clearNuke();
+            if (scenarioModeRef.current === "yellowstone") clearYellowstone();
+            if (scenarioModeRef.current === "tsunami") clearTsunami();
+            if (scenarioModeRef.current === "cataclysm") clearCataclysm();
+            unlockMapControls();
+            setScenarioMode("climate");
+          }}
+          style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "climate" ? "#052e16" : "#111827", color: scenarioMode === "climate" ? "#4ade80" : "#94a3b8", border: scenarioMode === "climate" ? "1px solid #22c55e" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
+          <div style={{ fontSize: 15 }}>🌍 Climate Change</div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Sea level rise projections</div>
+        </button>
+        <button
           onClick={() => { if (scenarioModeRef.current === "tsunami") clearTsunami(); if (scenarioModeRef.current === "cataclysm") clearCataclysm(); unlockMapControls(); setScenarioMode("nuke"); clearImpactPreview(); setNukeResult(null); setNukeError(""); setNukePointSet(false); nukePointRef.current = null; }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "nuke" ? "#4c1d95" : "#111827", color: scenarioMode === "nuke" ? "#c4b5fd" : "#94a3b8", border: scenarioMode === "nuke" ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>☢️ Nuke</div>
@@ -2402,19 +2415,6 @@ export default function HomePage() {
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "cataclysm" ? "#1a0505" : "#111827", color: scenarioMode === "cataclysm" ? "#ef4444" : "#94a3b8", border: scenarioMode === "cataclysm" ? "1px solid #dc2626" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>☄️ Cataclysm</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Pole shift inundation models</div>
-        </button>
-        <button
-          onClick={() => {
-            if (scenarioModeRef.current === "nuke") clearNuke();
-            if (scenarioModeRef.current === "yellowstone") clearYellowstone();
-            if (scenarioModeRef.current === "tsunami") clearTsunami();
-            if (scenarioModeRef.current === "cataclysm") clearCataclysm();
-            unlockMapControls();
-            setScenarioMode("climate");
-          }}
-          style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "climate" ? "#052e16" : "#111827", color: scenarioMode === "climate" ? "#4ade80" : "#94a3b8", border: scenarioMode === "climate" ? "1px solid #22c55e" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
-          <div style={{ fontSize: 15 }}>🌍 Climate Change</div>
-          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Sea level rise projections</div>
         </button>
       </div>
 
