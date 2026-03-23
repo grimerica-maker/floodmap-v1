@@ -151,6 +151,20 @@ const YELLOWSTONE_PRESETS = [
 ];
 
 // Build ash ellipse GeoJSON — jet stream blows ENE so bearing ~70° from Yellowstone
+// Centered ellipse for wind zones — no bearing offset, oriented N/S
+const buildWindEllipse = (centerLng, centerLat, majorKm, minorKm, steps = 96) => {
+  const kpLat = 110.574;
+  const kpLng = 111.32 * Math.cos((centerLat * Math.PI) / 180);
+  const coords = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * Math.PI * 2;
+    const nKm = Math.cos(t) * majorKm;
+    const eKm = Math.sin(t) * minorKm;
+    coords.push([centerLng + eKm / Math.max(kpLng, 0.0001), centerLat + nKm / kpLat]);
+  }
+  return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} };
+};
+
 const buildAshEllipse = (centerLng, centerLat, majorKm, minorKm, bearingDeg = 70, steps = 96) => {
   const kpLat = 110.574;
   const kpLng = 111.32 * Math.cos((centerLat * Math.PI) / 180);
@@ -1551,7 +1565,7 @@ export default function HomePage() {
     const centers = [windData.center1, windData.center2];
     centers.forEach(([cLng, cLat], ci) => {
       const features = [...windData.zones].reverse().map((zone, i) => ({
-        ...buildAshEllipse(cLng, cLat, zone.major_km, zone.minor_km),
+        ...buildWindEllipse(cLng, cLat, zone.major_km, zone.minor_km),
         properties: { zoneIdx: windData.zones.length - 1 - i, ...zone },
       }));
       try {
