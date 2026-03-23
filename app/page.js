@@ -54,6 +54,7 @@ const JSONLD_FAQ = {
 
 // ── Scenario data ─────────────────────────────────────────────────────────────
 const SCENARIOS = [
+  { emoji: "🌍", name: "Climate Change", tagline: "1.5°C to 4°C · Sea Rise · Wildfires · Ice Collapse", color: "#22c55e", desc: "Model IPCC sea level projections from Paris 1.5°C target through 4°C catastrophic warming. Cumulative wildfire risk zones across California, Amazon, Mediterranean, Siberia and more. West Antarctic and Greenland ice sheet collapse. Auto-flies to at-risk cities.", science: "IPCC AR6 · ETOPO1 · GPW v4" },
   { emoji: "🌊", name: "Sea Level Change", tagline: "−11,000m to +3,048m", color: "#3b82f6", desc: "Visualize coastal flooding at any sea level. Model ice age glaciation, modern IPCC melt projections, or complete ice sheet collapse. Real ETOPO1 terrain, pixel-accurate inundation.", science: "ETOPO1 · IPCC AR6 · GPW v4" },
   { emoji: "💥", name: "Asteroid Impact", tagline: "50m to 20km diameter", color: "#ef4444", desc: "Drop any asteroid anywhere on Earth. Calculate crater diameter, blast radius, thermal zone, EMP range, and tsunami generation using the Collins et al. Earth Impact Effects Program.", science: "Melosh 1989 · Collins et al. 2005 · Satake 2012" },
   { emoji: "☢️", name: "Nuclear Detonation", tagline: "1kt to 50Mt yield", color: "#a78bfa", desc: "Detonate any nuclear device from tactical to Tsar Bomba scale. Models fireball, blast zones, thermal radiation, EMP radius, and fallout plume with wind direction.", science: "Glasstone & Dolan 1977" },
@@ -64,6 +65,16 @@ const SCENARIOS = [
 
 // ── Full source list ──────────────────────────────────────────────────────────
 const SOURCES = [
+  {
+    category: "Climate Change & Wildfire",
+    color: "#22c55e",
+    items: [
+      { name: "IPCC AR6 WG1 (2021)", title: "Climate Change 2021: The Physical Science Basis — Sea Level Rise", publisher: "Intergovernmental Panel on Climate Change", use: "SSP1-2.6 and SSP5-8.5 sea level projections for 2050 and 2100. 1.5°C, 2°C, 3°C, 4°C warming scenario sea level estimates used for climate mode presets.", url: "https://www.ipcc.ch/report/ar6/wg1/" },
+      { name: "Bamber et al. (2019)", title: "Ice sheet contributions to future sea-level rise from structured expert judgment", publisher: "PNAS 116(23), 11195–11200", use: "West Antarctic Ice Sheet collapse (+3.3m) and Greenland full melt (+7m) estimates for ice sheet collapse presets.", url: "https://doi.org/10.1073/pnas.1817205116" },
+      { name: "Abatzoglou & Williams (2016)", title: "Impact of anthropogenic climate change on wildfire across western US forests", publisher: "PNAS 113(42), 11770–11775", use: "Warming-level wildfire risk zone calibration for western North America. Documented doubling of fire-affected area per degree of warming.", url: "https://doi.org/10.1073/pnas.1607171113" },
+      { name: "Jones et al. (2022)", title: "Global and regional trends and drivers of fire under climate change", publisher: "Reviews of Geophysics 60(3)", use: "Global wildfire expansion zones by warming level — Amazon, Mediterranean, Siberia, Australia — used to calibrate 1.5°C through 4°C wildfire ellipse placement.", url: "https://doi.org/10.1029/2022RG000798" },
+    ],
+  },
   {
     category: "Impact & Nuclear Physics",
     color: "#ef4444",
@@ -133,6 +144,7 @@ const EQUATIONS = [
 
 // ── FAQ ───────────────────────────────────────────────────────────────────────
 const FAQS = [
+  { q: "What climate change scenarios are modeled?", a: "Climate mode uses IPCC AR6 sea level projections — from the 1.5°C Paris target (+0.3m) through 4°C catastrophic warming (+1.5m), plus 2050 and 2100 low/high scenarios. Cumulative wildfire risk zones appear for warming presets, sourced from Abatzoglou & Williams (2016) and Jones et al. (2022). Ice sheet collapse presets include West Antarctic (+3.3m), Greenland full melt (+7m), and both combined (+10m)." },
   { q: "How accurate is the flood simulation?", a: "Flood inundation uses ETOPO1 terrain data (NOAA, 1 arc-minute resolution — roughly 1.8km cells globally). Each tile calculates terrain elevation versus requested sea level, producing pixel-accurate static inundation. Dynamic effects like storm surge, erosion, or groundwater are not modeled. Best for large-scale scenario visualization, not engineering-grade coastal assessment." },
   { q: "What physics model powers the asteroid impact calculator?", a: "Crater scaling uses Melosh (1989) transient-to-final diameter ratios. Blast and thermal radii use Collins et al. (2005) Earth Impact Effects Program methodology. Casualty estimates combine GPW v4 population data with zone-specific mortality rates (100% fireball, declining through blast and thermal zones)." },
   { q: "What is the ECDO / pole shift theory?", a: "ECDO (Exothermic Core-Mantle Decoupling Oscillation) is a theoretical model by The Ethical Skeptic proposing a 104° crustal displacement event driven by core-mantle thermal dynamics. Ben Davidson (Suspicious Observers) proposes a 90° displacement linked to solar micronova cycles. Both are theoretical — clearly labeled throughout the app — and simulated as presented by their authors. Disaster Map does not endorse or refute these theories." },
@@ -220,9 +232,9 @@ export default function Homepage() {
               Simulate Earth's<br />Greatest Threats
             </h1>
             <p style={{ fontSize: 20, color: "#94a3b8", maxWidth: 640, margin: "0 auto 44px", lineHeight: 1.8 }}>
-              Asteroid impacts. Nuclear detonations. Mega-tsunamis. Supervolcano eruptions.
+              Climate change. Asteroid impacts. Nuclear detonations. Mega-tsunamis. Supervolcano eruptions.
               Sea level rise. Crustal displacement. All on a live 3D globe —
-              powered by peer-reviewed physics and real terrain data.
+              powered by IPCC projections, peer-reviewed physics and real terrain data.
             </p>
             <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
               <Link href="/map" style={{ background: "#f97316", color: "#fff", padding: "17px 44px", borderRadius: 10, textDecoration: "none", fontWeight: 700, fontSize: 18, boxShadow: "0 0 40px rgba(249,115,22,0.35)" }}>
@@ -252,7 +264,7 @@ export default function Homepage() {
           {/* TRUST BAR */}
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(255,255,255,0.015)" }}>
             <div style={{ maxWidth: 960, margin: "0 auto", padding: "32px 40px", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 24, textAlign: "center" }}>
-              {[["6","Disaster Scenarios"],["ETOPO1","Global Terrain"],["GPW v4","Population Data"],["Real-time","Tile Rendering"],["3D Globe","WebGL Powered"],["Free","To Start"]].map(([v,l]) => (
+              {[["8","Disaster Scenarios"],["ETOPO1","Global Terrain"],["GPW v4","Population Data"],["Real-time","Tile Rendering"],["3D Globe","WebGL Powered"],["Free","To Start"]].map(([v,l]) => (
                 <div key={v}>
                   <div style={{ fontSize: 22, fontWeight: 700, color: "#f97316", fontStyle: "italic" }}>{v}</div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, letterSpacing: "0.06em", textTransform: "uppercase" }}>{l}</div>
