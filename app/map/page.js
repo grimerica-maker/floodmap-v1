@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v200";
+const FRONTEND_BUILD_LABEL = "v201";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -2521,17 +2521,31 @@ export default function HomePage() {
         </div>
       </>}
 
-      {/* ── CLIMATE CONTROLS ── */}
+      {/* ── CLIMATE CONTROLS — cloned from flood, green theme, preset-only ── */}
       {scenarioMode === "climate" && <>
         <hr style={{ margin: "0 0 16px 0", borderColor: "#1e2d45" }} />
+        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6, letterSpacing: "0.1em", color: "#22c55e", textTransform: "uppercase" }}>Sea Level Rise</div>
+        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 10, color: seaLevel > 0 ? "#4ade80" : "#94a3b8" }}>
+          {seaLevel > 0 ? `+${seaLevel}m` : `${seaLevel}m`}
+        </div>
+        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+          <button onClick={(e) => { e.stopPropagation(); executeFlood(); }}
+            style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "#14532d", color: "white", border: "1px solid #22c55e", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 15 }}>
+            Apply
+          </button>
+          <button onClick={() => { clearFlood(); seaLevelRef.current = 0; setSeaLevel(0); setInputLevel(0); setInputText("0"); }}
+            style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 15 }}>
+            Clear
+          </button>
+        </div>
         {["warming", "ipcc", "ice"].map(cat => (
           <div key={cat}>
-            <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "#64748b", textTransform: "uppercase", marginBottom: 6 }}>
+            <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "#64748b", textTransform: "uppercase", marginBottom: 6, marginTop: 4 }}>
               {cat === "warming" ? "🌡️ Warming Scenarios" : cat === "ipcc" ? "📊 IPCC Projections" : "🧊 Ice Sheet Collapse"}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
               {CLIMATE_PRESETS.filter(p => p.category === cat).map(p => {
-                const active = Math.abs((inputLevel || 0) - p.level) < 0.01;
+                const active = Math.abs((inputLevel || 0) - p.level) < 0.05;
                 return (
                   <button key={p.label}
                     onClick={() => {
@@ -2539,11 +2553,8 @@ export default function HomePage() {
                       setInputText(String(p.level));
                       setSeaLevel(p.level);
                       seaLevelRef.current = p.level;
-                      setScenarioMode("climate");
                       scenarioModeRef.current = "climate";
-                      // Trigger flood via executeFlood after state settles
                       setTimeout(() => executeFlood(), 50);
-                      // Draw wildfire zones for warming presets
                       const warmingMap = { 0.3: 1.5, 0.5: 2.0, 1.0: 3.0, 1.5: 4.0 };
                       const warmingLevel = warmingMap[p.level];
                       const map = mapRef.current;
@@ -2555,23 +2566,17 @@ export default function HomePage() {
                         }
                       }
                     }}
-                    style={{ padding: "8px 10px", background: active ? "#052e16" : "#111827", color: active ? "#4ade80" : "#94a3b8", border: active ? "1px solid #22c55e" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, textAlign: "left" }}>
-                    <div style={{ fontSize: 12 }}>{p.label}</div>
-                    <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{p.sub}</div>
+                    style={{ padding: "10px 10px", minHeight: 52, background: active ? "#052e16" : "#111827", color: active ? "#4ade80" : "#94a3b8", border: active ? "1px solid #22c55e" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
+                    <div style={{ fontSize: 13 }}>{p.label}</div>
+                    <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>{p.sub}</div>
                   </button>
                 );
               })}
             </div>
           </div>
         ))}
-        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-          <button onClick={clearFlood}
-            style={{ flex: 1, padding: "11px 10px", minHeight: 44, background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 14 }}>
-            Clear
-          </button>
-        </div>
         {(proTierRef.current ?? proTier ?? "free") !== "free" && floodDisplaced !== null && (
-          <div style={{ background: "#111827", border: "1px solid #22c55e", borderRadius: 10, padding: "10px 14px", marginBottom: 12 }}>
+          <div style={{ background: "#111827", border: "1px solid #22c55e", borderRadius: 10, padding: "10px 14px", marginBottom: 12, marginTop: 8 }}>
             <div style={{ fontSize: 11, color: "#22c55e", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Displaced Population</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: "#e2e8f0" }}>{floodDisplaced.toLocaleString()}</div>
           </div>
