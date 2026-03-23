@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v192";
+const FRONTEND_BUILD_LABEL = "v193";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1720,10 +1720,10 @@ export default function HomePage() {
       popup.setHTML(`
         <div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.7;padding:2px 6px">
           <div style="color:#94a3b8;font-size:11px;margin-bottom:6px">${lat.toFixed(4)}, ${lng.toFixed(4)}</div>
-          <div style="color:#e2e8f0;margin-bottom:2px">Terrain: <b>${terrainDisplay}</b></div>
-          <div style="color:#e2e8f0;margin-bottom:6px">Flood level: <b>${floodDisplay}</b></div>
-          <div style="color:${statusColor}">${statusIcon} ${statusText}</div>
-          <div style="color:#475569;font-size:10px;margin-top:6px">${modelLabel} · Click map for details</div>
+          <div style="color:#e2e8f0;margin-bottom:2px">Elevation: <b>${terrainDisplay}</b></div>
+          <div style="color:#e2e8f0;margin-bottom:6px">Inundation depth: <b style="color:#38bdf8">${floodDisplay}</b></div>
+          <div style="color:${statusColor};font-weight:700">${statusIcon} ${isFlooded ? `Flooded — ${waterDisplay} deep` : `Safe — ${Math.round(terrainM - floodM)}m above flood`}</div>
+          <div style="color:#475569;font-size:10px;margin-top:6px">☄️ ${modelLabel}</div>
         </div>
       `);
     } catch(e) {
@@ -2032,14 +2032,10 @@ export default function HomePage() {
       }
       if (scenarioModeRef.current === "cataclysm") {
         const overlay = cataclysmOverlayRef.current ?? "flood";
-        if (overlay === "wind") {
-          showCataclysmWindPopup(lng, lat);
-        } else if (overlay === "flood") {
+        if (overlay === "flood" || overlay === "both") {
           showCataclysmFloodPopup(lng, lat);
-        } else {
-          // "both" — show wind popup (wind data is more unique)
-          showCataclysmWindPopup(lng, lat);
         }
+        // wind only — no popup
         return;
       }
       showElevPopup(lng, lat);
