@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v210";
+const FRONTEND_BUILD_LABEL = "v211";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -493,6 +493,7 @@ export default function HomePage() {
   useEffect(() => { cataclysmOverlayRef.current = cataclysmOverlay; }, [cataclysmOverlay]);
   const [paywallModal, setPaywallModal] = useState(null); // null | "pro" | "ultra" | "ratelimit"
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
+  const [activeWarmingLevel, setActiveWarmingLevel] = useState(null);
   const [rlStatus, setRlStatus] = useState(() => getRLStatus());
 
   // Mobile-only UI state — purely cosmetic, zero effect on map/engine logic
@@ -2081,7 +2082,7 @@ export default function HomePage() {
 
   const clearFlood = () => {
     const map = mapRef.current;
-    if (map && map.isStyleLoaded()) { try { clearWildfireZones(map); } catch(e){} try { clearIceSheets(map); } catch(e){} }
+    if (map && map.isStyleLoaded()) { try { clearWildfireZones(map); } catch(e){} try { clearIceSheets(map); } catch(e){} } setActiveWarmingLevel(null);
     cancelPendingImpactRequest();
     impactRunSeqRef.current += 1;
     setImpactLoading(false);
@@ -2623,8 +2624,10 @@ export default function HomePage() {
                       const map = mapRef.current;
                       if (map) {
                         if (warmingLevel) {
+                          setActiveWarmingLevel(warmingLevel);
                           setTimeout(() => safely(() => drawWildfireZones(map, warmingLevel)), 600);
                         } else {
+                          setActiveWarmingLevel(null);
                           safely(() => clearWildfireZones(map));
                         }
                       }
@@ -2928,7 +2931,7 @@ export default function HomePage() {
       {scenarioMode === "impact" && <div>Asteroid Diameter: {impactDiameter.toLocaleString()} m</div>}
 
       {/* Wildfire legend in right panel — climate mode only */}
-      {scenarioMode === "climate" && WILDFIRE_ZONES.some(z => z.minLevel <= (inputLevel || 0)) && (
+      {scenarioMode === "climate" && activeWarmingLevel && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
           <div style={{ fontWeight: 700, marginBottom: 6 }}>🔥 Wildfire Risk Zones</div>
@@ -2939,8 +2942,7 @@ export default function HomePage() {
             { color: "#b91c1c", label: "4°C", desc: "Catastrophic" },
           ].filter(l => {
             const levelMap = { "#f97316": 1.5, "#ef4444": 2.0, "#dc2626": 3.0, "#b91c1c": 4.0 };
-            const warmingMap = { 0.3: 1.5, 0.5: 2.0, 1.0: 3.0, 1.5: 4.0 };
-            return levelMap[l.color] <= (warmingMap[inputLevel] || 0);
+            return levelMap[l.color] <= (activeWarmingLevel || 0);
           }).map(l => (
             <div key={l.color} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
               <div style={{ width: 12, height: 12, borderRadius: 2, background: l.color, opacity: 0.8, flexShrink: 0 }} />
