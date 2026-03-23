@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v212";
+const FRONTEND_BUILD_LABEL = "v213";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -78,14 +78,14 @@ const PRESETS = [
 ];
 
 const ICE_SHEET_ZONES = [
-  { name: "Laurentide", center: [-90.0, 55.0], major_km: 2550, minor_km: 1870, bearing: 10, color: "#bfdbfe" },
-  { name: "Fennoscandian", center: [18.0, 65.0], major_km: 1530, minor_km: 1020, bearing: 20, color: "#bfdbfe" },
-  { name: "British-Irish", center: [-3.5, 56.0], major_km: 510, minor_km: 323, bearing: 10, color: "#bfdbfe" },
-  { name: "Patagonian", center: [-70.0, -48.0], major_km: 765, minor_km: 272, bearing: 170, color: "#bfdbfe" },
-  { name: "Greenland (Extended)", center: [-42.0, 72.0], major_km: 1020, minor_km: 595, bearing: 10, color: "#e0f2fe" },
-  { name: "Antarctic (Extended)", center: [0.0, -82.0], major_km: 2380, minor_km: 2380, bearing: 0, color: "#e0f2fe" },
-  { name: "Barents-Kara", center: [55.0, 74.0], major_km: 1190, minor_km: 765, bearing: 80, color: "#bfdbfe" },
-  { name: "Cordilleran", center: [-126.0, 56.0], major_km: 1020, minor_km: 510, bearing: 160, color: "#bfdbfe" },
+  { name: "Laurentide", center: [-90.0, 55.0], major_km: 2372, minor_km: 1739, bearing: 10, color: "#bfdbfe" },
+  { name: "Fennoscandian", center: [18.0, 65.0], major_km: 1423, minor_km: 949, bearing: 20, color: "#bfdbfe" },
+  { name: "British-Irish", center: [-3.5, 56.0], major_km: 474, minor_km: 300, bearing: 10, color: "#bfdbfe" },
+  { name: "Patagonian", center: [-70.0, -48.0], major_km: 711, minor_km: 253, bearing: 170, color: "#bfdbfe" },
+  { name: "Greenland (Extended)", center: [-42.0, 72.0], major_km: 949, minor_km: 553, bearing: 10, color: "#e0f2fe" },
+  { name: "Antarctic (Extended)", center: [0.0, -82.0], major_km: 2213, minor_km: 2213, bearing: 0, color: "#e0f2fe" },
+  { name: "Barents-Kara", center: [55.0, 74.0], major_km: 1107, minor_km: 711, bearing: 80, color: "#bfdbfe" },
+  { name: "Cordilleran", center: [-126.0, 56.0], major_km: 949, minor_km: 474, bearing: 160, color: "#bfdbfe" },
 ];
 
 const ICE_SHEET_SOURCE = "ice-sheet-source";
