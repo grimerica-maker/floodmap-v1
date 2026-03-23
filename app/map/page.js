@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v191";
+const FRONTEND_BUILD_LABEL = "v192";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 10;
@@ -1495,10 +1495,10 @@ export default function HomePage() {
   // Wind kill zone data — centered on max displacement point and new equator midpoint
   const CATACLYSM_WIND = {
     davidson: {
-      // Center 1: Max rotational velocity — equatorial zone facing displacement
-      center1: [0, -90],
+      // Center 1: Max rotational velocity — mid-latitude for ellipse appearance
+      center1: [-90, -35],
       // Center 2: Secondary — opposite side
-      center2: [0, 90],
+      center2: [90, 35],
       // Wind speeds from 90° rotation in 12hrs: ~3,700 km/h peak at equator
       zones: [
         { name: "Instant Death", speedLabel: "3,700+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "No structure survives. Ground-level pressure wave equivalent to multiple nuclear detonations.", major_km: 2000, minor_km: 1200, color: "#ef4444", opacity: 0.55 },
@@ -1509,10 +1509,10 @@ export default function HomePage() {
       ],
     },
     tes: {
-      // Center 1: Max rotational velocity — equatorial zone
-      center1: [0, -59],
+      // Center 1: Max rotational velocity — mid-latitude for ellipse appearance
+      center1: [-59, -35],
       // Center 2: Pacific basin resonance
-      center2: [0, 121],
+      center2: [121, 35],
       // TES 104° rotation in 8hrs: ~5,800 km/h peak at equator
       zones: [
         { name: "Instant Death", speedLabel: "5,800+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "Complete atmospheric scouring. No survival possible.", major_km: 2500, minor_km: 1500, color: "#ef4444", opacity: 0.55 },
@@ -3146,50 +3146,47 @@ export default function HomePage() {
           DESKTOP: right stats panel — collapsible slide-in
       ═══════════════════════════════════════════════ */}
       {!isMobile && (<>
-        {/* Toggle tab — always pinned to right edge */}
-        <button
+        {/* Desktop stats pill — bottom right, mirrors mobile pill style */}
+        <div
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); setDesktopStatsOpen(v => !v); }}
           style={{
-            position: "absolute",
-            right: desktopStatsOpen ? 340 : 0,
-            top: "50%",
-            transform: "translateY(-50%)",
-            zIndex: 1001,
-            background: "#1e3a5f", color: "white", border: "none",
-            borderRadius: "8px 0 0 8px",
-            padding: "14px 7px",
-            cursor: "pointer",
-            boxShadow: "-2px 2px 8px rgba(0,0,0,0.4)",
-            transition: "right 0.25s ease",
-            display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-          }}
-        >
-          <span style={{ fontSize: 11, opacity: 0.7, writingMode: "vertical-rl", letterSpacing: "0.05em" }}>
-            {desktopStatsOpen ? "STATS" : "STATS"}
-          </span>
-          <span style={{ fontSize: 13 }}>{desktopStatsOpen ? "▶" : "◀"}</span>
-        </button>
-        {/* Sliding panel */}
-        <div
-          className="fm-desktop-stats"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: "absolute", right: 0, top: 10,
+            position: "absolute", bottom: 32, right: 20,
             background: "#1e3a5f", color: "white",
-            padding: 16, borderRadius: "12px 0 0 12px",
-            fontSize: 14, lineHeight: 1.45,
-            width: 340, maxHeight: "calc(100vh - 20px)",
-            overflowY: "auto",
-            zIndex: 1000,
-            transition: "transform 0.25s ease",
-            transform: desktopStatsOpen ? "translateX(0)" : "translateX(100%)",
-            boxShadow: "-4px 0 20px rgba(0,0,0,0.3)",
+            borderRadius: 20, padding: "7px 16px",
+            fontSize: 13, fontWeight: 700,
+            zIndex: 1100, cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 8,
+            boxShadow: "0 2px 12px rgba(0,0,0,0.35)",
+            whiteSpace: "nowrap", userSelect: "none",
           }}
         >
-          {statsContent}
+          <span style={{ color: "#facc15" }}>{FRONTEND_BUILD_LABEL}</span>
+          <span style={{ opacity: 0.7, margin: "0 2px" }}>·</span>
+          <span>{formatLevelForDisplay(seaLevel)}</span>
+          <span style={{ opacity: 0.7, margin: "0 2px" }}>·</span>
+          <span style={{ opacity: 0.85 }}>{status.length > 28 ? status.slice(0, 26) + "…" : status}</span>
+          <span style={{ marginLeft: 4, opacity: 0.7, fontSize: 11 }}>{desktopStatsOpen ? "▼" : "▲"}</span>
         </div>
+        {/* Desktop stats expanded sheet — bottom right, above pill */}
+        {desktopStatsOpen && (
+          <div
+            className="fm-desktop-stats"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "absolute", bottom: 72, right: 20,
+              background: "#1e3a5f", color: "white",
+              padding: "14px 16px", borderRadius: 14,
+              fontSize: 13, lineHeight: 1.5,
+              zIndex: 1050, minWidth: 320,
+              boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+              maxHeight: "70vh", overflowY: "auto",
+            }}
+          >
+            {statsContent}
+          </div>
+        )}
       </>)}
 
       {/* ═══════════════════════════════════════════════
