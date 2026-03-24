@@ -24,10 +24,10 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v220";
+const FRONTEND_BUILD_LABEL = "v221";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
-const FREE_SIM_PER_HOUR = 10;
+const FREE_SIM_PER_HOUR = 30;
 const FREE_SIM_PER_DAY  = 30;
 const PRO_SIM_PER_HOUR  = 50;
 const PRO_SIM_PER_DAY   = 200;
@@ -49,7 +49,6 @@ const checkAndIncrementRL = (isPro) => {
   const d = getRLData();
   const maxH = isPro ? PRO_SIM_PER_HOUR : FREE_SIM_PER_HOUR;
   const maxD = isPro ? PRO_SIM_PER_DAY  : FREE_SIM_PER_DAY;
-  if (d.hourCount >= maxH) return { allowed: false, reason: `hour`, limit: maxH };
   if (d.dayCount  >= maxD) return { allowed: false, reason: `day`,  limit: maxD };
   d.hourCount += 1;
   d.dayCount  += 1;
@@ -2416,7 +2415,7 @@ export default function HomePage() {
           <div style={{ background: "linear-gradient(135deg,#1e3a5f,#0f172a)", padding: "10px 12px" }}>
             <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>FREE TIER</div>
             <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 8 }}>
-              {rlStatus.hourCount}/{FREE_SIM_PER_HOUR} simulations this hour · {rlStatus.dayCount}/{FREE_SIM_PER_DAY} today
+              {rlStatus.dayCount}/{FREE_SIM_PER_DAY} simulations today
             </div>
             <button onClick={() => setPaywallModal("pro")}
               style={{ width: "100%", padding: "8px", background: "#f97316", color: "white", border: "none", borderRadius: 7, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
@@ -3427,7 +3426,7 @@ export default function HomePage() {
             {paywallModal === "ratelimit" ? (<>
               <div style={{ textAlign: "center", color: "#e2e8f0", fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Simulation Limit Reached</div>
               <div style={{ color: "#64748b", fontSize: 13, textAlign: "center", marginBottom: 20, lineHeight: 1.6 }}>
-                You've used {rlStatus.hourCount}/{FREE_SIM_PER_HOUR} simulations this hour and {rlStatus.dayCount}/{FREE_SIM_PER_DAY} today.<br/>
+                You've used {rlStatus.dayCount}/{FREE_SIM_PER_DAY} simulations today.<br/>
                 Upgrade to Pro for more.
               </div>
             </>) : (<>
