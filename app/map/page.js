@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v227";
+const FRONTEND_BUILD_LABEL = "v228";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -1996,16 +1996,18 @@ export default function HomePage() {
           map.touchZoomRotate.disable();
         });
       }
-      // Start post-flip spin centered on new pole
-      let lat2 = info.newPoleLat;
-      let lng2p = info.newPoleLng;
+      // Post-flip spin — start from current position, drift lat toward new pole
+      let lat2 = map.getCenter().lat;
+      let lng2p = map.getCenter().lng;
+      const targetLat = info.newPoleLat;
       let lt2 = null;
       let spinActive = true; // flag — set false to stop immediately
       const spin2 = (t) => {
         if (!spinActive) return; // bail out — don't reschedule
         if (lt2 !== null) {
           const delta = (t - lt2) * 0.005;
-          lat2 -= delta * 0.985;
+          // Drift latitude gradually toward new pole over time
+          lat2 += (targetLat - lat2) * 0.008;
           lng2p += delta * 0.174;
           if (lat2 < -85) lat2 = 85;
           safely(() => map.setCenter([lng2p, lat2]));
