@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v237";
+const FRONTEND_BUILD_LABEL = "v240";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -1862,19 +1862,24 @@ export default function HomePage() {
       } else { dynM = vel*0.15; }
       let surge = 0;
       if (model==="davidson") {
-        if (lat>=35&&lat<=58&&lng>=-15&&lng<=25) surge+=150;
-        if (lat>=15&&lat<=38&&lng>=-10&&lng<=40) surge+=200;
-        if (lat<=-35&&lat<=15&&lng>=-90&&lng<=-35) surge+=180;
-        if (lat>=10&&lat<=30&&lng>=-100&&lng<=-60) surge+=120;
-        if (lat>=-35&&lat<=15&&lng>=-20&&lng<=55) surge+=350;
-        if (lat>=5&&lat<=45&&lng>=55&&lng<=145) surge+=300;
+        if (lat<=15&&lng>=-90&&lng<=-35) surge+=1080;         // S America/Caribbean
+        if (lat>=10&&lat<=30&&lng>=-100&&lng<=-60) surge+=720; // Gulf of Mexico
+        if (lat>=30&&lat<=72&&lng>=-168&&lng<=-52) surge+=600; // N America
+        if (lat>=35&&lat<=58&&lng>=-15&&lng<=25) surge+=450;   // N Atlantic/Europe
+        if (lat>=15&&lat<=38&&lng>=-10&&lng<=40) surge+=600;   // Mediterranean
+        if (lat>=-35&&lat<=15&&lng>=-20&&lng<=55) surge+=1050; // Africa
+        if (lat>=5&&lat<=45&&lng>=55&&lng<=145) surge+=900;    // Asia
+        if (lat>=-45&&lat<=-10&&lng>=113&&lng<=154) surge+=800; // Australia
       }
       if (model==="tes") {
-        if (lat>=-35&&lat<=38&&lng>=-20&&lng<=55) surge+=400;
-        if (lat>=38&&lat<=72&&lng>=-15&&lng<=45) surge+=350;
-        if (lat>=5&&lat<=55&&lng>=45&&lng<=150) surge+=380;
+        if (lat>=15&&lat<=72&&lng>=-168&&lng<=-52) surge+=600;  // N America
+        if (lat>=-60&&lat<=15&&lng>=-82&&lng<=-34) surge+=1200; // S America
+        if (lat>=-35&&lat<=38&&lng>=-20&&lng<=55) surge+=800;   // Africa
+        if (lat>=38&&lat<=72&&lng>=-15&&lng<=45) surge+=1050;   // Europe
+        if (lat>=5&&lat<=55&&lng>=45&&lng<=150) surge+=380;     // Asia
+        if (lat>=-45&&lat<=-10&&lng>=113&&lng<=154) surge+=800; // Australia
       }
-      const floodM = Math.min(1200,Math.max(0,staticM+dynM+surge));
+      const floodM = Math.min(2500,Math.max(0,staticM+dynM+surge));
       const waterM = Math.max(0,floodM-terrainM);
       const isFlooded = terrainM<=floodM && terrainM<1200;
       const col = isFlooded?"#f87171":"#86efac";
@@ -1998,10 +2003,9 @@ export default function HomePage() {
           map.touchZoomRotate.disable();
         });
       }
-      // Post-flip spin — start from current position, drift lat toward new pole
-      let lat2 = map.getCenter().lat;
-      let lng2p = map.getCenter().lng;
-      const targetLat = info.newPoleLat;
+      // Post-flip spin — center on new pole, spin right to left
+      let lat2 = info.newPoleLat;
+      let lng2p = info.newPoleLng;
       let lt2 = null;
       let spinActive = true; // flag — set false to stop immediately
       const spin2 = (t) => {
@@ -2009,8 +2013,7 @@ export default function HomePage() {
         if (lt2 !== null) {
           const delta = (t - lt2) * 0.005;
           // Drift latitude gradually toward new pole over time
-          lat2 += (targetLat - lat2) * 0.008;
-          lng2p += delta * 0.174;
+          lng2p -= delta * 0.174; // right to left
           if (lat2 < -85) lat2 = 85;
           safely(() => map.setCenter([lng2p, lat2]));
         }
@@ -2428,12 +2431,9 @@ export default function HomePage() {
             </div>
             <button onClick={() => setPaywallModal("pro")}
               style={{ width: "100%", padding: "8px", background: "#f97316", color: "white", border: "none", borderRadius: 7, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-              ⚡ Founders Price — $18.99 Lifetime
+              ⚡ $18.99 Lifetime — Going up to $24.99
             </button>
-            <div style={{ textAlign: "center", marginTop: 6, fontSize: 11, color: "#475569" }}>
-              or <span onClick={() => window.open("https://buy.stripe.com/6oU5kDcyYbEe4yi6vra3u0a", "_blank")}
-                style={{ color: "#60a5fa", cursor: "pointer", textDecoration: "underline" }}>$6.99/month</span>
-            </div>
+
           </div>
         </div>
       ) : (
@@ -3444,10 +3444,10 @@ export default function HomePage() {
               </div>
               <div style={{ color: "#64748b", fontSize: 13, textAlign: "center", marginBottom: 20, lineHeight: 1.6 }}>
                 {paywallModal === "pro" && scenarioMode === "cataclysm"
-                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the post-cataclysm world. Founders price $18.99 lifetime or $6.99/month.</>
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the post-cataclysm world. Founders price $18.99 lifetime — going up to $24.99 soon.</>
                   : paywallModal === "pro" && scenarioMode === "tsunami"
-                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the tsunami inundation zone. Founders price $18.99 lifetime or $6.99/month.</>
-                  : "This feature requires Pro. Founders price $18.99 lifetime or $6.99/month."}
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the tsunami inundation zone. Founders price $18.99 lifetime — going up to $24.99 soon.</>
+                  : "This feature requires Pro. Founders price $18.99 lifetime — going up to $24.99 soon."}
               </div>
             </>)}
 
@@ -3458,7 +3458,7 @@ export default function HomePage() {
                 <span style={{ color: "#60a5fa", fontWeight: 700, fontSize: 15 }}>⚡ Pro Lifetime</span>
                 <span style={{ color: "#f97316", fontWeight: 700, fontSize: 15 }}>$18.99 once</span>
               </div>
-              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>Locked in forever — price increases after launch</div>
+              <div style={{ fontSize: 11, color: "#f97316", marginBottom: 8 }}>Price going up to $24.99 soon — lock in now</div>
               <div style={{ color: "#94a3b8", fontSize: 12, lineHeight: 1.7 }}>
                 ✓ {PRO_SIM_PER_HOUR} simulations/hour, {PRO_SIM_PER_DAY}/day<br/>
                 ✓ Satellite + Globe view<br/>
@@ -3472,18 +3472,7 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* Pro Monthly */}
-            <div style={{ background: "#111827", border: "1px solid #1e3a5f", borderRadius: 12, padding: "14px 16px", marginBottom: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                <span style={{ color: "#94a3b8", fontWeight: 700, fontSize: 15 }}>Pro Monthly</span>
-                <span style={{ color: "#94a3b8", fontWeight: 700, fontSize: 15 }}>$6.99/mo</span>
-              </div>
-              <div style={{ fontSize: 11, color: "#475569", marginBottom: 8 }}>Same features, cancel anytime</div>
-              <button onClick={() => { window.open("https://buy.stripe.com/6oU5kDcyYbEe4yi6vra3u0a", "_blank"); }}
-                style={{ width: "100%", padding: "9px", background: "transparent", color: "#94a3b8", border: "1px solid #1e3a5f", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-                Subscribe Monthly — $6.99 →
-              </button>
-            </div>
+
 
             {/* Developer Kit teaser */}
             <div style={{ background: "#0a0f1e", border: "1px solid #1e2d45", borderRadius: 12, padding: "12px 16px", marginBottom: 10 }}>
