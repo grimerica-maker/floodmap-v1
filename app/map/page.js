@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v228";
+const FRONTEND_BUILD_LABEL = "v229";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -1903,8 +1903,8 @@ export default function HomePage() {
     if (!map) return;
     const model = cataclysmModelRef.current;
     const info = model === "davidson"
-      ? { name: "Davidson / Suspicious Observers", flipBearing: -90, newPoleLat: 22, newPoleLng: 90, newPoleLabel: "New N. Pole (Bay of Bengal)" }
-      : { name: "The Ethical Skeptic ECDO", flipBearing: 104, newPoleLat: -26, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)" };
+      ? { name: "Davidson / Suspicious Observers", flipBearing: -90, newPoleLat: 22, newPoleLng: 90, newPoleLabel: "New N. Pole (Bay of Bengal)", finalBearing: -90 }
+      : { name: "The Ethical Skeptic ECDO", flipBearing: 104, newPoleLat: -26, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: -31 };
 
     clearCataclysm();
     setCataclysmAnimating(true);
@@ -1944,10 +1944,12 @@ export default function HomePage() {
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
       const startBearing = map.getBearing();
       const endBearing = startBearing + info.flipBearing;
+      // After flip, snap bearing to put new pole at top of globe
       safely(() => map.rotateTo(endBearing, {
         duration: 8000,
-        easing: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t, // ease in-out
+        easing: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
       }));
+      setTimeout(() => safely(() => map.rotateTo(info.finalBearing, { duration: 1500 })), 8200);
       setStatus(`☄️ ${info.name} — CRUSTAL DISPLACEMENT IN PROGRESS`);
     }, 5600);
 
