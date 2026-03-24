@@ -449,7 +449,7 @@ export default function Homepage() {
               © 2025 DisasterMap.ca · Built by <a href="https://x.com/grimerica" target="_blank" rel="noopener noreferrer" style={{ color: "#f97316", textDecoration: "none" }}>@grimerica</a>
             </div>
             <div style={{ display: "flex", gap: 28, justifyContent: "center", flexWrap: "wrap" }}>
-              {[["Launch App","/map"],["Privacy Policy","/privacy"],["Terms of Use","/terms"],["Contact","https://x.com/grimerica"],["Manage Billing","https://billing.stripe.com/p/login/00w28rcyY4bM8Oy1b7a3u00"]].map(([l,h]) => (
+              {[["Launch App","/map"],["Privacy Policy","/privacy"],["Terms of Use","/terms"],["Contact","https://formspree.io/f/xgopwayn"],["Manage Billing","https://billing.stripe.com/p/login/00w28rcyY4bM8Oy1b7a3u00"]].map(([l,h]) => (
                 <a key={l} href={h} style={{ color: "#475569", fontSize: 13, textDecoration: "none" }}
                   onMouseEnter={e=>e.currentTarget.style.color="#f97316"} onMouseLeave={e=>e.currentTarget.style.color="#475569"}>{l}</a>
               ))}
