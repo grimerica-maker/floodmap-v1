@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v245";
+const FRONTEND_BUILD_LABEL = "v246";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -3305,10 +3305,14 @@ export default function HomePage() {
               📷 Save Image
             </button>
           </div>
-          <div style={{ marginTop: 10 }}>
+          <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
             <a href="https://x.com/grimerica" target="_blank"
               style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 10px", background: "#000", color: "#fff", borderRadius: 7, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>
               𝕏 @grimerica
+            </a>
+            <a href="https://formspree.io/f/xgopwayn" target="_blank"
+              style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 10px", background: "#1e3a5f", color: "#60a5fa", borderRadius: 7, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>
+              ✉️ Support
             </a>
           </div>
         </>
@@ -3523,10 +3527,14 @@ export default function HomePage() {
               style={{ width: "100%", padding: "8px", background: "transparent", color: "#475569", border: "1px solid #1e2d45", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
               Continue Free
             </button>
-            <div style={{ textAlign: "center", marginTop: 12 }}>
+            <div style={{ textAlign: "center", marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
               <a href="https://x.com/grimerica" target="_blank"
                 style={{ fontSize: 12, color: "#475569", textDecoration: "none" }}>
-                Questions? 𝕏 @grimerica
+                𝕏 @grimerica
+              </a>
+              <a href="https://formspree.io/f/xgopwayn" target="_blank"
+                style={{ fontSize: 12, color: "#60a5fa", textDecoration: "none" }}>
+                ✉️ Contact support
               </a>
             </div>
           </div>
