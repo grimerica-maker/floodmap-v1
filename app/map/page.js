@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v246";
+const FRONTEND_BUILD_LABEL = "v247";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -492,6 +492,8 @@ export default function HomePage() {
   useEffect(() => { cataclysmOverlayRef.current = cataclysmOverlay; }, [cataclysmOverlay]);
   const [paywallModal, setPaywallModal] = useState(null); // null | "pro" | "ultra" | "ratelimit"
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
+  const [supportFormOpen, setSupportFormOpen] = useState(false);
+  const [supportMsg, setSupportMsg] = useState("");
   const [activeWarmingLevel, setActiveWarmingLevel] = useState(null);
   const [rlStatus, setRlStatus] = useState(() => getRLStatus());
 
@@ -2992,6 +2994,54 @@ export default function HomePage() {
         </>
       )}
 
+      {/* ── SUPPORT ── */}
+      <div style={{ borderTop: "1px solid #1e2d45", paddingTop: 16, marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#475569", textTransform: "uppercase" }}>Support</div>
+        {!supportFormOpen ? (
+          <div style={{ display: "flex", gap: 8 }}>
+            <a href="https://x.com/grimerica" target="_blank"
+              style={{ flex: 1, display: "block", textAlign: "center", padding: "8px", background: "#111827", color: "#94a3b8", border: "1px solid #1e2d45", borderRadius: 8, fontSize: 12, fontWeight: 700, textDecoration: "none" }}>
+              𝕏 @grimerica
+            </a>
+            <button onClick={() => setSupportFormOpen(true)}
+              style={{ flex: 1, padding: "8px", background: "#111827", color: "#60a5fa", border: "1px solid #1e3a5f", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              ✉️ Contact
+            </button>
+          </div>
+        ) : (
+          <div>
+            <textarea placeholder="Describe your issue..."
+              value={supportMsg} onChange={e => setSupportMsg(e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", background: "#111827", color: "#e2e8f0", border: "1px solid #1e3a5f", borderRadius: 8, fontSize: 12, resize: "none", height: 80, boxSizing: "border-box", marginBottom: 8, fontFamily: "Arial,sans-serif" }} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={async () => {
+                if (!supportMsg.trim()) return;
+                try {
+                  await fetch("https://formspree.io/f/xgopwayn", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: supportMsg, source: "DisasterMap app" })
+                  });
+                  setSupportMsg("");
+                  setSupportFormOpen(false);
+                  setStatus("Message sent! We'll get back to you.");
+                  setTimeout(() => setStatus(""), 4000);
+                } catch(e) {
+                  setStatus("Failed to send — try 𝕏 @grimerica");
+                  setTimeout(() => setStatus(""), 4000);
+                }
+              }} style={{ flex: 1, padding: "8px", background: "#1e3a5f", color: "#60a5fa", border: "1px solid #3b82f6", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                Send
+              </button>
+              <button onClick={() => { setSupportFormOpen(false); setSupportMsg(""); }}
+                style={{ padding: "8px 12px", background: "transparent", color: "#475569", border: "1px solid #1e2d45", borderRadius: 8, fontSize: 12, cursor: "pointer" }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* ── VIEW MODE ── */}
       <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>View Mode</div>
       <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
@@ -3532,10 +3582,10 @@ export default function HomePage() {
                 style={{ fontSize: 12, color: "#475569", textDecoration: "none" }}>
                 𝕏 @grimerica
               </a>
-              <a href="https://formspree.io/f/xgopwayn" target="_blank"
-                style={{ fontSize: 12, color: "#60a5fa", textDecoration: "none" }}>
+              <button onClick={() => { setPaywallModal(null); setSupportFormOpen(true); }}
+                style={{ background: "transparent", border: "none", fontSize: 12, color: "#60a5fa", cursor: "pointer", padding: 0 }}>
                 ✉️ Contact support
-              </a>
+              </button>
             </div>
           </div>
         </div>
