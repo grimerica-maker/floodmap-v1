@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v233";
+const FRONTEND_BUILD_LABEL = "v235";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -1904,7 +1904,7 @@ export default function HomePage() {
     const model = cataclysmModelRef.current;
     const info = model === "davidson"
       ? { name: "Davidson / Suspicious Observers", flipBearing: -90, newPoleLat: 22, newPoleLng: 90, newPoleLabel: "New N. Pole (Bay of Bengal)", finalBearing: -90, startBearing: 0 }
-      : { name: "The Ethical Skeptic ECDO", flipBearing: 104, newPoleLat: -26, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: 123, startBearing: -59 };
+      : { name: "The Ethical Skeptic ECDO", flipBearing: 104, newPoleLat: -26, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: 123, startBearing: 0 };
 
     clearCataclysm();
     setCataclysmAnimating(true);
@@ -1923,7 +1923,7 @@ export default function HomePage() {
     }, 300);
 
     // Step 2: Natural Earth rotation — longitude moves W→E via setCenter
-    let spinLng = map.getCenter().lng;
+    let spinLng = (model === "tes") ? -149 : map.getCenter().lng;
     let lastT = null;
     const spin = (t) => {
       if (lastT !== null) {
