@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v221";
+const FRONTEND_BUILD_LABEL = "v222";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -1586,7 +1586,7 @@ export default function HomePage() {
       center1: [-59, -35],
       // Center 2: Pacific basin resonance
       center2: [121, 35],
-      // TES 104° rotation in 8hrs: ~5,800 km/h peak at equator
+      // TES 104° rotation in 10.5hrs along 31°E meridian
       zones: [
         { name: "Instant Death", speedLabel: "5,800+ km/h", desc: "Hypersonic winds — total annihilation", survival: "0%", survivalNote: "Complete atmospheric scouring. No survival possible.", major_km: 2500, minor_km: 1500, color: "#ef4444", opacity: 0.55 },
         { name: "Severe", speedLabel: "2,500-5,800 km/h", desc: "Supersonic winds — catastrophic", survival: "1-2%", survivalNote: "Only deepest underground bunkers. All surface structures obliterated.", major_km: 5500, minor_km: 3300, color: "#f97316", opacity: 0.30 },
@@ -1845,7 +1845,7 @@ export default function HomePage() {
       // Calculate flood depth client-side — same math as tile server
       const CPARAMS = {
         davidson: { npLat:22, npLng:90, maxF:1700, rotDeg:90, rotHrs:12, maxDyn:0 },
-        tes:      { npLat:-40, npLng:-130, maxF:1200, rotDeg:104, rotHrs:8, maxDyn:1100 },
+        tes:      { npLat:-26, npLng:31,   maxF:1200, rotDeg:104, rotHrs:10.5, maxDyn:1100 },
       };
       const p = CPARAMS[model];
       const latR = lat*Math.PI/180, lngR = lng*Math.PI/180;
@@ -1904,7 +1904,7 @@ export default function HomePage() {
     const model = cataclysmModelRef.current;
     const info = model === "davidson"
       ? { name: "Davidson / Suspicious Observers", flipBearing: -90, newPoleLat: 22, newPoleLng: 90, newPoleLabel: "New N. Pole (Bay of Bengal)" }
-      : { name: "The Ethical Skeptic ECDO", flipBearing: -104, newPoleLat: -40, newPoleLng: -130, newPoleLabel: "New N. Pole (S. Pacific)" };
+      : { name: "The Ethical Skeptic ECDO", flipBearing: -104, newPoleLat: -26, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)" };
 
     clearCataclysm();
     setCataclysmAnimating(true);
@@ -2833,7 +2833,7 @@ export default function HomePage() {
           <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12, fontStyle: "italic", lineHeight: 1.5 }}>
             {cataclysmModel === "davidson"
               ? "~90° crustal displacement. New pole: Bay of Bengal. Americas flood 500-800m. Himalayas become new polar region."
-              : "104° due-south rotation in 8hrs. Global inundation 120-1200m. Pacific basin max resonance. Based on TES ECDO Theory."}
+              : "104° rotation along 31°E meridian. New pole: S. Africa. Global inundation 120-1200m. Based on TES ECDO Theory."}
           </div>
           <div style={{ fontSize: 11, color: "#475569", marginBottom: 10, lineHeight: 1.4 }}>
             ⚠ Theoretical model. Globe rotates to show displacement, then flood tiles render.
@@ -3074,7 +3074,7 @@ export default function HomePage() {
           <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8 }}>
             {cataclysmModel === "davidson"
               ? "~90° crustal displacement · New pole: Bay of Bengal · 12hr event"
-              : "104° due-south rotation · New pole: S. Pacific · 8hr event"}
+              : "104° rotation along 31°E · New pole: S. Africa (26°S) · 10-11hr event"}
           </div>
           {CATACLYSM_WIND[cataclysmModel] && (
             <>
@@ -3247,7 +3247,7 @@ export default function HomePage() {
                 : (scenarioMode === "yellowstone" && yellowstoneActive)
                 ? `🌋 Just simulated the Yellowstone ${(volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS)[Math.min(yellowstonePreset, (volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS).length - 1)].name} supervolcano on Disaster Map!${yellowstoneResult ? " Est. " + yellowstoneResult.total_deaths.toLocaleString() + " deaths." : ""} Ash covers most of North America. Try it: https://www.disastermap.ca`
                 : (scenarioMode === "cataclysm" && cataclysmActive)
-                ? `☄️ Just simulated a ${cataclysmModel === "davidson" ? "90° Ben Davidson / Suspicious Observers" : "104° TES ECDO Theory"} pole shift on Disaster Map! Global inundation ${cataclysmModel === "davidson" ? "500-800m Americas, 300-500m Europe" : "120-1200m global"}. Try it: https://www.disastermap.ca`
+                ? `☄️ Just simulated a ${cataclysmModel === "davidson" ? "90° Ben Davidson / Suspicious Observers" : "104° TES ECDO Theory"} pole shift on Disaster Map! Global inundation ${cataclysmModel === "davidson" ? "500-800m Americas, 300-500m Europe" : "120-1200m global, new pole S. Africa 31°E"}. Try it: https://www.disastermap.ca`
                 : (scenarioMode === "climate" && seaLevel !== 0)
                 ? `🌍 Just modeled ${activeWarmingLevel ? activeWarmingLevel + "°C warming" : seaLevel + "m sea level rise"} on Disaster Map Climate Change mode!${floodDisplaced ? " " + floodDisplaced.toLocaleString() + " people displaced." : ""} Wildfire zones + sea level rise visualized. Try it: https://www.disastermap.ca`
                 : `🌊 I just flooded the world ${seaLevel > 0 ? "+" : ""}${Math.round(seaLevel)}m on Disaster Map!${floodDisplaced ? " " + floodDisplaced.toLocaleString() + " people displaced." : ""} Try it: https://www.disastermap.ca`;
