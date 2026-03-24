@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v231";
+const FRONTEND_BUILD_LABEL = "v232";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -1942,9 +1942,9 @@ export default function HomePage() {
     setTimeout(() => {
       // MUST stop setCenter loop before rotateTo — they conflict
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-      const startBearing = map.getBearing();
-      const endBearing = startBearing + info.flipBearing;
-      // After flip, snap bearing to put new pole at top of globe
+      // Always reset to bearing 0 first so flip is consistent
+      safely(() => map.jumpTo({ bearing: 0 }));
+      const endBearing = info.flipBearing; // absolute, not relative
       safely(() => map.rotateTo(endBearing, {
         duration: 8000,
         easing: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
