@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v235";
+const FRONTEND_BUILD_LABEL = "v237";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -1923,7 +1923,7 @@ export default function HomePage() {
     }, 300);
 
     // Step 2: Natural Earth rotation — longitude moves W→E via setCenter
-    let spinLng = (model === "tes") ? -149 : map.getCenter().lng;
+    let spinLng = (model === "tes") ? 31 : map.getCenter().lng;
     let lastT = null;
     const spin = (t) => {
       if (lastT !== null) {
