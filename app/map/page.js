@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v244";
+const FRONTEND_BUILD_LABEL = "v245";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -2002,6 +2002,8 @@ export default function HomePage() {
         // Pole marker removed — position unreliable after bearing flip
       });
 
+      // Allow full globe navigation — remove lat restrictions
+      safely(() => { map.setMaxBounds(null); });
       // Interaction already handled below with currentTier check
       // Post-flip: same left-to-right longitude spin as before
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
@@ -2025,7 +2027,8 @@ export default function HomePage() {
           const delta = (t - lt2) * 0.005;
           // Drift latitude gradually toward new pole over time
           lng2p -= delta * 0.174; // right to left
-          if (lat2 < -85) lat2 = 85;
+          if (lat2 < -85) lat2 = -85;
+          if (lat2 > 85) lat2 = 85;
           safely(() => map.setCenter([lng2p, lat2]));
         }
         lt2 = t;
@@ -2041,6 +2044,15 @@ export default function HomePage() {
           map.scrollZoom.enable();
           map.doubleClickZoom.enable();
           map.touchZoomRotate.enable();
+          map.dragRotate.enable();
+          map.setMinZoom(0);
+          map.setMaxZoom(22);
+          map.setMaxBounds(null);
+        });
+      } else {
+        safely(() => {
+          map.dragRotate.enable();
+          map.setMaxBounds(null);
         });
       }
 
@@ -2144,6 +2156,7 @@ export default function HomePage() {
       attributionControl: true,
       collectResourceTiming: false,
       preserveDrawingBuffer: true,
+      renderWorldCopies: false,
       transformRequest: (url) => ({ url }),
     });
 
