@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v243";
+const FRONTEND_BUILD_LABEL = "v244";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -1604,6 +1604,7 @@ export default function HomePage() {
     const map = mapRef.current;
     setCataclysmActive(false);
     setCataclysmAnimating(false);
+    if (window._cataclysmPoleMarker) { try { window._cataclysmPoleMarker.remove(); } catch(e){} window._cataclysmPoleMarker = null; }
     setViewMode("map");
     // Stop spin animation
     if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
@@ -1955,7 +1956,7 @@ export default function HomePage() {
           duration: 8000,
           easing: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
         }));
-        setTimeout(() => safely(() => map.rotateTo(info.finalBearing, { duration: 1500 })), 8200);
+        // No bearing correction — let flip land naturally
       }, 2100);
     }, 5600);
 
@@ -1968,6 +1969,19 @@ export default function HomePage() {
       if (window.innerWidth <= 640) {
         safely(() => map.easeTo({ zoom: 0.8, duration: 600 }));
       }
+      // Add new north pole marker
+      try {
+        const existingMarker = window._cataclysmPoleMarker;
+        if (existingMarker) { existingMarker.remove(); window._cataclysmPoleMarker = null; }
+        const el = document.createElement("div");
+        el.style.cssText = "background:#ef4444;color:white;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700;font-family:Arial,sans-serif;white-space:nowrap;border:1px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.5);pointer-events:none;";
+        el.innerText = "⭐ " + info.newPoleLabel;
+        const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+          .setLngLat([info.newPoleLng, info.newPoleLat])
+          .addTo(map);
+        window._cataclysmPoleMarker = marker;
+      } catch(e) { console.warn("Pole marker error", e); }
+
       const tileUrl = `${floodEngineUrlRef.current}/cataclysm/${model}/{z}/{x}/{y}.png`;
 
       safely(() => {
