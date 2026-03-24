@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v241";
+const FRONTEND_BUILD_LABEL = "v243";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -1943,19 +1943,20 @@ export default function HomePage() {
       cataclysmSpinRef.current = requestAnimationFrame(spin);
     }, 1600);
 
-    // Step 3: Stop spin, then execute the bearing flip (crustal displacement)
+    // Step 3: Ease bearing to start position WHILE spin continues, then flip
     setTimeout(() => {
-      // MUST stop setCenter loop before rotateTo — they conflict
-      if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-      // Position globe so new pole is on right side — flip brings it to top
-      safely(() => map.jumpTo({ bearing: info.startBearing }));
-      const endBearing = info.flipBearing; // absolute, not relative
-      safely(() => map.rotateTo(endBearing, {
-        duration: 8000,
-        easing: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
-      }));
-      setTimeout(() => safely(() => map.rotateTo(info.finalBearing, { duration: 1500 })), 8200);
+      // Ease bearing smoothly to start position over 2s — spin keeps going via setCenter
+      safely(() => map.easeTo({ bearing: info.startBearing, duration: 2000 }));
       setStatus(`☄️ ${info.name} — CRUSTAL DISPLACEMENT IN PROGRESS`);
+      // After bearing settles, stop spin and do the flip
+      setTimeout(() => {
+        if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
+        safely(() => map.rotateTo(info.flipBearing, {
+          duration: 8000,
+          easing: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
+        }));
+        setTimeout(() => safely(() => map.rotateTo(info.finalBearing, { duration: 1500 })), 8200);
+      }, 2100);
     }, 5600);
 
     // Step 4: Flip complete — render overlays and fly to new pole
