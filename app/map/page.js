@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v229";
+const FRONTEND_BUILD_LABEL = "v230";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -1904,7 +1904,7 @@ export default function HomePage() {
     const model = cataclysmModelRef.current;
     const info = model === "davidson"
       ? { name: "Davidson / Suspicious Observers", flipBearing: -90, newPoleLat: 22, newPoleLng: 90, newPoleLabel: "New N. Pole (Bay of Bengal)", finalBearing: -90 }
-      : { name: "The Ethical Skeptic ECDO", flipBearing: 104, newPoleLat: -26, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: -31 };
+      : { name: "The Ethical Skeptic ECDO", flipBearing: 104, newPoleLat: -26, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: -151 };
 
     clearCataclysm();
     setCataclysmAnimating(true);
