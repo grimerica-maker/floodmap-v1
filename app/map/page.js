@@ -1626,6 +1626,8 @@ export default function HomePage() {
       });
       try { if (map.getLayer("cataclysm-layer")) map.removeLayer("cataclysm-layer"); } catch(e){}
       try { if (map.getSource("cataclysm-source")) map.removeSource("cataclysm-source"); } catch(e){}
+      try { if (map.getLayer("cataclysm-equator")) map.removeLayer("cataclysm-equator"); } catch(e){}
+      try { if (map.getSource("cataclysm-equator-src")) map.removeSource("cataclysm-equator-src"); } catch(e){}
       try { if (map.getLayer("cataclysm-pole-marker")) map.removeLayer("cataclysm-pole-marker"); } catch(e){}
       try { if (map.getSource("cataclysm-pole-marker-src")) map.removeSource("cataclysm-pole-marker-src"); } catch(e){}
       // Clear wind layers
@@ -1904,6 +1906,62 @@ export default function HomePage() {
     }
   };
 
+  const buildNewEquator = (poleLat, poleLng, steps = 120) => {
+    const pLat = poleLat * Math.PI / 180;
+    const pLng = poleLng * Math.PI / 180;
+    const px = Math.cos(pLat) * Math.cos(pLng);
+    const py = Math.cos(pLat) * Math.sin(pLng);
+    const pz = Math.sin(pLat);
+    // Two vectors perpendicular to pole
+    const arb = Math.abs(px) < 0.9 ? [1,0,0] : [0,1,0];
+    let v1x = arb[1]*pz - arb[2]*py, v1y = arb[2]*px - arb[0]*pz, v1z = arb[0]*py - arb[1]*px;
+    const mag = Math.sqrt(v1x**2 + v1y**2 + v1z**2);
+    v1x /= mag; v1y /= mag; v1z /= mag;
+    const v2x = py*v1z - pz*v1y, v2y = pz*v1x - px*v1z, v2z = px*v1y - py*v1x;
+    const coords = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = 2 * Math.PI * i / steps;
+      const x = Math.cos(t)*v1x + Math.sin(t)*v2x;
+      const y = Math.cos(t)*v1y + Math.sin(t)*v2y;
+      const z = Math.cos(t)*v1z + Math.sin(t)*v2z;
+      const lat = Math.asin(Math.max(-1, Math.min(1, z))) * 180 / Math.PI;
+      const lng = Math.atan2(y, x) * 180 / Math.PI;
+      coords.push([lng, lat]);
+    }
+    // Fix antimeridian jumps
+    for (let i = 1; i < coords.length; i++) {
+      const diff = coords[i][0] - coords[i-1][0];
+      if (diff > 180) coords[i][0] -= 360;
+      else if (diff < -180) coords[i][0] += 360;
+    }
+    return coords;
+  };
+
+  const drawNewEquator = (map, poleLat, poleLng, color) => {
+    try {
+      if (map.getLayer("cataclysm-equator")) map.removeLayer("cataclysm-equator");
+      if (map.getSource("cataclysm-equator-src")) map.removeSource("cataclysm-equator-src");
+    } catch(e) {}
+    const coords = buildNewEquator(poleLat, poleLng);
+    try {
+      map.addSource("cataclysm-equator-src", {
+        type: "geojson",
+        data: { type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} }
+      });
+      map.addLayer({
+        id: "cataclysm-equator",
+        type: "line",
+        source: "cataclysm-equator-src",
+        paint: {
+          "line-color": color,
+          "line-width": 2,
+          "line-opacity": 0.8,
+          "line-dasharray": [6, 4]
+        }
+      });
+    } catch(e) { console.warn("Equator draw error", e); }
+  };
+
   const triggerCataclysm = () => {
     const rl = checkAndIncrementRL(proTierRef.current !== "free");
     if (!rl.allowed) { setPaywallModal("ratelimit"); setRlStatus(getRLStatus()); return; }
@@ -1985,6 +2043,12 @@ export default function HomePage() {
           .addTo(map);
         window._cataclysmPoleMarker = marker;
       } catch(e) { console.warn("Pole marker error", e); }
+
+      // Draw new hypothetical equator
+      try {
+        const eqColor = model === "davidson" ? "#fbbf24" : "#34d399";
+        drawNewEquator(map, info.newPoleLat, info.newPoleLng, eqColor);
+      } catch(e) { console.warn("Equator error", e); }
 
       const tileUrl = `${floodEngineUrlRef.current}/cataclysm/${model}/{z}/{x}/{y}.png`;
 
