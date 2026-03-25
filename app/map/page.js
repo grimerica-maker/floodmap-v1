@@ -27,8 +27,8 @@ const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 const FRONTEND_BUILD_LABEL = "v248";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
-const FREE_SIM_PER_HOUR = 30;
-const FREE_SIM_PER_DAY  = 30;
+const FREE_SIM_PER_HOUR = 9999;
+const FREE_SIM_PER_DAY  = 9999;
 const PRO_SIM_PER_HOUR  = 50;
 const PRO_SIM_PER_DAY   = 200;
 
@@ -2525,9 +2525,7 @@ export default function HomePage() {
         <div style={{ marginBottom: 14, borderRadius: 10, overflow: "hidden", border: "1px solid #1e3a5f" }}>
           <div style={{ background: "linear-gradient(135deg,#1e3a5f,#0f172a)", padding: "10px 12px" }}>
             <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>FREE TIER</div>
-            <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 8 }}>
-              {rlStatus.dayCount}/{FREE_SIM_PER_DAY} simulations today
-            </div>
+
             <button onClick={() => setPaywallModal("pro")}
               style={{ width: "100%", padding: "8px", background: "#f97316", color: "white", border: "none", borderRadius: 7, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
               ⚡ $18.99 Lifetime — Going up to $24.99
