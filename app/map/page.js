@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v247";
+const FRONTEND_BUILD_LABEL = "v249";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -2012,7 +2012,7 @@ export default function HomePage() {
         }));
         // No bearing correction — let flip land naturally
       }, 2100);
-    }, 5600);
+    }, model === "tes" ? 5200 : 5600);
 
     // Step 4: Flip complete — render overlays and fly to new pole
     setTimeout(() => {
@@ -3123,7 +3123,7 @@ export default function HomePage() {
   const statsContent = (
     <>
       <div style={{ fontWeight: 700, marginBottom: 8 }}>Current Scenario</div>
-      <div style={{ color: "#facc15", fontWeight: 700 }}>Frontend build: {FRONTEND_BUILD_LABEL}</div>
+      <div style={{ color: "#facc15", fontWeight: 700 }}>Something not looking right? Hard refresh: Ctrl+Shift+R / Cmd+Shift+R</div>
       {(scenarioMode === "flood" || scenarioMode === "climate") && <div>Sea level: {formatLevelForDisplay(seaLevel)}</div>}
       {(scenarioMode === "flood" || scenarioMode === "climate") && seaLevel !== 0 && (
         <div style={{ fontWeight: 700, marginTop: 2 }}>
