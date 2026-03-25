@@ -24,11 +24,11 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v248";
+const FRONTEND_BUILD_LABEL = "v247";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
-const FREE_SIM_PER_HOUR = 9999;
-const FREE_SIM_PER_DAY  = 9999;
+const FREE_SIM_PER_HOUR = 30;
+const FREE_SIM_PER_DAY  = 30;
 const PRO_SIM_PER_HOUR  = 50;
 const PRO_SIM_PER_DAY   = 200;
 
@@ -453,7 +453,6 @@ export default function HomePage() {
   const proTierRef = useRef("free");
   const [cataclysmOverlay, setCataclysmOverlay] = useState("flood"); // "flood" | "wind" | "both"
   const cataclysmSpinRef = useRef(null);
-  const cataclysmRunRef = useRef(0);
   const [tsunamiResult, setTsunamiResult] = useState(null);
   const [tsunamiFloodLevel, setTsunamiFloodLevel] = useState(null);
   const tsunamiPopupRef = useRef(null); // 0=640k, 1=1.3M, 2=2.1M
@@ -1614,7 +1613,6 @@ export default function HomePage() {
     if (map && map.isStyleLoaded()) {
       // Re-enable map interaction in case it was locked for free tier
       try { map.dragPan.enable(); map.scrollZoom.enable(); map.doubleClickZoom.enable(); map.touchZoomRotate.enable(); } catch(e){}
-      safely(() => { map.setRenderWorldCopies(true); });
       // Reset bearing and pitch first, then switch projection and style after
       safely(() => map.jumpTo({ bearing: 0, pitch: 0 }));
       safely(() => {
@@ -1627,8 +1625,6 @@ export default function HomePage() {
       });
       try { if (map.getLayer("cataclysm-layer")) map.removeLayer("cataclysm-layer"); } catch(e){}
       try { if (map.getSource("cataclysm-source")) map.removeSource("cataclysm-source"); } catch(e){}
-      try { if (map.getLayer("cataclysm-equator")) map.removeLayer("cataclysm-equator"); } catch(e){}
-      try { if (map.getSource("cataclysm-equator-src")) map.removeSource("cataclysm-equator-src"); } catch(e){}
       try { if (map.getLayer("cataclysm-pole-marker")) map.removeLayer("cataclysm-pole-marker"); } catch(e){}
       try { if (map.getSource("cataclysm-pole-marker-src")) map.removeSource("cataclysm-pole-marker-src"); } catch(e){}
       // Clear wind layers
@@ -1907,62 +1903,6 @@ export default function HomePage() {
     }
   };
 
-  const buildNewEquator = (poleLat, poleLng, steps = 120) => {
-    const pLat = poleLat * Math.PI / 180;
-    const pLng = poleLng * Math.PI / 180;
-    const px = Math.cos(pLat) * Math.cos(pLng);
-    const py = Math.cos(pLat) * Math.sin(pLng);
-    const pz = Math.sin(pLat);
-    // Two vectors perpendicular to pole
-    const arb = Math.abs(px) < 0.9 ? [1,0,0] : [0,1,0];
-    let v1x = arb[1]*pz - arb[2]*py, v1y = arb[2]*px - arb[0]*pz, v1z = arb[0]*py - arb[1]*px;
-    const mag = Math.sqrt(v1x**2 + v1y**2 + v1z**2);
-    v1x /= mag; v1y /= mag; v1z /= mag;
-    const v2x = py*v1z - pz*v1y, v2y = pz*v1x - px*v1z, v2z = px*v1y - py*v1x;
-    const coords = [];
-    for (let i = 0; i <= steps; i++) {
-      const t = 2 * Math.PI * i / steps;
-      const x = Math.cos(t)*v1x + Math.sin(t)*v2x;
-      const y = Math.cos(t)*v1y + Math.sin(t)*v2y;
-      const z = Math.cos(t)*v1z + Math.sin(t)*v2z;
-      const lat = Math.asin(Math.max(-1, Math.min(1, z))) * 180 / Math.PI;
-      const lng = Math.atan2(y, x) * 180 / Math.PI;
-      coords.push([lng, lat]);
-    }
-    // Fix antimeridian jumps
-    for (let i = 1; i < coords.length; i++) {
-      const diff = coords[i][0] - coords[i-1][0];
-      if (diff > 180) coords[i][0] -= 360;
-      else if (diff < -180) coords[i][0] += 360;
-    }
-    return coords;
-  };
-
-  const drawNewEquator = (map, poleLat, poleLng, color) => {
-    try {
-      if (map.getLayer("cataclysm-equator")) map.removeLayer("cataclysm-equator");
-      if (map.getSource("cataclysm-equator-src")) map.removeSource("cataclysm-equator-src");
-    } catch(e) {}
-    const coords = buildNewEquator(poleLat, poleLng);
-    try {
-      map.addSource("cataclysm-equator-src", {
-        type: "geojson",
-        data: { type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} }
-      });
-      map.addLayer({
-        id: "cataclysm-equator",
-        type: "line",
-        source: "cataclysm-equator-src",
-        paint: {
-          "line-color": color,
-          "line-width": 2,
-          "line-opacity": 0.8,
-          "line-dasharray": [6, 4]
-        }
-      });
-    } catch(e) { console.warn("Equator draw error", e); }
-  };
-
   const triggerCataclysm = () => {
     const rl = checkAndIncrementRL(proTierRef.current !== "free");
     if (!rl.allowed) { setPaywallModal("ratelimit"); setRlStatus(getRLStatus()); return; }
@@ -1974,11 +1914,6 @@ export default function HomePage() {
       ? { name: "Davidson / Suspicious Observers", flipBearing: -90, newPoleLat: 22, newPoleLng: 90, newPoleLabel: "New N. Pole (Bay of Bengal)", finalBearing: -90, startBearing: 0 }
       : { name: "The Ethical Skeptic ECDO", flipBearing: 104, newPoleLat: -26, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: 123, startBearing: 0 };
 
-    // Cancel any previous run
-    if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-    cataclysmRunRef.current += 1;
-    const thisRun = cataclysmRunRef.current;
-
     clearCataclysm();
     setCataclysmAnimating(true);
 
@@ -1987,15 +1922,16 @@ export default function HomePage() {
     const _isMobileCat = window.innerWidth <= 640;
     const _catZoom = _isMobileCat ? 0.8 : 1.5;
     safely(() => { map.setProjection("globe"); });
-    safely(() => { map.setRenderWorldCopies(false); });
-    safely(() => map.jumpTo({ center: [0, 20], zoom: _catZoom, pitch: 0, bearing: 0 }));
+    // Use jumpTo immediately then flyTo — ensures zoom takes effect even on slow devices
     setTimeout(() => {
-      if (cataclysmRunRef.current !== thisRun) return;
+      safely(() => map.jumpTo({ zoom: _catZoom, pitch: 0, bearing: 0 }));
+    }, 100);
+    setTimeout(() => {
       safely(() => map.flyTo({ zoom: _catZoom, pitch: 0, bearing: 0, duration: 1200 }));
     }, 300);
 
     // Step 2: Natural Earth rotation — longitude moves W→E via setCenter
-    let spinLng = (model === "tes") ? 31 : map.getCenter().lng - 30;
+    let spinLng = (model === "tes") ? 31 : map.getCenter().lng;
     let lastT = null;
     const spin = (t) => {
       if (lastT !== null) {
@@ -2006,31 +1942,28 @@ export default function HomePage() {
       cataclysmSpinRef.current = requestAnimationFrame(spin);
     };
     setTimeout(() => {
-      if (cataclysmRunRef.current !== thisRun) return;
       setStatus(`☄️ ${info.name} — crustal displacement initiating…`);
       cataclysmSpinRef.current = requestAnimationFrame(spin);
     }, 1600);
 
     // Step 3: Ease bearing to start position WHILE spin continues, then flip
-    // Davidson spins 2s longer, TES flips 1s sooner
-    const flipDelay = model === "davidson" ? 7600 : 4600;
     setTimeout(() => {
-      if (cataclysmRunRef.current !== thisRun) return;
+      // Ease bearing smoothly to start position over 2s — spin keeps going via setCenter
       safely(() => map.easeTo({ bearing: info.startBearing, duration: 2000 }));
       setStatus(`☄️ ${info.name} — CRUSTAL DISPLACEMENT IN PROGRESS`);
+      // After bearing settles, stop spin and do the flip
       setTimeout(() => {
-        if (cataclysmRunRef.current !== thisRun) return;
         if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
         safely(() => map.rotateTo(info.flipBearing, {
           duration: 8000,
           easing: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
         }));
+        // No bearing correction — let flip land naturally
       }, 2100);
-    }, flipDelay);
+    }, 5600);
 
     // Step 4: Flip complete — render overlays and fly to new pole
     setTimeout(() => {
-      if (cataclysmRunRef.current !== thisRun) return;
       setStatus(`☄️ ${info.name} — inundation calculated`);
       setCataclysmAnimating(false);
       setCataclysmActive(true);
@@ -2050,12 +1983,6 @@ export default function HomePage() {
           .addTo(map);
         window._cataclysmPoleMarker = marker;
       } catch(e) { console.warn("Pole marker error", e); }
-
-      // Draw new hypothetical equator
-      try {
-        const eqColor = model === "davidson" ? "#fbbf24" : "#34d399";
-        drawNewEquator(map, info.newPoleLat, info.newPoleLng, eqColor);
-      } catch(e) { console.warn("Equator error", e); }
 
       const tileUrl = `${floodEngineUrlRef.current}/cataclysm/${model}/{z}/{x}/{y}.png`;
 
@@ -2164,8 +2091,7 @@ export default function HomePage() {
       };
       map.on("wheel", stopSpin);
       map.once("zoomstart", stopSpin);
-    // flipDelay + 2100 ease + 5000 pause + 8000 flip + 500 buffer
-    }, model === "davidson" ? 23200 : 20200);
+    }, 14000);
   };
 
   const clearNuke = () => {
@@ -2232,6 +2158,7 @@ export default function HomePage() {
       attributionControl: true,
       collectResourceTiming: false,
       preserveDrawingBuffer: true,
+      renderWorldCopies: false,
       transformRequest: (url) => ({ url }),
     });
 
@@ -2525,7 +2452,9 @@ export default function HomePage() {
         <div style={{ marginBottom: 14, borderRadius: 10, overflow: "hidden", border: "1px solid #1e3a5f" }}>
           <div style={{ background: "linear-gradient(135deg,#1e3a5f,#0f172a)", padding: "10px 12px" }}>
             <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>FREE TIER</div>
-
+            <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 8 }}>
+              {rlStatus.dayCount}/{FREE_SIM_PER_DAY} simulations today
+            </div>
             <button onClick={() => setPaywallModal("pro")}
               style={{ width: "100%", padding: "8px", background: "#f97316", color: "white", border: "none", borderRadius: 7, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
               ⚡ $18.99 Lifetime — Going up to $24.99
@@ -3067,10 +2996,7 @@ export default function HomePage() {
 
       {/* ── SUPPORT ── */}
       <div style={{ borderTop: "1px solid #1e2d45", paddingTop: 16, marginBottom: 16 }}>
-        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6, letterSpacing: "0.1em", color: "#475569", textTransform: "uppercase" }}>Support</div>
-        <div style={{ fontSize: 11, color: "#475569", marginBottom: 8, lineHeight: 1.5 }}>
-          💡 Most display issues are fixed with a <strong style={{ color: "#94a3b8" }}>hard refresh</strong> — hold <strong style={{ color: "#94a3b8" }}>Shift</strong> and press <strong style={{ color: "#94a3b8" }}>Reload</strong> (desktop) or clear browser cache (mobile).
-        </div>
+        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#475569", textTransform: "uppercase" }}>Support</div>
         {!supportFormOpen ? (
           <div style={{ display: "flex", gap: 8 }}>
             <a href="https://x.com/grimerica" target="_blank"
