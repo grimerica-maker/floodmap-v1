@@ -2074,9 +2074,10 @@ export default function HomePage() {
           map.touchZoomRotate.disable();
         });
       }
-      // Post-flip spin — center on new pole, spin right to left
-      let lat2 = info.newPoleLat;
-      let lng2p = info.newPoleLng;
+      // Post-flip spin — continue from wherever the globe landed, drift right to left
+      const currentCenter = map.getCenter();
+      let lat2 = currentCenter.lat;
+      let lng2p = currentCenter.lng;
       let lt2 = null;
       let spinActive = true; // flag — set false to stop immediately
       const spin2 = (t) => {
