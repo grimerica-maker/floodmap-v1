@@ -1897,7 +1897,7 @@ export default function HomePage() {
       // Calculate flood depth client-side — same math as tile server
       const CPARAMS = {
         davidson: { npLat:22, npLng:90, maxF:1700, rotDeg:90, rotHrs:12, maxDyn:0 },
-        tes:      { npLat:-26, npLng:31,   maxF:1200, rotDeg:104, rotHrs:10.5, maxDyn:1100 },
+        tes:      { npLat:-13.5, npLng:31,   maxF:1200, rotDeg:104, rotHrs:10.5, maxDyn:1100 },
       };
       const p = CPARAMS[model];
       const latR = lat*Math.PI/180, lngR = lng*Math.PI/180;
@@ -1961,7 +1961,7 @@ export default function HomePage() {
     const model = cataclysmModelRef.current;
     const info = model === "davidson"
       ? { name: "Davidson / Suspicious Observers", flipBearing: -90, newPoleLat: 22, newPoleLng: 90, newPoleLabel: "New N. Pole (Bay of Bengal)", finalBearing: -90, startBearing: 0 }
-      : { name: "The Ethical Skeptic ECDO", flipBearing: 104, newPoleLat: -26, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: 123, startBearing: 0 };
+      : { name: "The Ethical Skeptic ECDO", flipBearing: 104, newPoleLat: -13.5, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: 123, startBearing: 0 };
 
     clearCataclysm();
     cataclysmRunRef.current += 1;
