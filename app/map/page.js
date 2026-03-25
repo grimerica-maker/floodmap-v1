@@ -1995,7 +1995,7 @@ export default function HomePage() {
     }, 300);
 
     // Step 2: Natural Earth rotation — longitude moves W→E via setCenter
-    let spinLng = (model === "tes") ? 31 : map.getCenter().lng;
+    let spinLng = (model === "tes") ? 31 : map.getCenter().lng + 30;
     let lastT = null;
     const spin = (t) => {
       if (lastT !== null) {
@@ -2013,7 +2013,7 @@ export default function HomePage() {
 
     // Step 3: Ease bearing to start position WHILE spin continues, then flip
     // Davidson spins 2s longer, TES flips 1s sooner
-    const flipDelay = model === "davidson" ? 7600 : 4600;
+    const flipDelay = model === "davidson" ? 12600 : 9600;
     setTimeout(() => {
       if (cataclysmRunRef.current !== thisRun) return;
       safely(() => map.easeTo({ bearing: info.startBearing, duration: 2000 }));
