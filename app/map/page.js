@@ -1383,6 +1383,7 @@ export default function HomePage() {
       map.touchZoomRotate.enable();
       map.setMinZoom(0);
       map.setMaxZoom(22);
+      map.setRenderWorldCopies(true);
     });
   };
 
