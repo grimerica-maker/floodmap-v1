@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v248";
+const FRONTEND_BUILD_LABEL = "v247";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -1931,7 +1931,7 @@ export default function HomePage() {
     }, 300);
 
     // Step 2: Natural Earth rotation — longitude moves W→E via setCenter
-    let spinLng = (model === "tes") ? -30 : map.getCenter().lng;
+    let spinLng = (model === "tes") ? 31 : map.getCenter().lng;
     let lastT = null;
     const spin = (t) => {
       if (lastT !== null) {
@@ -1971,22 +1971,18 @@ export default function HomePage() {
       if (window.innerWidth <= 640) {
         safely(() => map.easeTo({ zoom: 0.8, duration: 600 }));
       }
-      // New pole marker — simple red dot, no snap
+      // Add new north pole marker
       try {
         const existingMarker = window._cataclysmPoleMarker;
         if (existingMarker) { existingMarker.remove(); window._cataclysmPoleMarker = null; }
         const el = document.createElement("div");
-        el.style.cssText = "width:14px;height:14px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.6);pointer-events:none;";
-        const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
+        el.style.cssText = "background:#ef4444;color:white;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700;font-family:Arial,sans-serif;white-space:nowrap;border:1px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.5);pointer-events:none;";
+        el.innerText = "⭐ " + info.newPoleLabel;
+        const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
           .setLngLat([info.newPoleLng, info.newPoleLat])
           .addTo(map);
         window._cataclysmPoleMarker = marker;
       } catch(e) { console.warn("Pole marker error", e); }
-
-      // Red new equator — bright and easy to see
-      try {
-        drawNewEquator(map, info.newPoleLat, info.newPoleLng, "#ef4444");
-      } catch(e) { console.warn("Equator error", e); }
 
       const tileUrl = `${floodEngineUrlRef.current}/cataclysm/${model}/{z}/{x}/{y}.png`;
 
@@ -2095,7 +2091,7 @@ export default function HomePage() {
       };
       map.on("wheel", stopSpin);
       map.once("zoomstart", stopSpin);
-    }, 17000);
+    }, 14000);
   };
 
   const clearNuke = () => {
