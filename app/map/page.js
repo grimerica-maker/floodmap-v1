@@ -2012,6 +2012,8 @@ export default function HomePage() {
     }, 1600);
 
     // Step 3: Ease bearing to start position WHILE spin continues, then flip
+    // Davidson spins 2s longer, TES flips 1s sooner
+    const flipDelay = model === "davidson" ? 7600 : 4600;
     setTimeout(() => {
       if (cataclysmRunRef.current !== thisRun) return;
       safely(() => map.easeTo({ bearing: info.startBearing, duration: 2000 }));
@@ -2024,7 +2026,7 @@ export default function HomePage() {
           easing: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
         }));
       }, 2100);
-    }, 5600);
+    }, flipDelay);
 
     // Step 4: Flip complete — render overlays and fly to new pole
     setTimeout(() => {
