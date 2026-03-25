@@ -453,6 +453,7 @@ export default function HomePage() {
   const proTierRef = useRef("free");
   const [cataclysmOverlay, setCataclysmOverlay] = useState("flood"); // "flood" | "wind" | "both"
   const cataclysmSpinRef = useRef(null);
+  const cataclysmRunRef = useRef(0);
   const [tsunamiResult, setTsunamiResult] = useState(null);
   const [tsunamiFloodLevel, setTsunamiFloodLevel] = useState(null);
   const tsunamiPopupRef = useRef(null); // 0=640k, 1=1.3M, 2=2.1M
@@ -1915,6 +1916,8 @@ export default function HomePage() {
       : { name: "The Ethical Skeptic ECDO", flipBearing: 104, newPoleLat: -26, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: 123, startBearing: 0 };
 
     clearCataclysm();
+    cataclysmRunRef.current += 1;
+    const thisRun = cataclysmRunRef.current;
     setCataclysmAnimating(true);
 
     // Step 1: Switch to globe, fly out
@@ -1942,6 +1945,7 @@ export default function HomePage() {
       cataclysmSpinRef.current = requestAnimationFrame(spin);
     };
     setTimeout(() => {
+      if (cataclysmRunRef.current !== thisRun) return;
       setStatus(`☄️ ${info.name} — crustal displacement initiating…`);
       cataclysmSpinRef.current = requestAnimationFrame(spin);
     }, 1600);
@@ -1950,6 +1954,7 @@ export default function HomePage() {
     setTimeout(() => {
       // Ease bearing smoothly to start position over 2s — spin keeps going via setCenter
       safely(() => map.easeTo({ bearing: info.startBearing, duration: 2000 }));
+      if (cataclysmRunRef.current !== thisRun) return;
       setStatus(`☄️ ${info.name} — CRUSTAL DISPLACEMENT IN PROGRESS`);
       // After bearing settles, stop spin and do the flip
       setTimeout(() => {
@@ -1964,6 +1969,7 @@ export default function HomePage() {
 
     // Step 4: Flip complete — render overlays and fly to new pole
     setTimeout(() => {
+      if (cataclysmRunRef.current !== thisRun) return;
       setStatus(`☄️ ${info.name} — inundation calculated`);
       setCataclysmAnimating(false);
       setCataclysmActive(true);
