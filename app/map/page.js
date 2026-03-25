@@ -453,6 +453,7 @@ export default function HomePage() {
   const proTierRef = useRef("free");
   const [cataclysmOverlay, setCataclysmOverlay] = useState("flood"); // "flood" | "wind" | "both"
   const cataclysmSpinRef = useRef(null);
+  const cataclysmRunRef = useRef(0);
   const [tsunamiResult, setTsunamiResult] = useState(null);
   const [tsunamiFloodLevel, setTsunamiFloodLevel] = useState(null);
   const tsunamiPopupRef = useRef(null); // 0=640k, 1=1.3M, 2=2.1M
@@ -1973,6 +1974,11 @@ export default function HomePage() {
       ? { name: "Davidson / Suspicious Observers", flipBearing: -90, newPoleLat: 22, newPoleLng: 90, newPoleLabel: "New N. Pole (Bay of Bengal)", finalBearing: -90, startBearing: 0 }
       : { name: "The Ethical Skeptic ECDO", flipBearing: 104, newPoleLat: -26, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: 123, startBearing: 0 };
 
+    // Cancel any previous run
+    if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
+    cataclysmRunRef.current += 1;
+    const thisRun = cataclysmRunRef.current;
+
     clearCataclysm();
     setCataclysmAnimating(true);
 
@@ -1982,11 +1988,9 @@ export default function HomePage() {
     const _catZoom = _isMobileCat ? 0.8 : 1.5;
     safely(() => { map.setProjection("globe"); });
     safely(() => { map.setRenderWorldCopies(false); });
-    // Use jumpTo immediately then flyTo — ensures zoom takes effect even on slow devices
+    safely(() => map.jumpTo({ center: [0, 20], zoom: _catZoom, pitch: 0, bearing: 0 }));
     setTimeout(() => {
-      safely(() => map.jumpTo({ zoom: _catZoom, pitch: 0, bearing: 0 }));
-    }, 100);
-    setTimeout(() => {
+      if (cataclysmRunRef.current !== thisRun) return;
       safely(() => map.flyTo({ zoom: _catZoom, pitch: 0, bearing: 0, duration: 1200 }));
     }, 300);
 
@@ -2002,28 +2006,29 @@ export default function HomePage() {
       cataclysmSpinRef.current = requestAnimationFrame(spin);
     };
     setTimeout(() => {
+      if (cataclysmRunRef.current !== thisRun) return;
       setStatus(`☄️ ${info.name} — crustal displacement initiating…`);
       cataclysmSpinRef.current = requestAnimationFrame(spin);
     }, 1600);
 
     // Step 3: Ease bearing to start position WHILE spin continues, then flip
     setTimeout(() => {
-      // Ease bearing smoothly to start position over 2s — spin keeps going via setCenter
+      if (cataclysmRunRef.current !== thisRun) return;
       safely(() => map.easeTo({ bearing: info.startBearing, duration: 2000 }));
       setStatus(`☄️ ${info.name} — CRUSTAL DISPLACEMENT IN PROGRESS`);
-      // After bearing settles, stop spin and do the flip
       setTimeout(() => {
+        if (cataclysmRunRef.current !== thisRun) return;
         if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
         safely(() => map.rotateTo(info.flipBearing, {
           duration: 8000,
           easing: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
         }));
-        // No bearing correction — let flip land naturally
       }, 2100);
     }, 5600);
 
     // Step 4: Flip complete — render overlays and fly to new pole
     setTimeout(() => {
+      if (cataclysmRunRef.current !== thisRun) return;
       setStatus(`☄️ ${info.name} — inundation calculated`);
       setCataclysmAnimating(false);
       setCataclysmActive(true);
