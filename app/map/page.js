@@ -1995,7 +1995,7 @@ export default function HomePage() {
     }, 300);
 
     // Step 2: Natural Earth rotation — longitude moves W→E via setCenter
-    let spinLng = (model === "tes") ? 31 : map.getCenter().lng + 30;
+    let spinLng = (model === "tes") ? 31 : map.getCenter().lng - 30;
     let lastT = null;
     const spin = (t) => {
       if (lastT !== null) {
@@ -2013,7 +2013,7 @@ export default function HomePage() {
 
     // Step 3: Ease bearing to start position WHILE spin continues, then flip
     // Davidson spins 2s longer, TES flips 1s sooner
-    const flipDelay = model === "davidson" ? 12600 : 9600;
+    const flipDelay = model === "davidson" ? 7600 : 4600;
     setTimeout(() => {
       if (cataclysmRunRef.current !== thisRun) return;
       safely(() => map.easeTo({ bearing: info.startBearing, duration: 2000 }));
@@ -2164,7 +2164,8 @@ export default function HomePage() {
       };
       map.on("wheel", stopSpin);
       map.once("zoomstart", stopSpin);
-    }, 14000);
+    // flipDelay + 2100 ease + 5000 pause + 8000 flip + 500 buffer
+    }, model === "davidson" ? 23200 : 20200);
   };
 
   const clearNuke = () => {
@@ -3068,7 +3069,10 @@ export default function HomePage() {
 
       {/* ── SUPPORT ── */}
       <div style={{ borderTop: "1px solid #1e2d45", paddingTop: 16, marginBottom: 16 }}>
-        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#475569", textTransform: "uppercase" }}>Support</div>
+        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6, letterSpacing: "0.1em", color: "#475569", textTransform: "uppercase" }}>Support</div>
+        <div style={{ fontSize: 11, color: "#475569", marginBottom: 8, lineHeight: 1.5 }}>
+          💡 Most display issues are fixed with a <strong style={{ color: "#94a3b8" }}>hard refresh</strong> — hold <strong style={{ color: "#94a3b8" }}>Shift</strong> and press <strong style={{ color: "#94a3b8" }}>Reload</strong> (desktop) or clear browser cache (mobile).
+        </div>
         {!supportFormOpen ? (
           <div style={{ display: "flex", gap: 8 }}>
             <a href="https://x.com/grimerica" target="_blank"
