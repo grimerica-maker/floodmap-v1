@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v247";
+const FRONTEND_BUILD_LABEL = "v248";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -1613,6 +1613,7 @@ export default function HomePage() {
     if (map && map.isStyleLoaded()) {
       // Re-enable map interaction in case it was locked for free tier
       try { map.dragPan.enable(); map.scrollZoom.enable(); map.doubleClickZoom.enable(); map.touchZoomRotate.enable(); } catch(e){}
+      safely(() => { map.setRenderWorldCopies(true); });
       // Reset bearing and pitch first, then switch projection and style after
       safely(() => map.jumpTo({ bearing: 0, pitch: 0 }));
       safely(() => {
@@ -1922,6 +1923,7 @@ export default function HomePage() {
     const _isMobileCat = window.innerWidth <= 640;
     const _catZoom = _isMobileCat ? 0.8 : 1.5;
     safely(() => { map.setProjection("globe"); });
+    safely(() => { map.setRenderWorldCopies(false); });
     // Use jumpTo immediately then flyTo — ensures zoom takes effect even on slow devices
     setTimeout(() => {
       safely(() => map.jumpTo({ zoom: _catZoom, pitch: 0, bearing: 0 }));
@@ -2158,7 +2160,6 @@ export default function HomePage() {
       attributionControl: true,
       collectResourceTiming: false,
       preserveDrawingBuffer: true,
-      renderWorldCopies: false,
       transformRequest: (url) => ({ url }),
     });
 
