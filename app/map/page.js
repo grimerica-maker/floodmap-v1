@@ -1085,17 +1085,9 @@ export default function HomePage() {
       const valid = results.filter(Boolean);
       console.log(`[nuke] ${strikes.length} fired, ${valid.length} valid results`);
       if (valid.length === 0) throw new Error("All detonations failed");
-      // Clear all previous nuke layers first
-      window._nukeDrawCount = -1;
-      drawNukeResult(valid[0]._lng, valid[0]._lat, valid[0], false);
-      // Draw remaining strikes
-      for (let i = 1; i < valid.length; i++) {
-        drawNukeResult(valid[i]._lng, valid[i]._lat, valid[i], true);
-      }
-      // Aggregate totals
+      drawAllNukeResults(valid);
       const totalDeaths = valid.reduce((s, d) => s + (d.deaths || 0), 0);
       const totalExposed = valid.reduce((s, d) => s + (d.exposed || 0), 0);
-      // Store combined result for display
       const combined = { ...valid[0], deaths: totalDeaths, exposed: totalExposed, _count: valid.length };
       setNukeResult(combined);
       setStatus(`${valid.length} detonation${valid.length > 1 ? "s" : ""} — ${(totalDeaths/1e6).toFixed(1)}M killed, ${(totalExposed/1e6).toFixed(1)}M exposed`);
@@ -1106,43 +1098,41 @@ export default function HomePage() {
     }
   };
 
-  const drawNukeResult = (lng, lat, data, append = false) => {
+  const NUKE_SRC = "nuke-combined-source";
+  const NUKE_LAYERS = ["nuke-emp","nuke-emp-line","nuke-thermal","nuke-thermal-line",
+    "nuke-blast-light","nuke-blast-light-line","nuke-blast-moderate","nuke-blast-moderate-line",
+    "nuke-blast-heavy","nuke-blast-heavy-line","nuke-fireball","nuke-fireball-line",
+    "nuke-radiation","nuke-fallout","nuke-fallout-line"];
+
+  const clearNukeLayers = (map) => {
+    NUKE_LAYERS.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
+    try { if (map.getSource(NUKE_SRC)) map.removeSource(NUKE_SRC); } catch(e){}
+    try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e){}
+  };
+
+  const drawAllNukeResults = (dataArr) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    if (!append) window._nukeDrawCount = 0;
-    else window._nukeDrawCount = (window._nukeDrawCount || 0) + 1;
-    const n = window._nukeDrawCount;
-    const srcId = `nuke-src-${n}`;
-    const nukeLayers = ["nuke-emp","nuke-emp-line","nuke-thermal","nuke-thermal-line",
-      "nuke-blast-light","nuke-blast-light-line","nuke-blast-moderate","nuke-blast-moderate-line",
-      "nuke-blast-heavy","nuke-blast-heavy-line","nuke-fireball","nuke-fireball-line",
-      "nuke-radiation","nuke-fallout","nuke-fallout-line"];
-    if (!append) {
-      // Clear all previous nuke layers/sources
-      for (let i = 0; i <= 10; i++) {
-        const s = `nuke-src-${i}`;
-        nukeLayers.forEach(id => { try { if (map.getLayer(`${id}-${i}`)) map.removeLayer(`${id}-${i}`); } catch(e){} });
-        try { if (map.getSource(s)) map.removeSource(s); } catch(e){}
-      }
-      nukeLayers.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
-      try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e){}
-    }
+    clearNukeLayers(map);
     const features = [];
-    if (data.emp_r_m > 0) features.push({ ...kmCircle(lng, lat, data.emp_r_m / 1000), properties: { kind: "emp" } });
-    features.push({ ...kmCircle(lng, lat, data.thermal_r_m / 1000), properties: { kind: "thermal" } });
-    features.push({ ...kmCircle(lng, lat, data.blast_light_r_m / 1000), properties: { kind: "blast-light" } });
-    features.push({ ...kmCircle(lng, lat, data.blast_moderate_r_m / 1000), properties: { kind: "blast-moderate" } });
-    features.push({ ...kmCircle(lng, lat, data.blast_heavy_r_m / 1000), properties: { kind: "blast-heavy" } });
-    features.push({ ...kmCircle(lng, lat, data.fireball_r_m / 1000), properties: { kind: "fireball" } });
-    if (data.radiation_r_m > 0) features.push({ ...kmCircle(lng, lat, data.radiation_r_m / 1000), properties: { kind: "radiation" } });
-    if (data.fallout_major_km > 0) features.push({ ...buildFalloutEllipse(lng, lat, data.fallout_major_km, data.fallout_minor_km, data.fallout_direction_deg), properties: { kind: "fallout" } });
+    dataArr.forEach(data => {
+      const lng = data._lng, lat = data._lat;
+      if (data.emp_r_m > 0) features.push({ ...kmCircle(lng, lat, data.emp_r_m/1000), properties: { kind: "emp" } });
+      features.push({ ...kmCircle(lng, lat, data.thermal_r_m/1000), properties: { kind: "thermal" } });
+      features.push({ ...kmCircle(lng, lat, data.blast_light_r_m/1000), properties: { kind: "blast-light" } });
+      features.push({ ...kmCircle(lng, lat, data.blast_moderate_r_m/1000), properties: { kind: "blast-moderate" } });
+      features.push({ ...kmCircle(lng, lat, data.blast_heavy_r_m/1000), properties: { kind: "blast-heavy" } });
+      features.push({ ...kmCircle(lng, lat, data.fireball_r_m/1000), properties: { kind: "fireball" } });
+      if (data.radiation_r_m > 0) features.push({ ...kmCircle(lng, lat, data.radiation_r_m/1000), properties: { kind: "radiation" } });
+      if (data.fallout_major_km > 0) features.push({ ...buildFalloutEllipse(lng, lat, data.fallout_major_km, data.fallout_minor_km, data.fallout_direction_deg), properties: { kind: "fallout" } });
+    });
+    const hasEmp = dataArr.some(d => d.emp_r_m > 0);
+    const hasRad = dataArr.some(d => d.radiation_r_m > 0);
+    const hasFallout = dataArr.some(d => d.fallout_major_km > 0);
     try {
-      map.addSource(srcId, { type: "geojson", data: { type: "FeatureCollection", features } });
-      const L = (id, type, filter, paint) => { try { map.addLayer({ id: `${id}-${n}`, type, source: srcId, filter: ["==", ["get", "kind"], filter], paint }); } catch(e){} };
-      if (data.emp_r_m > 0) {
-        L("nuke-emp","fill","emp",{"fill-color":"#7c3aed","fill-opacity":0.06});
-        L("nuke-emp-line","line","emp",{"line-color":"#7c3aed","line-width":1.5,"line-opacity":0.5,"line-dasharray":[4,4]});
-      }
+      map.addSource(NUKE_SRC, { type: "geojson", data: { type: "FeatureCollection", features } });
+      const L = (id, type, filter, paint) => map.addLayer({ id, type, source: NUKE_SRC, filter: ["==", ["get", "kind"], filter], paint });
+      if (hasEmp) { L("nuke-emp","fill","emp",{"fill-color":"#7c3aed","fill-opacity":0.06}); L("nuke-emp-line","line","emp",{"line-color":"#7c3aed","line-width":1.5,"line-opacity":0.5,"line-dasharray":[4,4]}); }
       L("nuke-thermal","fill","thermal",{"fill-color":"#f97316","fill-opacity":0.18});
       L("nuke-thermal-line","line","thermal",{"line-color":"#f97316","line-width":2,"line-opacity":0.9});
       L("nuke-blast-light","fill","blast-light",{"fill-color":"#fbbf24","fill-opacity":0.20});
@@ -1153,14 +1143,14 @@ export default function HomePage() {
       L("nuke-blast-heavy-line","line","blast-heavy",{"line-color":"#dc2626","line-width":3,"line-opacity":1.0});
       L("nuke-fireball","fill","fireball",{"fill-color":"#ffffff","fill-opacity":0.98});
       L("nuke-fireball-line","line","fireball",{"line-color":"#fde047","line-width":3,"line-opacity":1.0});
-      if (data.radiation_r_m > 0) L("nuke-radiation","line","radiation",{"line-color":"#4ade80","line-width":3,"line-opacity":1.0,"line-dasharray":[5,3]});
-      if (data.fallout_major_km > 0) {
-        L("nuke-fallout","fill","fallout",{"fill-color":"#84cc16","fill-opacity":0.15});
-        L("nuke-fallout-line","line","fallout",{"line-color":"#84cc16","line-width":2.5,"line-opacity":0.9,"line-dasharray":[6,3]});
-      }
+      if (hasRad) L("nuke-radiation","line","radiation",{"line-color":"#4ade80","line-width":3,"line-opacity":1.0,"line-dasharray":[5,3]});
+      if (hasFallout) { L("nuke-fallout","fill","fallout",{"fill-color":"#84cc16","fill-opacity":0.15}); L("nuke-fallout-line","line","fallout",{"line-color":"#84cc16","line-width":2.5,"line-opacity":0.9,"line-dasharray":[6,3]}); }
       safely(() => map.triggerRepaint());
-    } catch(e) { console.error("Failed to draw nuke result", e); }
+    } catch(e) { console.error("Failed to draw nuke results", e); }
   };
+
+  // Single-strike wrapper for style reload redraws
+  const drawNukeResult = (lng, lat, data) => drawAllNukeResults([{ ...data, _lng: lng, _lat: lat }]);
 
   const buildFalloutEllipse = (lng, lat, majorKm, minorKm, directionDeg, steps = 64) => {
     // directionDeg = compass bearing fallout travels TO (0=N,90=E,180=S,270=W)
@@ -2150,24 +2140,13 @@ export default function HomePage() {
   const clearNuke = () => {
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
-      const nukeLayers = ["nuke-emp","nuke-emp-line","nuke-thermal","nuke-thermal-line",
-        "nuke-blast-light","nuke-blast-light-line","nuke-blast-moderate","nuke-blast-moderate-line",
-        "nuke-blast-heavy","nuke-blast-heavy-line","nuke-fireball","nuke-fireball-line",
-        "nuke-radiation","nuke-fallout","nuke-fallout-line"];
-      for (let i = 0; i <= 10; i++) {
-        nukeLayers.forEach(id => { try { if (map.getLayer(`${id}-${i}`)) map.removeLayer(`${id}-${i}`); } catch(e){} });
-        try { if (map.getSource(`nuke-src-${i}`)) map.removeSource(`nuke-src-${i}`); } catch(e){}
-      }
-      nukeLayers.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
-      try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e){}
+      clearNukeLayers(map);
       try { if (map.getLayer(IMPACT_LAYER_ID)) map.removeLayer(IMPACT_LAYER_ID); } catch(e){}
       try { if (map.getSource(IMPACT_SOURCE_ID)) map.removeSource(IMPACT_SOURCE_ID); } catch(e){}
     }
-    // Remove all strike markers
     nukeStrikesRef.current.forEach(s => { try { s.marker.remove(); } catch(e){} });
     nukeStrikesRef.current = [];
     setNukeStrikes([]);
-    window._nukeDrawCount = 0;
     nukePointRef.current = null;
     setNukePointSet(false);
     setNukeResult(null);
