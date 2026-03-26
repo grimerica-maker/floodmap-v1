@@ -1121,7 +1121,6 @@ export default function HomePage() {
       nukeLayers.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
       try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e){}
     }
-    const n = window._nukeDrawCount;
     const features = [];
     if (data.emp_r_m > 0) features.push({ ...kmCircle(lng, lat, data.emp_r_m / 1000), properties: { kind: "emp" } });
     features.push({ ...kmCircle(lng, lat, data.thermal_r_m / 1000), properties: { kind: "thermal" } });
