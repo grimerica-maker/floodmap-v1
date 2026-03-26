@@ -1079,8 +1079,13 @@ export default function HomePage() {
       ));
       const valid = results.filter(Boolean);
       if (valid.length === 0) throw new Error("All detonations failed");
-      // Draw all results
-      valid.forEach(data => drawNukeResult(data._lng, data._lat, data, true));
+      // Clear all previous nuke layers first
+      window._nukeDrawCount = -1;
+      drawNukeResult(valid[0]._lng, valid[0]._lat, valid[0], false);
+      // Draw remaining strikes
+      for (let i = 1; i < valid.length; i++) {
+        drawNukeResult(valid[i]._lng, valid[i]._lat, valid[i], true);
+      }
       // Aggregate totals
       const totalDeaths = valid.reduce((s, d) => s + (d.deaths || 0), 0);
       const totalExposed = valid.reduce((s, d) => s + (d.exposed || 0), 0);
@@ -1098,7 +1103,10 @@ export default function HomePage() {
   const drawNukeResult = (lng, lat, data, append = false) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    const srcId = `nuke-src-${append ? (window._nukeDrawCount = ((window._nukeDrawCount||0) + 1)) : (window._nukeDrawCount = 0)}`;
+    if (!append) window._nukeDrawCount = 0;
+    else window._nukeDrawCount = (window._nukeDrawCount || 0) + 1;
+    const n = window._nukeDrawCount;
+    const srcId = `nuke-src-${n}`;
     const nukeLayers = ["nuke-emp","nuke-emp-line","nuke-thermal","nuke-thermal-line",
       "nuke-blast-light","nuke-blast-light-line","nuke-blast-moderate","nuke-blast-moderate-line",
       "nuke-blast-heavy","nuke-blast-heavy-line","nuke-fireball","nuke-fireball-line",
