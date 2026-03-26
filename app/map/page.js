@@ -1072,12 +1072,18 @@ export default function HomePage() {
     setNukeLoading(true); setNukeError(""); setNukeResult(null);
     setStatus(`Detonating ${nukeStrikesRef.current.length} strike${nukeStrikesRef.current.length > 1 ? "s" : ""}...`);
     try {
-      const results = await Promise.all(nukeStrikesRef.current.map(strike =>
-        fetch(`${floodEngineUrlRef.current}/nuke?lat=${strike.lat}&lng=${strike.lng}&yield_kt=${Number(nukeYield).toFixed(3)}&burst_type=${nukeBurst}&wind_deg=${Number(nukeWindDeg).toFixed(1)}&_=${Date.now()}`, { cache: "no-store" })
+      const yieldKt = Number(nukeYield).toFixed(3);
+      const burst = nukeBurst;
+      const windDeg = Number(nukeWindDeg).toFixed(1);
+      const strikes = [...nukeStrikesRef.current];
+      const results = await Promise.all(strikes.map((strike, idx) =>
+        fetch(`${floodEngineUrlRef.current}/nuke?lat=${strike.lat}&lng=${strike.lng}&yield_kt=${yieldKt}&burst_type=${burst}&wind_deg=${windDeg}&_=${Date.now()}_${idx}`, { cache: "no-store" })
           .then(r => r.ok ? r.json() : null)
           .then(data => data ? { ...data, _lat: strike.lat, _lng: strike.lng } : null)
+          .catch(() => null)
       ));
       const valid = results.filter(Boolean);
+      console.log(`[nuke] ${strikes.length} fired, ${valid.length} valid results`);
       if (valid.length === 0) throw new Error("All detonations failed");
       // Clear all previous nuke layers first
       window._nukeDrawCount = -1;
