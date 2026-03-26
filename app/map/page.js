@@ -438,6 +438,9 @@ export default function HomePage() {
   const [scenarioMode, setScenarioMode] = useState(null);
   const [impactDiameter, setImpactDiameter] = useState(1000);
   const [nukeYield, setNukeYield] = useState(15);
+  const nukeStrikesRef = useRef([]); // array of { lat, lng, marker }
+  const [nukeStrikes, setNukeStrikes] = useState([]); // mirror for UI
+  const MAX_NUKE_STRIKES = 5;
   const [yellowstonePreset, setYellowstonePreset] = useState(0);
   const [volcanoType, setVolcanoType] = useState("yellowstone"); // "yellowstone" | "toba" | "campi"
   const volcanoTypeRef = useRef("yellowstone");
@@ -466,7 +469,7 @@ export default function HomePage() {
   const [nukeResult, setNukeResult] = useState(null);
   const [nukeLoading, setNukeLoading] = useState(false);
   const [nukeError, setNukeError] = useState("");
-  const nukePointRef = useRef(null);
+  const nukePointRef = useRef(null); // kept for compatibility, points to last strike
   const [nukePointSet, setNukePointSet] = useState(false);
   const [impactResult, setImpactResult] = useState(null);
   const [impactLoading, setImpactLoading] = useState(false);
@@ -1062,109 +1065,88 @@ export default function HomePage() {
   };
 
   const runNuke = async () => {
-    if (!nukePointRef.current) { setStatus("Place detonation point first"); return; }
-    // Rate limit check
+    if (nukeStrikesRef.current.length === 0) { setStatus("Place at least one strike point first"); return; }
     const rl = checkAndIncrementRL(proTier !== "free");
-    if (!rl.allowed) {
-      setPaywallModal("ratelimit");
-      setRlStatus(getRLStatus());
-      return;
-    }
+    if (!rl.allowed) { setPaywallModal("ratelimit"); setRlStatus(getRLStatus()); return; }
     setRlStatus(getRLStatus());
-    const nukeLat = nukePointRef.current.lat;
-    const nukeLng = nukePointRef.current.lng;
     setNukeLoading(true); setNukeError(""); setNukeResult(null);
-    setStatus("Detonating...");
+    setStatus(`Detonating ${nukeStrikesRef.current.length} strike${nukeStrikesRef.current.length > 1 ? "s" : ""}...`);
     try {
-      const lat = nukeLat;
-      const lng = nukeLng;
-      const res = await fetch(
-        `${floodEngineUrlRef.current}/nuke?lat=${lat}&lng=${lng}&yield_kt=${Number(nukeYield).toFixed(3)}&burst_type=${nukeBurst}&wind_deg=${Number(nukeWindDeg).toFixed(1)}&_=${Date.now()}`,
-        { cache: "no-store" }
-      );
-      if (!res.ok) throw new Error("Nuke request failed");
-      const data = await res.json();
-      setNukeResult(data);
-      drawNukeResult(lng, lat, data);
-      const nukeLabel = data.severity_class === "Extinction scale" ? "Civilization ending" : data.severity_class;
-      setStatus(`${nukeLabel} — ${data.yield_kt >= 1000 ? (data.yield_kt/1000).toFixed(1)+"Mt" : data.yield_kt+"kt"} detonated`);
+      const results = await Promise.all(nukeStrikesRef.current.map(strike =>
+        fetch(`${floodEngineUrlRef.current}/nuke?lat=${strike.lat}&lng=${strike.lng}&yield_kt=${Number(nukeYield).toFixed(3)}&burst_type=${nukeBurst}&wind_deg=${Number(nukeWindDeg).toFixed(1)}&_=${Date.now()}`, { cache: "no-store" })
+          .then(r => r.ok ? r.json() : null)
+          .then(data => data ? { ...data, _lat: strike.lat, _lng: strike.lng } : null)
+      ));
+      const valid = results.filter(Boolean);
+      if (valid.length === 0) throw new Error("All detonations failed");
+      // Draw all results
+      valid.forEach(data => drawNukeResult(data._lng, data._lat, data, true));
+      // Aggregate totals
+      const totalDeaths = valid.reduce((s, d) => s + (d.deaths || 0), 0);
+      const totalExposed = valid.reduce((s, d) => s + (d.exposed || 0), 0);
+      // Store combined result for display
+      const combined = { ...valid[0], deaths: totalDeaths, exposed: totalExposed, _count: valid.length };
+      setNukeResult(combined);
+      setStatus(`${valid.length} detonation${valid.length > 1 ? "s" : ""} — ${(totalDeaths/1e6).toFixed(1)}M killed, ${(totalExposed/1e6).toFixed(1)}M exposed`);
     } catch (err) {
-      setNukeError("Detonation failed");
-      setStatus("Detonation failed");
+      setNukeError("Detonation failed"); setStatus("Detonation failed");
     } finally {
       setNukeLoading(false);
     }
   };
 
-  const drawNukeResult = (lng, lat, data) => {
+  const drawNukeResult = (lng, lat, data, append = false) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    const nukeLayers = ["nuke-emp","nuke-emp-line",
-      "nuke-thermal","nuke-thermal-line",
-      "nuke-blast-light","nuke-blast-light-line",
-      "nuke-blast-moderate","nuke-blast-moderate-line",
-      "nuke-blast-heavy","nuke-blast-heavy-line",
-      "nuke-fireball","nuke-fireball-line",
+    const srcId = `nuke-src-${append ? (window._nukeDrawCount = ((window._nukeDrawCount||0) + 1)) : (window._nukeDrawCount = 0)}`;
+    const nukeLayers = ["nuke-emp","nuke-emp-line","nuke-thermal","nuke-thermal-line",
+      "nuke-blast-light","nuke-blast-light-line","nuke-blast-moderate","nuke-blast-moderate-line",
+      "nuke-blast-heavy","nuke-blast-heavy-line","nuke-fireball","nuke-fireball-line",
       "nuke-radiation","nuke-fallout","nuke-fallout-line"];
-    nukeLayers.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e) {} });
-    try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e) {}
-
+    if (!append) {
+      // Clear all previous nuke layers/sources
+      for (let i = 0; i <= 10; i++) {
+        const s = `nuke-src-${i}`;
+        nukeLayers.forEach(id => { try { if (map.getLayer(`${id}-${i}`)) map.removeLayer(`${id}-${i}`); } catch(e){} });
+        try { if (map.getSource(s)) map.removeSource(s); } catch(e){}
+      }
+      nukeLayers.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
+      try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e){}
+    }
+    const n = window._nukeDrawCount;
     const features = [];
-
-    // EMP zone (airburst only) — huge, show first (bottom layer)
-    if (data.emp_r_m > 0) {
-      features.push({ ...kmCircle(lng, lat, data.emp_r_m / 1000), properties: { kind: "emp" } });
-    }
-    // Thermal zone
+    if (data.emp_r_m > 0) features.push({ ...kmCircle(lng, lat, data.emp_r_m / 1000), properties: { kind: "emp" } });
     features.push({ ...kmCircle(lng, lat, data.thermal_r_m / 1000), properties: { kind: "thermal" } });
-    // Light blast
     features.push({ ...kmCircle(lng, lat, data.blast_light_r_m / 1000), properties: { kind: "blast-light" } });
-    // Moderate blast
     features.push({ ...kmCircle(lng, lat, data.blast_moderate_r_m / 1000), properties: { kind: "blast-moderate" } });
-    // Heavy blast
     features.push({ ...kmCircle(lng, lat, data.blast_heavy_r_m / 1000), properties: { kind: "blast-heavy" } });
-    // Fireball
     features.push({ ...kmCircle(lng, lat, data.fireball_r_m / 1000), properties: { kind: "fireball" } });
-    // Radiation (surface only)
-    if (data.radiation_r_m > 0) {
-      features.push({ ...kmCircle(lng, lat, data.radiation_r_m / 1000), properties: { kind: "radiation" } });
-    }
-    // Fallout ellipse (surface only) — approximate as elongated circle
-    if (data.fallout_major_km > 0) {
-      const falloutFeature = buildFalloutEllipse(lng, lat, data.fallout_major_km, data.fallout_minor_km, data.fallout_direction_deg);
-      features.push({ ...falloutFeature, properties: { kind: "fallout" } });
-    }
-
+    if (data.radiation_r_m > 0) features.push({ ...kmCircle(lng, lat, data.radiation_r_m / 1000), properties: { kind: "radiation" } });
+    if (data.fallout_major_km > 0) features.push({ ...buildFalloutEllipse(lng, lat, data.fallout_major_km, data.fallout_minor_km, data.fallout_direction_deg), properties: { kind: "fallout" } });
     try {
-      map.addSource(IMPACT_PREVIEW_SOURCE_ID, { type: "geojson", data: { type: "FeatureCollection", features } });
+      map.addSource(srcId, { type: "geojson", data: { type: "FeatureCollection", features } });
+      const L = (id, type, filter, paint) => { try { map.addLayer({ id: `${id}-${n}`, type, source: srcId, filter: ["==", ["get", "kind"], filter], paint }); } catch(e){} };
       if (data.emp_r_m > 0) {
-        map.addLayer({ id: "nuke-emp", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "emp"], paint: { "fill-color": "#7c3aed", "fill-opacity": 0.06 } });
-        map.addLayer({ id: "nuke-emp-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "emp"], paint: { "line-color": "#7c3aed", "line-width": 1.5, "line-opacity": 0.5, "line-dasharray": [4, 4] } });
+        L("nuke-emp","fill","emp",{"fill-color":"#7c3aed","fill-opacity":0.06});
+        L("nuke-emp-line","line","emp",{"line-color":"#7c3aed","line-width":1.5,"line-opacity":0.5,"line-dasharray":[4,4]});
       }
-      // Thermal — orange fill + solid orange border
-      map.addLayer({ id: "nuke-thermal", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "fill-color": "#f97316", "fill-opacity": 0.18 } });
-      map.addLayer({ id: "nuke-thermal-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "line-color": "#f97316", "line-width": 2, "line-opacity": 0.9 } });
-      // Light blast — yellow fill + yellow border
-      map.addLayer({ id: "nuke-blast-light", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-light"], paint: { "fill-color": "#fbbf24", "fill-opacity": 0.20 } });
-      map.addLayer({ id: "nuke-blast-light-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-light"], paint: { "line-color": "#f59e0b", "line-width": 2, "line-opacity": 0.9 } });
-      // Moderate blast — red fill + red border
-      map.addLayer({ id: "nuke-blast-moderate", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-moderate"], paint: { "fill-color": "#ef4444", "fill-opacity": 0.30 } });
-      map.addLayer({ id: "nuke-blast-moderate-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-moderate"], paint: { "line-color": "#ef4444", "line-width": 2.5, "line-opacity": 1.0 } });
-      // Heavy blast — deep red fill + bright red border
-      map.addLayer({ id: "nuke-blast-heavy", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-heavy"], paint: { "fill-color": "#991b1b", "fill-opacity": 0.55 } });
-      map.addLayer({ id: "nuke-blast-heavy-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-heavy"], paint: { "line-color": "#dc2626", "line-width": 3, "line-opacity": 1.0 } });
-      // Fireball — white core with bright yellow border
-      map.addLayer({ id: "nuke-fireball", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fireball"], paint: { "fill-color": "#ffffff", "fill-opacity": 0.98 } });
-      map.addLayer({ id: "nuke-fireball-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fireball"], paint: { "line-color": "#fde047", "line-width": 3, "line-opacity": 1.0 } });
-      if (data.radiation_r_m > 0) {
-        map.addLayer({ id: "nuke-radiation", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "radiation"], paint: { "line-color": "#4ade80", "line-width": 3, "line-opacity": 1.0, "line-dasharray": [5, 3] } });
-      }
+      L("nuke-thermal","fill","thermal",{"fill-color":"#f97316","fill-opacity":0.18});
+      L("nuke-thermal-line","line","thermal",{"line-color":"#f97316","line-width":2,"line-opacity":0.9});
+      L("nuke-blast-light","fill","blast-light",{"fill-color":"#fbbf24","fill-opacity":0.20});
+      L("nuke-blast-light-line","line","blast-light",{"line-color":"#f59e0b","line-width":2,"line-opacity":0.9});
+      L("nuke-blast-moderate","fill","blast-moderate",{"fill-color":"#ef4444","fill-opacity":0.30});
+      L("nuke-blast-moderate-line","line","blast-moderate",{"line-color":"#ef4444","line-width":2.5,"line-opacity":1.0});
+      L("nuke-blast-heavy","fill","blast-heavy",{"fill-color":"#991b1b","fill-opacity":0.55});
+      L("nuke-blast-heavy-line","line","blast-heavy",{"line-color":"#dc2626","line-width":3,"line-opacity":1.0});
+      L("nuke-fireball","fill","fireball",{"fill-color":"#ffffff","fill-opacity":0.98});
+      L("nuke-fireball-line","line","fireball",{"line-color":"#fde047","line-width":3,"line-opacity":1.0});
+      if (data.radiation_r_m > 0) L("nuke-radiation","line","radiation",{"line-color":"#4ade80","line-width":3,"line-opacity":1.0,"line-dasharray":[5,3]});
       if (data.fallout_major_km > 0) {
-        map.addLayer({ id: "nuke-fallout", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fallout"], paint: { "fill-color": "#84cc16", "fill-opacity": 0.15 } });
-        map.addLayer({ id: "nuke-fallout-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fallout"], paint: { "line-color": "#84cc16", "line-width": 2.5, "line-opacity": 0.9, "line-dasharray": [6, 3] } });
+        L("nuke-fallout","fill","fallout",{"fill-color":"#84cc16","fill-opacity":0.15});
+        L("nuke-fallout-line","line","fallout",{"line-color":"#84cc16","line-width":2.5,"line-opacity":0.9,"line-dasharray":[6,3]});
       }
       safely(() => map.triggerRepaint());
-    } catch (e) { console.error("Failed to draw nuke result", e); }
+    } catch(e) { console.error("Failed to draw nuke result", e); }
   };
 
   const buildFalloutEllipse = (lng, lat, majorKm, minorKm, directionDeg, steps = 64) => {
@@ -2159,11 +2141,20 @@ export default function HomePage() {
         "nuke-blast-light","nuke-blast-light-line","nuke-blast-moderate","nuke-blast-moderate-line",
         "nuke-blast-heavy","nuke-blast-heavy-line","nuke-fireball","nuke-fireball-line",
         "nuke-radiation","nuke-fallout","nuke-fallout-line"];
-      nukeLayers.forEach((id) => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
+      for (let i = 0; i <= 10; i++) {
+        nukeLayers.forEach(id => { try { if (map.getLayer(`${id}-${i}`)) map.removeLayer(`${id}-${i}`); } catch(e){} });
+        try { if (map.getSource(`nuke-src-${i}`)) map.removeSource(`nuke-src-${i}`); } catch(e){}
+      }
+      nukeLayers.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
       try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e){}
       try { if (map.getLayer(IMPACT_LAYER_ID)) map.removeLayer(IMPACT_LAYER_ID); } catch(e){}
       try { if (map.getSource(IMPACT_SOURCE_ID)) map.removeSource(IMPACT_SOURCE_ID); } catch(e){}
     }
+    // Remove all strike markers
+    nukeStrikesRef.current.forEach(s => { try { s.marker.remove(); } catch(e){} });
+    nukeStrikesRef.current = [];
+    setNukeStrikes([]);
+    window._nukeDrawCount = 0;
     nukePointRef.current = null;
     setNukePointSet(false);
     setNukeResult(null);
@@ -2282,12 +2273,33 @@ export default function HomePage() {
       }
 
       if (scenarioModeRef.current === "nuke") {
-        nukePointRef.current = { lng, lat };
+        if (nukeStrikesRef.current.length >= MAX_NUKE_STRIKES) {
+          setStatus(`Maximum ${MAX_NUKE_STRIKES} strike points reached`);
+          return;
+        }
+        const map = mapRef.current;
+        // Create marker for this strike point
+        const el = document.createElement("div");
+        const idx = nukeStrikesRef.current.length;
+        el.style.cssText = "width:22px;height:22px;border-radius:50%;background:#7c3aed;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.5);";
+        el.innerText = idx + 1;
+        el.title = "Click to remove";
+        const marker = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([lng, lat]).addTo(map);
+        const strike = { lat, lng, marker, idx };
+        el.addEventListener("click", (e) => {
+          e.stopPropagation();
+          strike.marker.remove();
+          nukeStrikesRef.current = nukeStrikesRef.current.filter(s => s !== strike);
+          setNukeStrikes([...nukeStrikesRef.current]);
+          setNukePointSet(nukeStrikesRef.current.length > 0);
+          nukePointRef.current = nukeStrikesRef.current.length > 0 ? nukeStrikesRef.current[nukeStrikesRef.current.length - 1] : null;
+        });
+        nukeStrikesRef.current.push(strike);
+        nukePointRef.current = strike;
+        setNukeStrikes([...nukeStrikesRef.current]);
         setNukePointSet(true);
-        clearImpactPreview();
-        drawImpactPoint(lng, lat);
         setNukeResult(null); setNukeError("");
-        setStatus("Nuke point placed — set yield and detonate");
+        setStatus(`Strike ${idx + 1} placed — add more or detonate`);
         return;
       }
 
@@ -2469,8 +2481,8 @@ export default function HomePage() {
     }
     if (scenarioMode === "nuke") {
       setStatus(nukePointSet
-        ? nukeLoading ? "Detonating..." : nukeResult ? `${nukeResult.severity_class === "Extinction scale" ? "Civilization ending" : nukeResult.severity_class} — ${nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"}` : "Nuke point placed — detonate"
-        : "Click map to place detonation point"
+        ? nukeLoading ? "Detonating..." : nukeResult ? `${nukeResult._count > 1 ? nukeResult._count + " strikes" : nukeResult.severity_class === "Extinction scale" ? "Civilization ending" : nukeResult.severity_class} — ${nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"}` : `${nukeStrikes.length} strike${nukeStrikes.length !== 1 ? "s" : ""} placed — detonate`
+        : "Click map to place strike points (up to 5)"
       );
       return;
     }
@@ -2891,10 +2903,84 @@ export default function HomePage() {
             </>
           )}
 
+          {/* Nuclear war presets — pro only */}
+          {proTier !== "free" && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#7c3aed", textTransform: "uppercase" }}>⚡ War Presets</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                {[
+                  { label: "🇺🇸→🇷🇺 US Strikes Russia", strikes: [
+                    { lat: 55.75, lng: 37.62 }, { lat: 59.95, lng: 30.32 }, { lat: 56.85, lng: 60.60 },
+                    { lat: 43.11, lng: 131.90 }, { lat: 54.99, lng: 82.90 }
+                  ]},
+                  { label: "🇷🇺→🇺🇸 Russia Strikes US", strikes: [
+                    { lat: 40.71, lng: -74.01 }, { lat: 38.91, lng: -77.04 }, { lat: 34.05, lng: -118.24 },
+                    { lat: 41.88, lng: -87.63 }, { lat: 47.61, lng: -122.33 }
+                  ]},
+                  { label: "☢️ Full Exchange", strikes: [
+                    { lat: 55.75, lng: 37.62 }, { lat: 40.71, lng: -74.01 },
+                    { lat: 38.91, lng: -77.04 }, { lat: 59.95, lng: 30.32 }, { lat: 34.05, lng: -118.24 }
+                  ]},
+                  { label: "🇵🇰↔🇮🇳 Pakistan vs India", strikes: [
+                    { lat: 33.72, lng: 73.06 }, { lat: 31.55, lng: 74.34 },
+                    { lat: 28.61, lng: 77.21 }, { lat: 19.08, lng: 72.88 }, { lat: 22.57, lng: 88.36 }
+                  ]},
+                ].map(preset => (
+                  <button key={preset.label} onClick={() => {
+                    clearNuke();
+                    const map = mapRef.current;
+                    if (!map) return;
+                    preset.strikes.forEach((s, i) => {
+                      const el = document.createElement("div");
+                      el.style.cssText = "width:22px;height:22px;border-radius:50%;background:#7c3aed;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.5);";
+                      el.innerText = i + 1;
+                      const marker = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([s.lng, s.lat]).addTo(map);
+                      const strike = { lat: s.lat, lng: s.lng, marker, idx: i };
+                      el.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        strike.marker.remove();
+                        nukeStrikesRef.current = nukeStrikesRef.current.filter(x => x !== strike);
+                        setNukeStrikes([...nukeStrikesRef.current]);
+                        setNukePointSet(nukeStrikesRef.current.length > 0);
+                      });
+                      nukeStrikesRef.current.push(strike);
+                    });
+                    setNukeStrikes([...nukeStrikesRef.current]);
+                    setNukePointSet(true);
+                    setStatus(`${preset.strikes.length} targets loaded — detonate when ready`);
+                  }}
+                  style={{ padding: "8px 6px", fontSize: 10, fontWeight: 700, background: "#0f172a", color: "#a78bfa", border: "1px solid #312e81", borderRadius: 8, cursor: "pointer", textAlign: "left", lineHeight: 1.4 }}>
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Strike queue */}
+          {nukeStrikes.length > 0 && (
+            <div style={{ marginBottom: 12, padding: "8px 10px", background: "#0f172a", borderRadius: 8, border: "1px solid #1e2d45" }}>
+              <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6, fontWeight: 700 }}>
+                {nukeStrikes.length}/{MAX_NUKE_STRIKES} STRIKE{nukeStrikes.length > 1 ? "S" : ""} QUEUED
+              </div>
+              {nukeStrikes.map((s, i) => (
+                <div key={i} style={{ fontSize: 11, color: "#cbd5e1", display: "flex", justifyContent: "space-between" }}>
+                  <span>#{i+1} {s.lat.toFixed(2)}°, {s.lng.toFixed(2)}°</span>
+                  <span style={{ color: "#ef4444", cursor: "pointer" }} onClick={() => {
+                    s.marker.remove();
+                    nukeStrikesRef.current = nukeStrikesRef.current.filter(x => x !== s);
+                    setNukeStrikes([...nukeStrikesRef.current]);
+                    setNukePointSet(nukeStrikesRef.current.length > 0);
+                  }}>✕</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
             <button onClick={runNuke} disabled={!nukePointSet || nukeLoading}
               style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#7c3aed", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15, opacity: !nukePointSet || nukeLoading ? 0.65 : 1 }}>
-              {nukeLoading ? "Detonating..." : "☢️ Detonate"}
+              {nukeLoading ? "Detonating..." : `☢️ Detonate${nukeStrikes.length > 1 ? ` (${nukeStrikes.length})` : ""}`}
             </button>
             <button onClick={clearNuke}
               style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15 }}>
