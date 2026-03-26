@@ -1086,8 +1086,8 @@ export default function HomePage() {
       console.log(`[nuke] ${strikes.length} fired, ${valid.length} valid results`);
       if (valid.length === 0) throw new Error("All detonations failed");
       drawAllNukeResults(valid);
-      const totalDeaths = valid.reduce((s, d) => s + (d.deaths || 0), 0);
-      const totalExposed = valid.reduce((s, d) => s + (d.exposed || 0), 0);
+      const totalDeaths = valid.reduce((s, d) => s + (d.estimated_deaths || 0), 0);
+      const totalExposed = valid.reduce((s, d) => s + (d.population_exposed || 0), 0);
       const combined = { ...valid[0], deaths: totalDeaths, exposed: totalExposed, _count: valid.length };
       setNukeResult(combined);
       setStatus(`${valid.length} detonation${valid.length > 1 ? "s" : ""} — ${(totalDeaths/1e6).toFixed(1)}M killed, ${(totalExposed/1e6).toFixed(1)}M exposed`);
