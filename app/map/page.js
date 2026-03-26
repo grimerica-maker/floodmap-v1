@@ -1117,7 +1117,7 @@ export default function HomePage() {
     const features = [];
     dataArr.forEach(data => {
       const lng = data._lng, lat = data._lat;
-      if (data.emp_r_m > 0) features.push({ ...kmCircle(lng, lat, data.emp_r_m/1000), properties: { kind: "emp" } });
+      // EMP ring intentionally not drawn — radius is continental scale and not visually useful
       features.push({ ...kmCircle(lng, lat, data.thermal_r_m/1000), properties: { kind: "thermal" } });
       features.push({ ...kmCircle(lng, lat, data.blast_light_r_m/1000), properties: { kind: "blast-light" } });
       features.push({ ...kmCircle(lng, lat, data.blast_moderate_r_m/1000), properties: { kind: "blast-moderate" } });
@@ -1132,7 +1132,7 @@ export default function HomePage() {
     try {
       map.addSource(NUKE_SRC, { type: "geojson", data: { type: "FeatureCollection", features } });
       const L = (id, type, filter, paint) => map.addLayer({ id, type, source: NUKE_SRC, filter: ["==", ["get", "kind"], filter], paint });
-      if (hasEmp) { L("nuke-emp","fill","emp",{"fill-color":"#7c3aed","fill-opacity":0.06}); L("nuke-emp-line","line","emp",{"line-color":"#7c3aed","line-width":1.5,"line-opacity":0.5,"line-dasharray":[4,4]}); }
+      // EMP layers not drawn
       L("nuke-thermal","fill","thermal",{"fill-color":"#f97316","fill-opacity":0.18});
       L("nuke-thermal-line","line","thermal",{"line-color":"#f97316","line-width":2,"line-opacity":0.9});
       L("nuke-blast-light","fill","blast-light",{"fill-color":"#fbbf24","fill-opacity":0.20});
