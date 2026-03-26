@@ -24,7 +24,7 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v249";
+const FRONTEND_BUILD_LABEL = "v250";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -2898,28 +2898,74 @@ export default function HomePage() {
           {/* Nuclear war presets — pro only */}
           {proTier !== "free" && (
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#7c3aed", textTransform: "uppercase" }}>⚡ War Presets</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#7c3aed", textTransform: "uppercase" }}>⚡ Conflict Scenarios</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {[
-                  { label: "🇺🇸→🇷🇺 US Strikes Russia", strikes: [
-                    { lat: 55.75, lng: 37.62 }, { lat: 59.95, lng: 30.32 }, { lat: 56.85, lng: 60.60 },
-                    { lat: 43.11, lng: 131.90 }, { lat: 54.99, lng: 82.90 }
-                  ]},
-                  { label: "🇷🇺→🇺🇸 Russia Strikes US", strikes: [
-                    { lat: 40.71, lng: -74.01 }, { lat: 38.91, lng: -77.04 }, { lat: 34.05, lng: -118.24 },
-                    { lat: 41.88, lng: -87.63 }, { lat: 47.61, lng: -122.33 }
-                  ]},
-                  { label: "☢️ Full Exchange", strikes: [
-                    { lat: 55.75, lng: 37.62 }, { lat: 40.71, lng: -74.01 },
-                    { lat: 38.91, lng: -77.04 }, { lat: 59.95, lng: 30.32 }, { lat: 34.05, lng: -118.24 }
-                  ]},
-                  { label: "🇵🇰↔🇮🇳 Pakistan vs India", strikes: [
-                    { lat: 33.72, lng: 73.06 }, { lat: 31.55, lng: 74.34 },
-                    { lat: 28.61, lng: 77.21 }, { lat: 19.08, lng: 72.88 }, { lat: 22.57, lng: 88.36 }
-                  ]},
+                  {
+                    label: "🇷🇺→🇺🇸 Russia First Strike",
+                    sub: "RS-28 Sarmat MIRVs · 800kt each",
+                    yield_kt: 800, burst: "airburst",
+                    strikes: [
+                      { lat: 38.87, lng: -77.15, name: "Pentagon" },
+                      { lat: 41.07, lng: -95.91, name: "Offutt AFB" },
+                      { lat: 40.71, lng: -74.01, name: "New York" },
+                      { lat: 47.87, lng: -117.56, name: "Fairchild AFB" },
+                      { lat: 34.05, lng: -118.24, name: "Los Angeles" },
+                    ]
+                  },
+                  {
+                    label: "🇺🇸→🇷🇺 US Retaliation",
+                    sub: "W88 Trident MIRVs · 475kt each",
+                    yield_kt: 475, burst: "airburst",
+                    strikes: [
+                      { lat: 55.75, lng: 37.62, name: "Moscow" },
+                      { lat: 59.95, lng: 30.32, name: "St Petersburg" },
+                      { lat: 56.85, lng: 60.60, name: "Yekaterinburg" },
+                      { lat: 54.99, lng: 82.90, name: "Novosibirsk" },
+                      { lat: 43.11, lng: 131.90, name: "Vladivostok" },
+                    ]
+                  },
+                  {
+                    label: "☢️ Full Annihilation",
+                    sub: "Both sides · simultaneous · 475–800kt",
+                    yield_kt: 600, burst: "airburst",
+                    strikes: [
+                      { lat: 55.75, lng: 37.62, name: "Moscow" },
+                      { lat: 40.71, lng: -74.01, name: "New York" },
+                      { lat: 38.91, lng: -77.04, name: "Washington DC" },
+                      { lat: 59.95, lng: 30.32, name: "St Petersburg" },
+                      { lat: 34.05, lng: -118.24, name: "Los Angeles" },
+                    ]
+                  },
+                  {
+                    label: "🇵🇰↔🇮🇳 Kashmir Escalation",
+                    sub: "Shaheen-III / Agni-V · 45kt each",
+                    yield_kt: 45, burst: "airburst",
+                    strikes: [
+                      { lat: 33.72, lng: 73.06, name: "Islamabad" },
+                      { lat: 31.55, lng: 74.34, name: "Lahore" },
+                      { lat: 28.61, lng: 77.21, name: "New Delhi" },
+                      { lat: 19.08, lng: 72.88, name: "Mumbai" },
+                      { lat: 22.57, lng: 88.36, name: "Kolkata" },
+                    ]
+                  },
+                  {
+                    label: "🇰🇵 NK Strikes Seoul & Tokyo",
+                    sub: "Hwasong-17 · 250kt each",
+                    yield_kt: 250, burst: "airburst",
+                    strikes: [
+                      { lat: 37.57, lng: 126.98, name: "Seoul" },
+                      { lat: 37.45, lng: 126.89, name: "Incheon" },
+                      { lat: 35.69, lng: 139.69, name: "Tokyo" },
+                      { lat: 34.69, lng: 135.50, name: "Osaka" },
+                      { lat: 37.39, lng: 127.05, name: "US Forces Korea" },
+                    ]
+                  },
                 ].map(preset => (
                   <button key={preset.label} onClick={() => {
                     clearNuke();
+                    setNukeYield(preset.yield_kt);
+                    setNukeBurst(preset.burst);
                     const map = mapRef.current;
                     if (!map) return;
                     preset.strikes.forEach((s, i) => {
@@ -2928,8 +2974,8 @@ export default function HomePage() {
                       el.innerText = i + 1;
                       const marker = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([s.lng, s.lat]).addTo(map);
                       const strike = { lat: s.lat, lng: s.lng, marker, idx: i };
-                      el.addEventListener("click", (e) => {
-                        e.stopPropagation();
+                      el.addEventListener("click", (ev) => {
+                        ev.stopPropagation();
                         strike.marker.remove();
                         nukeStrikesRef.current = nukeStrikesRef.current.filter(x => x !== strike);
                         setNukeStrikes([...nukeStrikesRef.current]);
@@ -2939,10 +2985,11 @@ export default function HomePage() {
                     });
                     setNukeStrikes([...nukeStrikesRef.current]);
                     setNukePointSet(true);
-                    setStatus(`${preset.strikes.length} targets loaded — detonate when ready`);
+                    setStatus(`${preset.strikes.length} targets loaded · ${preset.yield_kt >= 1000 ? (preset.yield_kt/1000).toFixed(1)+"Mt" : preset.yield_kt+"kt"} — detonate when ready`);
                   }}
-                  style={{ padding: "8px 6px", fontSize: 10, fontWeight: 700, background: "#0f172a", color: "#a78bfa", border: "1px solid #312e81", borderRadius: 8, cursor: "pointer", textAlign: "left", lineHeight: 1.4 }}>
-                    {preset.label}
+                  style={{ padding: "8px 10px", fontWeight: 700, background: "#0f172a", color: "#a78bfa", border: "1px solid #312e81", borderRadius: 8, cursor: "pointer", textAlign: "left", lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700 }}>{preset.label}</div>
+                    <div style={{ fontSize: 10, color: "#6d6d9e", marginTop: 1 }}>{preset.sub}</div>
                   </button>
                 ))}
               </div>
@@ -3401,22 +3448,42 @@ export default function HomePage() {
       {scenarioMode === "nuke" && nukeResult && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>☢️ Detonation Results</div>
-          <div>Yield: {nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(2)+" Mt" : nukeResult.yield_kt+" kt"}</div>
-          <div>Type: {nukeResult.burst_type}</div>
-          <hr style={{ margin: "8px 0", opacity: 0.2 }} />
-          <div style={{ color: "#fde047" }}>● Fireball: {Math.round(nukeResult.fireball_r_m).toLocaleString()} m</div>
-          <div style={{ color: "#dc2626" }}>● Heavy blast: {(Math.round(nukeResult.blast_heavy_r_m)/1000).toFixed(1)} km</div>
-          <div style={{ color: "#ef4444" }}>● Moderate blast: {(Math.round(nukeResult.blast_moderate_r_m)/1000).toFixed(1)} km</div>
-          <div style={{ color: "#f97316" }}>● Thermal (3rd°): {(Math.round(nukeResult.thermal_r_m)/1000).toFixed(1)} km</div>
-          <div style={{ color: "#f59e0b" }}>● Light blast: {(Math.round(nukeResult.blast_light_r_m)/1000).toFixed(1)} km</div>
-          {nukeResult.radiation_r_m > 0 && <div style={{ color: "#4ade80" }}>◌ Radiation 500rem: {Math.round(nukeResult.radiation_r_m).toLocaleString()} m</div>}
-          {nukeResult.emp_r_m > 0 && <div style={{ color: "#a78bfa" }}>◌ EMP radius: {(Math.round(nukeResult.emp_r_m)/1000).toFixed(0)} km</div>}
-          {nukeResult.fallout_major_km > 0 && <div style={{ color: "#84cc16" }}>◌ Fallout: {Math.round(nukeResult.fallout_major_km)} × {Math.round(nukeResult.fallout_minor_km)} km</div>}
-          <hr style={{ margin: "8px 0", opacity: 0.2 }} />
-          <div style={{ fontWeight: 700 }}>Casualties</div>
-          <div>Exposed: {nukeResult.population_exposed != null ? nukeResult.population_exposed.toLocaleString() : "—"}</div>
-          <div>Est. deaths: {nukeResult.estimated_deaths != null ? nukeResult.estimated_deaths.toLocaleString() : "—"}</div>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>☢️ {nukeResult._count > 1 ? `${nukeResult._count} Strikes` : "Detonation"} Results</div>
+          {nukeResult._count > 1 ? (
+            <>
+              <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 6 }}>
+                {nukeResult._count} simultaneous detonations · {nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"} each
+              </div>
+              <hr style={{ margin: "8px 0", opacity: 0.2 }} />
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>Combined Casualties</div>
+              <div>Total exposed: {nukeResult.exposed != null ? nukeResult.exposed.toLocaleString() : "—"}</div>
+              <div style={{ color: "#ef4444", fontWeight: 700 }}>Total deaths: {nukeResult.deaths != null ? nukeResult.deaths.toLocaleString() : "—"}</div>
+              {nukeResult.radiation_deaths != null && nukeResult.radiation_deaths > 0 && (
+                <div style={{ color: "#4ade80" }}>◌ Lethal radiation deaths: {nukeResult.radiation_deaths.toLocaleString()}</div>
+              )}
+            </>
+          ) : (
+            <>
+              <div>Yield: {nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(2)+" Mt" : nukeResult.yield_kt+" kt"}</div>
+              <div>Type: {nukeResult.burst_type}</div>
+              <hr style={{ margin: "8px 0", opacity: 0.2 }} />
+              <div style={{ color: "#fde047" }}>● Fireball: {Math.round(nukeResult.fireball_r_m).toLocaleString()} m</div>
+              <div style={{ color: "#dc2626" }}>● Heavy blast: {(Math.round(nukeResult.blast_heavy_r_m)/1000).toFixed(1)} km</div>
+              <div style={{ color: "#ef4444" }}>● Moderate blast: {(Math.round(nukeResult.blast_moderate_r_m)/1000).toFixed(1)} km</div>
+              <div style={{ color: "#f97316" }}>● Thermal (3rd°): {(Math.round(nukeResult.thermal_r_m)/1000).toFixed(1)} km</div>
+              <div style={{ color: "#f59e0b" }}>● Light blast: {(Math.round(nukeResult.blast_light_r_m)/1000).toFixed(1)} km</div>
+              {nukeResult.radiation_r_m > 0 && <div style={{ color: "#4ade80" }}>◌ Radiation 500rem: {Math.round(nukeResult.radiation_r_m).toLocaleString()} m</div>}
+              {nukeResult.emp_r_m > 0 && <div style={{ color: "#a78bfa" }}>◌ EMP radius: {(Math.round(nukeResult.emp_r_m)/1000).toFixed(0)} km</div>}
+              {nukeResult.fallout_major_km > 0 && <div style={{ color: "#84cc16" }}>◌ Fallout: {Math.round(nukeResult.fallout_major_km)} × {Math.round(nukeResult.fallout_minor_km)} km</div>}
+              <hr style={{ margin: "8px 0", opacity: 0.2 }} />
+              <div style={{ fontWeight: 700 }}>Casualties</div>
+              <div>Exposed: {nukeResult.population_exposed != null ? nukeResult.population_exposed.toLocaleString() : "—"}</div>
+              <div>Est. deaths: {nukeResult.estimated_deaths != null ? nukeResult.estimated_deaths.toLocaleString() : "—"}</div>
+              {nukeResult.radiation_deaths != null && nukeResult.radiation_deaths > 0 && (
+                <div style={{ color: "#4ade80" }}>◌ Lethal radiation deaths: {nukeResult.radiation_deaths.toLocaleString()}</div>
+              )}
+            </>
+          )}
         </>
       )}
 
