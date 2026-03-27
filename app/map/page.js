@@ -933,7 +933,9 @@ export default function HomePage() {
         });
         try { if (map.getSource(srcId)) map.removeSource(srcId); } catch(e){}
       }
+      console.log("[drawLandImpact] adding source", srcId, "exists?", !!map.getSource(srcId));
       map.addSource(srcId, { type: "geojson", data });
+      console.log("[drawLandImpact] source added OK, adding layers for idx=", idx);
       map.addLayer({ id: thId,   type: "fill", source: srcId, filter: ["==", ["get", "kind"], "thermal"],    paint: { "fill-color": "#f97316", "fill-opacity": 0.15 } });
       map.addLayer({ id: thLId,  type: "line", source: srcId, filter: ["==", ["get", "kind"], "thermal"],    paint: { "line-color": "#f97316", "line-width": 2, "line-opacity": 0.9 } });
       map.addLayer({ id: blFId,  type: "fill", source: srcId, filter: ["==", ["get", "kind"], "blast-fill"], paint: { "fill-color": "#ef4444", "fill-opacity": 0.25 } });
@@ -944,9 +946,10 @@ export default function HomePage() {
       map.addLayer({ id: crId,   type: "fill", source: srcId, filter: ["==", ["get", "kind"], "crater"],     paint: { "fill-color": "#000000", "fill-opacity": 0.90 } });
       map.addLayer({ id: crInId, type: "fill", source: srcId, filter: ["==", ["get", "kind"], "crater-inner"], paint: { "fill-color": "#000000", "fill-opacity": 0.70 } });
       map.addLayer({ id: pulId,  type: "line", source: srcId, filter: ["==", ["get", "kind"], "crater-rim"], paint: { "line-color": "#fde047", "line-width": 3, "line-opacity": 0.95 } });
+      console.log("[drawLandImpact] all layers added OK for idx=", idx);
       safely(() => map.triggerRepaint());
       startImpactPulseAnimation();
-    } catch (e) { console.error("Failed to draw land impact result", e); }
+    } catch (e) { console.error("Failed to draw land impact result idx=", idx, e.message, e); }
   };
 
   const drawOceanImpactMarker = (lng, lat, idx = null) => {
