@@ -2917,6 +2917,7 @@ export default function HomePage() {
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Yield</div>
           {nukeSubMode === "emp" ? (
             // EMP mode — presets only, no slider (yield affects E1 intensity, not footprint size)
+            <>
             <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8 }}>Yield affects E1 pulse intensity — what electronics survive.</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
               {[
@@ -2936,6 +2937,7 @@ export default function HomePage() {
                 </button>
               ))}
             </div>
+            </>
           ) : (
             <>
               <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"} style={{ marginBottom: 12 }}>
