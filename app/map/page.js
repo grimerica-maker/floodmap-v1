@@ -430,6 +430,8 @@ export default function HomePage() {
   const activeFloodLevelRef = useRef(null);
   const initialViewAppliedRef = useRef(false);
   const impactRunSeqRef = useRef(0);
+  const impactCountRef = useRef(0); // number of impacts placed this session
+  const impactFloodLayersRef = useRef([]); // [{sourceId, layerId}] for cumulative flood tiles
 
   const [inputLevel, setInputLevel] = useState(0);
   const [inputText, setInputText] = useState("0");
@@ -2706,20 +2708,26 @@ export default function HomePage() {
               </div>
             </div>
           ))}
-          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, marginTop: 4, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Custom Size</div>
-          <input
-            type="range" min="50" max="20000" step="50" value={impactDiameter}
-            onChange={(e) => setImpactDiameter(Number(e.target.value))}
-            style={{ width: "100%", marginBottom: 10, height: 6, cursor: "pointer" }}
-          />
-          <input
-            type="number" min="50" max="20000" step="50" value={impactDiameter}
-            onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n)) setImpactDiameter(Math.max(50, Math.min(20000, n))); }}
-            style={{ width: "100%", padding: "12px 14px", fontSize: 17, border: "1px solid #1e2d45", marginBottom: 10, boxSizing: "border-box", borderRadius: 8, minHeight: 48, background: "#111827", color: "#e2e8f0" }}
-          />
-          <div style={{ fontSize: 13, marginBottom: 16, color: "#64748b" }}>
-            Diameter: <b>{impactDiameter.toLocaleString()} m</b>
-          </div>
+          {proTier !== "free" ? (<>
+            <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, marginTop: 4, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Custom Size</div>
+            <input
+              type="range" min="50" max="20000" step="50" value={impactDiameter}
+              onChange={(e) => setImpactDiameter(Number(e.target.value))}
+              style={{ width: "100%", marginBottom: 10, height: 6, cursor: "pointer" }}
+            />
+            <input
+              type="number" min="50" max="20000" step="50" value={impactDiameter}
+              onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n)) setImpactDiameter(Math.max(50, Math.min(20000, n))); }}
+              style={{ width: "100%", padding: "12px 14px", fontSize: 17, border: "1px solid #1e2d45", marginBottom: 10, boxSizing: "border-box", borderRadius: 8, minHeight: 48, background: "#111827", color: "#e2e8f0" }}
+            />
+            <div style={{ fontSize: 13, marginBottom: 16, color: "#64748b" }}>
+              Diameter: <b>{impactDiameter.toLocaleString()} m</b>
+            </div>
+          </>) : (
+            <button onClick={() => setPaywallModal("pro")} style={{ width: "100%", padding: "10px 14px", marginBottom: 16, marginTop: 4, background: "#0f172a", border: "1px solid #1e2d45", borderRadius: 8, color: "#475569", cursor: "pointer", textAlign: "left", fontSize: 12 }}>
+              🔒 Custom size — <span style={{ color: "#7c3aed" }}>Pro</span>
+            </button>
+          )}
           <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
             <button onClick={runImpact} disabled={!impactPointRef.current || impactLoading}
               style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#ef4444", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15, opacity: !impactPointRef.current || impactLoading ? 0.65 : 1 }}>
@@ -2948,12 +2956,18 @@ export default function HomePage() {
                   </button>
                 ))}
               </div>
-              <input type="range" min="0.001" max="50000" step="1" value={nukeYield}
-                onChange={(e) => setNukeYield(Number(e.target.value))}
-                style={{ width: "100%", marginBottom: 6, cursor: "pointer" }} />
-              <div style={{ fontSize: 13, marginBottom: 12, color: "#64748b" }}>
-                Yield: <b>{nukeYield >= 1000 ? (nukeYield/1000).toFixed(2)+" Mt" : nukeYield+" kt"}</b>
-              </div>
+              {proTier !== "free" ? (<>
+                <input type="range" min="0.001" max="50000" step="1" value={nukeYield}
+                  onChange={(e) => setNukeYield(Number(e.target.value))}
+                  style={{ width: "100%", marginBottom: 6, cursor: "pointer" }} />
+                <div style={{ fontSize: 13, marginBottom: 12, color: "#64748b" }}>
+                  Yield: <b>{nukeYield >= 1000 ? (nukeYield/1000).toFixed(2)+" Mt" : nukeYield+" kt"}</b>
+                </div>
+              </>) : (
+                <button onClick={() => setPaywallModal("pro")} style={{ width: "100%", padding: "10px 14px", marginBottom: 12, background: "#0f172a", border: "1px solid #1e2d45", borderRadius: 8, color: "#475569", cursor: "pointer", textAlign: "left", fontSize: 12 }}>
+                  🔒 Custom yield — <span style={{ color: "#7c3aed" }}>Pro</span>
+                </button>
+              )}
             </>
           )}
 
@@ -3007,8 +3021,8 @@ export default function HomePage() {
           )}
           </>)} {/* end nukeSubMode === "detonate" burst type section */}
 
-          {/* Nuclear war presets — detonate mode only, pro only */}
-          {nukeSubMode === "detonate" && proTier !== "free" && (
+          {/* Nuclear war presets — detonate mode only; multi-strike presets require pro */}
+          {nukeSubMode === "detonate" && (
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#7c3aed", textTransform: "uppercase" }}>⚡ Conflict Scenarios</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
