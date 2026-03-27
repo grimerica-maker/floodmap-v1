@@ -126,8 +126,9 @@ const YDI_FLOOD_CORRIDORS = {
       ]},
       // St Lawrence — follows real valley
       { name: "St Lawrence Outlet", flow_km3: 6800, dissipation: "Drains east through St Lawrence valley — peak discharge ~80,000 m³/s, dissipates into N Atlantic", width: 0.7, coords: [
-        [-79.1, 43.9], [-78.2, 44.0], [-76.8, 44.2], [-75.2, 44.5],
-        [-74.0, 45.5], [-72.5, 46.2], [-71.2, 46.8], [-69.5, 47.4],
+        [-79.1, 43.3], [-77.5, 43.0], [-76.5, 43.1], [-75.5, 43.5],
+        [-74.5, 43.8], [-74.0, 44.5], [-73.8, 45.5], [-73.5, 46.5],
+        [-72.5, 46.8], [-71.2, 46.8], [-69.5, 47.4],
         [-67.5, 47.9], [-65.5, 48.4], [-64.0, 48.8], [-62.5, 48.5], [-61.5, 47.3],
       ]},
     ]
@@ -183,8 +184,9 @@ const YDI_FLOOD_CORRIDORS = {
       ]},
       // St Lawrence wider
       { name: "St Lawrence Outlet", flow_km3: 11500, dissipation: "Combined Lake Agassiz + Great Lakes drainage east — primary trigger for AMOC disruption and Younger Dryas onset.", width: 1.0, coords: [
-        [-76.5, 44.2], [-75.2, 44.5], [-74.0, 45.5], [-72.5, 46.2],
-        [-71.2, 46.8], [-69.5, 47.4], [-67.5, 47.9], [-65.5, 48.4],
+        [-79.1, 43.3], [-77.5, 43.0], [-76.0, 43.2], [-75.0, 43.6],
+        [-74.3, 44.5], [-73.8, 45.5], [-73.5, 46.5],
+        [-72.5, 46.8], [-71.2, 46.8], [-69.5, 47.4], [-67.5, 47.9], [-65.5, 48.4],
         [-64.0, 48.8], [-62.5, 48.5], [-61.5, 47.3],
       ]},
       // Mackenzie River — primary Arctic drainage
@@ -253,8 +255,9 @@ const YDI_FLOOD_CORRIDORS = {
       ]},
       // St Lawrence at maximum
       { name: "St Lawrence / Atlantic", flow_km3: 28000, dissipation: "Maximum Atlantic freshwater injection — Lake Agassiz + Great Lakes combined. Salinity drop of 3-5ppt across N Atlantic. Younger Dryas onset within 1-3 years of peak discharge.", width: 1.6, coords: [
-        [-76.5, 44.2], [-75.2, 44.5], [-74.0, 45.5],
-        [-72.5, 46.2], [-71.2, 46.8], [-69.5, 47.4],
+        [-79.1, 43.3], [-77.5, 43.0], [-76.0, 43.2], [-75.0, 43.6],
+        [-74.3, 44.5], [-73.8, 45.5], [-73.5, 46.5],
+        [-72.5, 46.8], [-71.2, 46.8], [-69.5, 47.4],
         [-67.5, 47.9], [-65.5, 48.4], [-64.0, 48.8],
         [-62.5, 48.5], [-61.5, 47.3],
       ]},
@@ -2399,13 +2402,34 @@ export default function HomePage() {
 
       setStatus(`☄️ Younger Dryas — ${intensity.toUpperCase()} flood release · Columbia Scablands + Mississippi drainage`);
 
-      // Draw flood corridors using Mapbox line rendering — smooth halo + core
+      // Draw flood corridors — split each into segments with tapering width
+      // Width starts at 100% at source, tapers to 30% at terminus (hydrologically correct)
       const corridorData = YDI_FLOOD_CORRIDORS[intensity] || YDI_FLOOD_CORRIDORS.medium;
-      const features = corridorData.features.map((corridor, fi) => ({
-        type: "Feature",
-        geometry: { type: "LineString", coordinates: corridor.coords },
-        properties: { name: corridor.name, width: corridor.width, idx: fi }
-      }));
+      const features = [];
+      corridorData.features.forEach((corridor, fi) => {
+        const n = corridor.coords.length;
+        if (n < 2) return;
+        // Split into segments, each with its own width based on position along corridor
+        for (let i = 0; i < n - 1; i++) {
+          const t0 = i / (n - 1);           // 0 = source, 1 = terminus
+          const t1 = (i + 1) / (n - 1);
+          const tMid = (t0 + t1) / 2;
+          // Taper: starts wide, narrows toward end (100% → 30%)
+          const taper = 1.0 - (tMid * 0.7);
+          features.push({
+            type: "Feature",
+            geometry: { type: "LineString", coordinates: [corridor.coords[i], corridor.coords[i+1]] },
+            properties: {
+              name: corridor.name,
+              width: corridor.width * taper,
+              idx: fi,
+              flow_km3: corridor.flow_km3 || 0,
+              dissipation: corridor.dissipation || "",
+              seg: i,
+            }
+          });
+        }
+      });
       const fc = { type: "FeatureCollection", features };
       const srcId  = "ydi-flood-source";
       const haloId = "ydi-flood-halo";
