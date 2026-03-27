@@ -2367,7 +2367,7 @@ export default function HomePage() {
         if (nt < 1) requestAnimationFrame(fadeNodes);
       };
       requestAnimationFrame(fadeNodes);
-      setStatus("☄️ Younger Dryas — ice dam failure imminent…");
+      setStatus("☄️ Younger Dryas — meltwater surge initiating…");
     }, 2200);
 
     // Phase 3: release floods (5.5s after trigger)
@@ -2383,28 +2383,24 @@ export default function HomePage() {
       // Draw flood corridors as GeoJSON polygons — no backend needed
       const corridorData = YDI_FLOOD_CORRIDORS[intensity] || YDI_FLOOD_CORRIDORS.medium;
 
-      // Build buffered polygon features from centerline + width
-      const kpLat = 110.574;
+      // Build buffered polygon features from centerline + width (in degrees)
       const features = corridorData.features.map((corridor, fi) => {
         const { coords, width } = corridor;
-        // Build left and right offset lines then close into polygon
+        const half = width / 2;
         const left = [], right = [];
         for (let i = 0; i < coords.length; i++) {
           const [lng, lat] = coords[i];
-          const kpLng = 111.32 * Math.cos(lat * Math.PI / 180);
-          // Direction vector from prev to next point
           const prev = coords[Math.max(0, i-1)];
           const next = coords[Math.min(coords.length-1, i+1)];
-          const dx = (next[0] - prev[0]) / Math.max(kpLng, 0.001);
-          const dy = (next[1] - prev[1]) / kpLat;
+          // Direction vector in degree space
+          const dx = next[0] - prev[0];
+          const dy = next[1] - prev[1];
           const len = Math.sqrt(dx*dx + dy*dy) || 1;
-          // Perpendicular (normalized)
+          // Perpendicular offset in degrees
           const nx = -dy / len;
           const ny =  dx / len;
-          const offLng = nx * (width / 2) / Math.max(kpLng, 0.001);
-          const offLat = ny * (width / 2) / kpLat;
-          left.push([lng + offLng, lat + offLat]);
-          right.push([lng - offLng, lat - offLat]);
+          left.push([lng + nx * half, lat + ny * half]);
+          right.push([lng - nx * half, lat - ny * half]);
         }
         const ring = [...left, ...[...right].reverse(), left[0]];
         return {
