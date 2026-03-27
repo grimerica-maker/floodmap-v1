@@ -2959,9 +2959,11 @@ export default function HomePage() {
           const newBearing = startBearing + bearingDelta * eased;
           if (flipLastT !== null) flipLng -= (now - flipLastT) * 0.018;
           flipLastT = now;
-          // Shift center lat toward new pole lat as flip progresses — tracks spin axis
-          // Lng drifts freely — no pulling toward snap point
-          const centerLat = startLat + (info.snapLat - startLat) * eased;
+          // For Davidson: shift lat toward new pole (22°N) so spin axis tracks with tilt
+          // For TES: keep lat fixed at 20 — pole is southern hemisphere, lat shift causes chaos
+          const centerLat = model === "davidson"
+            ? startLat + (info.snapLat - startLat) * eased
+            : 20;
           safely(() => map.jumpTo({ bearing: newBearing, center: [flipLng, centerLat] }));
           if (progress < 1) {
             cataclysmSpinRef.current = requestAnimationFrame(flipLoop);
