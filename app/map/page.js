@@ -97,12 +97,6 @@ const YDI_SOURCE_NODES = [
   { id: "stjean",  name: "Eastern Outlet\n(Lac Saint-Jean)",               lat: 48.6,  lng: -72.0,  reachM: 550000  },
   { id: "columbia",name: "Columbia Mouth\n(Pacific Discharge)",            lat: 46.2,  lng: -123.9, reachM: 320000  },
 ];
-// Flood level (m elevation threshold) per source per intensity
-const YDI_LEVELS = {
-  low:    { bc: 80,  nipigon: 60,  stjean: 50,  columbia: 100 },
-  medium: { bc: 200, nipigon: 160, stjean: 140, columbia: 250 },
-  high:   { bc: 400, nipigon: 320, stjean: 280, columbia: 500 },
-};
 // YDI ice sheets to animate (subset of ICE_SHEET_ZONES — North America only)
 const YDI_ICE_INDICES = [0, 7]; // Laurentide=0, Cordilleran=7
 
@@ -2016,8 +2010,8 @@ export default function HomePage() {
   const clearYDI = () => {
     // Stop ice animation
     if (ydiIceFrameRef.current) { cancelAnimationFrame(ydiIceFrameRef.current); ydiIceFrameRef.current = null; }
-    // Remove flood tile layers (reuse impactFloodLayersRef cleanup)
-    removeImpactFloodLayers();
+    // Remove standard flood layer (YDI uses global flood tiles, not indexed impact layers)
+    removeFloodLayer();
     // Remove YDI-specific source node markers
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
@@ -2132,28 +2126,20 @@ export default function HomePage() {
       try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-fill`, "fill-opacity", 0.35); } catch(e){}
       try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-line`, "line-opacity", 0.7); } catch(e){}
 
-      const levels = YDI_LEVELS[intensity] || YDI_LEVELS.medium;
+      // Global flood tiles follow real terrain — river valleys (Mississippi, Columbia, St Lawrence)
+      // flood naturally because they're lowest elevation. Much more realistic than regional circles.
+      // Low=80m shows main corridors, Medium=200m fills basins, High=400m covers half continent
+      const globalLevel = intensity === "low" ? 80 : intensity === "medium" ? 200 : 400;
       setStatus(`☄️ Younger Dryas — ${intensity.toUpperCase()} flood release · Columbia Scablands + Mississippi drainage`);
 
-      // Add each regional flood tile layer sequentially with stagger for visual effect
-      YDI_SOURCE_NODES.forEach((node, i) => {
-        setTimeout(() => {
-          if (ydiRunRef.current !== run) return;
-          const level = levels[node.id];
-          // Use impactIdx offset from 10 so we don't collide with impact mode layers (0-2)
-          addFloodLayer(level, {
-            impactLat: node.lat, impactLng: node.lng,
-            reachM: node.reachM,
-            impactIdx: 10 + i,
-          });
-        }, i * 600);
-      });
+      // Single global flood layer — terrain-routed by DEM
+      addFloodLayer(globalLevel);
 
-      // Zoom out slightly to see full extent
+      // Zoom out to see full North American extent
       setTimeout(() => {
         if (ydiRunRef.current !== run) return;
-        safely(() => map.flyTo({ center: [-96, 46], zoom: 2.9, duration: 2000, essential: true }));
-      }, 1500);
+        safely(() => map.flyTo({ center: [-96, 46], zoom: 2.8, duration: 2000, essential: true }));
+      }, 800);
 
     }, 5500);
   };
