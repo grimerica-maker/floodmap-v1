@@ -2894,8 +2894,8 @@ export default function HomePage() {
     if (!map) return;
     const model = cataclysmModelRef.current;
     const info = model === "davidson"
-      ? { name: "Davidson / Suspicious Observers", flipBearing: -90, newPoleLat: 22, newPoleLng: 90, newPoleLabel: "New N. Pole (Bay of Bengal)", finalBearing: -90, startBearing: 0 }
-      : { name: "The Ethical Skeptic ECDO", flipBearing: 104, newPoleLat: -13.5, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: 123, startBearing: 0 };
+      ? { name: "Davidson / Suspicious Observers", flipBearing: 90, newPoleLat: 22, newPoleLng: 90, newPoleLabel: "New N. Pole (Bay of Bengal)", finalBearing: 90, startBearing: 0, snapLat: 22, snapLng: 0 }
+      : { name: "The Ethical Skeptic ECDO", flipBearing: 104, newPoleLat: -13.5, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: 123, startBearing: 0, snapLat: -13.5, snapLng: -59 };
 
     clearCataclysm();
     cataclysmRunRef.current += 1;
@@ -2948,6 +2948,7 @@ export default function HomePage() {
         const easeInOut = t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
         let flipLng = map.getCenter().lng;
         let flipLastT = null;
+        const startLat = 20;
         const flipLoop = (now) => {
           if (cataclysmRunRef.current !== thisRun) return;
           const elapsed = now - flipStart;
@@ -2956,14 +2957,16 @@ export default function HomePage() {
           const newBearing = startBearing + bearingDelta * eased;
           if (flipLastT !== null) flipLng -= (now - flipLastT) * 0.018;
           flipLastT = now;
-          safely(() => map.jumpTo({ bearing: newBearing, center: [flipLng, 20] }));
+          // Gradually shift spin center lat toward new pole lat as flip progresses
+          const centerLat = startLat + (info.newPoleLat - startLat) * eased;
+          safely(() => map.jumpTo({ bearing: newBearing, center: [flipLng, centerLat] }));
           if (progress < 1) {
             cataclysmSpinRef.current = requestAnimationFrame(flipLoop);
           } else {
             cataclysmSpinRef.current = null;
             // Flip done — smooth flyTo new pole centered at top
             safely(() => map.easeTo({
-              center: [info.newPoleLng, info.newPoleLat],
+              center: [info.snapLng, info.snapLat],
               bearing: targetBearing,
               zoom: _catZoom,
               duration: 1800,
@@ -3036,17 +3039,17 @@ export default function HomePage() {
         });
       }
       // Post-flip spin — bearing decrements (right to left) around centered new pole
-      // No latitude movement — globe rotates cleanly under the new pole at top
+      // Small delay lets the easeTo finish landing before spin takes over
       let bearingSpin = map.getBearing();
       let lt2 = null;
       let spinActive = true;
       const spin2 = (t) => {
         if (!spinActive) return;
         if (lt2 !== null) {
-          bearingSpin -= (t - lt2) * 0.012; // right to left bearing spin
+          bearingSpin += (t - lt2) * 0.012; // right to left: bearing increases spins globe rightward under fixed pole
         }
         lt2 = t;
-        safely(() => map.jumpTo({ bearing: bearingSpin, center: [info.newPoleLng, info.newPoleLat] }));
+        safely(() => map.jumpTo({ bearing: bearingSpin, center: [info.snapLng, info.snapLat] }));
         cataclysmSpinRef.current = requestAnimationFrame(spin2);
       };
       cataclysmSpinRef.current = requestAnimationFrame(spin2);
@@ -3104,7 +3107,7 @@ export default function HomePage() {
       };
       map.on("wheel", stopSpin);
       map.once("zoomstart", stopSpin);
-    }, 14000);
+    }, 17500);
   };
 
   const clearNuke = () => {
