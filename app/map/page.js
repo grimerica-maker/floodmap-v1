@@ -2895,7 +2895,7 @@ export default function HomePage() {
     const model = cataclysmModelRef.current;
     const info = model === "davidson"
       ? { name: "Davidson / Suspicious Observers", flipBearing: 90, newPoleLat: 22, newPoleLng: 90, newPoleLabel: "New N. Pole (Bay of Bengal)", finalBearing: 90, startBearing: 0, snapLat: 22, snapLng: 0 }
-      : { name: "The Ethical Skeptic ECDO", flipBearing: 104, newPoleLat: -13.5, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: 123, startBearing: 0, snapLat: -13.5, snapLng: -59 };
+      : { name: "The Ethical Skeptic ECDO", flipBearing: -76, newPoleLat: -13.5, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: -76, startBearing: 0, snapLat: 20, snapLng: -59 };
 
     clearCataclysm();
     cataclysmRunRef.current += 1;
@@ -3078,26 +3078,27 @@ export default function HomePage() {
 
       // Stop spin on first interaction (pro: keep map, free: show paywall)
       const stopSpin = () => {
-        spinActive = false;
-        if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-        map.off("wheel", stopSpin);
-        map.off("zoomstart", stopSpin);
-        if ((proTierRef.current ?? proTier ?? "free") === "free") {
-          // Free: pan allowed, zoom triggers paywall
-          safely(() => { map.dragPan.enable(); });
-          map.on("wheel", () => setPaywallModal("pro"));
-          map.on("zoomstart", () => setPaywallModal("pro"));
-        } else {
-          safely(() => {
-            map.dragPan.enable();
-            map.scrollZoom.enable();
-            map.doubleClickZoom.enable();
-            map.touchZoomRotate.enable();
-          });
-        }
+        try {
+          spinActive = false;
+          if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
+          try { map.off("wheel", stopSpin); } catch(e){}
+          try { map.off("zoomstart", stopSpin); } catch(e){}
+          if ((proTierRef.current ?? proTier ?? "free") === "free") {
+            safely(() => { map.dragPan.enable(); });
+            try { map.on("wheel", () => setPaywallModal("pro")); } catch(e){}
+            try { map.on("zoomstart", () => setPaywallModal("pro")); } catch(e){}
+          } else {
+            safely(() => {
+              map.dragPan.enable();
+              map.scrollZoom.enable();
+              map.doubleClickZoom.enable();
+              map.touchZoomRotate.enable();
+            });
+          }
+        } catch(e) { console.warn("stopSpin error", e); }
       };
-      map.on("wheel", stopSpin);
-      map.once("zoomstart", stopSpin);
+      try { map.on("wheel", stopSpin); } catch(e){}
+      try { map.once("zoomstart", stopSpin); } catch(e){}
     }, 17500);
   };
 
