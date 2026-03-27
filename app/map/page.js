@@ -2916,7 +2916,7 @@ export default function HomePage() {
     }, 300);
 
     // Step 2: Natural Earth rotation — longitude moves W→E via setCenter
-    let spinLng = (model === "tes") ? 31 : 0; // force Davidson to start from Greenwich for consistent flip
+    let spinLng = (model === "tes") ? 31 : -90; // Davidson starts on NA, TES on Africa
     let lastT = null;
     const spin = (t) => {
       if (lastT !== null) {
