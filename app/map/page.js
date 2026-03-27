@@ -2417,14 +2417,14 @@ export default function HomePage() {
       try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-fill`, "fill-opacity", 0.35); } catch(e){}
       try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-line`, "line-opacity", 0.7); } catch(e){}
 
-      // Calculate total flow volume across all corridors
-      const totalFlow = corridorData.features.reduce((sum, c) => sum + (c.flow_km3 || 0), 0);
-      const totalFlowStr = totalFlow > 0 ? `${Math.round(totalFlow/1000)*1000}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "";
-      setStatus(`☄️ Younger Dryas — ${intensity.toUpperCase()} flood release · ~${totalFlowStr} km³ total meltwater`);
-
       // Draw flood corridors — split each into segments with tapering width
       // Width starts at 100% at source, tapers to 30% at terminus (hydrologically correct)
       const corridorData = YDI_FLOOD_CORRIDORS[intensity] || YDI_FLOOD_CORRIDORS.medium;
+
+      // Calculate total flow volume across all corridors
+      const totalFlow = corridorData.features.reduce((sum, c) => sum + (c.flow_km3 || 0), 0);
+      const totalFlowStr = totalFlow > 0 ? totalFlow.toLocaleString() : "";
+      setStatus(`☄️ Younger Dryas — ${intensity.toUpperCase()} flood release · ~${totalFlowStr} km³ total meltwater`);
       const features = [];
       corridorData.features.forEach((corridor, fi) => {
         const n = corridor.coords.length;
