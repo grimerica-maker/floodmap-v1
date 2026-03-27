@@ -102,7 +102,7 @@ const YDI_SOURCE_NODES = [
 // Low = main channels, Medium = widened + tributaries, High = full basin sheet flow
 const YDI_FLOOD_CORRIDORS = {
   low: {
-    opacity: 0.75,
+    opacity: 0.82,
     features: [
       // Columbia River / Channeled Scablands — narrow gorge corridor
       { name: "Columbia Scablands", width: 0.6, coords: [
@@ -132,7 +132,7 @@ const YDI_FLOOD_CORRIDORS = {
     ]
   },
   medium: {
-    opacity: 0.78,
+    opacity: 0.86,
     features: [
       // Columbia / Scablands — wider sheet flow
       { name: "Columbia Scablands", width: 1.4, coords: [
@@ -190,7 +190,7 @@ const YDI_FLOOD_CORRIDORS = {
     ]
   },
   high: {
-    opacity: 0.82,
+    opacity: 0.90,
     features: [
       // Columbia / Scablands — massive sheet flow
       { name: "Columbia Sheet Flow", width: 2.5, coords: [
@@ -261,93 +261,88 @@ const YDI_FLOOD_CORRIDORS = {
 };
 
 // Real Last Glacial Maximum ice sheet extents as lat/lng polygons
-// Source: Dyke et al. 2002, Peltier ICE-5G reconstruction
+// Pulled back slightly from maximum extent to show Finger Lakes region and ice-free corridor
 const YDI_ICE_SHEETS = [
   {
     name: "Laurentide Ice Sheet",
     color: "#bfdbfe",
-    // Outer margin at ~12,900 BP — traces real southern limit
+    // Southern margin pulled north ~2-3° to show Finger Lakes, Erie, Ontario ice-free
     coords: [
-      [-73, 40.5],  // Long Island / New England coast
-      [-76, 39.5],  // New Jersey
-      [-80, 39.0],  // Pennsylvania
-      [-82, 38.5],  // Ohio River
-      [-86, 38.5],  // Indiana
-      [-91, 38.8],  // Missouri River mouth
-      [-96, 40.0],  // Nebraska
-      [-101, 41.0], // Kansas/Nebraska border
-      [-104, 43.0], // South Dakota
-      [-108, 46.0], // Montana
-      [-111, 47.5], // Montana/Idaho
-      [-114, 49.0], // Alberta border
-      [-118, 50.5], // BC interior
-      [-120, 52.0], // BC
-      [-124, 54.0], // BC coast
-      [-130, 57.0], // Alaska panhandle
-      [-135, 59.0], // SE Alaska
-      [-140, 61.0], // Alaska
-      [-145, 62.0], // Gulf of Alaska
-      [-150, 63.0], // Alaska
-      [-155, 62.0], // Alaska peninsula
-      [-160, 61.0], // Alaska
-      [-165, 60.5], // W Alaska
-      [-168, 62.0], // Bering area
-      [-165, 65.0], // N Alaska
-      [-160, 68.0], // Arctic Alaska
-      [-155, 70.0], // Arctic
-      [-140, 72.0], // Arctic coast
-      [-120, 73.5], // Victoria Island area
-      [-100, 74.0], // Nunavut
-      [-85,  75.0], // Baffin Island west
-      [-75,  76.0], // Baffin Island
-      [-65,  76.5], // N Quebec
-      [-60,  75.0], // Labrador
-      [-55,  72.0], // Newfoundland area
-      [-53,  68.0], // Labrador coast
-      [-56,  62.0], // Labrador south
-      [-60,  58.0], // Gulf of St Lawrence area
-      [-65,  55.0], // Nova Scotia area
-      [-67,  50.0], // Maine/Maritime
-      [-70,  45.5], // Maine
-      [-73,  43.0], // Vermont/NH
-      [-73,  40.5], // back to start
+      [-76.5, 43.0],  // Finger Lakes / upstate NY southern limit
+      [-79.0, 42.5],  // Lake Erie south shore
+      [-82.5, 41.5],  // NW Ohio
+      [-85.5, 41.5],  // Indiana/Ohio border
+      [-87.5, 41.8],  // Chicago area
+      [-90.0, 42.5],  // Wisconsin
+      [-93.0, 43.5],  // Minnesota
+      [-96.5, 45.0],  // N Dakota border
+      [-99.5, 46.5],  // N Dakota
+      [-102.0, 47.5], // N Dakota/Montana
+      [-106.0, 48.5], // Montana
+      [-109.0, 49.0], // Montana/Alberta border
+      [-112.0, 49.0], // Alberta south — ice-free corridor starts here
+      // Ice-free corridor (Mackenzie) — indent eastward
+      [-113.5, 51.0], // Corridor west edge
+      [-113.0, 53.5], // Corridor narrows
+      [-113.5, 56.0], // N Alberta corridor
+      [-116.0, 58.0], // NE BC — rejoins ice
+      [-118.0, 59.5], // Northern BC
+      [-120.0, 61.0], // Yukon border
+      // Arctic extent
+      [-125.0, 63.0],
+      [-130.0, 65.0],
+      [-135.0, 68.0],
+      [-130.0, 70.0],
+      [-120.0, 72.0],
+      [-105.0, 73.0],
+      [-90.0,  73.5],
+      [-80.0,  74.0],
+      [-72.0,  74.5],
+      [-65.0,  73.0],
+      [-60.0,  70.0],
+      [-57.0,  65.0],
+      [-59.0,  60.0],
+      [-63.0,  57.0],
+      [-66.0,  52.0],
+      [-69.0,  48.0],
+      [-71.0,  46.0],
+      [-73.5,  44.5],
+      [-76.5,  43.0],  // back to start
     ]
   },
   {
     name: "Cordilleran Ice Sheet",
     color: "#bfdbfe",
-    // Covers BC, Yukon, SE Alaska at LGM
+    // Stays west of ice-free corridor — doesn't reach Alberta plains
     coords: [
-      [-114, 49.0], // Alberta/BC border south
-      [-116, 48.5], // N Idaho
-      [-118, 47.5], // Washington state
-      [-120, 46.5], // Central Washington
-      [-121, 45.5], // Columbia River gorge
-      [-122, 45.0], // Portland area (southern limit)
-      [-123, 45.5], // Oregon coast
-      [-124, 46.0], // Olympic Peninsula
-      [-124, 48.0], // Puget Sound
-      [-123, 49.5], // Vancouver Island north
-      [-124, 51.0], // BC coast
-      [-126, 53.0], // BC central coast
-      [-128, 54.5], // BC north coast
-      [-130, 56.0], // SE Alaska
-      [-132, 57.5], // SE Alaska
-      [-135, 59.0], // Glacier Bay area
-      [-138, 60.0], // SE Alaska north
-      [-140, 61.0], // Alaska border
-      [-141, 62.0], // Alaska/Yukon border
-      [-138, 63.5], // Yukon
-      [-135, 64.0], // Yukon north
-      [-132, 63.0], // Yukon east
-      [-128, 61.5], // Northern BC
-      [-124, 60.0], // BC/Yukon border
-      [-120, 59.0], // Northern BC interior
-      [-118, 57.0], // BC interior north
-      [-116, 55.0], // BC interior central
-      [-114, 53.0], // Alberta foothills
-      [-114, 51.0], // Rockies
-      [-114, 49.0], // back to start
+      [-113.5, 49.0],  // BC/Alberta border — eastern limit
+      [-115.0, 48.0],  // N Idaho limit
+      [-117.0, 47.0],  // Washington
+      [-119.5, 46.5],  // Central Washington
+      [-121.0, 45.5],  // Columbia River
+      [-122.0, 45.0],  // Portland area — southern limit
+      [-123.5, 45.5],  // Oregon coast
+      [-124.0, 47.0],  // Olympic Peninsula
+      [-123.5, 48.5],  // Puget Sound
+      [-124.0, 50.0],  // Vancouver Island north
+      [-125.0, 52.0],  // BC coast
+      [-127.0, 54.0],  // BC north coast
+      [-129.0, 56.0],  // SE Alaska
+      [-132.0, 57.5],
+      [-135.0, 59.0],
+      [-138.0, 60.5],
+      [-141.0, 61.5],  // Alaska border
+      [-140.0, 63.0],  // Yukon
+      [-136.0, 63.5],
+      [-133.0, 62.5],
+      [-129.0, 61.0],
+      [-125.0, 60.0],
+      [-121.0, 59.0],
+      [-118.0, 57.5],  // BC interior
+      [-116.0, 55.5],
+      [-114.5, 53.0],
+      [-113.5, 51.0],  // Ice-free corridor east edge
+      [-113.5, 49.0],  // back to start
     ]
   }
 ];
@@ -2427,9 +2422,9 @@ export default function HomePage() {
         try { if (map.getSource(srcId)) map.removeSource(srcId); } catch(e){}
         map.addSource(srcId, { type: "geojson", data: { type: "FeatureCollection", features } });
         map.addLayer({ id: layerId, type: "fill", source: srcId,
-          paint: { "fill-color": "#1e64dc", "fill-opacity": corridorData.opacity } });
+          paint: { "fill-color": "#1a5fb4", "fill-opacity": corridorData.opacity } });
         map.addLayer({ id: lineId, type: "line", source: srcId,
-          paint: { "line-color": "#60a5fa", "line-width": 1.5, "line-opacity": 0.6 } });
+          paint: { "line-color": "#93c5fd", "line-width": 2.5, "line-opacity": 0.85 } });
         safely(() => map.triggerRepaint());
       } catch(e) { console.error("YDI flood draw error", e); }
 
@@ -3988,7 +3983,7 @@ export default function HomePage() {
           {cataclysmModel === "ydi" && (
             <div>
               <div style={{ fontSize: 11, color: "#38bdf8", marginBottom: 8, lineHeight: 1.5 }}>
-                Laurentide ice sheet collapse drains through Columbia River Scablands, Mississippi basin, and St. Lawrence outlet simultaneously. Flood tiles computed from real terrain elevation data.
+                Laurentide & Cordilleran ice sheets at ~12,900 BP extent, with ice-free corridor visible. Flood corridors show meltwater drainage through Columbia Scablands, Mississippi basin, and St. Lawrence outlet.
               </div>
               <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#38bdf8", textTransform: "uppercase" }}>Flood Scale</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 6 }}>
