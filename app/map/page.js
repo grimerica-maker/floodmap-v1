@@ -425,13 +425,14 @@ export default function HomePage() {
   const impactDiameterRef = useRef(1000);
   const floodEngineUrlRef = useRef(FLOOD_ENGINE_PROXY_PATH);
 
-  const impactPointRef = useRef(null);
+  const impactPointRef = useRef(null);       // last placed point (compat)
+  const impactPointsRef = useRef([]);         // [{lng, lat, marker, result}] multi-impact
   const impactResultRef = useRef(null);
   const activeFloodLevelRef = useRef(null);
   const initialViewAppliedRef = useRef(false);
   const impactRunSeqRef = useRef(0);
-  const impactCountRef = useRef(0); // number of impacts placed this session
-  const impactFloodLayersRef = useRef([]); // [{sourceId, layerId}] for cumulative flood tiles
+  const impactCountRef = useRef(0);
+  const impactFloodLayersRef = useRef([]); // [{sourceId, layerId}] cumulative flood tiles
 
   const [inputLevel, setInputLevel] = useState(0);
   const [inputText, setInputText] = useState("0");
@@ -481,6 +482,7 @@ export default function HomePage() {
   const [impactResult, setImpactResult] = useState(null);
   const [impactLoading, setImpactLoading] = useState(false);
   const [impactError, setImpactError] = useState("");
+  const [impactPoints, setImpactPoints] = useState([]); // mirror of impactPointsRef for UI re-render
   const [unitMode, setUnitMode] = useState("m");
   const [floodDisplaced, setFloodDisplaced] = useState(null);
   const [status, setStatus] = useState("Loading map...");
@@ -736,6 +738,15 @@ export default function HomePage() {
     safely(() => map.dragRotate.disable()); safely(() => map.touchZoomRotate.disableRotation());
   };
 
+  const removeImpactFloodLayers = () => {
+    const map = mapRef.current;
+    impactFloodLayersRef.current.forEach(({ sourceId, layerId }) => {
+      try { if (map && map.getLayer(layerId)) map.removeLayer(layerId); } catch(e){}
+      try { if (map && map.getSource(sourceId)) map.removeSource(sourceId); } catch(e){}
+    });
+    impactFloodLayersRef.current = [];
+  };
+
   const removeFloodLayer = () => {
     const map = mapRef.current;
     if (!map) { activeFloodLevelRef.current = null; return; }
@@ -744,6 +755,8 @@ export default function HomePage() {
       if (map.getSource(FLOOD_SOURCE_ID)) map.removeSource(FLOOD_SOURCE_ID);
     } catch (e) { console.warn("Failed removing flood layer:", e); }
     activeFloodLevelRef.current = null;
+    // Also clear any cumulative impact flood layers
+    removeImpactFloodLayers();
   };
 
   const removeImpactPreviewLayers = () => {
@@ -764,10 +777,14 @@ export default function HomePage() {
     } catch (e) { console.warn("Failed clearing impact preview layers:", e); }
   };
 
-  const clearImpactPreview = () => { removeFloodLayer(); removeImpactPreviewLayers(); };
+  const clearImpactPreview = () => { removeFloodLayer(); removeImpactPreviewLayers(); removeImpactFloodLayers(); };
 
   const removeImpactPoint = () => {
     const map = mapRef.current;
+    // Remove all multi-impact markers
+    impactPointsRef.current.forEach(p => { try { p.marker && p.marker.remove(); } catch(e){} });
+    impactPointsRef.current = [];
+    setImpactPoints([]);
     if (!map) { impactPointRef.current = null; return; }
     try {
       if (map.getLayer(IMPACT_LAYER_ID)) map.removeLayer(IMPACT_LAYER_ID);
@@ -913,46 +930,62 @@ export default function HomePage() {
     const normalizedLevel = Number(level);
     if (!Number.isFinite(normalizedLevel) || normalizedLevel === 0) return false;
 
-    const { impactLat, impactLng, reachM } = opts;
+    const { impactLat, impactLng, reachM, impactIdx } = opts;
     const isRegional = impactLat != null && impactLng != null && reachM != null && reachM > 0;
+    // impactIdx: if set, add as cumulative indexed layer (impact mode multi-point)
+    const isIndexed = impactIdx != null;
+    const sourceId = isIndexed ? `flood-source-impact-${impactIdx}` : FLOOD_SOURCE_ID;
+    const layerId  = isIndexed ? `flood-layer-impact-${impactIdx}`  : FLOOD_LAYER_ID;
 
     const tileUrl = isRegional
       ? `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(normalizedLevel)}/${encodeURIComponent(impactLat)}/${encodeURIComponent(impactLng)}/${encodeURIComponent(reachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`
       : `${floodEngineUrlRef.current}/flood/${encodeURIComponent(normalizedLevel)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
 
     try {
-      if (
-        activeFloodLevelRef.current === normalizedLevel &&
-        map.getLayer(FLOOD_LAYER_ID) &&
-        map.getSource(FLOOD_SOURCE_ID)
-      ) return true;
-      if (map.getLayer(FLOOD_LAYER_ID)) map.removeLayer(FLOOD_LAYER_ID);
-      if (map.getSource(FLOOD_SOURCE_ID)) map.removeSource(FLOOD_SOURCE_ID);
-      map.addSource(FLOOD_SOURCE_ID, { type: "raster", tiles: [tileUrl], tileSize: 256, minzoom: 0, maxzoom: 22 });
-      map.addLayer({ id: FLOOD_LAYER_ID, type: "raster", source: FLOOD_SOURCE_ID, paint: { "raster-opacity": 1, "raster-fade-duration": 0, "raster-resampling": "linear" } });
-      activeFloodLevelRef.current = normalizedLevel;
+      if (!isIndexed) {
+        if (
+          activeFloodLevelRef.current === normalizedLevel &&
+          map.getLayer(FLOOD_LAYER_ID) &&
+          map.getSource(FLOOD_SOURCE_ID)
+        ) return true;
+        if (map.getLayer(FLOOD_LAYER_ID)) map.removeLayer(FLOOD_LAYER_ID);
+        if (map.getSource(FLOOD_SOURCE_ID)) map.removeSource(FLOOD_SOURCE_ID);
+      } else {
+        // Remove existing indexed layer if already exists (re-run)
+        try { if (map.getLayer(layerId)) map.removeLayer(layerId); } catch(e){}
+        try { if (map.getSource(sourceId)) map.removeSource(sourceId); } catch(e){}
+      }
+      map.addSource(sourceId, { type: "raster", tiles: [tileUrl], tileSize: 256, minzoom: 0, maxzoom: 22 });
+      map.addLayer({ id: layerId, type: "raster", source: sourceId, paint: { "raster-opacity": 1, "raster-fade-duration": 0, "raster-resampling": "linear" } });
+      if (!isIndexed) {
+        activeFloodLevelRef.current = normalizedLevel;
+      } else {
+        // Track indexed layer for cleanup
+        impactFloodLayersRef.current = impactFloodLayersRef.current.filter(l => l.layerId !== layerId);
+        impactFloodLayersRef.current.push({ sourceId, layerId });
+      }
       safely(() => map.triggerRepaint());
-      if (DEBUG_FLOOD) console.log("FLOOD LAYER ADDED", { level: normalizedLevel, isRegional, tileUrl });
+      if (DEBUG_FLOOD) console.log("FLOOD LAYER ADDED", { level: normalizedLevel, isRegional, isIndexed, tileUrl });
       return true;
     } catch (e) {
       console.error("Failed to add flood layer", e);
-      activeFloodLevelRef.current = null;
+      if (!isIndexed) activeFloodLevelRef.current = null;
       return false;
     }
   };
 
-  const applyOceanImpactFlood = (result, lng, lat) => {
+  const applyOceanImpactFlood = (result, lng, lat, impactIdx = null) => {
     const waveHeight = Number(result.wave_height_m ?? 0);
     const reachM = Number(result.estimated_wave_reach_m ?? result.tsunami_radius_m ?? 0);
     if (waveHeight <= 0) return false;
     if (waveHeight >= EXTINCTION_WAVE_HEIGHT_M) {
-      const ok = addFloodLayer(waveHeight);
-      if (!ok) setTimeout(() => { addFloodLayer(waveHeight); }, 50);
+      const ok = addFloodLayer(waveHeight, { impactIdx });
+      if (!ok) setTimeout(() => { addFloodLayer(waveHeight, { impactIdx }); }, 50);
       return true;
     }
-    const ok = addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM });
+    const ok = addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM, impactIdx });
     if (!ok) {
-      setTimeout(() => { addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM }); }, 50);
+      setTimeout(() => { addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM, impactIdx }); }, 50);
     }
     return true;
   };
@@ -1012,7 +1045,8 @@ export default function HomePage() {
   };
 
   const runImpact = async () => {
-    if (!impactPointRef.current) { setStatus("Place impact point first"); return; }
+    if (impactPointsRef.current.length === 0 && !impactPointRef.current) { setStatus("Place impact point first"); return; }
+    const points = impactPointsRef.current.length > 0 ? impactPointsRef.current : [impactPointRef.current];
     // Rate limit check
     const rl = checkAndIncrementRL(proTier !== "free");
     if (!rl.allowed) {
@@ -1022,46 +1056,82 @@ export default function HomePage() {
     }
     setRlStatus(getRLStatus());
     cancelPendingImpactRequest();
-    clearImpactPreview();
+    removeImpactFloodLayers();
+    removeImpactPreviewLayers();
     const runSeq = impactRunSeqRef.current + 1;
     impactRunSeqRef.current = runSeq;
     const controller = new AbortController();
     impactRequestRef.current = controller;
-    impactTimeoutRef.current = setTimeout(() => { controller.abort(); }, 12000);
+    impactTimeoutRef.current = setTimeout(() => { controller.abort(); }, 30000);
     try {
       setImpactLoading(true); setImpactError(""); setImpactResult(null);
-      setStatus("Running impact simulation...");
-      const { lng, lat } = impactPointRef.current;
-      const res = await fetch(
-        `${floodEngineUrlRef.current}/impact?lat=${lat}&lng=${lng}&diameter=${impactDiameterRef.current}&_=${Date.now()}`,
-        { signal: controller.signal, cache: "no-store" }
-      );
-      if (!res.ok) throw new Error("Impact request failed");
-      const data = await res.json();
-      if (DEBUG_FLOOD) console.log("IMPACT RESULT", data);
-      if (impactRunSeqRef.current !== runSeq) return;
-      if (!impactPointRef.current) return;
-      if (scenarioModeRef.current !== "impact") return;
-      setImpactResult(data);
+      setStatus(`Running ${points.length} impact simulation${points.length > 1 ? "s" : ""}...`);
 
-      if (data.is_ocean_impact === true && Number(data.wave_height_m ?? 0) > 0) {
-        drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
-        applyOceanImpactFlood(data, impactPointRef.current.lng, impactPointRef.current.lat);
-        const wh = Math.round(Number(data.wave_height_m));
-        const reach = Math.round(Number(data.estimated_wave_reach_m ?? 0) / 1000);
-        const isExtinction = wh >= EXTINCTION_WAVE_HEIGHT_M;
-        setStatus(isExtinction
-          ? `Extinction scale impact — ${wh}m global wave`
-          : `Ocean impact — ${wh}m wave, ${reach}km reach`
+      // Run all points in parallel
+      const results = await Promise.all(points.map(async (pt, i) => {
+        const res = await fetch(
+          `${floodEngineUrlRef.current}/impact?lat=${pt.lat}&lng=${pt.lng}&diameter=${impactDiameterRef.current}&_=${Date.now()}_${i}`,
+          { signal: controller.signal, cache: "no-store" }
         );
+        if (!res.ok) throw new Error(`Impact request ${i+1} failed`);
+        return res.json();
+      }));
+
+      if (impactRunSeqRef.current !== runSeq) return;
+      if (scenarioModeRef.current !== "impact") return;
+
+      // Store results on points for redraw on style change
+      results.forEach((data, i) => { if (points[i]) points[i].result = data; });
+
+      // Aggregate stats
+      const totalDeaths = results.reduce((s, d) => s + (d.estimated_deaths || 0), 0);
+      const totalExposed = results.reduce((s, d) => s + (d.population_exposed || 0), 0);
+      // Worst-case blackout (most severe single impact dominates atmosphere)
+      const worstBlackout = results.reduce((best, d) => {
+        return (d.blackout_pct || 0) > (best.blackout_pct || 0) ? d : best;
+      }, results[0]);
+      // Combined result for stats panel
+      const combinedResult = {
+        ...results[0],
+        _count: results.length,
+        _results: results,
+        estimated_deaths: totalDeaths,
+        population_exposed: totalExposed,
+        blackout_pct: worstBlackout?.blackout_pct || 0,
+        blackout_duration_months: worstBlackout?.blackout_duration_months || 0,
+        blackout_severity: worstBlackout?.blackout_severity || "None",
+      };
+      setImpactResult(combinedResult);
+      impactResultRef.current = combinedResult;
+
+      // Draw each impact
+      results.forEach((data, i) => {
+        const pt = points[i];
+        if (!pt) return;
+        if (data.is_ocean_impact === true && Number(data.wave_height_m ?? 0) > 0) {
+          drawOceanImpactMarker(pt.lng, pt.lat);
+          applyOceanImpactFlood(data, pt.lng, pt.lat, i);
+        } else {
+          // For multi-point land impacts, only draw crater rings for each
+          // (uses shared IMPACT_PREVIEW_SOURCE_ID — last one wins visually)
+          drawLandImpactFromResult(pt.lng, pt.lat, data);
+        }
+      });
+
+      const hasOcean = results.some(d => d.is_ocean_impact);
+      if (results.length > 1) {
+        setStatus(`${results.length} impacts — ${totalDeaths.toLocaleString()} est. deaths`);
+      } else if (hasOcean) {
+        const wh = Math.round(Number(results[0].wave_height_m));
+        const reach = Math.round(Number(results[0].estimated_wave_reach_m ?? 0) / 1000);
+        setStatus(wh >= EXTINCTION_WAVE_HEIGHT_M ? `Extinction scale — ${wh}m global wave` : `Ocean impact — ${wh}m wave, ${reach}km reach`);
       } else {
-        drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, data);
-        setStatus("Land impact simulation complete");
+        setStatus("Impact simulation complete");
       }
     } catch (err) {
       if (impactRunSeqRef.current !== runSeq) return;
       console.error(err);
-      clearImpactPreview();
+      removeImpactFloodLayers();
       if (err?.name === "AbortError") { setImpactError("Impact simulation timed out"); setStatus("Impact simulation timed out"); }
       else { setImpactError("Impact simulation failed"); setStatus("Impact simulation failed"); }
     } finally {
@@ -2259,14 +2329,20 @@ export default function HomePage() {
       if ((scenarioModeRef.current === "flood" || scenarioModeRef.current === "climate") && Number(seaLevelRef.current) !== 0 && floodAllowedInCurrentView()) {
         setTimeout(() => { syncFloodScenario(); }, 50);
       } else { removeFloodLayer(); }
-      if (scenarioModeRef.current === "impact" && impactPointRef.current && impactResultRef.current) {
-        const result = impactResultRef.current;
+      if (scenarioModeRef.current === "impact" && impactResultRef.current) {
+        const points = impactPointsRef.current.length > 0 ? impactPointsRef.current : (impactPointRef.current ? [impactPointRef.current] : []);
         setTimeout(() => {
-          drawImpactPoint(impactPointRef.current.lng, impactPointRef.current.lat);
-          if (result.is_ocean_impact === true && Number(result.wave_height_m ?? 0) > 0) {
-            drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
-            setTimeout(() => { applyOceanImpactFlood(result, impactPointRef.current.lng, impactPointRef.current.lat); }, 50);
-          } else { drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, result); }
+          points.forEach((pt, i) => {
+            if (!pt) return;
+            const result = pt.result || impactResultRef.current;
+            if (!result) return;
+            if (result.is_ocean_impact === true && Number(result.wave_height_m ?? 0) > 0) {
+              drawOceanImpactMarker(pt.lng, pt.lat);
+              setTimeout(() => { applyOceanImpactFlood(result, pt.lng, pt.lat, i); }, 50);
+            } else {
+              drawLandImpactFromResult(pt.lng, pt.lat, result);
+            }
+          });
         }, 50);
       }
     };
@@ -2293,14 +2369,44 @@ export default function HomePage() {
       const { lng, lat } = e.lngLat;
 
       if (scenarioModeRef.current === "impact") {
-        cancelPendingImpactRequest();
-        impactRunSeqRef.current += 1;
-        setImpactLoading(false);
-        clearImpactPreview();
-        drawImpactPoint(lng, lat);
+        const MAX_IMPACT_POINTS = proTierRef.current !== "free" ? 3 : 1;
+        if (impactPointsRef.current.length >= MAX_IMPACT_POINTS) {
+          if (proTierRef.current === "free") {
+            setPaywallModal("pro");
+          } else {
+            setStatus("Maximum 3 impact points — clear to reset");
+          }
+          return;
+        }
+        // Add new point as numbered marker
+        const idx = impactPointsRef.current.length;
+        const el = document.createElement("div");
+        el.style.cssText = "width:26px;height:26px;border-radius:50%;background:#ef4444;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.5);";
+        el.innerText = idx + 1;
+        const marker = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([lng, lat]).addTo(mapRef.current);
+        const point = { lng, lat, marker, idx, result: null };
+        el.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          point.marker.remove();
+          // Remove indexed flood layer for this point
+          const fl = impactFloodLayersRef.current.find(l => l.layerId === `flood-layer-impact-${idx}`);
+          if (fl) {
+            try { if (mapRef.current.getLayer(fl.layerId)) mapRef.current.removeLayer(fl.layerId); } catch(e){}
+            try { if (mapRef.current.getSource(fl.sourceId)) mapRef.current.removeSource(fl.sourceId); } catch(e){}
+            impactFloodLayersRef.current = impactFloodLayersRef.current.filter(l => l !== fl);
+          }
+          impactPointsRef.current = impactPointsRef.current.filter(p => p !== point);
+          impactPointRef.current = impactPointsRef.current.length > 0 ? impactPointsRef.current[impactPointsRef.current.length - 1] : null;
+          setImpactPoints([...impactPointsRef.current]);
+          setImpactResult(null);
+          setStatus(`Impact point removed`);
+        });
+        impactPointsRef.current.push(point);
+        impactPointRef.current = point; // compat
+        setImpactPoints([...impactPointsRef.current]);
         drawImpactPreview(lng, lat, impactDiameterRef.current);
         setImpactResult(null); setImpactError("");
-        setStatus("Impact preview ready");
+        setStatus(impactPointsRef.current.length > 1 ? `${impactPointsRef.current.length} impact points placed — Run Impact` : "Impact point placed — Run Impact");
         return;
       }
 
@@ -2728,10 +2834,15 @@ export default function HomePage() {
               🔒 Custom size — <span style={{ color: "#7c3aed" }}>Pro</span>
             </button>
           )}
+          {proTier !== "free" && (
+            <div style={{ fontSize: 11, color: "#475569", marginBottom: 8 }}>
+              {impactPoints.length > 0 ? `${impactPoints.length}/3 impact points placed` : "Click map to place up to 3 impact points"}
+            </div>
+          )}
           <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-            <button onClick={runImpact} disabled={!impactPointRef.current || impactLoading}
-              style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#ef4444", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15, opacity: !impactPointRef.current || impactLoading ? 0.65 : 1 }}>
-              {impactLoading ? "Running..." : "Run Impact"}
+            <button onClick={runImpact} disabled={impactPoints.length === 0 && !impactPointRef.current || impactLoading}
+              style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#ef4444", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15, opacity: (impactPoints.length === 0 && !impactPointRef.current) || impactLoading ? 0.65 : 1 }}>
+              {impactLoading ? "Running..." : impactPoints.length > 1 ? `Run ${impactPoints.length} Impacts` : "Run Impact"}
             </button>
             <button onClick={() => { clearImpactPreview(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setStatus("Impact cleared"); }}
               style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15 }}>
@@ -3430,26 +3541,65 @@ export default function HomePage() {
       {impactResult && scenarioMode !== "tsunami" && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
-          <div style={{ fontWeight: 700 }}>Impact Results</div>
-          <div>Energy: {Number(impactResult.energy_mt_tnt ?? impactResult.energy_mt ?? 0).toFixed(2)} Mt</div>
-          <div style={{ color: "#fde047" }}>● Crater: {Math.round(Number(impactResult.crater_diameter_m ?? 0)).toLocaleString()} m dia</div>
-          <div style={{ color: "#b45309" }}>● Ejecta: {Math.round(Number(impactResult.crater_diameter_m ?? 0) * 1.55).toLocaleString()} m</div>
-          <div style={{ color: "#ef4444" }}>● Blast: {Math.round(Number(impactResult.blast_radius_m ?? 0)).toLocaleString()} m</div>
-          <div style={{ color: "#f97316" }}>● Thermal: {Math.round(Number(impactResult.thermal_radius_m ?? 0)).toLocaleString()} m</div>
-          {impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0 && (
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>
+            💥 {impactResult._count > 1 ? `${impactResult._count} Impact Results` : "Impact Results"}
+          </div>
+          {impactResult._count > 1 ? (
+            // Multi-impact: show per-impact summary
+            impactResult._results.map((r, i) => (
+              <div key={i} style={{ marginBottom: 6, padding: "6px 8px", background: "#0f0a0a", borderRadius: 6, border: "1px solid #3f1515" }}>
+                <div style={{ fontSize: 11, color: "#f97316", fontWeight: 700, marginBottom: 2 }}>Impact {i+1} · {Number(r.energy_mt_tnt ?? 0).toFixed(1)} Mt · {r.severity_class}</div>
+                {r.is_ocean_impact ? (
+                  <div style={{ fontSize: 11, color: "#60a5fa" }}>🌊 Ocean · {Math.round(r.wave_height_m ?? 0).toLocaleString()}m wave · {Math.round((r.estimated_wave_reach_m ?? 0)/1000).toLocaleString()}km reach</div>
+                ) : (
+                  <div style={{ fontSize: 11, color: "#fde047" }}>🏔 Land · Crater {Math.round(r.crater_diameter_m ?? 0).toLocaleString()}m</div>
+                )}
+              </div>
+            ))
+          ) : (
+            // Single impact: full detail
             <>
-              <div>Wave Height: {Math.round(Number(impactResult.wave_height_m ?? 0)).toLocaleString()} m</div>
-              {Number(impactResult.wave_height_m ?? 0) < EXTINCTION_WAVE_HEIGHT_M && (
-                <div>Tsunami Reach: {Math.round(Number(impactResult.estimated_wave_reach_m ?? 0) / 1000).toLocaleString()} km</div>
+              <div>Energy: {Number(impactResult.energy_mt_tnt ?? impactResult.energy_mt ?? 0).toFixed(2)} Mt</div>
+              <div style={{ color: "#fde047" }}>● Crater: {Math.round(Number(impactResult.crater_diameter_m ?? 0)).toLocaleString()} m dia</div>
+              <div style={{ color: "#b45309" }}>● Ejecta: {Math.round(Number(impactResult.crater_diameter_m ?? 0) * 1.55).toLocaleString()} m</div>
+              <div style={{ color: "#ef4444" }}>● Blast: {Math.round(Number(impactResult.blast_radius_m ?? 0)).toLocaleString()} m</div>
+              <div style={{ color: "#f97316" }}>● Thermal: {Math.round(Number(impactResult.thermal_radius_m ?? 0)).toLocaleString()} m</div>
+              {impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0 && (
+                <>
+                  <div>Wave Height: {Math.round(Number(impactResult.wave_height_m ?? 0)).toLocaleString()} m</div>
+                  {Number(impactResult.wave_height_m ?? 0) < EXTINCTION_WAVE_HEIGHT_M && (
+                    <div>Tsunami Reach: {Math.round(Number(impactResult.estimated_wave_reach_m ?? 0) / 1000).toLocaleString()} km</div>
+                  )}
+                </>
               )}
+              <div>Severity: {impactResult.severity_class ?? "--"}</div>
             </>
           )}
-          <div>Severity: {impactResult.severity_class ?? "--"}</div>
-          <hr style={{ margin: "10px 0", opacity: 0.2 }} />
-          <div style={{ fontWeight: 700 }}>Casualty Estimate</div>
-          <div>Population Exposed: {impactResult.population_exposed != null ? formatCompactCount(impactResult.population_exposed) : "Coming soon"}</div>
-          <div>Estimated Deaths: {impactResult.estimated_deaths != null ? formatCompactCount(impactResult.estimated_deaths) : "Coming soon"}</div>
-          <div style={{ fontSize: 12, opacity: 0.8 }}>Confidence: low / rough estimate</div>
+          <hr style={{ margin: "8px 0", opacity: 0.2 }} />
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Casualties{impactResult._count > 1 ? " (Combined)" : ""}</div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>Population exposed</span>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>{impactResult.population_exposed != null ? formatCompactCount(impactResult.population_exposed) : "—"}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>Estimated deaths</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#ef4444" }}>{impactResult.estimated_deaths != null ? formatCompactCount(impactResult.estimated_deaths) : "—"}</span>
+          </div>
+          {Number(impactResult.blackout_pct ?? 0) > 0 && (
+            <div style={{ marginTop: 4, padding: "8px 10px", background: "#0a0a1a", borderRadius: 8, border: "1px solid #1e2d45" }}>
+              <div style={{ fontWeight: 700, fontSize: 12, color: "#a78bfa", marginBottom: 4 }}>🌑 Atmospheric Blackout</div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>Sunlight reduction</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{impactResult.blackout_pct}%</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>Duration</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{impactResult.blackout_duration_months} months</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic" }}>{impactResult.blackout_severity}</div>
+            </div>
+          )}
+          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 6 }}>Confidence: low / rough estimate</div>
         </>
       )}
 
@@ -3566,6 +3716,20 @@ export default function HomePage() {
                   <span style={{ fontSize: 11, color: "#94a3b8" }}>{z.deaths.toLocaleString()} deaths ({z.mortality_pct}%)</span>
                 </div>
               ))}
+              {Number(yellowstoneResult.blackout_pct ?? 0) > 0 && (
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #3f1515" }}>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: "#a78bfa", marginBottom: 4 }}>🌑 Atmospheric Blackout</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                    <span style={{ fontSize: 12, color: "#94a3b8" }}>Sunlight reduction</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{yellowstoneResult.blackout_pct}%</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, color: "#94a3b8" }}>Duration</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{yellowstoneResult.blackout_duration_months} months</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic" }}>{yellowstoneResult.blackout_severity}</div>
+                </div>
+              )}
             </div>
           ) : yellowstoneActive ? (
             <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>Calculating casualties...</div>
