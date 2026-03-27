@@ -2008,12 +2008,13 @@ export default function HomePage() {
 
   // ── Younger Dryas Impact ─────────────────────────────────────────────────
   const clearYDI = () => {
-    // Stop ice animation
     if (ydiIceFrameRef.current) { cancelAnimationFrame(ydiIceFrameRef.current); ydiIceFrameRef.current = null; }
-    // Remove standard flood layer (YDI uses global flood tiles, not indexed impact layers)
-    removeFloodLayer();
-    // Remove YDI-specific source node markers
+    // Remove YDI flood layer (uses its own source/layer IDs)
     const map = mapRef.current;
+    if (map && map.isStyleLoaded()) {
+      try { if (map.getLayer("ydi-flood-layer")) map.removeLayer("ydi-flood-layer"); } catch(e){}
+      try { if (map.getSource("ydi-flood-source")) map.removeSource("ydi-flood-source"); } catch(e){}
+    }
     if (map && map.isStyleLoaded()) {
       YDI_SOURCE_NODES.forEach(n => {
         try { if (map.getLayer(`ydi-node-${n.id}`)) map.removeLayer(`ydi-node-${n.id}`); } catch(e){}
@@ -2126,14 +2127,23 @@ export default function HomePage() {
       try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-fill`, "fill-opacity", 0.35); } catch(e){}
       try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-line`, "line-opacity", 0.7); } catch(e){}
 
-      // Global flood tiles follow real terrain — river valleys (Mississippi, Columbia, St Lawrence)
-      // flood naturally because they're lowest elevation. Much more realistic than regional circles.
-      // Low=80m shows main corridors, Medium=200m fills basins, High=400m covers half continent
+      // Pre-rendered YDI tiles — terrain-routed flood following Columbia Scablands,
+      // Mississippi valley, St Lawrence corridor. Generated once offline by generate_ydi_tiles.py.
+      // Returns 204 (empty) until tiles are generated — no crash.
       const globalLevel = intensity === "low" ? 80 : intensity === "medium" ? 200 : 400;
       setStatus(`☄️ Younger Dryas — ${intensity.toUpperCase()} flood release · Columbia Scablands + Mississippi drainage`);
 
-      // Single global flood layer — terrain-routed by DEM
-      addFloodLayer(globalLevel);
+      const ydiUrl = `${floodEngineUrlRef.current}/ydi/${intensity}/{z}/{x}/{y}.png`;
+      const ydiSourceId = "ydi-flood-source";
+      const ydiLayerId  = "ydi-flood-layer";
+      try {
+        if (map.getLayer(ydiLayerId)) map.removeLayer(ydiLayerId);
+        if (map.getSource(ydiSourceId)) map.removeSource(ydiSourceId);
+        map.addSource(ydiSourceId, { type: "raster", tiles: [ydiUrl], tileSize: 256, minzoom: 0, maxzoom: 10 });
+        map.addLayer({ id: ydiLayerId, type: "raster", source: ydiSourceId,
+          paint: { "raster-opacity": 1, "raster-fade-duration": 0, "raster-resampling": "linear" } });
+        safely(() => map.triggerRepaint());
+      } catch(e) { console.error("YDI flood layer error", e); }
 
       // Zoom out to see full North American extent
       setTimeout(() => {
