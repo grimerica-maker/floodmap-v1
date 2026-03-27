@@ -90,6 +90,22 @@ const ICE_SHEET_ZONES = [
 const ICE_SHEET_SOURCE = "ice-sheet-source";
 const ICE_SHEET_PREFIX = "ice-sheet-zone";
 
+// ── Younger Dryas Impact flood scenario ────────────────────────────────────
+const YDI_SOURCE_NODES = [
+  { id: "bc",      name: "Cordilleran Ice Dam\n(Nechako / Prince George)", lat: 53.9,  lng: -122.7, reachM: 850000  },
+  { id: "nipigon", name: "Laurentide Collapse\n(Lake Nipigon)",            lat: 49.7,  lng: -88.3,  reachM: 700000  },
+  { id: "stjean",  name: "Eastern Outlet\n(Lac Saint-Jean)",               lat: 48.6,  lng: -72.0,  reachM: 550000  },
+  { id: "columbia",name: "Columbia Mouth\n(Pacific Discharge)",            lat: 46.2,  lng: -123.9, reachM: 320000  },
+];
+// Flood level (m elevation threshold) per source per intensity
+const YDI_LEVELS = {
+  low:    { bc: 80,  nipigon: 60,  stjean: 50,  columbia: 100 },
+  medium: { bc: 200, nipigon: 160, stjean: 140, columbia: 250 },
+  high:   { bc: 400, nipigon: 320, stjean: 280, columbia: 500 },
+};
+// YDI ice sheets to animate (subset of ICE_SHEET_ZONES — North America only)
+const YDI_ICE_INDICES = [0, 7]; // Laurentide=0, Cordilleran=7
+
 const WILDFIRE_ZONES = [
   // 1.5°C zones — current trajectory
   { name: "California", center: [-120.5, 37.5], major_km: 500, minor_km: 280, bearing: 150, minLevel: 1.5, color: "#f97316" },
@@ -466,6 +482,10 @@ export default function HomePage() {
   const [cataclysmOverlay, setCataclysmOverlay] = useState("flood"); // "flood" | "wind" | "both"
   const cataclysmSpinRef = useRef(null);
   const cataclysmRunRef = useRef(0);
+  const [ydiIntensity, setYdiIntensity] = useState("medium"); // "low"|"medium"|"high"
+  const ydiIntensityRef = useRef("medium");
+  const ydiRunRef = useRef(0);
+  const ydiIceFrameRef = useRef(null);
   const [tsunamiResult, setTsunamiResult] = useState(null);
   const [tsunamiFloodLevel, setTsunamiFloodLevel] = useState(null);
   const tsunamiPopupRef = useRef(null); // 0=640k, 1=1.3M, 2=2.1M
@@ -1958,6 +1978,7 @@ export default function HomePage() {
     const map = mapRef.current;
     setCataclysmActive(false);
     setCataclysmAnimating(false);
+    clearYDI(); // also cleans up YDI flood layers and ice sheets
     if (window._cataclysmPoleMarker) { try { window._cataclysmPoleMarker.remove(); } catch(e){} window._cataclysmPoleMarker = null; }
     setViewMode("map");
     // Stop spin animation
@@ -1991,7 +2012,151 @@ export default function HomePage() {
     }
   };
 
-  const drawIceSheets = (map) => {
+  // ── Younger Dryas Impact ─────────────────────────────────────────────────
+  const clearYDI = () => {
+    // Stop ice animation
+    if (ydiIceFrameRef.current) { cancelAnimationFrame(ydiIceFrameRef.current); ydiIceFrameRef.current = null; }
+    // Remove flood tile layers (reuse impactFloodLayersRef cleanup)
+    removeImpactFloodLayers();
+    // Remove YDI-specific source node markers
+    const map = mapRef.current;
+    if (map && map.isStyleLoaded()) {
+      YDI_SOURCE_NODES.forEach(n => {
+        try { if (map.getLayer(`ydi-node-${n.id}`)) map.removeLayer(`ydi-node-${n.id}`); } catch(e){}
+        try { if (map.getSource(`ydi-node-src-${n.id}`)) map.removeSource(`ydi-node-src-${n.id}`); } catch(e){}
+      });
+      // Clear ice sheets
+      try { if (map.getLayer(`${ICE_SHEET_PREFIX}-fill`)) map.removeLayer(`${ICE_SHEET_PREFIX}-fill`); } catch(e){}
+      try { if (map.getLayer(`${ICE_SHEET_PREFIX}-line`)) map.removeLayer(`${ICE_SHEET_PREFIX}-line`); } catch(e){}
+      try { if (map.getLayer(`${ICE_SHEET_PREFIX}-label`)) map.removeLayer(`${ICE_SHEET_PREFIX}-label`); } catch(e){}
+      try { if (map.getSource(ICE_SHEET_SOURCE)) map.removeSource(ICE_SHEET_SOURCE); } catch(e){}
+    }
+  };
+
+  const triggerYDI = (intensity = ydiIntensityRef.current) => {
+    const map = mapRef.current;
+    if (!map) return;
+    clearYDI();
+    const run = ++ydiRunRef.current;
+    setStatus("☄️ Younger Dryas Impact — Laurentide ice collapse initiating…");
+    safely(() => map.setProjection("mercator"));
+
+    // Fly to North America
+    safely(() => map.flyTo({ center: [-96, 50], zoom: 3.2, duration: 1400, essential: true }));
+
+    // Phase 1: animate pulsing ice sheets (500ms after fly starts)
+    setTimeout(() => {
+      if (ydiRunRef.current !== run) return;
+      const naSheets = YDI_ICE_INDICES.map(i => ICE_SHEET_ZONES[i]);
+      const features = naSheets.map((z, i) => ({
+        ...buildAshEllipse(z.center[0], z.center[1], z.major_km, z.minor_km, z.bearing),
+        properties: { name: z.name, color: "#bfdbfe", idx: i },
+      }));
+      const fc = { type: "FeatureCollection", features };
+      try {
+        if (map.getSource(ICE_SHEET_SOURCE)) {
+          map.getSource(ICE_SHEET_SOURCE).setData(fc);
+        } else {
+          map.addSource(ICE_SHEET_SOURCE, { type: "geojson", data: fc });
+          map.addLayer({ id: `${ICE_SHEET_PREFIX}-fill`, type: "fill", source: ICE_SHEET_SOURCE,
+            paint: { "fill-color": ["get", "color"], "fill-opacity": 0.0 } });
+          map.addLayer({ id: `${ICE_SHEET_PREFIX}-line`, type: "line", source: ICE_SHEET_SOURCE,
+            paint: { "line-color": "#93c5fd", "line-width": 1.8, "line-opacity": 0.0 } });
+        }
+      } catch(e) {}
+      setStatus("☄️ Younger Dryas — Laurentide & Cordilleran ice sheets at maximum extent");
+
+      // Fade ice sheets in
+      let t = 0;
+      const fadeIn = () => {
+        if (ydiRunRef.current !== run) return;
+        t += 0.03;
+        const op = Math.min(t, 1);
+        try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-fill`, "fill-opacity", op * 0.5); } catch(e){}
+        try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-line`, "line-opacity", op * 0.9); } catch(e){}
+        if (t < 1) { ydiIceFrameRef.current = requestAnimationFrame(fadeIn); }
+        else { ydiIceFrameRef.current = null; }
+      };
+      ydiIceFrameRef.current = requestAnimationFrame(fadeIn);
+    }, 600);
+
+    // Phase 2: pulse ice sheets 3 times then release floods (3s)
+    setTimeout(() => {
+      if (ydiRunRef.current !== run) return;
+      let pulseCount = 0;
+      const maxPulses = 3;
+      let pulsing = true;
+      const pulse = (timestamp) => {
+        if (ydiRunRef.current !== run || !pulsing) return;
+        const cycle = (Math.sin(timestamp / 280) + 1) / 2; // 0→1 pulse
+        try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-fill`, "fill-opacity", 0.25 + cycle * 0.45); } catch(e){}
+        try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-line`, "line-opacity", 0.5 + cycle * 0.5); } catch(e){}
+        ydiIceFrameRef.current = requestAnimationFrame(pulse);
+      };
+      ydiIceFrameRef.current = requestAnimationFrame(pulse);
+
+      // Add source node markers
+      YDI_SOURCE_NODES.forEach(n => {
+        try {
+          if (!map.getSource(`ydi-node-src-${n.id}`)) {
+            map.addSource(`ydi-node-src-${n.id}`, { type: "geojson", data: {
+              type: "Feature", geometry: { type: "Point", coordinates: [n.lng, n.lat] }, properties: {}
+            }});
+            map.addLayer({ id: `ydi-node-${n.id}`, type: "circle", source: `ydi-node-src-${n.id}`,
+              paint: { "circle-radius": 8, "circle-color": "#38bdf8", "circle-stroke-width": 2,
+                "circle-stroke-color": "#ffffff", "circle-opacity": 0.0, "circle-stroke-opacity": 0.0 } });
+          }
+        } catch(e){}
+      });
+
+      // Fade nodes in
+      let nt = 0;
+      const fadeNodes = () => {
+        if (ydiRunRef.current !== run) return;
+        nt = Math.min(nt + 0.05, 1);
+        YDI_SOURCE_NODES.forEach(n => {
+          try { map.setPaintProperty(`ydi-node-${n.id}`, "circle-opacity", nt); } catch(e){}
+          try { map.setPaintProperty(`ydi-node-${n.id}`, "circle-stroke-opacity", nt); } catch(e){}
+        });
+        if (nt < 1) requestAnimationFrame(fadeNodes);
+      };
+      requestAnimationFrame(fadeNodes);
+      setStatus("☄️ Younger Dryas — ice dam failure imminent…");
+    }, 2200);
+
+    // Phase 3: release floods (5.5s after trigger)
+    setTimeout(() => {
+      if (ydiRunRef.current !== run) return;
+      // Stop pulse, settle ice at medium opacity
+      if (ydiIceFrameRef.current) { cancelAnimationFrame(ydiIceFrameRef.current); ydiIceFrameRef.current = null; }
+      try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-fill`, "fill-opacity", 0.35); } catch(e){}
+      try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-line`, "line-opacity", 0.7); } catch(e){}
+
+      const levels = YDI_LEVELS[intensity] || YDI_LEVELS.medium;
+      setStatus(`☄️ Younger Dryas — ${intensity.toUpperCase()} flood release · Columbia Scablands + Mississippi drainage`);
+
+      // Add each regional flood tile layer sequentially with stagger for visual effect
+      YDI_SOURCE_NODES.forEach((node, i) => {
+        setTimeout(() => {
+          if (ydiRunRef.current !== run) return;
+          const level = levels[node.id];
+          // Use impactIdx offset from 10 so we don't collide with impact mode layers (0-2)
+          addFloodLayer(level, {
+            impactLat: node.lat, impactLng: node.lng,
+            reachM: node.reachM,
+            impactIdx: 10 + i,
+          });
+        }, i * 600);
+      });
+
+      // Zoom out slightly to see full extent
+      setTimeout(() => {
+        if (ydiRunRef.current !== run) return;
+        safely(() => map.flyTo({ center: [-96, 46], zoom: 2.9, duration: 2000, essential: true }));
+      }, 1500);
+
+    }, 5500);
+  };
     const features = ICE_SHEET_ZONES.map((z, i) => ({
       ...buildAshEllipse(z.center[0], z.center[1], z.major_km, z.minor_km, z.bearing),
       properties: { name: z.name, color: z.color, idx: i },
@@ -3515,14 +3680,50 @@ export default function HomePage() {
               </button>
             ))}
           </div>
-          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12, fontStyle: "italic", lineHeight: 1.5 }}>
-            {cataclysmModel === "davidson"
-              ? "~90° crustal displacement. New pole: Bay of Bengal. Americas flood 500-800m. Himalayas become new polar region."
-              : "104° rotation along 31°E meridian. New pole: S. Africa. Global inundation 120-1200m. Based on TES ECDO Theory."}
-          </div>
-          <div style={{ fontSize: 11, color: "#475569", marginBottom: 10, lineHeight: 1.4 }}>
-            ⚠ Theoretical model. Globe rotates to show displacement, then flood tiles render.
-          </div>
+          {/* Younger Dryas — full-width button */}
+          <button
+            onClick={() => { cataclysmModelRef.current = "ydi"; setCataclysmModel("ydi"); clearCataclysm(); }}
+            style={{ width: "100%", padding: "10px 14px", minHeight: 52, marginBottom: 14, border: cataclysmModel === "ydi" ? "1px solid #0ea5e9" : "1px solid #1e2d45", background: cataclysmModel === "ydi" ? "#0c1a2e" : "#111827", color: cataclysmModel === "ydi" ? "#38bdf8" : "#94a3b8", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 12, textAlign: "left" }}>
+            <div>☄️ Younger Dryas Impact</div>
+            <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>~12,900 BP · Laurentide collapse · Columbia Scablands</div>
+          </button>
+          {cataclysmModel !== "ydi" && (
+            <>
+              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12, fontStyle: "italic", lineHeight: 1.5 }}>
+                {cataclysmModel === "davidson"
+                  ? "~90° crustal displacement. New pole: Bay of Bengal. Americas flood 500-800m. Himalayas become new polar region."
+                  : "104° rotation along 31°E meridian. New pole: S. Africa. Global inundation 120-1200m. Based on TES ECDO Theory."}
+              </div>
+              <div style={{ fontSize: 11, color: "#475569", marginBottom: 10, lineHeight: 1.4 }}>
+                ⚠ Theoretical model. Globe rotates to show displacement, then flood tiles render.
+              </div>
+            </>
+          )}
+          {cataclysmModel === "ydi" && (
+            <>
+              <div style={{ fontSize: 11, color: "#38bdf8", marginBottom: 8, lineHeight: 1.5 }}>
+                Laurentide ice sheet collapse drains through Columbia River Scablands, Mississippi basin, and St. Lawrence outlet simultaneously. Flood tiles computed from real terrain elevation data.
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#38bdf8", textTransform: "uppercase" }}>Flood Scale</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 6 }}>
+                {[
+                  { key: "low",    label: "Low",    sub: "~80m" },
+                  { key: "medium", label: "Medium", sub: "~200m" },
+                  { key: "high",   label: "High",   sub: "~400m" },
+                ].map(({ key, label, sub }) => (
+                  <button key={key}
+                    onClick={() => { setYdiIntensity(key); ydiIntensityRef.current = key; }}
+                    style={{ padding: "9px 6px", border: ydiIntensity === key ? "1px solid #0ea5e9" : "1px solid #1e2d45", background: ydiIntensity === key ? "#0c2a4a" : "#111827", color: ydiIntensity === key ? "#38bdf8" : "#94a3b8", cursor: "pointer", borderRadius: 8, fontWeight: 700, fontSize: 12, textAlign: "center" }}>
+                    <div>{label}</div>
+                    <div style={{ fontSize: 10, opacity: 0.7, marginTop: 1 }}>{sub}</div>
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize: 10, color: "#475569", marginBottom: 12, fontStyle: "italic" }}>
+                Controls flood extent and basin fill. Not a physical water volume.
+              </div>
+            </>
+          )}
 
           {cataclysmActive && (
             <>
@@ -3553,10 +3754,10 @@ export default function HomePage() {
           )}
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
             <button
-              onClick={triggerCataclysm}
+              onClick={cataclysmModel === "ydi" ? () => triggerYDI(ydiIntensityRef.current) : triggerCataclysm}
               disabled={cataclysmAnimating}
-              style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "#dc2626", color: "white", border: "none", fontWeight: 700, cursor: cataclysmAnimating ? "not-allowed" : "pointer", borderRadius: 8, fontSize: 15, opacity: cataclysmAnimating ? 0.65 : 1 }}>
-              {cataclysmAnimating ? "Displacing…" : "☄️ Trigger"}
+              style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: cataclysmModel === "ydi" ? "#0369a1" : "#dc2626", color: "white", border: "none", fontWeight: 700, cursor: cataclysmAnimating ? "not-allowed" : "pointer", borderRadius: 8, fontSize: 15, opacity: cataclysmAnimating ? 0.65 : 1 }}>
+              {cataclysmModel === "ydi" ? "🌊 Run Flood" : cataclysmAnimating ? "Displacing…" : "☄️ Trigger"}
             </button>
             <button
               onClick={clearCataclysm}
