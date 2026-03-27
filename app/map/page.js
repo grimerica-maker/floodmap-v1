@@ -2957,11 +2957,10 @@ export default function HomePage() {
           const newBearing = startBearing + bearingDelta * eased;
           if (flipLastT !== null) flipLng -= (now - flipLastT) * 0.018;
           flipLastT = now;
-          // Gradually shift center lat AND lng toward snap point as flip progresses
-          // This prevents a jump when easeTo fires at flip completion
+          // Shift center lat toward new pole lat as flip progresses — tracks spin axis
+          // Lng drifts freely — no pulling toward snap point
           const centerLat = startLat + (info.snapLat - startLat) * eased;
-          const centerLng = flipLng + (info.snapLng - flipLng) * eased * 0.6;
-          safely(() => map.jumpTo({ bearing: newBearing, center: [centerLng, centerLat] }));
+          safely(() => map.jumpTo({ bearing: newBearing, center: [flipLng, centerLat] }));
           if (progress < 1) {
             cataclysmSpinRef.current = requestAnimationFrame(flipLoop);
           } else {
@@ -3036,15 +3035,16 @@ export default function HomePage() {
       // Post-flip spin — bearing decrements (right to left) around centered new pole
       // Small delay lets the easeTo finish landing before spin takes over
       let bearingSpin = map.getBearing();
+      let spinCenter = map.getCenter();
       let lt2 = null;
       let spinActive = true;
       const spin2 = (t) => {
         if (!spinActive) return;
         if (lt2 !== null) {
-          bearingSpin += (t - lt2) * 0.012; // right to left: bearing increases spins globe rightward under fixed pole
+          bearingSpin += (t - lt2) * 0.012;
         }
         lt2 = t;
-        safely(() => map.jumpTo({ bearing: bearingSpin, center: [info.snapLng, info.snapLat] }));
+        safely(() => map.jumpTo({ bearing: bearingSpin, center: [spinCenter.lng, spinCenter.lat] }));
         cataclysmSpinRef.current = requestAnimationFrame(spin2);
       };
       cataclysmSpinRef.current = requestAnimationFrame(spin2);
