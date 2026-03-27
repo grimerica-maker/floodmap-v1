@@ -175,6 +175,23 @@ const YDI_FLOOD_CORRIDORS = {
         [-85.2, 38.8], [-86.8, 37.9], [-87.5, 37.8], [-88.1, 37.2],
         [-88.7, 37.1], [-89.1, 37.1],
       ]},
+      // Missouri → Mississippi confluence connector
+      { name: "Missouri-Mississippi Confluence", flow_km3: 5200, dissipation: "Missouri joins Mississippi at St Louis — combined flow overwhelms valley, backflooding both banks for 100km.", width: 0.8, coords: [
+        [-91.7, 38.8], [-91.4, 38.6], [-91.1, 38.3], [-90.8, 38.0],
+        [-90.5, 37.8], [-90.2, 37.5], [-89.8, 37.2], [-89.1, 37.1],
+      ]},
+      // Pennsylvania / Appalachian overflow — connects Ohio east toward Atlantic
+      { name: "Appalachian Overflow", flow_km3: 2800, dissipation: "Proglacial lake overflow across low Appalachian gaps — Potomac, Susquehanna, Delaware all at flood stage simultaneously.", width: 0.6, coords: [
+        [-80.5, 40.6], [-79.5, 40.4], [-78.5, 40.2], [-77.5, 40.3],
+        [-77.0, 40.0], [-76.5, 39.8], [-76.2, 39.5], [-75.8, 39.2],
+        [-75.5, 38.8], [-75.2, 38.5],
+      ]},
+      // Chicago outlet — Great Lakes drain SW into Illinois River
+      { name: "Chicago Outlet", flow_km3: 3100, dissipation: "Lake Michigan overflow through Chicago outlet into Illinois River — ancient drainage route reactivated at peak meltwater discharge.", width: 0.7, coords: [
+        [-87.8, 41.8], [-88.0, 41.5], [-88.5, 41.0], [-89.0, 40.5],
+        [-89.5, 40.0], [-90.0, 39.5], [-90.4, 39.0], [-90.5, 38.5],
+        [-90.5, 38.0], [-89.8, 37.2],
+      ]},
       // Great Lakes overflow through Chicago outlet + Niagara
       { name: "Great Lakes System", flow_km3: 8800, dissipation: "Proglacial Lake Agassiz + Great Lakes overflow. Multiple outlet phases — Port Huron, Kirkfield, North Bay outlets active simultaneously.", width: 1.1, coords: [
         [-88.0, 46.0], [-87.2, 45.5], [-86.5, 44.8], [-85.5, 44.0],
@@ -2400,7 +2417,10 @@ export default function HomePage() {
       try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-fill`, "fill-opacity", 0.35); } catch(e){}
       try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-line`, "line-opacity", 0.7); } catch(e){}
 
-      setStatus(`☄️ Younger Dryas — ${intensity.toUpperCase()} flood release · Columbia Scablands + Mississippi drainage`);
+      // Calculate total flow volume across all corridors
+      const totalFlow = corridorData.features.reduce((sum, c) => sum + (c.flow_km3 || 0), 0);
+      const totalFlowStr = totalFlow > 0 ? `${Math.round(totalFlow/1000)*1000}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "";
+      setStatus(`☄️ Younger Dryas — ${intensity.toUpperCase()} flood release · ~${totalFlowStr} km³ total meltwater`);
 
       // Draw flood corridors — split each into segments with tapering width
       // Width starts at 100% at source, tapers to 30% at terminus (hydrologically correct)
