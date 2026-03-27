@@ -3034,20 +3034,8 @@ export default function HomePage() {
       }
       // Post-flip spin — bearing decrements (right to left) around centered new pole
       // Small delay lets the easeTo finish landing before spin takes over
-      let bearingSpin = map.getBearing();
-      let spinCenter = map.getCenter();
-      let lt2 = null;
-      let spinActive = true;
-      const spin2 = (t) => {
-        if (!spinActive) return;
-        if (lt2 !== null) {
-          bearingSpin += (t - lt2) * 0.012;
-        }
-        lt2 = t;
-        safely(() => map.jumpTo({ bearing: bearingSpin, center: [spinCenter.lng, spinCenter.lat] }));
-        cataclysmSpinRef.current = requestAnimationFrame(spin2);
-      };
-      cataclysmSpinRef.current = requestAnimationFrame(spin2);
+      // Hard stop — no post-flip spin
+      cataclysmSpinRef.current = null;
 
       // Enable interaction for pro, lock for free
       const isFree = (proTierRef.current ?? proTier ?? "free") === "free";
