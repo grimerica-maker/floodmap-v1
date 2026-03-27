@@ -1154,6 +1154,7 @@ export default function HomePage() {
         blackout_pct: worstBlackout?.blackout_pct || 0,
         blackout_duration_months: worstBlackout?.blackout_duration_months || 0,
         blackout_severity: worstBlackout?.blackout_severity || "None",
+        famine_deaths_estimate: worstBlackout?.famine_deaths_estimate || 0,
       };
       setImpactResult(combinedResult);
       impactResultRef.current = combinedResult;
@@ -3658,6 +3659,12 @@ export default function HomePage() {
                 <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{impactResult.blackout_duration_months} months</span>
               </div>
               <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic" }}>{impactResult.blackout_severity}</div>
+              {Number(impactResult.famine_deaths_estimate ?? 0) > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTop: "1px solid #1e2d45" }}>
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>Est. indirect famine deaths</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316" }}>{formatCompactCount(impactResult.famine_deaths_estimate)}</span>
+                </div>
+              )}
             </div>
           )}
           <div style={{ fontSize: 11, opacity: 0.6, marginTop: 6 }}>Confidence: low / rough estimate</div>
@@ -3789,6 +3796,12 @@ export default function HomePage() {
                     <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{yellowstoneResult.blackout_duration_months} months</span>
                   </div>
                   <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic" }}>{yellowstoneResult.blackout_severity}</div>
+                  {Number(yellowstoneResult.famine_deaths_estimate ?? 0) > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTop: "1px solid #1e2d45" }}>
+                      <span style={{ fontSize: 12, color: "#94a3b8" }}>Est. indirect famine deaths</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316" }}>{formatCompactCount(yellowstoneResult.famine_deaths_estimate)}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -3814,6 +3827,18 @@ export default function HomePage() {
                   <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{p.blackout_duration_months} months</span>
                 </div>
                 <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic" }}>{p.blackout_severity}</div>
+                {(() => {
+                  const GLOBAL_POP = 8_100_000_000;
+                  const fd = (p.blackout_pct >= 5 && p.blackout_duration_months >= 1)
+                    ? Math.round(GLOBAL_POP * Math.pow(p.blackout_pct / 100, 1.5) * (p.blackout_duration_months / 12) * 0.15)
+                    : 0;
+                  return fd > 0 ? (
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTop: "1px solid #1e2d45" }}>
+                      <span style={{ fontSize: 12, color: "#94a3b8" }}>Est. indirect famine deaths</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316" }}>{formatCompactCount(fd)}</span>
+                    </div>
+                  ) : null;
+                })()}
               </div>
             );
           })()}
