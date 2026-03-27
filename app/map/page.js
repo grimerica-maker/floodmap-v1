@@ -437,6 +437,7 @@ export default function HomePage() {
   const initialViewAppliedRef = useRef(false);
   const impactRunSeqRef = useRef(0);
   const impactCountRef = useRef(0);
+  const impactDrawingRef = useRef(false); // true while runImpact is drawing results
   const impactFloodLayersRef = useRef([]); // [{sourceId, layerId}] cumulative flood tiles
 
   const [inputLevel, setInputLevel] = useState(0);
@@ -1145,17 +1146,20 @@ export default function HomePage() {
       setImpactResult(combinedResult);
       impactResultRef.current = combinedResult;
 
-      // Draw each impact
+      // Draw each impact — set flag so handleStyleLoad doesn't interfere
+      impactDrawingRef.current = true;
       results.forEach((data, i) => {
         const pt = points[i];
         if (!pt) return;
+        const drawIdx = pt.idx ?? i; // prefer stored idx; fallback to loop position
         if (data.is_ocean_impact === true && Number(data.wave_height_m ?? 0) > 0) {
           drawOceanImpactMarker(pt.lng, pt.lat);
-          applyOceanImpactFlood(data, pt.lng, pt.lat, i);
+          applyOceanImpactFlood(data, pt.lng, pt.lat, drawIdx);
         } else {
-          drawLandImpactFromResult(pt.lng, pt.lat, data, i);
+          drawLandImpactFromResult(pt.lng, pt.lat, data, drawIdx);
         }
       });
+      impactDrawingRef.current = false;
 
       const hasOcean = results.some(d => d.is_ocean_impact);
       if (results.length > 1) {
@@ -2368,18 +2372,21 @@ export default function HomePage() {
       if ((scenarioModeRef.current === "flood" || scenarioModeRef.current === "climate") && Number(seaLevelRef.current) !== 0 && floodAllowedInCurrentView()) {
         setTimeout(() => { syncFloodScenario(); }, 50);
       } else { removeFloodLayer(); }
-      if (scenarioModeRef.current === "impact" && impactResultRef.current) {
+      if (scenarioModeRef.current === "impact" && impactResultRef.current && !impactDrawingRef.current) {
         const points = impactPointsRef.current.length > 0 ? impactPointsRef.current : (impactPointRef.current ? [impactPointRef.current] : []);
         setTimeout(() => {
-          points.forEach((pt, i) => {
+          // If runImpact started drawing while we waited, skip — it owns the canvas
+          if (impactDrawingRef.current) return;
+          points.forEach((pt) => {
             if (!pt) return;
+            const drawIdx = pt.idx ?? 0; // always use the point's own stable idx
             const result = pt.result || impactResultRef.current;
             if (!result) return;
             if (result.is_ocean_impact === true && Number(result.wave_height_m ?? 0) > 0) {
               drawOceanImpactMarker(pt.lng, pt.lat);
-              setTimeout(() => { applyOceanImpactFlood(result, pt.lng, pt.lat, i); }, 50);
+              setTimeout(() => { applyOceanImpactFlood(result, pt.lng, pt.lat, drawIdx); }, 50);
             } else {
-              drawLandImpactFromResult(pt.lng, pt.lat, result, i);
+              drawLandImpactFromResult(pt.lng, pt.lat, result, drawIdx);
             }
           });
         }, 50);
