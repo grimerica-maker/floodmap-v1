@@ -2606,7 +2606,10 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!mapRef.current || !mapRef.current.isStyleLoaded()) return;
-    if (scenarioMode !== "impact" || !impactResult || !impactPointRef.current) return;
+    if (scenarioMode !== "impact" || !impactResult) return;
+    // Multi-impact: results are drawn inside runImpact, don't redraw here
+    if (impactResult._count > 1) return;
+    if (!impactPointRef.current) return;
     if (impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0) {
       drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
       setTimeout(() => { applyOceanImpactFlood(impactResult, impactPointRef.current.lng, impactPointRef.current.lat); }, 50);
