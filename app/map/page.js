@@ -945,21 +945,31 @@ export default function HomePage() {
     } catch (e) { console.error("Failed to draw land impact result", e); }
   };
 
-  const drawOceanImpactMarker = (lng, lat) => {
+  const drawOceanImpactMarker = (lng, lat, idx = null) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return false;
+    // Use indexed IDs when idx is provided so multiple ocean impacts don't overwrite each other
+    const srcId  = idx != null ? `${IMPACT_PREVIEW_SOURCE_ID}-${idx}` : IMPACT_PREVIEW_SOURCE_ID;
+    const crId   = idx != null ? `${IMPACT_CRATER_LAYER_ID}-${idx}`   : IMPACT_CRATER_LAYER_ID;
+    const pulId  = idx != null ? `${IMPACT_CRATER_LAYER_ID}-pulse-${idx}` : `${IMPACT_CRATER_LAYER_ID}-pulse`;
     try {
-      // Only remove base (non-indexed) preview layers — don't wipe sibling impacts
-      const baseIds = [`${IMPACT_CRATER_LAYER_ID}-pulse`, `${IMPACT_CRATER_LAYER_ID}-inner`,
-        `${IMPACT_CRATER_LAYER_ID}-rim`, `${IMPACT_CRATER_LAYER_ID}-ejecta`,
-        `${IMPACT_CRATER_LAYER_ID}-ejecta-line`, `${IMPACT_BLAST_LAYER_ID}-fill`,
-        IMPACT_THERMAL_LAYER_ID, `${IMPACT_THERMAL_LAYER_ID}-line`,
-        IMPACT_BLAST_LAYER_ID, IMPACT_CRATER_LAYER_ID];
-      baseIds.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
-      try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e){}
-      map.addSource(IMPACT_PREVIEW_SOURCE_ID, { type: "geojson", data: { type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Point", coordinates: [lng, lat] }, properties: { kind: "impact-core" } }] } });
-      map.addLayer({ id: IMPACT_CRATER_LAYER_ID, type: "circle", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "impact-core"], paint: { "circle-radius": 10, "circle-color": "#ef4444", "circle-stroke-width": 2, "circle-stroke-color": "#ffffff" } });
-      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-pulse`, type: "circle", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "impact-core"], paint: { "circle-radius": 28, "circle-color": "rgba(0,0,0,0)", "circle-stroke-width": 2, "circle-stroke-color": "#ef4444", "circle-stroke-opacity": 0.9 } });
+      if (idx != null) {
+        // Clean up just this indexed pair
+        [crId, pulId].forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
+        try { if (map.getSource(srcId)) map.removeSource(srcId); } catch(e){}
+      } else {
+        // Single-point fallback: remove base layers only
+        const baseIds = [`${IMPACT_CRATER_LAYER_ID}-pulse`, `${IMPACT_CRATER_LAYER_ID}-inner`,
+          `${IMPACT_CRATER_LAYER_ID}-rim`, `${IMPACT_CRATER_LAYER_ID}-ejecta`,
+          `${IMPACT_CRATER_LAYER_ID}-ejecta-line`, `${IMPACT_BLAST_LAYER_ID}-fill`,
+          IMPACT_THERMAL_LAYER_ID, `${IMPACT_THERMAL_LAYER_ID}-line`,
+          IMPACT_BLAST_LAYER_ID, IMPACT_CRATER_LAYER_ID];
+        baseIds.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
+        try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e){}
+      }
+      map.addSource(srcId, { type: "geojson", data: { type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Point", coordinates: [lng, lat] }, properties: { kind: "impact-core" } }] } });
+      map.addLayer({ id: crId,  type: "circle", source: srcId, filter: ["==", ["get", "kind"], "impact-core"], paint: { "circle-radius": 10, "circle-color": "#ef4444", "circle-stroke-width": 2, "circle-stroke-color": "#ffffff" } });
+      map.addLayer({ id: pulId, type: "circle", source: srcId, filter: ["==", ["get", "kind"], "impact-core"], paint: { "circle-radius": 28, "circle-color": "rgba(0,0,0,0)", "circle-stroke-width": 2, "circle-stroke-color": "#ef4444", "circle-stroke-opacity": 0.9 } });
       safely(() => map.triggerRepaint());
       startImpactPulseAnimation();
       return true;
@@ -1153,7 +1163,7 @@ export default function HomePage() {
         if (!pt) return;
         const drawIdx = pt.idx ?? i; // prefer stored idx; fallback to loop position
         if (data.is_ocean_impact === true && Number(data.wave_height_m ?? 0) > 0) {
-          drawOceanImpactMarker(pt.lng, pt.lat);
+          drawOceanImpactMarker(pt.lng, pt.lat, drawIdx);
           applyOceanImpactFlood(data, pt.lng, pt.lat, drawIdx);
         } else {
           drawLandImpactFromResult(pt.lng, pt.lat, data, drawIdx);
@@ -2383,7 +2393,7 @@ export default function HomePage() {
             const result = pt.result || impactResultRef.current;
             if (!result) return;
             if (result.is_ocean_impact === true && Number(result.wave_height_m ?? 0) > 0) {
-              drawOceanImpactMarker(pt.lng, pt.lat);
+              drawOceanImpactMarker(pt.lng, pt.lat, drawIdx);
               setTimeout(() => { applyOceanImpactFlood(result, pt.lng, pt.lat, drawIdx); }, 50);
             } else {
               drawLandImpactFromResult(pt.lng, pt.lat, result, drawIdx);
