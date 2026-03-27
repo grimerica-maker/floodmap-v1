@@ -2259,7 +2259,7 @@ export default function HomePage() {
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
       // Flood corridor layers
-      ["ydi-flood-halo", "ydi-flood-core"].forEach(id => {
+      ["ydi-flood-halo", "ydi-flood-mid", "ydi-flood-core"].forEach(id => {
         try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){}
       });
       try { if (map.getSource("ydi-flood-source")) map.removeSource("ydi-flood-source"); } catch(e){}
@@ -2395,24 +2395,44 @@ export default function HomePage() {
         [haloId, coreId].forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
         try { if (map.getSource(srcId)) map.removeSource(srcId); } catch(e){}
         map.addSource(srcId, { type: "geojson", data: fc });
-        // Halo — wide, light blue, soft edges
+        // Zoom-interpolated widths — corridors scale with map so they don't shrink on zoom
+        // Base multipliers: halo=4x, mid=2x, core=1x relative to width property
+        const zoomWidth = (base) => ["interpolate", ["linear"], ["zoom"],
+          2,  ["*", ["get", "width"], base * 2],
+          4,  ["*", ["get", "width"], base * 6],
+          6,  ["*", ["get", "width"], base * 16],
+          8,  ["*", ["get", "width"], base * 40],
+          10, ["*", ["get", "width"], base * 90],
+        ];
+
+        // Outer halo — 4x core, lightest blue, shallow fringe (150% per side)
         map.addLayer({ id: haloId, type: "line", source: srcId,
           layout: { "line-cap": "round", "line-join": "round" },
           paint: {
-            "line-color": "#93c5fd",
-            "line-width": ["*", ["get", "width"], 22],
-            "line-opacity": 0.38,
-            "line-blur": ["*", ["get", "width"], 5],
+            "line-color": "#bfdbfe",
+            "line-width": zoomWidth(4),
+            "line-opacity": 0.35,
+            "line-blur": 4,
           }
         });
-        // Core — narrower, solid dark blue
+        // Mid layer — 2x core, medium blue
+        map.addLayer({ id: "ydi-flood-mid", type: "line", source: srcId,
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: {
+            "line-color": "#3b82f6",
+            "line-width": zoomWidth(2),
+            "line-opacity": 0.62,
+            "line-blur": 1.5,
+          }
+        });
+        // Core — dark blue, deepest channel
         map.addLayer({ id: coreId, type: "line", source: srcId,
           layout: { "line-cap": "round", "line-join": "round" },
           paint: {
             "line-color": "#1d4ed8",
-            "line-width": ["*", ["get", "width"], 10],
-            "line-opacity": 0.88,
-            "line-blur": 0.8,
+            "line-width": zoomWidth(1),
+            "line-opacity": 0.92,
+            "line-blur": 0.5,
           }
         });
         // Click popup
@@ -2420,7 +2440,32 @@ export default function HomePage() {
           if (scenarioModeRef.current !== "cataclysm" || cataclysmModelRef.current !== "ydi") return;
           const name = e.features?.[0]?.properties?.name || "Flood Corridor";
           const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: true, className: "elev-popup", maxWidth: "220px" });
-          popup.setLngLat(e.lngLat).setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px"><div style="color:#38bdf8;font-weight:700;margin-bottom:4px">🌊 ${name}</div><div style="color:#e2e8f0;margin-bottom:4px">Younger Dryas Meltwater Corridor</div><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><span style="color:#94a3b8;font-size:11px">Status:</span><span style="color:#ef4444;font-weight:700">Inundated</span></div><div style="color:#64748b;font-size:11px;font-style:italic">~12,900 BP · Laurentide meltwater drainage · Survival possible on high ground only</div></div>`).addTo(map);
+          const w = e.features?.[0]?.properties?.width || 1;
+          const intens = ydiIntensityRef.current;
+          const depthCore = intens === "high" ? "150-300m" : intens === "medium" ? "80-150m" : "30-80m";
+          const depthMid  = intens === "high" ? "50-150m"  : intens === "medium" ? "30-80m"  : "10-30m";
+          const depthHalo = intens === "high" ? "10-50m"   : intens === "medium" ? "5-30m"   : "1-10m";
+          // Determine which zone was clicked by distance from line (approximate via pixel width)
+          popup.setLngLat(e.lngLat).setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+            <div style="color:#38bdf8;font-weight:700;margin-bottom:6px">🌊 ${name}</div>
+            <div style="color:#e2e8f0;font-size:12px;margin-bottom:6px">Younger Dryas Meltwater · ~12,900 BP</div>
+            <div style="margin-bottom:4px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+                <span style="font-size:11px;color:#1d4ed8;font-weight:700">■ Core channel</span>
+                <span style="font-size:11px;color:#e2e8f0">${depthCore} deep</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+                <span style="font-size:11px;color:#3b82f6;font-weight:700">■ Mid zone</span>
+                <span style="font-size:11px;color:#e2e8f0">${depthMid} deep</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+                <span style="font-size:11px;color:#bfdbfe;font-weight:700">■ Shallow fringe</span>
+                <span style="font-size:11px;color:#e2e8f0">${depthHalo} deep</span>
+              </div>
+            </div>
+            <div style="color:#ef4444;font-weight:700;font-size:12px;margin-bottom:3px">⚠ Inundated</div>
+            <div style="color:#64748b;font-size:11px;font-style:italic">Survival possible on high ground only</div>
+          </div>`).addTo(map);
         });
         map.on("mouseenter", haloId, () => { map.getCanvas().style.cursor = "pointer"; });
         map.on("mouseleave", haloId, () => { map.getCanvas().style.cursor = "crosshair"; });
