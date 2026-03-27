@@ -2303,8 +2303,19 @@ export default function HomePage() {
       }
 
       if (scenarioModeRef.current === "nuke") {
-        if (nukeStrikesRef.current.length >= MAX_NUKE_STRIKES) {
-          setStatus(`Maximum ${MAX_NUKE_STRIKES} strike points reached`);
+        // EMP mode: single point only
+        if (nukeSubModeRef.current === "emp" && nukeStrikesRef.current.length >= 1) {
+          setStatus("EMP mode uses a single detonation point — clear first to reposition");
+          return;
+        }
+        // Multi-strike is pro only — free users get 1 strike
+        const maxStrikes = (proTierRef.current !== "free") ? MAX_NUKE_STRIKES : 1;
+        if (nukeStrikesRef.current.length >= maxStrikes) {
+          if (proTierRef.current === "free") {
+            setPaywallModal("pro");
+          } else {
+            setStatus(`Maximum ${MAX_NUKE_STRIKES} strike points reached`);
+          }
           return;
         }
         const map = mapRef.current;
@@ -2919,6 +2930,7 @@ export default function HomePage() {
             Yield: <b>{nukeYield >= 1000 ? (nukeYield/1000).toFixed(2)+" Mt" : nukeYield+" kt"}</b>
           </div>
 
+          {nukeSubMode === "detonate" && (<>
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Burst Type</div>
           <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
             <button onClick={() => setNukeBurst("airburst")}
@@ -2966,9 +2978,10 @@ export default function HomePage() {
                 style={{ width: "100%", marginBottom: 14, cursor: "pointer" }} />
             </>
           )}
+          </>)} {/* end nukeSubMode === "detonate" burst type section */}
 
-          {/* Nuclear war presets — pro only */}
-          {proTier !== "free" && (
+          {/* Nuclear war presets — detonate mode only, pro only */}
+          {nukeSubMode === "detonate" && proTier !== "free" && (
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#7c3aed", textTransform: "uppercase" }}>⚡ Conflict Scenarios</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -3072,7 +3085,7 @@ export default function HomePage() {
           {nukeStrikes.length > 0 && (
             <div style={{ marginBottom: 12, padding: "8px 10px", background: "#0f172a", borderRadius: 8, border: "1px solid #1e2d45" }}>
               <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6, fontWeight: 700 }}>
-                {nukeStrikes.length}/{MAX_NUKE_STRIKES} STRIKE{nukeStrikes.length > 1 ? "S" : ""} QUEUED
+                {nukeStrikes.length}/{nukeSubMode === "emp" ? 1 : proTier !== "free" ? MAX_NUKE_STRIKES : 1} STRIKE{nukeStrikes.length > 1 ? "S" : ""} QUEUED
               </div>
               {nukeStrikes.map((s, i) => (
                 <div key={i} style={{ fontSize: 11, color: "#cbd5e1", display: "flex", justifyContent: "space-between" }}>
