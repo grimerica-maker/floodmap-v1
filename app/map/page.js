@@ -2932,48 +2932,43 @@ export default function HomePage() {
       cataclysmSpinRef.current = requestAnimationFrame(spin);
     }, 1600);
 
-    // Step 3: Ease bearing to start position WHILE spin continues, then flip
+    // Step 3: Single rAF loop — bearing flip + longitude spin simultaneously
+    // On completion: flyTo new pole centered, then bearing-spin post-flip
     setTimeout(() => {
-      // Ease bearing smoothly to start position over 2s — spin keeps going via setCenter
       safely(() => map.easeTo({ bearing: info.startBearing, duration: 2000 }));
       if (cataclysmRunRef.current !== thisRun) return;
       setStatus(`☄️ ${info.name} — CRUSTAL DISPLACEMENT IN PROGRESS`);
-      // After bearing settles, do the flip — but KEEP longitude spin running simultaneously
       setTimeout(() => {
-        // Don't cancel spin — let it keep going while rotateTo animates bearing
-        // This creates dual-axis rotation: longitude drift + bearing flip at same time
+        if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
         const flipStart = performance.now();
         const flipDuration = 8000;
         const startBearing = map.getBearing();
         const targetBearing = info.flipBearing;
         const bearingDelta = targetBearing - startBearing;
         const easeInOut = t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-
-        // Cancel the setCenter spin loop — we'll fold it into the flip loop
-        if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
         let flipLng = map.getCenter().lng;
         let flipLastT = null;
-
         const flipLoop = (now) => {
           if (cataclysmRunRef.current !== thisRun) return;
           const elapsed = now - flipStart;
           const progress = Math.min(elapsed / flipDuration, 1);
           const eased = easeInOut(progress);
-
-          // Bearing: interpolate toward target
           const newBearing = startBearing + bearingDelta * eased;
-          // Longitude: keep drifting at same speed as original spin
-          if (flipLastT !== null) {
-            flipLng -= (now - flipLastT) * 0.018;
-          }
+          if (flipLastT !== null) flipLng -= (now - flipLastT) * 0.018;
           flipLastT = now;
-
           safely(() => map.jumpTo({ bearing: newBearing, center: [flipLng, 20] }));
-
           if (progress < 1) {
             cataclysmSpinRef.current = requestAnimationFrame(flipLoop);
           } else {
             cataclysmSpinRef.current = null;
+            // Flip done — smooth flyTo new pole centered at top
+            safely(() => map.easeTo({
+              center: [info.newPoleLng, info.newPoleLat],
+              bearing: targetBearing,
+              zoom: _catZoom,
+              duration: 1800,
+              easing: t => t < 0.5 ? 2*t*t : -1+(4-2*t)*t,
+            }));
           }
         };
         cataclysmSpinRef.current = requestAnimationFrame(flipLoop);
@@ -3040,23 +3035,18 @@ export default function HomePage() {
           map.touchZoomRotate.disable();
         });
       }
-      // Post-flip spin — continue from wherever the globe landed, drift right to left
-      const currentCenter = map.getCenter();
-      let lat2 = currentCenter.lat;
-      let lng2p = currentCenter.lng;
+      // Post-flip spin — bearing decrements (right to left) around centered new pole
+      // No latitude movement — globe rotates cleanly under the new pole at top
+      let bearingSpin = map.getBearing();
       let lt2 = null;
-      let spinActive = true; // flag — set false to stop immediately
+      let spinActive = true;
       const spin2 = (t) => {
-        if (!spinActive) return; // bail out — don't reschedule
+        if (!spinActive) return;
         if (lt2 !== null) {
-          const delta = (t - lt2) * 0.005;
-          // Drift latitude gradually toward new pole over time
-          lng2p -= delta * 0.174; // right to left
-          if (lat2 < -85) lat2 = -85;
-          if (lat2 > 85) lat2 = 85;
-          safely(() => map.setCenter([lng2p, lat2]));
+          bearingSpin -= (t - lt2) * 0.012; // right to left bearing spin
         }
         lt2 = t;
+        safely(() => map.jumpTo({ bearing: bearingSpin, center: [info.newPoleLng, info.newPoleLat] }));
         cataclysmSpinRef.current = requestAnimationFrame(spin2);
       };
       cataclysmSpinRef.current = requestAnimationFrame(spin2);
