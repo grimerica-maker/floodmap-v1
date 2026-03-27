@@ -473,6 +473,8 @@ export default function HomePage() {
   const [yellowstoneActive, setYellowstoneActive] = useState(false);
   const [yellowstoneResult, setYellowstoneResult] = useState(null);
   const yellowstonePopupRef = useRef(null);
+  const impactZonePopupRef = useRef(null);
+  const nukeZonePopupRef = useRef(null);
   const [nukeBurst, setNukeBurst] = useState("airburst");
   const [nukeWindDeg, setNukeWindDeg] = useState(270);
   const [nukeSubMode, setNukeSubMode] = useState("detonate"); // "detonate" | "emp"
@@ -481,6 +483,7 @@ export default function HomePage() {
   const [empResult, setEmpResult] = useState(null);
   const [empLoading, setEmpLoading] = useState(false);
   const [nukeResult, setNukeResult] = useState(null);
+  const nukeResultRef = useRef(null);
   const [nukeLoading, setNukeLoading] = useState(false);
   const [nukeError, setNukeError] = useState("");
   const nukePointRef = useRef(null); // kept for compatibility, points to last strike
@@ -560,6 +563,7 @@ export default function HomePage() {
   useEffect(() => { scenarioModeRef.current = scenarioMode; }, [scenarioMode]);
   useEffect(() => { impactDiameterRef.current = impactDiameter; }, [impactDiameter]);
   useEffect(() => { impactResultRef.current = impactResult; }, [impactResult]);
+  useEffect(() => { nukeResultRef.current = nukeResult; }, [nukeResult]);
   useEffect(() => { floodEngineUrlRef.current = floodEngineUrl; }, [floodEngineUrl]);
 
   // Star field animation
@@ -1182,7 +1186,7 @@ export default function HomePage() {
         const reach = Math.round(Number(results[0].estimated_wave_reach_m ?? 0) / 1000);
         setStatus(wh >= EXTINCTION_WAVE_HEIGHT_M ? `Extinction scale — ${wh}m global wave` : `Ocean impact — ${wh}m wave, ${reach}km reach`);
       } else {
-        setStatus("Impact simulation complete");
+        setStatus("Impact simulation complete — click map for zone details");
       }
     } catch (err) {
       if (impactRunSeqRef.current !== runSeq) return;
@@ -1256,7 +1260,7 @@ export default function HomePage() {
       const totalExposed = valid.reduce((s, d) => s + (d.population_exposed || 0), 0);
       const combined = { ...valid[0], deaths: totalDeaths, exposed: totalExposed, _count: valid.length };
       setNukeResult(combined);
-      setStatus(`${valid.length} detonation${valid.length > 1 ? "s" : ""} — ${(totalDeaths/1e6).toFixed(1)}M killed, ${(totalExposed/1e6).toFixed(1)}M exposed`);
+      setStatus(`${valid.length} detonation${valid.length > 1 ? "s" : ""} — ${(totalDeaths/1e6).toFixed(1)}M killed, ${(totalExposed/1e6).toFixed(1)}M exposed · click map for zone details`);
     } catch (err) {
       setNukeError("Detonation failed"); setStatus("Detonation failed");
     } finally {
@@ -1719,8 +1723,154 @@ export default function HomePage() {
     yellowstonePopupRef.current = popup;
   };
 
-  // Wind kill zone data — centered on max displacement point and new equator midpoint
-  const CATACLYSM_WIND = {
+  const showImpactZonePopup = (lng, lat) => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; }
+
+    const result = impactResultRef.current;
+    if (!result) return;
+
+    // Use haversine to find distance from each impact point, pick closest
+    const pts = impactPointsRef.current.length > 0 ? impactPointsRef.current : (impactPointRef.current ? [impactPointRef.current] : []);
+    if (pts.length === 0) return;
+
+    const haversineKm = (lat1, lng1, lat2, lng2) => {
+      const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+      return R * 2 * Math.asin(Math.sqrt(a));
+    };
+
+    // Find closest impact point and use its result
+    let closestPt = pts[0];
+    let closestResult = pts[0].result || result;
+    let closestDist = haversineKm(lat, lng, pts[0].lat, pts[0].lng);
+    for (const pt of pts) {
+      const d = haversineKm(lat, lng, pt.lat, pt.lng);
+      if (d < closestDist) { closestDist = d; closestPt = pt; closestResult = pt.result || result; }
+    }
+
+    const distKm = haversineKm(lat, lng, closestPt.lat, closestPt.lng);
+    const craterR  = (closestResult.crater_diameter_m ?? 0) / 2000;
+    const blastR   = (closestResult.blast_radius_m ?? 0) / 1000;
+    const thermalR = (closestResult.thermal_radius_m ?? 0) / 1000;
+
+    let zone = null;
+    if (distKm <= craterR) {
+      zone = { name: "Crater Zone", color: "#fde047", survival: "0%",
+        desc: `Direct impact — ${Math.round(closestResult.crater_diameter_m ?? 0).toLocaleString()}m diameter crater`,
+        note: "Total vaporisation. No survival possible within crater radius." };
+    } else if (distKm <= blastR) {
+      const pct = Math.max(0, Math.round((1 - (distKm - craterR) / (blastR - craterR)) * 100));
+      zone = { name: "Blast Zone", color: "#ef4444", survival: "~5-15%",
+        desc: `${Math.round(closestResult.blast_radius_m ?? 0).toLocaleString()}m blast radius · ${Math.round(distKm).toLocaleString()}km from impact`,
+        note: "Lethal overpressure. Reinforced underground shelter only. Most buildings destroyed." };
+    } else if (distKm <= thermalR) {
+      zone = { name: "Thermal Zone", color: "#f97316", survival: "~40-60%",
+        desc: `${Math.round(closestResult.thermal_radius_m ?? 0).toLocaleString()}m thermal radius · ${Math.round(distKm).toLocaleString()}km from impact`,
+        note: "Severe burns, fires ignite. Shelter underground or in concrete structure. Evacuate if possible." };
+    } else {
+      zone = { name: "Outside effect zones", color: "#94a3b8", survival: "High",
+        desc: `${Math.round(distKm).toLocaleString()}km from nearest impact`,
+        note: "Seismic effects possible. Monitor emergency broadcasts." };
+    }
+
+    const energyMt = Number(closestResult.energy_mt_tnt ?? closestResult.energy_mt ?? 0).toFixed(1);
+    const content = `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+      <div style="color:${zone.color};font-weight:700;margin-bottom:4px">💥 ${zone.name}</div>
+      <div style="color:#e2e8f0;margin-bottom:4px">${zone.desc}</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span style="color:#94a3b8;font-size:11px">Survival odds:</span>
+        <span style="color:${zone.survival === '0%' ? '#ef4444' : zone.survival === 'High' ? '#4ade80' : '#fbbf24'};font-weight:700;font-size:13px">${zone.survival}</span>
+      </div>
+      <div style="color:#64748b;font-size:11px;font-style:italic">${zone.note}</div>
+      <div style="color:#475569;font-size:10px;margin-top:4px">${closestResult.severity_class ?? ""} · ${energyMt} Mt</div>
+    </div>`;
+
+    const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: false, className: "elev-popup", maxWidth: "260px" });
+    popup.setLngLat([lng, lat]).setHTML(content).addTo(map);
+    impactZonePopupRef.current = popup;
+  };
+
+  const showNukeZonePopup = (lng, lat) => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; }
+
+    const result = nukeResultRef.current;
+    if (!result) return;
+
+    // Find closest strike point
+    const strikes = nukeStrikesRef.current;
+    if (strikes.length === 0) return;
+
+    const haversineKm = (lat1, lng1, lat2, lng2) => {
+      const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+      return R * 2 * Math.asin(Math.sqrt(a));
+    };
+
+    // Find the closest strike's result data
+    let closestStrike = strikes[0];
+    let closestDist = haversineKm(lat, lng, strikes[0].lat, strikes[0].lng);
+    for (const s of strikes) {
+      const d = haversineKm(lat, lng, s.lat, s.lng);
+      if (d < closestDist) { closestDist = d; closestStrike = s; }
+    }
+
+    // Use the first result (all strikes same yield) — nukeResult is combined
+    const r = result;
+    const distKm = haversineKm(lat, lng, closestStrike.lat, closestStrike.lng);
+    const fireballR  = (r.fireball_r_m ?? 0) / 1000;
+    const heavyR     = (r.blast_heavy_r_m ?? 0) / 1000;
+    const moderateR  = (r.blast_moderate_r_m ?? 0) / 1000;
+    const lightR     = (r.blast_light_r_m ?? 0) / 1000;
+    const thermalR   = (r.thermal_r_m ?? 0) / 1000;
+
+    const NUKE_ZONES = [
+      { name: "Fireball", maxR: fireballR,  color: "#ffffff", survival: "0%",
+        psi: ">200 psi", desc: "Nuclear fireball — total vaporisation",
+        note: "Everything within this radius ceases to exist. Temperatures exceed the surface of the sun briefly." },
+      { name: "Heavy Blast", maxR: heavyR,  color: "#dc2626", survival: "~0-2%",
+        psi: "20 psi", desc: "Severe structural damage — reinforced concrete destroyed",
+        note: "Only deep underground bunkers survive. All above-ground structures obliterated." },
+      { name: "Moderate Blast", maxR: moderateR, color: "#ef4444", survival: "~5-15%",
+        psi: "5 psi", desc: "Moderate blast — most buildings collapse",
+        note: "Reinforced concrete may survive. Injuries from debris near-universal. Immediate evacuation essential." },
+      { name: "Light Blast", maxR: lightR,  color: "#f59e0b", survival: "~40-60%",
+        psi: "1 psi", desc: "Light blast — windows shatter, doors blown off",
+        note: "Equivalent to strong hurricane. Shelter in sturdy building away from windows. Flying glass is main hazard." },
+      { name: "Thermal Zone", maxR: thermalR, color: "#f97316", survival: "~50-70%",
+        psi: "<1 psi", desc: "Thermal radiation — severe burns",
+        note: "Third-degree burns on exposed skin. Seek shelter immediately, cover skin. Fire risk." },
+    ];
+
+    let zone = null;
+    for (const z of NUKE_ZONES) {
+      if (distKm <= z.maxR) { zone = z; break; }
+    }
+    if (!zone) {
+      zone = { name: "Outside blast zones", color: "#94a3b8", survival: "High", psi: "<0.5 psi",
+        desc: `${Math.round(distKm).toLocaleString()}km from nearest detonation`,
+        note: "Possible fallout depending on wind direction. Monitor emergency broadcasts." };
+    }
+
+    const yieldStr = r.yield_kt >= 1000 ? `${(r.yield_kt/1000).toFixed(1)}Mt` : `${r.yield_kt}kt`;
+    const content = `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+      <div style="color:${zone.color};font-weight:700;margin-bottom:4px">☢️ ${zone.name}</div>
+      <div style="color:#e2e8f0;margin-bottom:4px">${zone.desc}</div>
+      <div style="display:flex;gap:12px;margin-bottom:4px">
+        <div><span style="color:#94a3b8;font-size:11px">Overpressure: </span><span style="color:#e2e8f0;font-weight:700;font-size:12px">${zone.psi}</span></div>
+        <div><span style="color:#94a3b8;font-size:11px">Survival: </span><span style="color:${zone.survival === '0%' ? '#ef4444' : zone.survival === '~0-2%' ? '#ef4444' : zone.survival === 'High' ? '#4ade80' : '#fbbf24'};font-weight:700;font-size:12px">${zone.survival}</span></div>
+      </div>
+      <div style="color:#64748b;font-size:11px;font-style:italic">${zone.note}</div>
+      <div style="color:#475569;font-size:10px;margin-top:4px">${yieldStr} ${r.burst_type ?? "airburst"} · ${Math.round(distKm).toLocaleString()}km from detonation</div>
+    </div>`;
+
+    const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: false, className: "elev-popup", maxWidth: "270px" });
+    popup.setLngLat([lng, lat]).setHTML(content).addTo(map);
+    nukeZonePopupRef.current = popup;
+  };
     davidson: {
       // Center 1: Max rotational velocity — mid-latitude for ellipse appearance
       center1: [-90, -35],
@@ -2309,12 +2459,14 @@ export default function HomePage() {
       try { if (map.getLayer(IMPACT_LAYER_ID)) map.removeLayer(IMPACT_LAYER_ID); } catch(e){}
       try { if (map.getSource(IMPACT_SOURCE_ID)) map.removeSource(IMPACT_SOURCE_ID); } catch(e){}
     }
+    if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; }
     nukeStrikesRef.current.forEach(s => { try { s.marker.remove(); } catch(e){} });
     nukeStrikesRef.current = [];
     setNukeStrikes([]);
     nukePointRef.current = null;
     setNukePointSet(false);
     setNukeResult(null);
+    nukeResultRef.current = null;
     setNukeError("");
     setEmpResult(null);
     setStatus("Nuke cleared");
@@ -2428,6 +2580,11 @@ export default function HomePage() {
       const { lng, lat } = e.lngLat;
 
       if (scenarioModeRef.current === "impact") {
+        // If results exist, show zone popup; otherwise place a new impact point
+        if (impactResultRef.current) {
+          showImpactZonePopup(lng, lat);
+          return;
+        }
         const MAX_IMPACT_POINTS = proTierRef.current !== "free" ? 3 : 1;
         if (impactPointsRef.current.length >= MAX_IMPACT_POINTS) {
           if (proTierRef.current === "free") {
@@ -2470,6 +2627,11 @@ export default function HomePage() {
       }
 
       if (scenarioModeRef.current === "nuke") {
+        // If detonation results exist, show zone popup on click
+        if (nukeResultRef.current && nukeSubModeRef.current === "detonate") {
+          showNukeZonePopup(lng, lat);
+          return;
+        }
         // EMP mode: single point only
         if (nukeSubModeRef.current === "emp" && nukeStrikesRef.current.length >= 1) {
           setStatus("EMP mode uses a single detonation point — clear first to reposition");
@@ -2906,7 +3068,7 @@ export default function HomePage() {
               style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#ef4444", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15, opacity: (impactPoints.length === 0 && !impactPointRef.current) || impactLoading ? 0.65 : 1 }}>
               {impactLoading ? "Running..." : impactPoints.length > 1 ? `Run ${impactPoints.length} Impacts` : "Run Impact"}
             </button>
-            <button onClick={() => { clearImpactPreview(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setStatus("Impact cleared"); }}
+            <button onClick={() => { clearImpactPreview(); removeImpactPoint(); setImpactResult(null); setImpactError(""); if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } setStatus("Impact cleared"); }}
               style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15 }}>
               Clear
             </button>
