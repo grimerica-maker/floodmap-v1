@@ -260,6 +260,23 @@ const YDI_FLOOD_CORRIDORS = {
         [-80.5, 40.6], [-82.9, 40.4], [-84.2, 39.1],
         [-86.8, 37.9], [-88.1, 37.2], [-89.1, 37.1],
       ]},
+      // Missouri → Mississippi confluence
+      { name: "Missouri-Mississippi Confluence", flow_km3: 8500, dissipation: "Missouri meets Mississippi at St Louis — combined 500,000 m³/s overwhelms valley 150km wide.", width: 1.2, coords: [
+        [-91.7, 38.8], [-91.4, 38.5], [-91.1, 38.2],
+        [-90.8, 37.9], [-90.4, 37.5], [-89.9, 37.2], [-89.1, 37.1],
+      ]},
+      // Appalachian overflow — Ohio east to Atlantic
+      { name: "Appalachian Overflow", flow_km3: 4500, dissipation: "Proglacial lakes overflow Appalachian gaps — Susquehanna, Potomac, Delaware all at maximum flood stage.", width: 0.9, coords: [
+        [-80.5, 40.6], [-79.5, 40.3], [-78.5, 40.1],
+        [-77.5, 40.2], [-77.0, 39.9], [-76.5, 39.6],
+        [-76.0, 39.2], [-75.7, 38.8], [-75.3, 38.4],
+      ]},
+      // Chicago outlet — Lake Michigan → Illinois → Mississippi
+      { name: "Chicago Outlet", flow_km3: 5200, dissipation: "Lake Michigan overflows Chicago outlet into Illinois River — ancient glacial drainage route, reactivated.", width: 1.0, coords: [
+        [-87.8, 41.8], [-88.0, 41.4], [-88.5, 41.0],
+        [-89.0, 40.5], [-89.5, 40.0], [-90.0, 39.4],
+        [-90.4, 38.8], [-90.5, 38.2], [-89.8, 37.2],
+      ]},
       // Great Lakes + Agassiz full flood
       { name: "Lake Agassiz Overflow", flow_km3: 24000, dissipation: "Catastrophic Lake Agassiz outburst — largest lake in N American history. Eastern outlet flooded St Lawrence, Arctic outlet flooded Mackenzie. AMOC shutdown within decades.", width: 1.8, coords: [
         [-99.0, 52.0], [-97.0, 50.5], [-96.5, 49.5],
