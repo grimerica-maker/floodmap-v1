@@ -889,6 +889,7 @@ export default function HomePage() {
 
   const drawLandImpactFromResult = (lng, lat, result, idx = null) => {
     const map = mapRef.current;
+    console.log("[drawLandImpact] idx=", idx, "lng=", lng, "lat=", lat);
     if (!map || !map.isStyleLoaded() || !result) return;
     const craterKm = Number(result.crater_diameter_m ?? 0) / 2000;
     const blastKm = Number(result.blast_radius_m ?? 0) / 1000;
@@ -2607,14 +2608,16 @@ export default function HomePage() {
   useEffect(() => {
     if (!mapRef.current || !mapRef.current.isStyleLoaded()) return;
     if (scenarioMode !== "impact" || !impactResult) return;
+    console.log("[impact useEffect] _count=", impactResult._count, "is_ocean=", impactResult.is_ocean_impact);
     // Multi-impact: results are drawn inside runImpact, don't redraw here
-    if (impactResult._count > 1) return;
+    if (impactResult._count > 1) { console.log("[impact useEffect] skipping multi-impact redraw"); return; }
     if (!impactPointRef.current) return;
     if (impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0) {
       drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
       setTimeout(() => { applyOceanImpactFlood(impactResult, impactPointRef.current.lng, impactPointRef.current.lat); }, 50);
       return;
     }
+    console.log("[impact useEffect] drawing single land impact");
     drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, impactResult);
   }, [impactResult, scenarioMode]);
 
