@@ -101,173 +101,179 @@ const YDI_SOURCE_NODES = [
 // Each corridor is a centerline with width_deg that gets buffered into a polygon
 // Low = main channels, Medium = widened + tributaries, High = full basin sheet flow
 const YDI_FLOOD_CORRIDORS = {
+  // LOW — main channels only, following existing river valleys precisely
   low: {
     opacity: 0.82,
     features: [
-      // Columbia River Gorge — follows actual channel through Cascades
+      // Columbia River Gorge — real channel through Cascade Mountains
       { name: "Columbia River Gorge", flow_km3: 8400, dissipation: "Drains west through Cascades to Pacific — Columbia Bar discharge ~180,000 m³/s peak", width: 0.6, coords: [
-        [-117.0, 46.5], [-118.5, 46.2], [-119.5, 46.1], [-120.5, 45.7],
-        [-121.2, 45.6], [-121.8, 45.6], [-122.3, 45.6], [-123.2, 46.1],
-        [-123.9, 46.2], [-124.1, 46.0],
+        [-117.0, 46.0], [-118.5, 46.2], [-119.5, 46.3], [-120.5, 46.6],
+        [-121.0, 45.7], [-121.7, 45.7], [-122.3, 45.6], [-123.1, 46.1],
+        [-123.9, 46.2],
       ]},
-      // Channeled Scablands — the defining YDI feature
+      // Channeled Scablands — real flood channels across eastern Washington
       { name: "Channeled Scablands", flow_km3: 12000, dissipation: "Multiple simultaneous flood channels carved through basalt — converges on Columbia River at Pasco Basin", width: 0.7, coords: [
-        [-117.5, 48.0], [-118.2, 47.5], [-118.8, 47.2], [-119.2, 46.8],
-        [-119.5, 46.5], [-119.8, 46.2], [-119.5, 46.1],
+        [-117.5, 47.8], [-118.0, 47.3], [-118.8, 47.0], [-119.3, 46.8],
+        [-119.0, 46.5], [-119.5, 46.3], [-118.5, 46.2], [-117.0, 46.0],
       ]},
-      // Mississippi main stem — follows actual river valley
+      // Mississippi River — follows actual river course
       { name: "Upper Mississippi", flow_km3: 9200, dissipation: "Flows south along existing Mississippi valley — peak discharge ~150,000 m³/s, dissipates into Gulf of Mexico", width: 0.9, coords: [
-        [-92.5, 44.8], [-91.5, 43.5], [-91.2, 42.5], [-91.0, 41.5],
-        [-90.5, 40.5], [-90.2, 39.5], [-90.0, 38.5], [-89.7, 37.5],
-        [-89.5, 36.5], [-89.5, 35.5], [-89.8, 34.5], [-90.2, 33.5],
-        [-90.6, 32.5], [-91.0, 31.5], [-91.2, 30.5], [-89.5, 29.2],
+        [-93.1, 44.9], [-92.8, 44.3], [-91.5, 43.5], [-91.1, 42.5],
+        [-90.6, 41.6], [-90.2, 40.6], [-89.9, 39.7], [-89.6, 38.9],
+        [-89.1, 37.1], [-89.2, 36.5], [-89.5, 35.9], [-89.8, 35.1],
+        [-90.4, 34.2], [-91.1, 33.2], [-91.5, 32.3], [-91.4, 31.2],
+        [-91.2, 30.4], [-89.9, 29.3],
       ]},
-      // St Lawrence — Great Lakes outlet
+      // St Lawrence — follows real valley
       { name: "St Lawrence Outlet", flow_km3: 6800, dissipation: "Drains east through St Lawrence valley — peak discharge ~80,000 m³/s, dissipates into N Atlantic", width: 0.7, coords: [
-        [-79.1, 43.2], [-78.5, 43.5], [-77.0, 43.9], [-75.8, 44.3],
-        [-74.8, 45.0], [-73.5, 45.5], [-72.5, 46.0],
-        [-71.0, 46.8], [-69.5, 47.5], [-67.5, 47.8], [-65.5, 48.5],
-        [-64.0, 48.5], [-62.0, 47.5], [-60.5, 47.0],
+        [-79.1, 43.9], [-78.2, 44.0], [-76.8, 44.2], [-75.2, 44.5],
+        [-74.0, 45.5], [-72.5, 46.2], [-71.2, 46.8], [-69.5, 47.4],
+        [-67.5, 47.9], [-65.5, 48.4], [-64.0, 48.8], [-62.5, 48.5], [-61.5, 47.3],
       ]},
     ]
   },
+
+  // MEDIUM — corridors widen + Missouri, Ohio, Great Lakes added
   medium: {
     opacity: 0.86,
     features: [
-      // Columbia / Scablands — wider
+      // Columbia system wider
       { name: "Columbia River System", flow_km3: 18000, dissipation: "Catastrophic flood pulse through Columbia Gorge — estimated 40x modern peak discharge. Pacific plume extended 300km offshore.", width: 1.3, coords: [
-        [-116.5, 48.5], [-117.5, 48.0], [-118.5, 47.5], [-119.2, 47.0],
-        [-119.5, 46.5], [-119.8, 46.2], [-119.5, 46.1],
-        [-120.5, 45.7], [-121.2, 45.6], [-121.8, 45.6],
-        [-122.3, 45.6], [-123.2, 46.1], [-123.9, 46.2], [-124.2, 45.8],
+        [-117.0, 47.0], [-117.5, 46.8], [-118.8, 47.0], [-119.3, 46.8],
+        [-119.5, 46.3], [-120.5, 46.6], [-121.0, 45.7], [-121.7, 45.7],
+        [-122.3, 45.6], [-123.1, 46.1], [-123.9, 46.2],
       ]},
-      // Willamette Valley flooded
+      // Willamette Valley backflood — real Lake Allison extent
       { name: "Willamette Backflood", flow_km3: 3200, dissipation: "Columbia backflood into Willamette Valley — ancient Lake Allison. Water ponded to ~120m elevation before draining south.", width: 0.8, coords: [
-        [-122.7, 45.5], [-123.0, 45.0], [-123.1, 44.5], [-123.0, 44.0],
-        [-122.9, 43.5], [-122.8, 43.0],
+        [-122.7, 45.5], [-123.0, 45.1], [-123.1, 44.6],
+        [-123.1, 44.1], [-122.9, 43.8], [-122.6, 43.4],
       ]},
-      // Missouri River — follows actual channel
+      // Missouri River — follows actual river course from Montana to confluence
       { name: "Missouri River Corridor", flow_km3: 14500, dissipation: "Drains southeast along Missouri valley into Mississippi — peak discharge ~200,000 m³/s. Sediment load turned Gulf of Mexico turbid for years.", width: 1.0, coords: [
-        [-110.5, 47.5], [-108.5, 47.0], [-106.5, 47.5], [-104.5, 46.8],
-        [-102.0, 46.0], [-100.0, 45.0], [-98.5, 44.0], [-97.5, 43.0],
-        [-96.8, 42.0], [-96.5, 41.5], [-96.0, 41.0], [-95.8, 40.5],
-        [-95.5, 39.5], [-94.5, 39.0], [-93.5, 39.0], [-92.5, 40.0],
-        [-91.5, 41.0], [-91.2, 42.0], [-90.8, 42.5],
+        [-112.5, 47.5], [-111.5, 47.2], [-110.5, 47.8], [-109.5, 47.5],
+        [-107.0, 47.8], [-106.0, 47.6], [-104.0, 47.1], [-101.8, 46.9],
+        [-100.4, 46.9], [-99.3, 46.4], [-98.0, 46.0], [-97.4, 46.9],
+        [-97.5, 46.0], [-96.8, 46.9], [-96.7, 46.2], [-96.5, 46.0],
+        [-96.8, 45.6], [-98.0, 44.5], [-99.3, 43.5], [-100.4, 43.7],
+        [-101.2, 42.9], [-99.3, 41.5], [-97.5, 41.2], [-96.8, 41.2],
+        [-96.2, 41.5], [-95.9, 41.3], [-95.7, 40.6], [-95.5, 39.9],
+        [-94.9, 39.3], [-94.6, 39.1], [-94.0, 39.0], [-93.4, 39.1],
+        [-93.0, 39.1], [-92.5, 38.8], [-91.7, 38.8],
       ]},
-      // Mississippi expanded
+      // Mississippi wider
       { name: "Lower Mississippi / Gulf", flow_km3: 22000, dissipation: "Combined Missouri + Upper Mississippi discharge — peak ~400,000 m³/s. Gulf of Mexico freshwater cap suppressed thermohaline circulation, triggering Younger Dryas cooling.", width: 1.3, coords: [
-        [-92.5, 44.8], [-91.5, 43.5], [-91.2, 42.5], [-91.0, 41.5],
-        [-90.5, 40.5], [-90.2, 39.5], [-90.0, 38.5], [-89.7, 37.5],
-        [-89.5, 36.5], [-89.5, 35.5], [-89.8, 34.5], [-90.2, 33.5],
-        [-90.6, 32.5], [-91.0, 31.5], [-91.2, 30.5], [-89.5, 29.2],
-        [-89.0, 29.0], [-88.5, 29.5],
+        [-93.1, 44.9], [-92.8, 44.3], [-91.5, 43.5], [-91.1, 42.5],
+        [-90.6, 41.6], [-90.4, 40.5], [-90.0, 39.5], [-89.6, 38.5],
+        [-89.1, 37.1], [-89.5, 36.0], [-89.8, 35.1],
+        [-90.4, 34.2], [-91.1, 33.2], [-91.5, 32.3], [-91.4, 31.2],
+        [-91.2, 30.4], [-90.0, 29.5], [-89.2, 29.2],
       ]},
-      // Ohio River
+      // Ohio River — follows real valley
       { name: "Ohio River Overflow", flow_km3: 4100, dissipation: "Proglacial lakes drained SW through Ohio valley. Joined Mississippi above Cairo IL.", width: 0.7, coords: [
-        [-84.5, 39.5], [-83.0, 39.0], [-81.5, 38.5], [-80.5, 38.2],
-        [-79.5, 38.5], [-80.5, 38.5], [-82.5, 38.8], [-84.0, 39.2],
-        [-85.0, 38.5], [-86.5, 38.0], [-87.5, 37.5], [-88.5, 37.5],
-        [-89.0, 37.0], [-89.1, 37.0],
+        [-80.5, 40.6], [-81.5, 40.4], [-82.9, 40.4], [-84.2, 39.1],
+        [-85.2, 38.8], [-86.8, 37.9], [-87.5, 37.8], [-88.1, 37.2],
+        [-88.7, 37.1], [-89.1, 37.1],
       ]},
-      // Great Lakes overflow
+      // Great Lakes overflow through Chicago outlet + Niagara
       { name: "Great Lakes System", flow_km3: 8800, dissipation: "Proglacial Lake Agassiz + Great Lakes overflow. Multiple outlet phases — Port Huron, Kirkfield, North Bay outlets active simultaneously.", width: 1.1, coords: [
-        [-91.5, 46.8], [-89.5, 46.5], [-87.5, 45.8], [-86.0, 45.2],
-        [-85.0, 44.5], [-83.5, 44.0], [-83.0, 43.5], [-82.5, 42.8],
-        [-81.5, 42.5], [-80.8, 42.8], [-80.0, 43.2], [-79.5, 43.2],
-        [-79.1, 43.2], [-78.8, 43.5],
+        [-88.0, 46.0], [-87.2, 45.5], [-86.5, 44.8], [-85.5, 44.0],
+        [-84.5, 43.2], [-83.5, 42.5], [-82.8, 42.5], [-81.8, 42.8],
+        [-80.8, 42.8], [-80.0, 43.0], [-79.5, 43.3], [-79.1, 43.9],
+        [-78.2, 44.0], [-76.8, 44.2],
       ]},
-      // St Lawrence wide
-      { name: "St Lawrence System", flow_km3: 11000, dissipation: "Greatest freshwater pulse to N Atlantic in 10,000 years. Disrupted AMOC — primary driver of Younger Dryas 1,200-year cold event.", width: 1.1, coords: [
-        [-79.1, 43.2], [-78.2, 43.6], [-77.0, 43.9], [-75.8, 44.3],
-        [-74.8, 45.0], [-73.5, 45.5], [-72.5, 46.0],
-        [-71.0, 46.8], [-69.5, 47.5], [-67.5, 47.8], [-65.5, 48.5],
-        [-64.0, 48.5], [-62.0, 47.5], [-60.5, 47.0],
+      // St Lawrence wider
+      { name: "St Lawrence Outlet", flow_km3: 11500, dissipation: "Combined Lake Agassiz + Great Lakes drainage east — primary trigger for AMOC disruption and Younger Dryas onset.", width: 1.0, coords: [
+        [-76.5, 44.2], [-75.2, 44.5], [-74.0, 45.5], [-72.5, 46.2],
+        [-71.2, 46.8], [-69.5, 47.4], [-67.5, 47.9], [-65.5, 48.4],
+        [-64.0, 48.8], [-62.5, 48.5], [-61.5, 47.3],
       ]},
-      // Mackenzie River
-      { name: "Mackenzie Corridor", flow_km3: 7200, dissipation: "Northern outlet to Arctic Ocean. Ice-free corridor drainage. Less studied but significant Arctic freshwater input.", width: 1.0, coords: [
-        [-115.0, 60.5], [-118.0, 61.5], [-121.0, 62.5], [-124.0, 64.0],
-        [-127.0, 66.0], [-130.5, 68.0], [-133.5, 69.5], [-135.5, 69.5],
+      // Mackenzie River — primary Arctic drainage
+      { name: "Mackenzie Corridor", flow_km3: 7200, dissipation: "Drains northwest through Mackenzie valley to Beaufort Sea — freshwater input suppressed Arctic thermohaline. Ice-free corridor drainage.", width: 0.9, coords: [
+        [-113.5, 56.0], [-117.0, 58.5], [-120.5, 61.5],
+        [-122.5, 63.5], [-126.0, 65.0], [-128.5, 67.0],
+        [-132.0, 68.5], [-134.5, 69.2],
       ]},
     ]
   },
+
+  // HIGH — full continental sheet flow
   high: {
     opacity: 0.90,
     features: [
-      // Columbia mega-flood
-      { name: "Columbia Mega-Flood", flow_km3: 28000, dissipation: "Maximum Missoula flood discharge — carved the Channeled Scablands in days. Peak discharge ~17 million m³/s, 10x Amazon River. Pacific plume visible from orbit.", width: 2.2, coords: [
-        [-115.5, 49.0], [-116.5, 48.5], [-117.5, 48.0], [-118.5, 47.5],
-        [-119.2, 47.0], [-119.5, 46.5], [-119.8, 46.2], [-119.5, 46.1],
-        [-120.5, 45.7], [-121.2, 45.6], [-121.8, 45.6],
-        [-122.3, 45.6], [-123.0, 46.0], [-123.9, 46.2], [-124.3, 45.8],
+      // Columbia — catastrophic
+      { name: "Columbia River System", flow_km3: 32000, dissipation: "Maximum Missoula-scale discharge — Columbia Gorge walls carved, Channeled Scablands fully active. Pacific sediment plume visible 500km offshore.", width: 1.8, coords: [
+        [-117.0, 47.5], [-117.5, 47.0], [-118.8, 47.0], [-119.3, 46.8],
+        [-119.5, 46.3], [-120.5, 46.6], [-121.0, 45.7], [-121.7, 45.7],
+        [-122.3, 45.6], [-123.1, 46.1], [-123.9, 46.2],
       ]},
-      // Willamette full flood
-      { name: "Willamette Valley Lake", flow_km3: 5800, dissipation: "Ancient Lake Allison — 120m deep at maximum. Portland area under 100m of water. Drained over weeks as Columbia pulse subsided.", width: 1.4, coords: [
-        [-122.5, 45.8], [-122.8, 45.3], [-123.0, 44.8], [-123.1, 44.3],
-        [-123.0, 43.8], [-122.9, 43.3], [-122.7, 42.8],
+      { name: "Channeled Scablands", flow_km3: 18000, dissipation: "Full Scabland flood — Moses Coulee, Grand Coulee, Cheney-Palouse tract all active. Coulees carved in days.", width: 1.4, coords: [
+        [-118.5, 48.2], [-118.8, 47.6], [-119.3, 47.2], [-119.8, 46.9],
+        [-119.0, 46.5], [-119.5, 46.3], [-118.5, 46.2], [-117.0, 46.0],
       ]},
-      // Snake River plain full width
-      { name: "Snake River Plain", flow_km3: 9500, dissipation: "Tributary to Columbia — 800km of channeled basalt. Spread across 50km wide plain before funnelling into Columbia Gorge.", width: 1.5, coords: [
-        [-111.5, 42.5], [-112.5, 43.0], [-114.0, 43.5], [-115.5, 44.0],
-        [-116.5, 44.5], [-117.5, 46.0], [-118.5, 47.5],
+      { name: "Willamette Backflood", flow_km3: 5800, dissipation: "Lake Allison at maximum — Willamette Valley inundated to ~120m. Portland area under 30m of water.", width: 1.2, coords: [
+        [-122.7, 45.5], [-123.0, 45.1], [-123.1, 44.6],
+        [-123.1, 44.1], [-122.9, 43.8], [-122.6, 43.4],
       ]},
-      // Missouri mega
-      { name: "Missouri Megaflood", flow_km3: 24000, dissipation: "Lake Agassiz overflow — multiple sudden drainage events. Carried ~6x modern Missouri sediment load, depositing deep loess across Great Plains southward.", width: 1.9, coords: [
-        [-110.5, 47.5], [-108.5, 47.0], [-106.5, 47.5], [-104.5, 46.8],
-        [-102.0, 46.0], [-100.0, 45.0], [-98.5, 44.0], [-97.5, 43.0],
-        [-96.8, 42.0], [-96.5, 41.5], [-96.0, 41.0], [-95.5, 39.5],
-        [-94.5, 39.0], [-93.5, 39.0], [-92.5, 40.0], [-91.5, 41.0],
-        [-91.2, 42.0], [-90.8, 42.5],
-      ]},
-      // Mississippi full width
-      { name: "Mississippi / Gulf Flood", flow_km3: 38000, dissipation: "Peak combined discharge ~650,000 m³/s — greater than all modern rivers combined. Gulf of Mexico freshwater lens lasted decades, shutting down Atlantic thermohaline circulation.", width: 2.1, coords: [
-        [-92.5, 44.8], [-91.5, 43.5], [-91.2, 42.5], [-91.0, 41.5],
-        [-90.5, 40.5], [-90.2, 39.5], [-90.0, 38.5], [-89.7, 37.5],
-        [-89.5, 36.5], [-89.5, 35.5], [-89.8, 34.5], [-90.2, 33.5],
-        [-90.6, 32.5], [-91.0, 31.5], [-91.2, 30.5], [-89.5, 29.2],
-        [-89.0, 28.8], [-88.5, 29.0], [-88.0, 29.5],
+      // Missouri at maximum
+      { name: "Missouri River Sheet", flow_km3: 28000, dissipation: "Missouri at peak — overbank flooding across Great Plains 50-100km wide. Kansas City and St Louis under 15-40m.", width: 1.6, coords: [
+        [-112.5, 47.5], [-110.5, 47.8], [-107.0, 47.8],
+        [-104.0, 47.1], [-100.4, 46.9], [-97.4, 46.9],
+        [-96.5, 46.0], [-98.0, 44.5], [-99.3, 43.5],
+        [-101.2, 42.9], [-97.5, 41.2], [-96.2, 41.5],
+        [-95.5, 39.9], [-94.6, 39.1], [-92.5, 38.8], [-91.7, 38.8],
       ]},
       // Great Plains sheet flow
-      { name: "Great Plains Sheet Flow", flow_km3: 12000, dissipation: "Overland sheet flow across flat plains — not confined to channels. Dissipated southward into Red River / Arkansas drainages.", width: 2.0, coords: [
-        [-99.0, 49.0], [-99.5, 47.5], [-99.5, 46.0], [-99.0, 44.5],
-        [-98.5, 43.0], [-98.0, 41.5], [-97.5, 40.0], [-97.5, 38.5],
-        [-97.8, 37.0], [-98.0, 36.0],
+      { name: "Great Plains Inundation", flow_km3: 16000, dissipation: "Overland sheet flow across flat Great Plains — no confining valley. Broad shallow flood 2-15m deep covering thousands of km².", width: 2.0, coords: [
+        [-100.0, 49.0], [-100.5, 47.5], [-100.0, 46.0],
+        [-99.5, 44.5], [-99.0, 43.0], [-98.5, 41.5],
+        [-98.0, 40.0], [-97.5, 38.5], [-97.0, 37.0],
       ]},
-      // Ohio full
-      { name: "Ohio / Tennessee Corridor", flow_km3: 7800, dissipation: "Ice-marginal drainage — proglacial lakes burst repeatedly. Followed Ohio then Tennessee R. valleys to Mississippi.", width: 1.2, coords: [
-        [-84.5, 39.5], [-83.0, 39.0], [-81.5, 38.5], [-80.0, 38.0],
-        [-82.0, 38.5], [-84.5, 38.5], [-86.5, 38.0], [-87.5, 37.5],
-        [-88.0, 37.0], [-88.5, 36.5], [-88.0, 35.5], [-87.5, 35.0],
-        [-86.5, 35.5], [-85.5, 35.0], [-84.5, 35.5], [-83.5, 35.0],
+      // Mississippi at full capacity
+      { name: "Lower Mississippi / Gulf", flow_km3: 42000, dissipation: "Peak combined discharge — all N American drainages converging. Gulf of Mexico freshwater lid killed marine life for centuries. Primary AMOC shutdown mechanism.", width: 2.0, coords: [
+        [-93.1, 44.9], [-91.5, 43.5], [-90.6, 41.6],
+        [-90.0, 39.5], [-89.6, 38.5], [-89.1, 37.1],
+        [-89.5, 36.0], [-90.4, 34.2], [-91.1, 33.2],
+        [-91.5, 32.3], [-91.2, 30.4], [-89.5, 29.2],
+        [-88.8, 30.0],
       ]},
-      // Great Lakes full
-      { name: "Great Lakes Megaflood", flow_km3: 16000, dissipation: "Lake Agassiz + Superior + Michigan + Huron all overflowing simultaneously. Multiple outlets active — catastrophic drainage event.", width: 1.8, coords: [
-        [-91.5, 46.8], [-89.5, 46.4], [-87.5, 45.7], [-86.0, 45.0],
-        [-85.0, 44.3], [-83.8, 43.8], [-83.0, 43.0], [-82.2, 42.5],
-        [-81.2, 42.5], [-80.2, 42.8], [-79.5, 43.0], [-79.1, 43.2],
-        [-78.5, 43.5], [-77.5, 43.8], [-76.5, 44.0],
+      // Ohio
+      { name: "Ohio River Overflow", flow_km3: 7800, dissipation: "Ohio valley at maximum — Cincinnati under 25m. Joins Mississippi adding massive discharge pulse.", width: 1.0, coords: [
+        [-80.5, 40.6], [-82.9, 40.4], [-84.2, 39.1],
+        [-86.8, 37.9], [-88.1, 37.2], [-89.1, 37.1],
       ]},
-      // St Lawrence mega
-      { name: "St Lawrence Megaflood", flow_km3: 19000, dissipation: "The Younger Dryas trigger event. ~19,000 km³ freshwater to N Atlantic in decades. Stopped AMOC cold — plunged N hemisphere into 1,200-year glacial relapse. Dissipated into Labrador Sea.", width: 1.7, coords: [
-        [-79.1, 43.2], [-78.2, 43.8], [-77.0, 44.1], [-75.8, 44.5],
-        [-74.5, 45.2], [-73.5, 45.8], [-72.5, 46.0],
-        [-71.0, 46.8], [-69.5, 47.5], [-67.5, 47.8], [-65.5, 48.5],
-        [-64.0, 48.5], [-62.0, 47.5], [-60.5, 47.0],
+      // Great Lakes + Agassiz full flood
+      { name: "Lake Agassiz Overflow", flow_km3: 24000, dissipation: "Catastrophic Lake Agassiz outburst — largest lake in N American history. Eastern outlet flooded St Lawrence, Arctic outlet flooded Mackenzie. AMOC shutdown within decades.", width: 1.8, coords: [
+        [-99.0, 52.0], [-97.0, 50.5], [-96.5, 49.5],
+        [-96.8, 48.5], [-96.8, 47.5], [-96.5, 46.5],
+        [-96.8, 46.0], [-93.0, 46.5], [-90.0, 46.0],
+        [-88.0, 45.5], [-87.0, 44.5], [-86.0, 43.5],
+        [-85.0, 43.0], [-84.0, 42.5], [-83.0, 42.2],
+        [-82.0, 42.5], [-81.0, 42.8], [-80.0, 43.0],
+        [-79.5, 43.3], [-79.1, 43.9], [-77.5, 44.1],
       ]},
-      // Mackenzie mega
-      { name: "Mackenzie Arctic Outlet", flow_km3: 11500, dissipation: "Arctic outlet — freshwater to Beaufort Sea. Sea ice disruption cascaded into atmospheric circulation changes across Arctic.", width: 1.7, coords: [
-        [-114.0, 60.0], [-116.5, 61.0], [-120.0, 62.5], [-124.0, 64.5],
-        [-127.5, 66.5], [-131.0, 68.5], [-134.0, 69.5], [-136.5, 70.0],
+      // St Lawrence at maximum
+      { name: "St Lawrence / Atlantic", flow_km3: 28000, dissipation: "Maximum Atlantic freshwater injection — Lake Agassiz + Great Lakes combined. Salinity drop of 3-5ppt across N Atlantic. Younger Dryas onset within 1-3 years of peak discharge.", width: 1.6, coords: [
+        [-76.5, 44.2], [-75.2, 44.5], [-74.0, 45.5],
+        [-72.5, 46.2], [-71.2, 46.8], [-69.5, 47.4],
+        [-67.5, 47.9], [-65.5, 48.4], [-64.0, 48.8],
+        [-62.5, 48.5], [-61.5, 47.3],
+      ]},
+      // Mackenzie at maximum
+      { name: "Mackenzie Arctic Outlet", flow_km3: 14000, dissipation: "Lake Agassiz northern spillway — Beaufort Sea freshwater spike. Arctic sea ice formation disrupted for centuries.", width: 1.4, coords: [
+        [-113.5, 56.0], [-117.0, 58.5], [-120.5, 61.5],
+        [-122.5, 63.5], [-126.0, 65.0], [-128.5, 67.0],
+        [-132.0, 68.5], [-134.5, 69.2],
       ]},
       // Hudson Bay drainage
-      { name: "Hudson Bay Outlet", flow_km3: 8500, dissipation: "Eastern Laurentide drainage — Hudson Strait outlet. Combined with St Lawrence pulse to deliver massive freshwater anomaly to Labrador Sea.", width: 1.8, coords: [
-        [-82.0, 56.0], [-80.5, 58.0], [-80.0, 60.0], [-79.5, 62.0],
-        [-79.0, 63.5], [-78.0, 65.0], [-76.5, 66.5],
+      { name: "Hudson Bay Outlet", flow_km3: 9500, dissipation: "Laurentide ice margin retreat opened Hudson Bay — massive meltwater pulse to Labrador Sea and N Atlantic.", width: 1.3, coords: [
+        [-85.0, 56.0], [-83.5, 58.0], [-82.5, 60.0],
+        [-82.0, 62.0], [-82.5, 64.0], [-83.0, 66.0],
       ]},
-      // Atlantic shelf flooding
-      { name: "Atlantic Coastal Flooding", flow_km3: 4200, dissipation: "Sea level rise + meltwater flooding of continental shelf. Coast retreated ~100km inland in centuries. Dissipated across Atlantic shelf.", width: 1.4, coords: [
-        [-75.5, 35.0], [-75.2, 36.5], [-74.8, 38.0], [-74.5, 39.5],
-        [-74.0, 41.0], [-73.5, 42.5], [-72.0, 43.5], [-70.5, 44.5],
-        [-69.5, 45.5], [-68.0, 46.5],
+      // Atlantic coastal flooding
+      { name: "Atlantic Seaboard", flow_km3: 4200, dissipation: "Coastal inundation from sea level rise + storm surge amplification. Continental shelf exposed during glacial low stand now reflooding.", width: 1.2, coords: [
+        [-75.5, 35.5], [-75.2, 37.0], [-74.8, 38.5],
+        [-74.2, 40.0], [-73.8, 41.5], [-72.5, 42.5],
+        [-71.0, 43.5], [-70.0, 44.5], [-68.0, 46.5],
       ]},
     ]
   }
@@ -2419,33 +2425,33 @@ export default function HomePage() {
           10, ["*", ["get", "width"], base * 180],
         ];
 
-        // Outer halo — 4x core, medium-light blue (doubled opacity)
+        // Outer halo — 4x core, lightest blue, 150% per side fringe, semi-transparent
         map.addLayer({ id: haloId, type: "line", source: srcId,
           layout: { "line-cap": "round", "line-join": "round" },
           paint: {
-            "line-color": "#60a5fa",
+            "line-color": "#bfdbfe",
             "line-width": zoomWidth(4),
-            "line-opacity": 0.55,
-            "line-blur": 6,
+            "line-opacity": 0.32,
+            "line-blur": 8,
           }
         });
-        // Mid layer — 2x core, bright blue
+        // Mid layer — 2x core, medium blue, semi-transparent
         map.addLayer({ id: "ydi-flood-mid", type: "line", source: srcId,
           layout: { "line-cap": "round", "line-join": "round" },
           paint: {
-            "line-color": "#2563eb",
+            "line-color": "#3b82f6",
             "line-width": zoomWidth(2),
-            "line-opacity": 0.75,
+            "line-opacity": 0.52,
             "line-blur": 2,
           }
         });
-        // Core — dark blue, deepest channel
+        // Core — solid dark blue, main channel
         map.addLayer({ id: coreId, type: "line", source: srcId,
           layout: { "line-cap": "round", "line-join": "round" },
           paint: {
-            "line-color": "#1e3a8a",
+            "line-color": "#1e40af",
             "line-width": zoomWidth(1),
-            "line-opacity": 0.95,
+            "line-opacity": 0.78,
             "line-blur": 0.5,
           }
         });
@@ -2816,14 +2822,45 @@ export default function HomePage() {
       safely(() => map.easeTo({ bearing: info.startBearing, duration: 2000 }));
       if (cataclysmRunRef.current !== thisRun) return;
       setStatus(`☄️ ${info.name} — CRUSTAL DISPLACEMENT IN PROGRESS`);
-      // After bearing settles, stop spin and do the flip
+      // After bearing settles, do the flip — but KEEP longitude spin running simultaneously
       setTimeout(() => {
+        // Don't cancel spin — let it keep going while rotateTo animates bearing
+        // This creates dual-axis rotation: longitude drift + bearing flip at same time
+        const flipStart = performance.now();
+        const flipDuration = 8000;
+        const startBearing = map.getBearing();
+        const targetBearing = info.flipBearing;
+        const bearingDelta = targetBearing - startBearing;
+        const easeInOut = t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+
+        // Cancel the setCenter spin loop — we'll fold it into the flip loop
         if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-        safely(() => map.rotateTo(info.flipBearing, {
-          duration: 8000,
-          easing: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
-        }));
-        // No bearing correction — let flip land naturally
+        let flipLng = map.getCenter().lng;
+        let flipLastT = null;
+
+        const flipLoop = (now) => {
+          if (cataclysmRunRef.current !== thisRun) return;
+          const elapsed = now - flipStart;
+          const progress = Math.min(elapsed / flipDuration, 1);
+          const eased = easeInOut(progress);
+
+          // Bearing: interpolate toward target
+          const newBearing = startBearing + bearingDelta * eased;
+          // Longitude: keep drifting at same speed as original spin
+          if (flipLastT !== null) {
+            flipLng -= (now - flipLastT) * 0.018;
+          }
+          flipLastT = now;
+
+          safely(() => map.jumpTo({ bearing: newBearing, center: [flipLng, 20] }));
+
+          if (progress < 1) {
+            cataclysmSpinRef.current = requestAnimationFrame(flipLoop);
+          } else {
+            cataclysmSpinRef.current = null;
+          }
+        };
+        cataclysmSpinRef.current = requestAnimationFrame(flipLoop);
       }, 2100);
     }, model === "tes" ? 5200 : 5600);
 
