@@ -915,9 +915,7 @@ export default function HomePage() {
     const pulId  = idx != null ? `${IMPACT_CRATER_LAYER_ID}-pulse-${idx}` : `${IMPACT_CRATER_LAYER_ID}-pulse`;
     const thLId  = idx != null ? `${IMPACT_THERMAL_LAYER_ID}-line-${idx}` : `${IMPACT_THERMAL_LAYER_ID}-line`;
     try {
-      // Only clear all on first impact (idx=0) or single impact (idx=null)
-      if (idx == null || idx === 0) clearImpactPreview();
-      // Clean up this specific indexed set if re-drawing
+      // Clean up this specific indexed set if re-drawing (clearing is done by caller)
       if (idx != null) {
         [thId, thLId, blFId, blId, ejId, ejLId, rimId, crId, crInId, pulId].forEach(id => {
           try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){}
@@ -944,7 +942,14 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return false;
     try {
-      removeImpactPreviewLayers();
+      // Only remove base (non-indexed) preview layers — don't wipe sibling impacts
+      const baseIds = [`${IMPACT_CRATER_LAYER_ID}-pulse`, `${IMPACT_CRATER_LAYER_ID}-inner`,
+        `${IMPACT_CRATER_LAYER_ID}-rim`, `${IMPACT_CRATER_LAYER_ID}-ejecta`,
+        `${IMPACT_CRATER_LAYER_ID}-ejecta-line`, `${IMPACT_BLAST_LAYER_ID}-fill`,
+        IMPACT_THERMAL_LAYER_ID, `${IMPACT_THERMAL_LAYER_ID}-line`,
+        IMPACT_BLAST_LAYER_ID, IMPACT_CRATER_LAYER_ID];
+      baseIds.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
+      try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e){}
       map.addSource(IMPACT_PREVIEW_SOURCE_ID, { type: "geojson", data: { type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Point", coordinates: [lng, lat] }, properties: { kind: "impact-core" } }] } });
       map.addLayer({ id: IMPACT_CRATER_LAYER_ID, type: "circle", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "impact-core"], paint: { "circle-radius": 10, "circle-color": "#ef4444", "circle-stroke-width": 2, "circle-stroke-color": "#ffffff" } });
       map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-pulse`, type: "circle", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "impact-core"], paint: { "circle-radius": 28, "circle-color": "rgba(0,0,0,0)", "circle-stroke-width": 2, "circle-stroke-color": "#ef4444", "circle-stroke-opacity": 0.9 } });
@@ -1087,7 +1092,7 @@ export default function HomePage() {
     setRlStatus(getRLStatus());
     cancelPendingImpactRequest();
     removeImpactFloodLayers();
-    removeImpactPreviewLayers();
+    removeImpactPreviewLayers(); // clear all before drawing fresh set
     const runSeq = impactRunSeqRef.current + 1;
     impactRunSeqRef.current = runSeq;
     const controller = new AbortController();
