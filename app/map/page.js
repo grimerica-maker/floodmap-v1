@@ -185,6 +185,7 @@ const YELLOWSTONE_PRESETS = [
     desc: "Largest known — 1,000 km³ ejecta",
     vei: 8,
     color: "#ef4444",
+    blackout_pct: 70, blackout_duration_months: 36, blackout_severity: "Nuclear winter — mass starvation",
     zones: [
       { name: "Kill Zone", desc: "Total devastation, pyroclastic flows", survival: "0%", survivalNote: "Pyroclastic flows, 1000°C+. No survival possible.", ash_m: 100, major_km: 200, minor_km: 120, color: "#fef08a", opacity: 0.85 },
       { name: "Heavy Ash (>1m)", desc: "Structures collapse, crops destroyed", survival: "2-5%", survivalNote: "Roof collapse, water contamination, no food. Survival only with immediate evacuation.", ash_m: 1, major_km: 800, minor_km: 400, color: "#b91c1c", opacity: 0.55 },
@@ -198,6 +199,7 @@ const YELLOWSTONE_PRESETS = [
     desc: "Mid-size — 280 km³ ejecta",
     vei: 8,
     color: "#f97316",
+    blackout_pct: 40, blackout_duration_months: 18, blackout_severity: "Global dimming — crop failures likely",
     zones: [
       { name: "Kill Zone", desc: "Total devastation", survival: "0%", survivalNote: "Pyroclastic flows, 1000°C+. No survival possible.", ash_m: 50, major_km: 120, minor_km: 70, color: "#fef08a", opacity: 0.85 },
       { name: "Heavy Ash (>1m)", desc: "Structures collapse", survival: "2-5%", survivalNote: "Roof collapse, water contamination, no food. Survival only with immediate evacuation.", ash_m: 1, major_km: 450, minor_km: 220, color: "#b91c1c", opacity: 0.55 },
@@ -211,6 +213,7 @@ const YELLOWSTONE_PRESETS = [
     desc: "First eruption — 2,450 km³ ejecta",
     vei: 8,
     color: "#a855f7",
+    blackout_pct: 70, blackout_duration_months: 36, blackout_severity: "Nuclear winter — mass starvation",
     zones: [
       { name: "Kill Zone", desc: "Total devastation", survival: "0%", survivalNote: "Pyroclastic flows, 1000°C+. No survival possible.", ash_m: 200, major_km: 300, minor_km: 180, color: "#fef08a", opacity: 0.85 },
       { name: "Heavy Ash (>1m)", desc: "Structures collapse", survival: "2-5%", survivalNote: "Roof collapse, water contamination, no food. Survival only with immediate evacuation.", ash_m: 1, major_km: 1200, minor_km: 600, color: "#b91c1c", opacity: 0.55 },
@@ -266,6 +269,7 @@ const TOBA_PRESETS = [
     desc: "Largest eruption in 2M years — 2,800 km³ ejecta",
     vei: 8,
     color: "#ef4444",
+    blackout_pct: 80, blackout_duration_months: 48, blackout_severity: "Extinction winter — photosynthesis collapse",
     zones: [
       { name: "Kill Zone", desc: "Total devastation, pyroclastic flows", survival: "0%", survivalNote: "Pyroclastic flows 1000°C+. No survival possible.", major_km: 400, minor_km: 250, color: "#fef08a", opacity: 0.85 },
       { name: "Heavy Ash (>1m)", desc: "Structures collapse, crops destroyed", survival: "2-5%", survivalNote: "Roof collapse, water contamination. Evacuation only hope.", major_km: 1600, minor_km: 900, color: "#b91c1c", opacity: 0.55 },
@@ -285,6 +289,7 @@ const CAMPI_PRESETS = [
     desc: "Caldera collapse — ~500 km³ ejecta, Naples direct hit",
     vei: 8,
     color: "#f97316",
+    blackout_pct: 45, blackout_duration_months: 24, blackout_severity: "Global dimming — crop failures likely",
     zones: [
       { name: "Kill Zone", desc: "Total devastation — Naples destroyed", survival: "0%", survivalNote: "Pyroclastic flows obliterate Naples and surrounding area.", major_km: 150, minor_km: 100, color: "#fef08a", opacity: 0.85 },
       { name: "Heavy Ash (>1m)", desc: "Structures collapse across Italy", survival: "2-5%", survivalNote: "Roof collapse, water contamination. Immediate evacuation required.", major_km: 600, minor_km: 350, color: "#b91c1c", opacity: 0.55 },
@@ -3773,6 +3778,28 @@ export default function HomePage() {
           ) : yellowstoneActive ? (
             <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>Calculating casualties...</div>
           ) : null}
+          {/* Blackout from frontend preset — always shown for all volcano types */}
+          {(() => {
+            const activePresets = volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
+            const p = activePresets[Math.min(yellowstonePreset, activePresets.length - 1)];
+            // Only show if not already shown inside yellowstoneResult block
+            if (yellowstoneResult && Number(yellowstoneResult.blackout_pct ?? 0) > 0) return null;
+            if (!p?.blackout_pct) return null;
+            return (
+              <div style={{ marginTop: 8, padding: "8px 10px", background: "#0a0a1a", borderRadius: 8, border: "1px solid #1e2d45" }}>
+                <div style={{ fontWeight: 700, fontSize: 12, color: "#a78bfa", marginBottom: 4 }}>🌑 Atmospheric Blackout</div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>Sunlight reduction</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{p.blackout_pct}%</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>Duration</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{p.blackout_duration_months} months</span>
+                </div>
+                <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic" }}>{p.blackout_severity}</div>
+              </div>
+            );
+          })()}
           <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>Click map for zone details</div>
         </>
       )}
