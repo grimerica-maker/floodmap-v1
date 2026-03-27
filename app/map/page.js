@@ -106,27 +106,33 @@ const YDI_FLOOD_CORRIDORS = {
     opacity: 0.82,
     features: [
       // Columbia River Gorge — real channel through Cascade Mountains
-      { name: "Columbia River Gorge", flow_km3: 8400, dissipation: "Drains west through Cascades to Pacific — Columbia Bar discharge ~180,000 m³/s peak", width: 0.6, coords: [
+      { name: "Columbia River Gorge", flow_km3: 8400, dissipation: "Drains west through Cascades to Pacific — Columbia Bar discharge ~180,000 m³/s peak", width: 1.2, coords: [
         [-117.4, 47.7], [-118.0, 47.2], [-118.5, 46.8], [-119.0, 46.4],
         [-119.1, 46.2], [-119.3, 45.9], [-119.7, 45.7], [-120.2, 45.7],
         [-120.7, 45.7], [-121.2, 45.7], [-121.5, 45.7], [-121.9, 45.6],
         [-122.3, 45.6], [-122.7, 45.5], [-123.1, 46.1], [-123.8, 46.2],
       ]},
       // Channeled Scablands — real flood channels across eastern Washington
-      { name: "Channeled Scablands", flow_km3: 12000, dissipation: "Multiple simultaneous flood channels carved through basalt — converges on Columbia River at Pasco Basin", width: 0.7, coords: [
+      { name: "Channeled Scablands", flow_km3: 12000, dissipation: "Multiple simultaneous flood channels carved through basalt — converges on Columbia River at Pasco Basin", width: 1.4, coords: [
         [-117.5, 47.8], [-117.8, 47.4], [-118.2, 47.0], [-118.6, 46.7],
         [-118.9, 46.4], [-119.1, 46.2],
       ]},
       // Mississippi River — follows actual river course
-      { name: "Upper Mississippi", flow_km3: 9200, dissipation: "Flows south along existing Mississippi valley — peak discharge ~150,000 m³/s, dissipates into Gulf of Mexico", width: 0.9, coords: [
+      { name: "Upper Mississippi", flow_km3: 9200, dissipation: "Flows south along existing Mississippi valley — peak discharge ~150,000 m³/s, dissipates into Gulf of Mexico", width: 1.8, coords: [
         [-93.1, 44.9], [-92.8, 44.3], [-91.5, 43.5], [-91.1, 42.5],
         [-90.6, 41.6], [-90.2, 40.6], [-89.9, 39.7], [-89.6, 38.9],
         [-89.1, 37.1], [-89.2, 36.5], [-89.5, 35.9], [-89.8, 35.1],
         [-90.4, 34.2], [-91.1, 33.2], [-91.5, 32.3], [-91.4, 31.2],
         [-91.2, 30.4], [-89.9, 29.3],
       ]},
+      // Finger Lakes drainage — Seneca/Cayuga drain east via Mohawk to Hudson
+      { name: "Finger Lakes Outlet", flow_km3: 1800, dissipation: "Seneca and Cayuga Lakes overflow east through Mohawk Valley — joins Hudson River at Troy, drains to Atlantic.", width: 0.8, coords: [
+        [-76.8, 42.7], [-76.2, 43.0], [-75.5, 43.1], [-74.8, 43.0],
+        [-74.2, 42.9], [-73.7, 42.7], [-73.7, 42.5], [-73.8, 42.0],
+        [-73.9, 41.5], [-74.0, 41.0], [-74.0, 40.7],
+      ]},
       // St Lawrence — follows real valley
-      { name: "St Lawrence Outlet", flow_km3: 6800, dissipation: "Drains east through St Lawrence valley — peak discharge ~80,000 m³/s, dissipates into N Atlantic", width: 0.7, coords: [
+      { name: "St Lawrence Outlet", flow_km3: 6800, dissipation: "Drains east through St Lawrence valley — peak discharge ~80,000 m³/s, dissipates into N Atlantic", width: 1.4, coords: [
         [-79.1, 43.3], [-77.5, 43.0], [-76.5, 43.1], [-75.5, 43.5],
         [-74.5, 43.8], [-74.0, 44.5], [-73.8, 45.5], [-73.5, 46.5],
         [-72.5, 46.8], [-71.2, 46.8], [-69.5, 47.4],
@@ -140,19 +146,19 @@ const YDI_FLOOD_CORRIDORS = {
     opacity: 0.86,
     features: [
       // Columbia system wider
-      { name: "Columbia River System", flow_km3: 18000, dissipation: "Catastrophic flood pulse through Columbia Gorge — estimated 40x modern peak discharge. Pacific plume extended 300km offshore.", width: 1.3, coords: [
+      { name: "Columbia River System", flow_km3: 18000, dissipation: "Catastrophic flood pulse through Columbia Gorge — estimated 40x modern peak discharge. Pacific plume extended 300km offshore.", width: 2.6, coords: [
         [-117.4, 47.7], [-117.8, 47.3], [-118.3, 46.9], [-118.8, 46.5],
         [-119.1, 46.2], [-119.3, 45.9], [-119.7, 45.7], [-120.2, 45.7],
         [-120.8, 45.7], [-121.3, 45.7], [-121.7, 45.7], [-122.0, 45.6],
         [-122.3, 45.6], [-122.7, 45.5], [-123.1, 46.1], [-123.9, 46.2],
       ]},
       // Willamette Valley backflood — real Lake Allison extent
-      { name: "Willamette Backflood", flow_km3: 3200, dissipation: "Columbia backflood into Willamette Valley — ancient Lake Allison. Water ponded to ~120m elevation before draining south.", width: 0.8, coords: [
+      { name: "Willamette Backflood", flow_km3: 3200, dissipation: "Columbia backflood into Willamette Valley — ancient Lake Allison. Water ponded to ~120m elevation before draining south.", width: 1.6, coords: [
         [-122.7, 45.5], [-123.0, 45.1], [-123.1, 44.6],
         [-123.1, 44.1], [-122.9, 43.8], [-122.6, 43.4],
       ]},
       // Missouri River — follows actual river course from Montana to confluence
-      { name: "Missouri River Corridor", flow_km3: 14500, dissipation: "Drains southeast along Missouri valley into Mississippi — peak discharge ~200,000 m³/s. Sediment load turned Gulf of Mexico turbid for years.", width: 1.0, coords: [
+      { name: "Missouri River Corridor", flow_km3: 14500, dissipation: "Drains southeast along Missouri valley into Mississippi — peak discharge ~200,000 m³/s. Sediment load turned Gulf of Mexico turbid for years.", width: 2.0, coords: [
         [-112.5, 47.5], [-111.5, 47.2], [-110.5, 47.8], [-109.5, 47.5],
         [-107.0, 47.8], [-106.0, 47.6], [-104.0, 47.1], [-101.8, 46.9],
         [-100.4, 46.9], [-99.3, 46.4], [-98.0, 46.0], [-97.4, 46.9],
@@ -164,7 +170,7 @@ const YDI_FLOOD_CORRIDORS = {
         [-93.0, 39.1], [-92.5, 38.8], [-91.7, 38.8],
       ]},
       // Mississippi wider
-      { name: "Lower Mississippi / Gulf", flow_km3: 22000, dissipation: "Combined Missouri + Upper Mississippi discharge — peak ~400,000 m³/s. Gulf of Mexico freshwater cap suppressed thermohaline circulation, triggering Younger Dryas cooling.", width: 1.3, coords: [
+      { name: "Lower Mississippi / Gulf", flow_km3: 22000, dissipation: "Combined Missouri + Upper Mississippi discharge — peak ~400,000 m³/s. Gulf of Mexico freshwater cap suppressed thermohaline circulation, triggering Younger Dryas cooling.", width: 2.6, coords: [
         [-93.1, 44.9], [-92.8, 44.3], [-91.5, 43.5], [-91.1, 42.5],
         [-90.6, 41.6], [-90.4, 40.5], [-90.0, 39.5], [-89.6, 38.5],
         [-89.1, 37.1], [-89.5, 36.0], [-89.8, 35.1],
@@ -172,44 +178,50 @@ const YDI_FLOOD_CORRIDORS = {
         [-91.2, 30.4], [-90.0, 29.5], [-89.2, 29.2],
       ]},
       // Ohio River — follows real valley
-      { name: "Ohio River Overflow", flow_km3: 4100, dissipation: "Proglacial lakes drained SW through Ohio valley. Joined Mississippi above Cairo IL.", width: 0.7, coords: [
+      { name: "Ohio River Overflow", flow_km3: 4100, dissipation: "Proglacial lakes drained SW through Ohio valley. Joined Mississippi above Cairo IL.", width: 1.4, coords: [
         [-80.5, 40.6], [-81.5, 40.4], [-82.9, 40.4], [-84.2, 39.1],
         [-85.2, 38.8], [-86.8, 37.9], [-87.5, 37.8], [-88.1, 37.2],
         [-88.7, 37.1], [-89.1, 37.1],
       ]},
       // Missouri → Mississippi confluence connector
-      { name: "Missouri-Mississippi Confluence", flow_km3: 5200, dissipation: "Missouri joins Mississippi at St Louis — combined flow overwhelms valley, backflooding both banks for 100km.", width: 0.8, coords: [
+      { name: "Missouri-Mississippi Confluence", flow_km3: 5200, dissipation: "Missouri joins Mississippi at St Louis — combined flow overwhelms valley, backflooding both banks for 100km.", width: 1.6, coords: [
         [-91.7, 38.8], [-91.4, 38.6], [-91.1, 38.3], [-90.8, 38.0],
         [-90.5, 37.8], [-90.2, 37.5], [-89.8, 37.2], [-89.1, 37.1],
       ]},
       // Pennsylvania / Appalachian overflow — connects Ohio east toward Atlantic
-      { name: "Appalachian Overflow", flow_km3: 2800, dissipation: "Proglacial lake overflow across low Appalachian gaps — Potomac, Susquehanna, Delaware all at flood stage simultaneously.", width: 0.6, coords: [
+      { name: "Appalachian Overflow", flow_km3: 2800, dissipation: "Proglacial lake overflow across low Appalachian gaps — Potomac, Susquehanna, Delaware all at flood stage simultaneously.", width: 1.2, coords: [
         [-80.5, 40.6], [-79.5, 40.4], [-78.5, 40.2], [-77.5, 40.3],
         [-77.0, 40.0], [-76.5, 39.8], [-76.2, 39.5], [-75.8, 39.2],
         [-75.5, 38.8], [-75.2, 38.5],
       ]},
       // Chicago outlet — Great Lakes drain SW into Illinois River
-      { name: "Chicago Outlet", flow_km3: 3100, dissipation: "Lake Michigan overflow through Chicago outlet into Illinois River — ancient drainage route reactivated at peak meltwater discharge.", width: 0.7, coords: [
+      { name: "Chicago Outlet", flow_km3: 3100, dissipation: "Lake Michigan overflow through Chicago outlet into Illinois River — ancient drainage route reactivated at peak meltwater discharge.", width: 1.4, coords: [
         [-87.8, 41.8], [-88.0, 41.5], [-88.5, 41.0], [-89.0, 40.5],
         [-89.5, 40.0], [-90.0, 39.5], [-90.4, 39.0], [-90.5, 38.5],
         [-90.5, 38.0], [-89.8, 37.2],
       ]},
       // Great Lakes overflow through Chicago outlet + Niagara
-      { name: "Great Lakes System", flow_km3: 8800, dissipation: "Proglacial Lake Agassiz + Great Lakes overflow. Multiple outlet phases — Port Huron, Kirkfield, North Bay outlets active simultaneously.", width: 1.1, coords: [
+      { name: "Great Lakes System", flow_km3: 8800, dissipation: "Proglacial Lake Agassiz + Great Lakes overflow. Multiple outlet phases — Port Huron, Kirkfield, North Bay outlets active simultaneously.", width: 2.2, coords: [
         [-88.0, 46.0], [-87.2, 45.5], [-86.5, 44.8], [-85.5, 44.0],
         [-84.5, 43.2], [-83.5, 42.5], [-82.8, 42.5], [-81.8, 42.8],
         [-80.8, 42.8], [-80.0, 43.0], [-79.5, 43.3], [-79.1, 43.9],
         [-78.2, 44.0], [-76.8, 44.2],
       ]},
+      // Finger Lakes drainage — wider at medium
+      { name: "Finger Lakes Outlet", flow_km3: 3200, dissipation: "Seneca/Cayuga/Keuka overflow — Mohawk Valley corridor fills to 60m. Hudson gorge at maximum capacity draining to Atlantic.", width: 1.4, coords: [
+        [-77.1, 42.6], [-76.8, 42.7], [-76.2, 43.0], [-75.5, 43.1],
+        [-74.8, 43.0], [-74.2, 42.9], [-73.7, 42.7], [-73.7, 42.3],
+        [-73.8, 41.8], [-73.9, 41.2], [-74.0, 40.7],
+      ]},
       // St Lawrence wider
-      { name: "St Lawrence Outlet", flow_km3: 11500, dissipation: "Combined Lake Agassiz + Great Lakes drainage east — primary trigger for AMOC disruption and Younger Dryas onset.", width: 1.0, coords: [
+      { name: "St Lawrence Outlet", flow_km3: 11500, dissipation: "Combined Lake Agassiz + Great Lakes drainage east — primary trigger for AMOC disruption and Younger Dryas onset.", width: 2.0, coords: [
         [-79.1, 43.3], [-77.5, 43.0], [-76.0, 43.2], [-75.0, 43.6],
         [-74.3, 44.5], [-73.8, 45.5], [-73.5, 46.5],
         [-72.5, 46.8], [-71.2, 46.8], [-69.5, 47.4], [-67.5, 47.9], [-65.5, 48.4],
         [-64.0, 48.8], [-62.5, 48.5], [-61.5, 47.3],
       ]},
       // Mackenzie River — primary Arctic drainage
-      { name: "Mackenzie Corridor", flow_km3: 7200, dissipation: "Drains northwest through Mackenzie valley to Beaufort Sea — freshwater input suppressed Arctic thermohaline. Ice-free corridor drainage.", width: 0.9, coords: [
+      { name: "Mackenzie Corridor", flow_km3: 7200, dissipation: "Drains northwest through Mackenzie valley to Beaufort Sea — freshwater input suppressed Arctic thermohaline. Ice-free corridor drainage.", width: 1.8, coords: [
         [-113.5, 56.0], [-117.0, 58.5], [-120.5, 61.5],
         [-122.5, 63.5], [-126.0, 65.0], [-128.5, 67.0],
         [-132.0, 68.5], [-134.5, 69.2],
@@ -222,22 +234,22 @@ const YDI_FLOOD_CORRIDORS = {
     opacity: 0.90,
     features: [
       // Columbia — catastrophic
-      { name: "Columbia River System", flow_km3: 32000, dissipation: "Maximum Missoula-scale discharge — Columbia Gorge walls carved, Channeled Scablands fully active. Pacific sediment plume visible 500km offshore.", width: 1.8, coords: [
+      { name: "Columbia River System", flow_km3: 32000, dissipation: "Maximum Missoula-scale discharge — Columbia Gorge walls carved, Channeled Scablands fully active. Pacific sediment plume visible 500km offshore.", width: 3.6, coords: [
         [-117.4, 47.8], [-117.8, 47.4], [-118.2, 47.0], [-118.7, 46.6],
         [-119.1, 46.2], [-119.3, 45.9], [-119.7, 45.7], [-120.2, 45.7],
         [-120.8, 45.7], [-121.3, 45.7], [-121.7, 45.7], [-122.0, 45.6],
         [-122.3, 45.6], [-122.7, 45.5], [-123.1, 46.1], [-123.9, 46.2],
       ]},
-      { name: "Channeled Scablands", flow_km3: 18000, dissipation: "Full Scabland flood — Moses Coulee, Grand Coulee, Cheney-Palouse tract all active. Coulees carved in days.", width: 1.4, coords: [
+      { name: "Channeled Scablands", flow_km3: 18000, dissipation: "Full Scabland flood — Moses Coulee, Grand Coulee, Cheney-Palouse tract all active. Coulees carved in days.", width: 2.8, coords: [
         [-117.5, 48.2], [-117.9, 47.7], [-118.3, 47.2], [-118.7, 46.8],
         [-119.0, 46.5], [-119.1, 46.2],
       ]},
-      { name: "Willamette Backflood", flow_km3: 5800, dissipation: "Lake Allison at maximum — Willamette Valley inundated to ~120m. Portland area under 30m of water.", width: 1.2, coords: [
+      { name: "Willamette Backflood", flow_km3: 5800, dissipation: "Lake Allison at maximum — Willamette Valley inundated to ~120m. Portland area under 30m of water.", width: 2.4, coords: [
         [-122.7, 45.5], [-123.0, 45.1], [-123.1, 44.6],
         [-123.1, 44.1], [-122.9, 43.8], [-122.6, 43.4],
       ]},
       // Missouri at maximum
-      { name: "Missouri River Sheet", flow_km3: 28000, dissipation: "Missouri at peak — overbank flooding across Great Plains 50-100km wide. Kansas City and St Louis under 15-40m.", width: 1.6, coords: [
+      { name: "Missouri River Sheet", flow_km3: 28000, dissipation: "Missouri at peak — overbank flooding across Great Plains 50-100km wide. Kansas City and St Louis under 15-40m.", width: 3.2, coords: [
         [-112.5, 47.5], [-110.5, 47.8], [-107.0, 47.8],
         [-104.0, 47.1], [-100.4, 46.9], [-97.4, 46.9],
         [-96.5, 46.0], [-98.0, 44.5], [-99.3, 43.5],
@@ -245,13 +257,13 @@ const YDI_FLOOD_CORRIDORS = {
         [-95.5, 39.9], [-94.6, 39.1], [-92.5, 38.8], [-91.7, 38.8],
       ]},
       // Great Plains sheet flow
-      { name: "Great Plains Inundation", flow_km3: 16000, dissipation: "Overland sheet flow across flat Great Plains — no confining valley. Broad shallow flood 2-15m deep covering thousands of km².", width: 2.0, coords: [
+      { name: "Great Plains Inundation", flow_km3: 16000, dissipation: "Overland sheet flow across flat Great Plains — no confining valley. Broad shallow flood 2-15m deep covering thousands of km².", width: 4.0, coords: [
         [-100.0, 49.0], [-100.5, 47.5], [-100.0, 46.0],
         [-99.5, 44.5], [-99.0, 43.0], [-98.5, 41.5],
         [-98.0, 40.0], [-97.5, 38.5], [-97.0, 37.0],
       ]},
       // Mississippi at full capacity
-      { name: "Lower Mississippi / Gulf", flow_km3: 42000, dissipation: "Peak combined discharge — all N American drainages converging. Gulf of Mexico freshwater lid killed marine life for centuries. Primary AMOC shutdown mechanism.", width: 2.0, coords: [
+      { name: "Lower Mississippi / Gulf", flow_km3: 42000, dissipation: "Peak combined discharge — all N American drainages converging. Gulf of Mexico freshwater lid killed marine life for centuries. Primary AMOC shutdown mechanism.", width: 4.0, coords: [
         [-93.1, 44.9], [-91.5, 43.5], [-90.6, 41.6],
         [-90.0, 39.5], [-89.6, 38.5], [-89.1, 37.1],
         [-89.5, 36.0], [-90.4, 34.2], [-91.1, 33.2],
@@ -259,29 +271,62 @@ const YDI_FLOOD_CORRIDORS = {
         [-88.8, 30.0],
       ]},
       // Ohio
-      { name: "Ohio River Overflow", flow_km3: 7800, dissipation: "Ohio valley at maximum — Cincinnati under 25m. Joins Mississippi adding massive discharge pulse.", width: 1.0, coords: [
+      { name: "Ohio River Overflow", flow_km3: 7800, dissipation: "Ohio valley at maximum — Cincinnati under 25m. Joins Mississippi adding massive discharge pulse.", width: 2.0, coords: [
         [-80.5, 40.6], [-82.9, 40.4], [-84.2, 39.1],
         [-86.8, 37.9], [-88.1, 37.2], [-89.1, 37.1],
       ]},
       // Missouri → Mississippi confluence
-      { name: "Missouri-Mississippi Confluence", flow_km3: 8500, dissipation: "Missouri meets Mississippi at St Louis — combined 500,000 m³/s overwhelms valley 150km wide.", width: 1.2, coords: [
+      { name: "Missouri-Mississippi Confluence", flow_km3: 8500, dissipation: "Missouri meets Mississippi at St Louis — combined 500,000 m³/s overwhelms valley 150km wide.", width: 2.4, coords: [
         [-91.7, 38.8], [-91.4, 38.5], [-91.1, 38.2],
         [-90.8, 37.9], [-90.4, 37.5], [-89.9, 37.2], [-89.1, 37.1],
       ]},
       // Appalachian overflow — Ohio east to Atlantic
-      { name: "Appalachian Overflow", flow_km3: 4500, dissipation: "Proglacial lakes overflow Appalachian gaps — Susquehanna, Potomac, Delaware all at maximum flood stage.", width: 0.9, coords: [
+      { name: "Appalachian Overflow", flow_km3: 4500, dissipation: "Proglacial lakes overflow Appalachian gaps — Susquehanna, Potomac, Delaware all at maximum flood stage.", width: 1.8, coords: [
         [-80.5, 40.6], [-79.5, 40.3], [-78.5, 40.1],
         [-77.5, 40.2], [-77.0, 39.9], [-76.5, 39.6],
         [-76.0, 39.2], [-75.7, 38.8], [-75.3, 38.4],
       ]},
+      // Finger Lakes → Chemung / Susquehanna drainage — westernmost channels
+      { name: "Chemung River Outflow", flow_km3: 1800, dissipation: "Seneca and Chemung lake overflow drains south through Chemung valley into Susquehanna.", width: 1.4, coords: [
+        [-76.9, 42.9], [-76.9, 42.4], [-77.0, 42.0],
+        [-76.9, 41.5], [-76.8, 41.0], [-76.5, 40.5], [-76.3, 40.0],
+      ]},
+      // Cayuga / Seneca outlet south
+      { name: "Cayuga Outlet", flow_km3: 1600, dissipation: "Cayuga Lake overflow — drains south through valleys carved by retreating ice margin.", width: 1.3, coords: [
+        [-76.5, 42.8], [-76.4, 42.3], [-76.3, 41.8],
+        [-76.2, 41.3], [-76.0, 40.8], [-75.8, 40.2],
+      ]},
+      // Oneida / Mohawk corridor south
+      { name: "Mohawk-Susquehanna", flow_km3: 2200, dissipation: "Mohawk valley overflow cuts south through Catskill gaps into Susquehanna — massive proglacial lake drainage.", width: 1.5, coords: [
+        [-75.5, 43.1], [-75.3, 42.6], [-75.1, 42.1],
+        [-75.0, 41.6], [-75.0, 41.1], [-74.9, 40.7], [-74.8, 40.2],
+      ]},
+      // Delaware River corridor
+      { name: "Delaware Outflow", flow_km3: 1900, dissipation: "Delaware River at maximum — Philadelphia region under 15-25m. Drains to Delaware Bay and Atlantic.", width: 1.4, coords: [
+        [-74.8, 42.5], [-74.9, 42.0], [-75.0, 41.5],
+        [-75.1, 41.0], [-75.1, 40.5], [-74.9, 40.0],
+        [-75.1, 39.7], [-75.2, 39.3], [-75.4, 39.0],
+      ]},
+      // Hudson River — direct Atlantic outlet
+      { name: "Hudson River Megaflood", flow_km3: 3200, dissipation: "Hudson at 50x modern discharge — New York Harbor under 40m. Continental shelf exposed by glacial low stand now reflooding from both directions.", width: 1.7, coords: [
+        [-73.9, 43.8], [-73.9, 43.3], [-73.9, 42.8],
+        [-73.9, 42.2], [-73.9, 41.7], [-74.0, 41.2],
+        [-74.0, 40.7], [-74.1, 40.5], [-74.0, 40.2],
+      ]},
+      // Connecticut / Rhode Island coastal flooding
+      { name: "New England Coast", flow_km3: 1400, dissipation: "Coastal flooding from Atlantic sea level rise + proglacial lake drainage. Long Island Sound fully inundated.", width: 1.2, coords: [
+        [-73.5, 41.5], [-72.8, 41.4], [-72.0, 41.4],
+        [-71.5, 41.5], [-71.0, 41.6], [-70.5, 41.8],
+        [-70.0, 42.0], [-69.8, 41.7],
+      ]},
       // Chicago outlet — Lake Michigan → Illinois → Mississippi
-      { name: "Chicago Outlet", flow_km3: 5200, dissipation: "Lake Michigan overflows Chicago outlet into Illinois River — ancient glacial drainage route, reactivated.", width: 1.0, coords: [
+      { name: "Chicago Outlet", flow_km3: 5200, dissipation: "Lake Michigan overflows Chicago outlet into Illinois River — ancient glacial drainage route, reactivated.", width: 2.0, coords: [
         [-87.8, 41.8], [-88.0, 41.4], [-88.5, 41.0],
         [-89.0, 40.5], [-89.5, 40.0], [-90.0, 39.4],
         [-90.4, 38.8], [-90.5, 38.2], [-89.8, 37.2],
       ]},
       // Great Lakes + Agassiz full flood
-      { name: "Lake Agassiz Overflow", flow_km3: 24000, dissipation: "Catastrophic Lake Agassiz outburst — largest lake in N American history. Eastern outlet flooded St Lawrence, Arctic outlet flooded Mackenzie. AMOC shutdown within decades.", width: 1.8, coords: [
+      { name: "Lake Agassiz Overflow", flow_km3: 24000, dissipation: "Catastrophic Lake Agassiz outburst — largest lake in N American history. Eastern outlet flooded St Lawrence, Arctic outlet flooded Mackenzie. AMOC shutdown within decades.", width: 3.6, coords: [
         [-99.0, 52.0], [-97.0, 50.5], [-96.5, 49.5],
         [-96.8, 48.5], [-96.8, 47.5], [-96.5, 46.5],
         [-96.8, 46.0], [-93.0, 46.5], [-90.0, 46.0],
@@ -290,8 +335,15 @@ const YDI_FLOOD_CORRIDORS = {
         [-82.0, 42.5], [-81.0, 42.8], [-80.0, 43.0],
         [-79.5, 43.3], [-79.1, 43.9], [-77.5, 44.1],
       ]},
+      // Finger Lakes megaflood — all lakes overflow simultaneously
+      { name: "Finger Lakes Megaflood", flow_km3: 5800, dissipation: "All 11 Finger Lakes overflow simultaneously — Mohawk corridor 80m deep. Hudson canyon fully inundated to Manhattan.", width: 2.0, coords: [
+        [-77.3, 42.5], [-77.0, 42.6], [-76.5, 42.8], [-76.0, 43.0],
+        [-75.4, 43.1], [-74.7, 43.0], [-74.2, 42.9], [-73.7, 42.7],
+        [-73.7, 42.2], [-73.8, 41.5], [-73.9, 41.0], [-74.0, 40.7],
+        [-74.0, 40.5], [-74.0, 40.3],
+      ]},
       // St Lawrence at maximum
-      { name: "St Lawrence / Atlantic", flow_km3: 28000, dissipation: "Maximum Atlantic freshwater injection — Lake Agassiz + Great Lakes combined. Salinity drop of 3-5ppt across N Atlantic. Younger Dryas onset within 1-3 years of peak discharge.", width: 1.6, coords: [
+      { name: "St Lawrence / Atlantic", flow_km3: 28000, dissipation: "Maximum Atlantic freshwater injection — Lake Agassiz + Great Lakes combined. Salinity drop of 3-5ppt across N Atlantic. Younger Dryas onset within 1-3 years of peak discharge.", width: 3.2, coords: [
         [-79.1, 43.3], [-77.5, 43.0], [-76.0, 43.2], [-75.0, 43.6],
         [-74.3, 44.5], [-73.8, 45.5], [-73.5, 46.5],
         [-72.5, 46.8], [-71.2, 46.8], [-69.5, 47.4],
@@ -299,18 +351,18 @@ const YDI_FLOOD_CORRIDORS = {
         [-62.5, 48.5], [-61.5, 47.3],
       ]},
       // Mackenzie at maximum
-      { name: "Mackenzie Arctic Outlet", flow_km3: 14000, dissipation: "Lake Agassiz northern spillway — Beaufort Sea freshwater spike. Arctic sea ice formation disrupted for centuries.", width: 1.4, coords: [
+      { name: "Mackenzie Arctic Outlet", flow_km3: 14000, dissipation: "Lake Agassiz northern spillway — Beaufort Sea freshwater spike. Arctic sea ice formation disrupted for centuries.", width: 2.8, coords: [
         [-113.5, 56.0], [-117.0, 58.5], [-120.5, 61.5],
         [-122.5, 63.5], [-126.0, 65.0], [-128.5, 67.0],
         [-132.0, 68.5], [-134.5, 69.2],
       ]},
       // Hudson Bay drainage
-      { name: "Hudson Bay Outlet", flow_km3: 9500, dissipation: "Laurentide ice margin retreat opened Hudson Bay — massive meltwater pulse to Labrador Sea and N Atlantic.", width: 1.3, coords: [
+      { name: "Hudson Bay Outlet", flow_km3: 9500, dissipation: "Laurentide ice margin retreat opened Hudson Bay — massive meltwater pulse to Labrador Sea and N Atlantic.", width: 2.6, coords: [
         [-85.0, 56.0], [-83.5, 58.0], [-82.5, 60.0],
         [-82.0, 62.0], [-82.5, 64.0], [-83.0, 66.0],
       ]},
       // Atlantic coastal flooding
-      { name: "Atlantic Seaboard", flow_km3: 4200, dissipation: "Coastal inundation from sea level rise + storm surge amplification. Continental shelf exposed during glacial low stand now reflooding.", width: 1.2, coords: [
+      { name: "Atlantic Seaboard", flow_km3: 4200, dissipation: "Coastal inundation from sea level rise + storm surge amplification. Continental shelf exposed during glacial low stand now reflooding.", width: 2.4, coords: [
         [-75.5, 35.5], [-75.2, 37.0], [-74.8, 38.5],
         [-74.2, 40.0], [-73.8, 41.5], [-72.5, 42.5],
         [-71.0, 43.5], [-70.0, 44.5], [-68.0, 46.5],
