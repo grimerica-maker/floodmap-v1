@@ -899,7 +899,6 @@ export default function HomePage() {
 
   const drawLandImpactFromResult = (lng, lat, result, idx = null) => {
     const map = mapRef.current;
-    console.log("[drawLandImpact] idx=", idx, "lng=", lng, "lat=", lat);
     if (!map || !result) return;
     const craterKm = Number(result.crater_diameter_m ?? 0) / 2000;
     const blastKm = Number(result.blast_radius_m ?? 0) / 1000;
@@ -933,9 +932,7 @@ export default function HomePage() {
         });
         try { if (map.getSource(srcId)) map.removeSource(srcId); } catch(e){}
       }
-      console.log("[drawLandImpact] adding source", srcId, "exists?", !!map.getSource(srcId));
       map.addSource(srcId, { type: "geojson", data });
-      console.log("[drawLandImpact] source added OK, adding layers for idx=", idx);
       map.addLayer({ id: thId,   type: "fill", source: srcId, filter: ["==", ["get", "kind"], "thermal"],    paint: { "fill-color": "#f97316", "fill-opacity": 0.15 } });
       map.addLayer({ id: thLId,  type: "line", source: srcId, filter: ["==", ["get", "kind"], "thermal"],    paint: { "line-color": "#f97316", "line-width": 2, "line-opacity": 0.9 } });
       map.addLayer({ id: blFId,  type: "fill", source: srcId, filter: ["==", ["get", "kind"], "blast-fill"], paint: { "fill-color": "#ef4444", "fill-opacity": 0.25 } });
@@ -946,10 +943,9 @@ export default function HomePage() {
       map.addLayer({ id: crId,   type: "fill", source: srcId, filter: ["==", ["get", "kind"], "crater"],     paint: { "fill-color": "#000000", "fill-opacity": 0.90 } });
       map.addLayer({ id: crInId, type: "fill", source: srcId, filter: ["==", ["get", "kind"], "crater-inner"], paint: { "fill-color": "#000000", "fill-opacity": 0.70 } });
       map.addLayer({ id: pulId,  type: "line", source: srcId, filter: ["==", ["get", "kind"], "crater-rim"], paint: { "line-color": "#fde047", "line-width": 3, "line-opacity": 0.95 } });
-      console.log("[drawLandImpact] all layers added OK for idx=", idx);
       safely(() => map.triggerRepaint());
       startImpactPulseAnimation();
-    } catch (e) { console.error("Failed to draw land impact result idx=", idx, e.message, e); }
+    } catch (e) { console.error("Failed to draw land impact result", e); }
   };
 
   const drawOceanImpactMarker = (lng, lat, idx = null) => {
@@ -2636,16 +2632,14 @@ export default function HomePage() {
   useEffect(() => {
     if (!mapRef.current || !mapRef.current.isStyleLoaded()) return;
     if (scenarioMode !== "impact" || !impactResult) return;
-    console.log("[impact useEffect] _count=", impactResult._count, "is_ocean=", impactResult.is_ocean_impact);
     // Multi-impact: results are drawn inside runImpact, don't redraw here
-    if (impactResult._count > 1) { console.log("[impact useEffect] skipping multi-impact redraw"); return; }
+    if (impactResult._count > 1) return;
     if (!impactPointRef.current) return;
     if (impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0) {
       drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
       setTimeout(() => { applyOceanImpactFlood(impactResult, impactPointRef.current.lng, impactPointRef.current.lat); }, 50);
       return;
     }
-    console.log("[impact useEffect] drawing single land impact");
     drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, impactResult);
   }, [impactResult, scenarioMode]);
 
