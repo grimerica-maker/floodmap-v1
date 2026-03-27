@@ -107,14 +107,15 @@ const YDI_FLOOD_CORRIDORS = {
     features: [
       // Columbia River Gorge — real channel through Cascade Mountains
       { name: "Columbia River Gorge", flow_km3: 8400, dissipation: "Drains west through Cascades to Pacific — Columbia Bar discharge ~180,000 m³/s peak", width: 0.6, coords: [
-        [-117.0, 46.0], [-118.5, 46.2], [-119.5, 46.3], [-120.5, 46.6],
-        [-121.0, 45.7], [-121.7, 45.7], [-122.3, 45.6], [-123.1, 46.1],
-        [-123.9, 46.2],
+        [-117.4, 47.7], [-118.0, 47.2], [-118.5, 46.8], [-119.0, 46.4],
+        [-119.1, 46.2], [-119.3, 45.9], [-119.7, 45.7], [-120.2, 45.7],
+        [-120.7, 45.7], [-121.2, 45.7], [-121.5, 45.7], [-121.9, 45.6],
+        [-122.3, 45.6], [-122.7, 45.5], [-123.1, 46.1], [-123.8, 46.2],
       ]},
       // Channeled Scablands — real flood channels across eastern Washington
       { name: "Channeled Scablands", flow_km3: 12000, dissipation: "Multiple simultaneous flood channels carved through basalt — converges on Columbia River at Pasco Basin", width: 0.7, coords: [
-        [-117.5, 47.8], [-118.0, 47.3], [-118.8, 47.0], [-119.3, 46.8],
-        [-119.0, 46.5], [-119.5, 46.3], [-118.5, 46.2], [-117.0, 46.0],
+        [-117.5, 47.8], [-117.8, 47.4], [-118.2, 47.0], [-118.6, 46.7],
+        [-118.9, 46.4], [-119.1, 46.2],
       ]},
       // Mississippi River — follows actual river course
       { name: "Upper Mississippi", flow_km3: 9200, dissipation: "Flows south along existing Mississippi valley — peak discharge ~150,000 m³/s, dissipates into Gulf of Mexico", width: 0.9, coords: [
@@ -140,9 +141,10 @@ const YDI_FLOOD_CORRIDORS = {
     features: [
       // Columbia system wider
       { name: "Columbia River System", flow_km3: 18000, dissipation: "Catastrophic flood pulse through Columbia Gorge — estimated 40x modern peak discharge. Pacific plume extended 300km offshore.", width: 1.3, coords: [
-        [-117.0, 47.0], [-117.5, 46.8], [-118.8, 47.0], [-119.3, 46.8],
-        [-119.5, 46.3], [-120.5, 46.6], [-121.0, 45.7], [-121.7, 45.7],
-        [-122.3, 45.6], [-123.1, 46.1], [-123.9, 46.2],
+        [-117.4, 47.7], [-117.8, 47.3], [-118.3, 46.9], [-118.8, 46.5],
+        [-119.1, 46.2], [-119.3, 45.9], [-119.7, 45.7], [-120.2, 45.7],
+        [-120.8, 45.7], [-121.3, 45.7], [-121.7, 45.7], [-122.0, 45.6],
+        [-122.3, 45.6], [-122.7, 45.5], [-123.1, 46.1], [-123.9, 46.2],
       ]},
       // Willamette Valley backflood — real Lake Allison extent
       { name: "Willamette Backflood", flow_km3: 3200, dissipation: "Columbia backflood into Willamette Valley — ancient Lake Allison. Water ponded to ~120m elevation before draining south.", width: 0.8, coords: [
@@ -221,13 +223,14 @@ const YDI_FLOOD_CORRIDORS = {
     features: [
       // Columbia — catastrophic
       { name: "Columbia River System", flow_km3: 32000, dissipation: "Maximum Missoula-scale discharge — Columbia Gorge walls carved, Channeled Scablands fully active. Pacific sediment plume visible 500km offshore.", width: 1.8, coords: [
-        [-117.0, 47.5], [-117.5, 47.0], [-118.8, 47.0], [-119.3, 46.8],
-        [-119.5, 46.3], [-120.5, 46.6], [-121.0, 45.7], [-121.7, 45.7],
-        [-122.3, 45.6], [-123.1, 46.1], [-123.9, 46.2],
+        [-117.4, 47.8], [-117.8, 47.4], [-118.2, 47.0], [-118.7, 46.6],
+        [-119.1, 46.2], [-119.3, 45.9], [-119.7, 45.7], [-120.2, 45.7],
+        [-120.8, 45.7], [-121.3, 45.7], [-121.7, 45.7], [-122.0, 45.6],
+        [-122.3, 45.6], [-122.7, 45.5], [-123.1, 46.1], [-123.9, 46.2],
       ]},
       { name: "Channeled Scablands", flow_km3: 18000, dissipation: "Full Scabland flood — Moses Coulee, Grand Coulee, Cheney-Palouse tract all active. Coulees carved in days.", width: 1.4, coords: [
-        [-118.5, 48.2], [-118.8, 47.6], [-119.3, 47.2], [-119.8, 46.9],
-        [-119.0, 46.5], [-119.5, 46.3], [-118.5, 46.2], [-117.0, 46.0],
+        [-117.5, 48.2], [-117.9, 47.7], [-118.3, 47.2], [-118.7, 46.8],
+        [-119.0, 46.5], [-119.1, 46.2],
       ]},
       { name: "Willamette Backflood", flow_km3: 5800, dissipation: "Lake Allison at maximum — Willamette Valley inundated to ~120m. Portland area under 30m of water.", width: 1.2, coords: [
         [-122.7, 45.5], [-123.0, 45.1], [-123.1, 44.6],
