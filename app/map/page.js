@@ -787,6 +787,8 @@ export default function HomePage() {
         `${IMPACT_CRATER_LAYER_ID}-ejecta-${i}`, `${IMPACT_CRATER_LAYER_ID}-ejecta-line-${i}`,
         `${IMPACT_CRATER_LAYER_ID}-rim-${i}`, `${IMPACT_CRATER_LAYER_ID}-${i}`,
         `${IMPACT_CRATER_LAYER_ID}-inner-${i}`, `${IMPACT_CRATER_LAYER_ID}-pulse-${i}`,
+        // Ocean marker layers (distinct prefix to avoid land layer collisions)
+        `impact-ocean-marker-${i}`, `impact-ocean-marker-pulse-${i}`,
       );
     }
     try {
@@ -795,6 +797,8 @@ export default function HomePage() {
       for (let i = 0; i < 3; i++) {
         const srcId = `${IMPACT_PREVIEW_SOURCE_ID}-${i}`;
         try { if (map.getSource(srcId)) map.removeSource(srcId); } catch(e){}
+        // Ocean marker sources
+        try { if (map.getSource(`impact-ocean-source-${i}`)) map.removeSource(`impact-ocean-source-${i}`); } catch(e){}
       }
     } catch (e) { console.warn("Failed clearing impact preview layers:", e); }
   };
@@ -948,13 +952,12 @@ export default function HomePage() {
   const drawOceanImpactMarker = (lng, lat, idx = null) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return false;
-    // Use indexed IDs when idx is provided so multiple ocean impacts don't overwrite each other
-    const srcId  = idx != null ? `${IMPACT_PREVIEW_SOURCE_ID}-${idx}` : IMPACT_PREVIEW_SOURCE_ID;
-    const crId   = idx != null ? `${IMPACT_CRATER_LAYER_ID}-${idx}`   : IMPACT_CRATER_LAYER_ID;
-    const pulId  = idx != null ? `${IMPACT_CRATER_LAYER_ID}-pulse-${idx}` : `${IMPACT_CRATER_LAYER_ID}-pulse`;
+    // Use a distinct "ocean-marker" prefix so these IDs never collide with land impact layer IDs
+    const srcId  = idx != null ? `impact-ocean-source-${idx}`       : IMPACT_PREVIEW_SOURCE_ID;
+    const crId   = idx != null ? `impact-ocean-marker-${idx}`       : IMPACT_CRATER_LAYER_ID;
+    const pulId  = idx != null ? `impact-ocean-marker-pulse-${idx}` : `${IMPACT_CRATER_LAYER_ID}-pulse`;
     try {
       if (idx != null) {
-        // Clean up just this indexed pair
         [crId, pulId].forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
         try { if (map.getSource(srcId)) map.removeSource(srcId); } catch(e){}
       } else {
