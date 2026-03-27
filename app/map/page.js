@@ -2157,6 +2157,8 @@ export default function HomePage() {
 
     }, 5500);
   };
+
+  const drawIceSheets = (map) => {
     const features = ICE_SHEET_ZONES.map((z, i) => ({
       ...buildAshEllipse(z.center[0], z.center[1], z.major_km, z.minor_km, z.bearing),
       properties: { name: z.name, color: z.color, idx: i },
@@ -3688,7 +3690,7 @@ export default function HomePage() {
             <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>~12,900 BP · Laurentide collapse · Columbia Scablands</div>
           </button>
           {cataclysmModel !== "ydi" && (
-            <>
+            <div>
               <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12, fontStyle: "italic", lineHeight: 1.5 }}>
                 {cataclysmModel === "davidson"
                   ? "~90° crustal displacement. New pole: Bay of Bengal. Americas flood 500-800m. Himalayas become new polar region."
@@ -3697,10 +3699,10 @@ export default function HomePage() {
               <div style={{ fontSize: 11, color: "#475569", marginBottom: 10, lineHeight: 1.4 }}>
                 ⚠ Theoretical model. Globe rotates to show displacement, then flood tiles render.
               </div>
-            </>
+            </div>
           )}
           {cataclysmModel === "ydi" && (
-            <>
+            <div>
               <div style={{ fontSize: 11, color: "#38bdf8", marginBottom: 8, lineHeight: 1.5 }}>
                 Laurentide ice sheet collapse drains through Columbia River Scablands, Mississippi basin, and St. Lawrence outlet simultaneously. Flood tiles computed from real terrain elevation data.
               </div>
@@ -3722,7 +3724,7 @@ export default function HomePage() {
               <div style={{ fontSize: 10, color: "#475569", marginBottom: 12, fontStyle: "italic" }}>
                 Controls flood extent and basin fill. Not a physical water volume.
               </div>
-            </>
+            </div>
           )}
 
           {cataclysmActive && (
