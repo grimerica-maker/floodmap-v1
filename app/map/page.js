@@ -1871,6 +1871,9 @@ export default function HomePage() {
     popup.setLngLat([lng, lat]).setHTML(content).addTo(map);
     nukeZonePopupRef.current = popup;
   };
+
+  // Wind kill zone data — centered on max displacement point and new equator midpoint
+  const CATACLYSM_WIND = {
     davidson: {
       // Center 1: Max rotational velocity — mid-latitude for ellipse appearance
       center1: [-90, -35],
