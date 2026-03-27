@@ -2893,7 +2893,7 @@ export default function HomePage() {
               style={{ flex: 1, padding: "10px 8px", minHeight: 44, background: nukeSubMode === "detonate" ? "#7c3aed" : "#111827", color: nukeSubMode === "detonate" ? "white" : "#94a3b8", border: nukeSubMode === "detonate" ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 13 }}>
               ☢️ Detonation
             </button>
-            <button onClick={() => { setNukeSubMode("emp"); nukeSubModeRef.current = "emp"; setNukeResult(null); }}
+            <button onClick={() => { setNukeSubMode("emp"); nukeSubModeRef.current = "emp"; setNukeResult(null); setNukeYield(475); }}
               style={{ flex: 1, padding: "10px 8px", minHeight: 44, background: nukeSubMode === "emp" ? "#7c3aed" : "#111827", color: nukeSubMode === "emp" ? "white" : "#94a3b8", border: nukeSubMode === "emp" ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 13 }}>
               ⚡ Strategic EMP
             </button>
@@ -2915,20 +2915,45 @@ export default function HomePage() {
           )}
 
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Yield</div>
-          <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"} style={{ marginBottom: 12 }}>
-            {NUKE_PRESETS.map((p) => (
-              <button key={p.label} onClick={() => setNukeYield(p.yield_kt)}
-                style={{ padding: "10px 8px", minHeight: 48, border: "1px solid #d1d5db", background: nukeYield === p.yield_kt ? "#7c3aed" : "white", color: nukeYield === p.yield_kt ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700, whiteSpace: "nowrap", fontSize: 13 }}>
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <input type="range" min="0.001" max="50000" step="1" value={nukeYield}
-            onChange={(e) => setNukeYield(Number(e.target.value))}
-            style={{ width: "100%", marginBottom: 6, cursor: "pointer" }} />
-          <div style={{ fontSize: 13, marginBottom: 12, color: "#64748b" }}>
-            Yield: <b>{nukeYield >= 1000 ? (nukeYield/1000).toFixed(2)+" Mt" : nukeYield+" kt"}</b>
-          </div>
+          {nukeSubMode === "emp" ? (
+            // EMP mode — presets only, no slider (yield affects E1 intensity, not footprint size)
+            <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8 }}>Yield affects E1 pulse intensity — what electronics survive.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+              {[
+                { label: "Hiroshima · 15kt", e1: "~5 kV/m", effect: "Disrupts phones, computers, consumer electronics", yield_kt: 15 },
+                { label: "W76 · 100kt",      e1: "~13 kV/m", effect: "Damages vehicle electronics, grid control systems", yield_kt: 100 },
+                { label: "W88 · 475kt",      e1: "~29 kV/m", effect: "Destroys civilian infrastructure, unhardened military", yield_kt: 475 },
+                { label: "B83 · 1.2Mt",      e1: "~46 kV/m", effect: "Damages lightly hardened military systems", yield_kt: 1200 },
+                { label: "Tsar Bomba · 50Mt", e1: "~200 kV/m", effect: "Destroys hardened systems, Faraday-caged equipment", yield_kt: 50000 },
+              ].map((p) => (
+                <button key={p.label} onClick={() => setNukeYield(p.yield_kt)}
+                  style={{ padding: "9px 12px", background: nukeYield === p.yield_kt ? "#1e0a3c" : "#0f0a2a", border: nukeYield === p.yield_kt ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 8, textAlign: "left", width: "100%" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+                    <span style={{ fontWeight: 700, fontSize: 12, color: nukeYield === p.yield_kt ? "#c4b5fd" : "#94a3b8" }}>{p.label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#7c3aed" }}>{p.e1}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#475569" }}>{p.effect}</div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"} style={{ marginBottom: 12 }}>
+                {NUKE_PRESETS.map((p) => (
+                  <button key={p.label} onClick={() => setNukeYield(p.yield_kt)}
+                    style={{ padding: "10px 8px", minHeight: 48, border: "1px solid #d1d5db", background: nukeYield === p.yield_kt ? "#7c3aed" : "white", color: nukeYield === p.yield_kt ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700, whiteSpace: "nowrap", fontSize: 13 }}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <input type="range" min="0.001" max="50000" step="1" value={nukeYield}
+                onChange={(e) => setNukeYield(Number(e.target.value))}
+                style={{ width: "100%", marginBottom: 6, cursor: "pointer" }} />
+              <div style={{ fontSize: 13, marginBottom: 12, color: "#64748b" }}>
+                Yield: <b>{nukeYield >= 1000 ? (nukeYield/1000).toFixed(2)+" Mt" : nukeYield+" kt"}</b>
+              </div>
+            </>
+          )}
 
           {nukeSubMode === "detonate" && (<>
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Burst Type</div>
