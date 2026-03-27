@@ -2957,21 +2957,16 @@ export default function HomePage() {
           const newBearing = startBearing + bearingDelta * eased;
           if (flipLastT !== null) flipLng -= (now - flipLastT) * 0.018;
           flipLastT = now;
-          // Gradually shift spin center lat toward new pole lat as flip progresses
-          const centerLat = startLat + (info.newPoleLat - startLat) * eased;
-          safely(() => map.jumpTo({ bearing: newBearing, center: [flipLng, centerLat] }));
+          // Gradually shift center lat AND lng toward snap point as flip progresses
+          // This prevents a jump when easeTo fires at flip completion
+          const centerLat = startLat + (info.snapLat - startLat) * eased;
+          const centerLng = flipLng + (info.snapLng - flipLng) * eased * 0.6;
+          safely(() => map.jumpTo({ bearing: newBearing, center: [centerLng, centerLat] }));
           if (progress < 1) {
             cataclysmSpinRef.current = requestAnimationFrame(flipLoop);
           } else {
             cataclysmSpinRef.current = null;
-            // Flip done — smooth flyTo new pole centered at top
-            safely(() => map.easeTo({
-              center: [info.snapLng, info.snapLat],
-              bearing: targetBearing,
-              zoom: _catZoom,
-              duration: 1800,
-              easing: t => t < 0.5 ? 2*t*t : -1+(4-2*t)*t,
-            }));
+            // Flip done — just stop, no snap
           }
         };
         cataclysmSpinRef.current = requestAnimationFrame(flipLoop);
