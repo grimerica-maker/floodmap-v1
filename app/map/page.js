@@ -2916,7 +2916,7 @@ export default function HomePage() {
     }, 300);
 
     // Step 2: Natural Earth rotation — longitude moves W→E via setCenter
-    let spinLng = (model === "tes") ? 31 : map.getCenter().lng;
+    let spinLng = (model === "tes") ? 31 : 0; // force Davidson to start from Greenwich for consistent flip
     let lastT = null;
     const spin = (t) => {
       if (lastT !== null) {
@@ -2928,6 +2928,8 @@ export default function HomePage() {
     };
     setTimeout(() => {
       if (cataclysmRunRef.current !== thisRun) return;
+      // Force known start position so flip is consistent regardless of previous state
+      safely(() => map.jumpTo({ center: [spinLng, 20], bearing: 0, pitch: 0 }));
       setStatus(`☄️ ${info.name} — crustal displacement initiating…`);
       cataclysmSpinRef.current = requestAnimationFrame(spin);
     }, 1600);
@@ -3023,13 +3025,13 @@ export default function HomePage() {
       // Interaction already handled below with currentTier check
       // Post-flip: same left-to-right longitude spin as before
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-      // Free: allow pan but lock zoom — can explore but not zoom in
+      // Free: full zoom + pan — paywall after 30s
       if ((proTierRef.current ?? proTier ?? "free") === "free") {
         safely(() => {
           map.dragPan.enable();
-          map.scrollZoom.disable();
-          map.doubleClickZoom.disable();
-          map.touchZoomRotate.disable();
+          map.scrollZoom.enable();
+          map.doubleClickZoom.enable();
+          map.touchZoomRotate.enable();
         });
       }
       // Post-flip spin — bearing decrements (right to left) around centered new pole
@@ -3052,6 +3054,10 @@ export default function HomePage() {
         });
       } else {
         safely(() => {
+          map.dragPan.enable();
+          map.scrollZoom.enable();
+          map.doubleClickZoom.enable();
+          map.touchZoomRotate.enable();
           map.dragRotate.enable();
           map.setMaxBounds(null);
         });
