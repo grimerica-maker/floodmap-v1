@@ -466,6 +466,11 @@ export default function HomePage() {
   const yellowstonePopupRef = useRef(null);
   const [nukeBurst, setNukeBurst] = useState("airburst");
   const [nukeWindDeg, setNukeWindDeg] = useState(270);
+  const [nukeSubMode, setNukeSubMode] = useState("detonate"); // "detonate" | "emp"
+  const nukeSubModeRef = useRef("detonate");
+  const [empAltitudeKm, setEmpAltitudeKm] = useState(400);
+  const [empResult, setEmpResult] = useState(null);
+  const [empLoading, setEmpLoading] = useState(false);
   const [nukeResult, setNukeResult] = useState(null);
   const [nukeLoading, setNukeLoading] = useState(false);
   const [nukeError, setNukeError] = useState("");
@@ -1064,6 +1069,39 @@ export default function HomePage() {
     }
   };
 
+  const runEmp = async () => {
+    if (nukeStrikesRef.current.length === 0) { setStatus("Place EMP detonation point first"); return; }
+    const strike = nukeStrikesRef.current[0]; // EMP uses single point
+    setEmpLoading(true);
+    setEmpResult(null);
+    setStatus("Computing EMP footprint...");
+    try {
+      const res = await fetch(
+        `${floodEngineUrlRef.current}/emp?lat=${strike.lat}&lng=${strike.lng}&yield_kt=${nukeYield.toFixed(3)}&altitude_km=${empAltitudeKm}&_=${Date.now()}`,
+        { cache: "no-store" }
+      );
+      if (!res.ok) throw new Error("EMP request failed");
+      const data = await res.json();
+      setEmpResult(data);
+      // Draw EMP ring on map
+      const map = mapRef.current;
+      if (map && map.isStyleLoaded()) {
+        clearNukeLayers(map);
+        const empKm = data.emp_r_km;
+        const features = [{ ...kmCircle(strike.lng, strike.lat, empKm), properties: { kind: "emp" } }];
+        map.addSource(NUKE_SRC, { type: "geojson", data: { type: "FeatureCollection", features } });
+        map.addLayer({ id: "nuke-emp", type: "fill", source: NUKE_SRC, filter: ["==", ["get", "kind"], "emp"], paint: { "fill-color": "#7c3aed", "fill-opacity": 0.08 } });
+        map.addLayer({ id: "nuke-emp-line", type: "line", source: NUKE_SRC, filter: ["==", ["get", "kind"], "emp"], paint: { "line-color": "#7c3aed", "line-width": 2, "line-opacity": 0.8, "line-dasharray": [6, 3] } });
+        safely(() => map.triggerRepaint());
+      }
+      setStatus(`EMP footprint: ${Math.round(data.emp_r_km).toLocaleString()} km radius · ${(data.population_at_risk/1e6).toFixed(1)}M at risk`);
+    } catch (e) {
+      setStatus("EMP simulation failed");
+    } finally {
+      setEmpLoading(false);
+    }
+  };
+
   const runNuke = async () => {
     if (nukeStrikesRef.current.length === 0) { setStatus("Place at least one strike point first"); return; }
     const rl = checkAndIncrementRL(proTier !== "free");
@@ -1126,7 +1164,6 @@ export default function HomePage() {
       if (data.radiation_r_m > 0) features.push({ ...kmCircle(lng, lat, data.radiation_r_m/1000), properties: { kind: "radiation" } });
       if (data.fallout_major_km > 0) features.push({ ...buildFalloutEllipse(lng, lat, data.fallout_major_km, data.fallout_minor_km, data.fallout_direction_deg), properties: { kind: "fallout" } });
     });
-    const hasEmp = dataArr.some(d => d.emp_r_m > 0);
     const hasRad = dataArr.some(d => d.radiation_r_m > 0);
     const hasFallout = dataArr.some(d => d.fallout_major_km > 0);
     try {
@@ -2151,6 +2188,7 @@ export default function HomePage() {
     setNukePointSet(false);
     setNukeResult(null);
     setNukeError("");
+    setEmpResult(null);
     setStatus("Nuke cleared");
   };
 
@@ -2472,10 +2510,17 @@ export default function HomePage() {
       return;
     }
     if (scenarioMode === "nuke") {
-      setStatus(nukePointSet
-        ? nukeLoading ? "Detonating..." : nukeResult ? `${nukeResult._count > 1 ? nukeResult._count + " strikes" : nukeResult.severity_class === "Extinction scale" ? "Civilization ending" : nukeResult.severity_class} — ${nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"}` : `${nukeStrikes.length} strike${nukeStrikes.length !== 1 ? "s" : ""} placed — detonate`
-        : "Click map to place strike points (up to 5)"
-      );
+      if (nukeSubMode === "emp") {
+        setStatus(nukePointSet
+          ? empLoading ? "Computing EMP footprint..." : empResult ? `EMP footprint: ${Math.round(empResult.emp_r_km).toLocaleString()} km · ${(empResult.population_at_risk/1e6).toFixed(1)}M at risk` : "Place point then Launch EMP"
+          : "Click map to place EMP detonation point"
+        );
+      } else {
+        setStatus(nukePointSet
+          ? nukeLoading ? "Detonating..." : nukeResult ? `${nukeResult._count > 1 ? nukeResult._count + " strikes" : nukeResult.severity_class === "Extinction scale" ? "Civilization ending" : nukeResult.severity_class} — ${nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"}` : `${nukeStrikes.length} strike${nukeStrikes.length !== 1 ? "s" : ""} placed — detonate`
+          : "Click map to place strike points (up to 5)"
+        );
+      }
       return;
     }
     if (viewMode === "globe" && seaLevel === 0) { setStatus("Globe mode"); return; }
@@ -2831,6 +2876,33 @@ export default function HomePage() {
       {/* ── NUKE CONTROLS ── */}
       {scenarioMode === "nuke" && (
         <>
+          {/* Sub-mode toggle */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            <button onClick={() => { setNukeSubMode("detonate"); nukeSubModeRef.current = "detonate"; setEmpResult(null); }}
+              style={{ flex: 1, padding: "10px 8px", minHeight: 44, background: nukeSubMode === "detonate" ? "#7c3aed" : "#111827", color: nukeSubMode === "detonate" ? "white" : "#94a3b8", border: nukeSubMode === "detonate" ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 13 }}>
+              ☢️ Detonation
+            </button>
+            <button onClick={() => { setNukeSubMode("emp"); nukeSubModeRef.current = "emp"; setNukeResult(null); }}
+              style={{ flex: 1, padding: "10px 8px", minHeight: 44, background: nukeSubMode === "emp" ? "#7c3aed" : "#111827", color: nukeSubMode === "emp" ? "white" : "#94a3b8", border: nukeSubMode === "emp" ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 13 }}>
+              ⚡ Strategic EMP
+            </button>
+          </div>
+
+          {nukeSubMode === "emp" && (
+            <div style={{ background: "#0f0a2a", border: "1px solid #4c1d95", borderRadius: 10, padding: "10px 12px", marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8, lineHeight: 1.5 }}>
+                High-altitude detonation (~400km). No blast or thermal at ground level. EMP disables unshielded electronics across the footprint.
+              </div>
+              <div style={{ fontSize: 12, color: "#7c3aed", fontWeight: 700, marginBottom: 6 }}>Burst Altitude: {empAltitudeKm} km</div>
+              <input type="range" min="200" max="600" step="10" value={empAltitudeKm}
+                onChange={e => setEmpAltitudeKm(Number(e.target.value))}
+                style={{ width: "100%", marginBottom: 10, cursor: "pointer" }} />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#475569", marginBottom: 4 }}>
+                <span>200km (regional)</span><span>400km (optimal)</span><span>600km (global)</span>
+              </div>
+            </div>
+          )}
+
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Yield</div>
           <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"} style={{ marginBottom: 12 }}>
             {NUKE_PRESETS.map((p) => (
@@ -3017,9 +3089,12 @@ export default function HomePage() {
           )}
 
           <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-            <button onClick={runNuke} disabled={!nukePointSet || nukeLoading}
-              style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#7c3aed", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15, opacity: !nukePointSet || nukeLoading ? 0.65 : 1 }}>
-              {nukeLoading ? "Detonating..." : `☢️ Detonate${nukeStrikes.length > 1 ? ` (${nukeStrikes.length})` : ""}`}
+            <button onClick={nukeSubMode === "emp" ? runEmp : runNuke}
+              disabled={!nukePointSet || nukeLoading || empLoading}
+              style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#7c3aed", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15, opacity: !nukePointSet || nukeLoading || empLoading ? 0.65 : 1 }}>
+              {nukeSubMode === "emp"
+                ? (empLoading ? "Computing..." : "⚡ Launch EMP")
+                : (nukeLoading ? "Detonating..." : `☢️ Detonate${nukeStrikes.length > 1 ? ` (${nukeStrikes.length})` : ""}`)}
             </button>
             <button onClick={clearNuke}
               style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15 }}>
@@ -3445,6 +3520,30 @@ export default function HomePage() {
         </>
       )}
 
+      {scenarioMode === "nuke" && empResult && (
+        <>
+          <hr style={{ margin: "10px 0", opacity: 0.25 }} />
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>⚡ Strategic EMP Results</div>
+          <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 6 }}>
+            {empResult.yield_kt >= 1000 ? (empResult.yield_kt/1000).toFixed(1)+"Mt" : empResult.yield_kt+"kt"} · {empResult.burst_altitude_km}km altitude
+          </div>
+          <div style={{ color: "#a78bfa" }}>◌ Footprint radius: {Math.round(empResult.emp_r_km).toLocaleString()} km</div>
+          <div style={{ color: "#a78bfa", marginTop: 2 }}>◌ E1 pulse: ~{empResult.e1_field_kvm} kV/m</div>
+          <div style={{ marginTop: 6, padding: "8px 10px", background: "#0f0a2a", borderRadius: 8, border: "1px solid #4c1d95" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <span style={{ fontSize: 12, color: "#94a3b8" }}>Population at risk</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#a78bfa" }}>{empResult.population_at_risk?.toLocaleString() ?? "—"}</span>
+            </div>
+            <div style={{ fontSize: 11, color: "#7c3aed", marginBottom: 3 }}>
+              Footprint = geometric horizon only. No EMP beyond this line.
+            </div>
+            <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic", lineHeight: 1.5 }}>
+              ⚠ No direct casualties — detonation is above the atmosphere. Grid collapse causes indirect deaths over weeks/months.
+            </div>
+          </div>
+        </>
+      )}
+
       {scenarioMode === "nuke" && nukeResult && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
@@ -3473,7 +3572,7 @@ export default function HomePage() {
               <div style={{ color: "#f97316" }}>● Thermal (3rd°): {(Math.round(nukeResult.thermal_r_m)/1000).toFixed(1)} km</div>
               <div style={{ color: "#f59e0b" }}>● Light blast: {(Math.round(nukeResult.blast_light_r_m)/1000).toFixed(1)} km</div>
               {nukeResult.radiation_r_m > 0 && <div style={{ color: "#4ade80" }}>◌ Radiation 500rem: {Math.round(nukeResult.radiation_r_m).toLocaleString()} m</div>}
-              {nukeResult.emp_r_m > 0 && <div style={{ color: "#a78bfa" }}>◌ EMP radius: {(Math.round(nukeResult.emp_r_m)/1000).toFixed(0)} km</div>}
+              {/* EMP not shown here — use Strategic EMP mode for HEMP scenarios */}
               {nukeResult.fallout_major_km > 0 && <div style={{ color: "#84cc16" }}>◌ Fallout: {Math.round(nukeResult.fallout_major_km)} × {Math.round(nukeResult.fallout_minor_km)} km</div>}
               <hr style={{ margin: "8px 0", opacity: 0.2 }} />
               <div style={{ fontWeight: 700 }}>Casualties</div>
@@ -3518,7 +3617,7 @@ export default function HomePage() {
         return null;
       })()}
 
-      {(impactResult || nukeResult || (scenarioMode === "flood" && seaLevel !== 0) || (scenarioMode === "climate" && seaLevel !== 0) || (scenarioMode === "yellowstone" && yellowstoneActive) || (scenarioMode === "tsunami" && tsunamiActive) || (scenarioMode === "cataclysm" && cataclysmActive)) && (
+      {(impactResult || nukeResult || empResult || (scenarioMode === "flood" && seaLevel !== 0) || (scenarioMode === "climate" && seaLevel !== 0) || (scenarioMode === "yellowstone" && yellowstoneActive) || (scenarioMode === "tsunami" && tsunamiActive) || (scenarioMode === "cataclysm" && cataclysmActive)) && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.2 }} />
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#f97316" }}>SHARE</div>
