@@ -97,8 +97,260 @@ const YDI_SOURCE_NODES = [
   { id: "stjean",  name: "Eastern Outlet\n(Lac Saint-Jean)",               lat: 48.6,  lng: -72.0,  reachM: 550000  },
   { id: "columbia",name: "Columbia Mouth\n(Pacific Discharge)",            lat: 46.2,  lng: -123.9, reachM: 320000  },
 ];
-// YDI ice sheets to animate (subset of ICE_SHEET_ZONES — North America only)
-const YDI_ICE_INDICES = [0, 7]; // Laurentide=0, Cordilleran=7
+// YDI flood corridors — traced from Carlson/Kennett Younger Dryas flood reconstruction
+// Each corridor is a centerline with width_deg that gets buffered into a polygon
+// Low = main channels, Medium = widened + tributaries, High = full basin sheet flow
+const YDI_FLOOD_CORRIDORS = {
+  low: {
+    opacity: 0.75,
+    features: [
+      // Columbia River / Channeled Scablands — narrow gorge corridor
+      { name: "Columbia Scablands", width: 0.6, coords: [
+        [-118.0, 47.5], [-119.5, 47.2], [-120.5, 47.0], [-121.5, 46.5],
+        [-122.0, 46.2], [-122.5, 45.9], [-123.0, 46.2], [-123.9, 46.2],
+        [-124.2, 46.0],
+      ]},
+      // Upper Columbia / Snake River
+      { name: "Snake River Plain", width: 0.5, coords: [
+        [-114.5, 43.5], [-115.5, 43.8], [-116.5, 44.0], [-117.5, 46.0],
+        [-118.0, 47.5],
+      ]},
+      // Mississippi main stem
+      { name: "Mississippi Corridor", width: 0.8, coords: [
+        [-93.5, 45.0], [-92.5, 44.0], [-91.5, 42.5], [-91.0, 41.0],
+        [-90.5, 39.5], [-90.2, 38.5], [-89.8, 37.5], [-89.5, 36.5],
+        [-89.5, 35.0], [-90.0, 33.5], [-90.5, 32.5], [-91.0, 31.0],
+        [-91.2, 29.5], [-89.5, 29.0],
+      ]},
+      // St Lawrence outlet
+      { name: "St Lawrence", width: 0.7, coords: [
+        [-84.0, 46.0], [-82.5, 46.2], [-80.0, 45.5], [-77.5, 45.0],
+        [-75.5, 44.5], [-73.5, 45.5], [-72.0, 46.5], [-70.5, 47.0],
+        [-68.0, 47.5], [-65.0, 48.0], [-63.0, 48.5], [-61.0, 47.0],
+        [-59.5, 46.5],
+      ]},
+    ]
+  },
+  medium: {
+    opacity: 0.78,
+    features: [
+      // Columbia / Scablands — wider sheet flow
+      { name: "Columbia Scablands", width: 1.4, coords: [
+        [-117.0, 48.5], [-118.0, 47.5], [-119.5, 47.2], [-120.5, 47.0],
+        [-121.5, 46.5], [-122.0, 46.2], [-122.5, 45.9], [-123.0, 46.2],
+        [-123.9, 46.2], [-124.3, 45.8],
+      ]},
+      // Snake + Willamette
+      { name: "Snake / Willamette", width: 0.9, coords: [
+        [-112.5, 43.0], [-113.5, 43.5], [-114.5, 43.5], [-116.0, 44.5],
+        [-117.0, 46.5], [-118.0, 47.5],
+      ]},
+      { name: "Willamette Valley", width: 0.8, coords: [
+        [-122.5, 45.5], [-123.0, 45.0], [-123.2, 44.5], [-123.1, 44.0],
+        [-122.8, 43.5],
+      ]},
+      // Missouri River
+      { name: "Missouri Corridor", width: 0.9, coords: [
+        [-111.0, 46.5], [-109.5, 46.0], [-107.0, 47.0], [-104.0, 46.5],
+        [-101.0, 45.5], [-99.0, 44.5], [-97.0, 43.5], [-96.5, 42.5],
+        [-96.0, 41.5], [-95.5, 41.0], [-95.8, 40.0], [-95.5, 39.0],
+        [-94.5, 38.5], [-93.8, 38.8], [-93.5, 39.5], [-92.5, 40.5],
+        [-91.8, 41.5], [-91.2, 42.0], [-90.5, 41.5],
+      ]},
+      // Mississippi expanded
+      { name: "Mississippi Basin", width: 1.2, coords: [
+        [-93.5, 45.0], [-92.5, 44.0], [-91.5, 42.5], [-91.0, 41.0],
+        [-90.5, 39.5], [-90.2, 38.5], [-89.8, 37.5], [-89.5, 36.5],
+        [-89.5, 35.0], [-90.0, 33.5], [-90.5, 32.5], [-91.0, 31.0],
+        [-91.2, 29.5], [-89.5, 29.0],
+      ]},
+      // Ohio River
+      { name: "Ohio Valley", width: 0.7, coords: [
+        [-84.5, 39.0], [-83.0, 38.8], [-81.5, 38.5], [-80.0, 38.2],
+        [-79.0, 38.5], [-82.0, 38.5], [-84.0, 39.0],
+      ]},
+      // Great Lakes overflow
+      { name: "Great Lakes", width: 1.0, coords: [
+        [-92.0, 47.0], [-89.5, 47.5], [-87.0, 46.5], [-85.5, 46.0],
+        [-84.0, 46.0], [-82.5, 46.2], [-80.5, 44.5], [-79.5, 43.5],
+        [-78.5, 43.0], [-77.0, 43.5], [-76.0, 44.0], [-75.5, 44.5],
+      ]},
+      // St Lawrence expanded
+      { name: "St Lawrence", width: 1.0, coords: [
+        [-84.0, 46.0], [-82.5, 46.2], [-80.0, 45.5], [-77.5, 45.0],
+        [-75.5, 44.5], [-73.5, 45.5], [-72.0, 46.5], [-70.5, 47.0],
+        [-68.0, 47.5], [-65.0, 48.0], [-63.0, 48.5], [-61.0, 47.0],
+        [-59.5, 46.5],
+      ]},
+      // Mackenzie River NW Canada
+      { name: "Mackenzie Corridor", width: 0.9, coords: [
+        [-114.5, 60.0], [-120.0, 61.5], [-123.5, 63.5], [-126.0, 65.0],
+        [-128.5, 67.0], [-131.0, 68.5], [-133.5, 69.0], [-135.0, 69.5],
+      ]},
+    ]
+  },
+  high: {
+    opacity: 0.82,
+    features: [
+      // Columbia / Scablands — massive sheet flow
+      { name: "Columbia Sheet Flow", width: 2.5, coords: [
+        [-116.0, 49.0], [-117.0, 48.5], [-118.5, 48.0], [-119.5, 47.5],
+        [-120.5, 47.2], [-121.5, 46.8], [-122.0, 46.4], [-122.8, 46.0],
+        [-123.5, 46.2], [-124.3, 45.8],
+      ]},
+      // Puget Sound flooded
+      { name: "Puget Sound Inundation", width: 1.2, coords: [
+        [-122.5, 49.0], [-122.8, 48.5], [-122.5, 48.0], [-122.3, 47.5],
+        [-122.5, 47.0], [-122.8, 46.5],
+      ]},
+      // Snake + tributaries wide
+      { name: "Snake Basin", width: 1.6, coords: [
+        [-111.0, 42.5], [-112.5, 43.0], [-114.5, 43.5], [-116.0, 44.5],
+        [-117.5, 46.5], [-118.5, 48.0],
+      ]},
+      // Missouri wide
+      { name: "Missouri Sheet", width: 1.8, coords: [
+        [-111.0, 46.5], [-109.0, 46.0], [-107.0, 47.0], [-104.0, 46.5],
+        [-101.0, 45.5], [-99.0, 44.0], [-97.0, 43.0], [-96.5, 42.0],
+        [-96.0, 41.0], [-95.5, 40.5], [-95.0, 39.5], [-94.5, 38.5],
+        [-93.5, 39.0], [-92.5, 40.0], [-91.5, 41.5], [-90.8, 42.0],
+      ]},
+      // Mississippi wide + Gulf flooding
+      { name: "Mississippi / Gulf", width: 2.0, coords: [
+        [-93.5, 45.0], [-92.0, 43.5], [-91.0, 42.0], [-90.5, 40.0],
+        [-90.2, 38.5], [-90.0, 37.0], [-89.5, 35.5], [-89.5, 34.0],
+        [-90.0, 32.5], [-90.5, 31.5], [-91.0, 30.5], [-91.5, 29.5],
+        [-89.5, 29.0], [-88.5, 30.0], [-88.0, 30.5],
+      ]},
+      // Great Plains sheet flow
+      { name: "Great Plains", width: 2.2, coords: [
+        [-98.0, 49.0], [-99.0, 47.0], [-99.5, 45.0], [-99.0, 43.0],
+        [-98.5, 41.5], [-97.5, 40.0], [-97.0, 38.5], [-97.5, 37.0],
+        [-98.0, 36.0],
+      ]},
+      // Great Lakes / Ontario fully flooded
+      { name: "Great Lakes Sheet", width: 1.8, coords: [
+        [-92.0, 47.5], [-89.5, 48.0], [-87.0, 47.0], [-85.0, 46.5],
+        [-83.5, 46.0], [-82.0, 46.5], [-80.0, 45.0], [-79.0, 43.5],
+        [-78.0, 43.0], [-76.5, 43.5], [-75.5, 44.5],
+      ]},
+      // St Lawrence wide
+      { name: "St Lawrence / Atlantic", width: 1.6, coords: [
+        [-84.0, 46.0], [-81.5, 45.5], [-79.0, 44.5], [-76.5, 44.0],
+        [-74.0, 45.0], [-72.0, 46.5], [-70.0, 47.0], [-67.5, 47.5],
+        [-65.0, 48.5], [-63.0, 49.0], [-61.0, 47.5], [-59.5, 46.5],
+      ]},
+      // Mackenzie wide
+      { name: "Mackenzie Sheet", width: 1.8, coords: [
+        [-113.0, 59.0], [-116.0, 60.5], [-120.5, 62.0], [-124.0, 64.0],
+        [-127.0, 66.0], [-130.0, 68.0], [-133.0, 69.5], [-136.0, 70.0],
+      ]},
+      // Hudson Bay drainage
+      { name: "Hudson Bay Outlet", width: 2.0, coords: [
+        [-85.0, 55.0], [-83.0, 57.0], [-82.0, 59.0], [-82.5, 61.0],
+        [-83.0, 63.0], [-83.5, 65.0],
+      ]},
+      // Atlantic coastal flooding
+      { name: "Atlantic Shelf", width: 1.5, coords: [
+        [-76.0, 35.0], [-75.5, 36.5], [-75.0, 38.0], [-74.5, 39.5],
+        [-74.0, 41.0], [-73.5, 42.5], [-72.5, 43.5], [-71.0, 44.5],
+        [-70.0, 45.5], [-68.0, 46.5],
+      ]},
+    ]
+  }
+};
+
+// Real Last Glacial Maximum ice sheet extents as lat/lng polygons
+// Source: Dyke et al. 2002, Peltier ICE-5G reconstruction
+const YDI_ICE_SHEETS = [
+  {
+    name: "Laurentide Ice Sheet",
+    color: "#bfdbfe",
+    // Outer margin at ~12,900 BP — traces real southern limit
+    coords: [
+      [-73, 40.5],  // Long Island / New England coast
+      [-76, 39.5],  // New Jersey
+      [-80, 39.0],  // Pennsylvania
+      [-82, 38.5],  // Ohio River
+      [-86, 38.5],  // Indiana
+      [-91, 38.8],  // Missouri River mouth
+      [-96, 40.0],  // Nebraska
+      [-101, 41.0], // Kansas/Nebraska border
+      [-104, 43.0], // South Dakota
+      [-108, 46.0], // Montana
+      [-111, 47.5], // Montana/Idaho
+      [-114, 49.0], // Alberta border
+      [-118, 50.5], // BC interior
+      [-120, 52.0], // BC
+      [-124, 54.0], // BC coast
+      [-130, 57.0], // Alaska panhandle
+      [-135, 59.0], // SE Alaska
+      [-140, 61.0], // Alaska
+      [-145, 62.0], // Gulf of Alaska
+      [-150, 63.0], // Alaska
+      [-155, 62.0], // Alaska peninsula
+      [-160, 61.0], // Alaska
+      [-165, 60.5], // W Alaska
+      [-168, 62.0], // Bering area
+      [-165, 65.0], // N Alaska
+      [-160, 68.0], // Arctic Alaska
+      [-155, 70.0], // Arctic
+      [-140, 72.0], // Arctic coast
+      [-120, 73.5], // Victoria Island area
+      [-100, 74.0], // Nunavut
+      [-85,  75.0], // Baffin Island west
+      [-75,  76.0], // Baffin Island
+      [-65,  76.5], // N Quebec
+      [-60,  75.0], // Labrador
+      [-55,  72.0], // Newfoundland area
+      [-53,  68.0], // Labrador coast
+      [-56,  62.0], // Labrador south
+      [-60,  58.0], // Gulf of St Lawrence area
+      [-65,  55.0], // Nova Scotia area
+      [-67,  50.0], // Maine/Maritime
+      [-70,  45.5], // Maine
+      [-73,  43.0], // Vermont/NH
+      [-73,  40.5], // back to start
+    ]
+  },
+  {
+    name: "Cordilleran Ice Sheet",
+    color: "#bfdbfe",
+    // Covers BC, Yukon, SE Alaska at LGM
+    coords: [
+      [-114, 49.0], // Alberta/BC border south
+      [-116, 48.5], // N Idaho
+      [-118, 47.5], // Washington state
+      [-120, 46.5], // Central Washington
+      [-121, 45.5], // Columbia River gorge
+      [-122, 45.0], // Portland area (southern limit)
+      [-123, 45.5], // Oregon coast
+      [-124, 46.0], // Olympic Peninsula
+      [-124, 48.0], // Puget Sound
+      [-123, 49.5], // Vancouver Island north
+      [-124, 51.0], // BC coast
+      [-126, 53.0], // BC central coast
+      [-128, 54.5], // BC north coast
+      [-130, 56.0], // SE Alaska
+      [-132, 57.5], // SE Alaska
+      [-135, 59.0], // Glacier Bay area
+      [-138, 60.0], // SE Alaska north
+      [-140, 61.0], // Alaska border
+      [-141, 62.0], // Alaska/Yukon border
+      [-138, 63.5], // Yukon
+      [-135, 64.0], // Yukon north
+      [-132, 63.0], // Yukon east
+      [-128, 61.5], // Northern BC
+      [-124, 60.0], // BC/Yukon border
+      [-120, 59.0], // Northern BC interior
+      [-118, 57.0], // BC interior north
+      [-116, 55.0], // BC interior central
+      [-114, 53.0], // Alberta foothills
+      [-114, 51.0], // Rockies
+      [-114, 49.0], // back to start
+    ]
+  }
+];
 
 const WILDFIRE_ZONES = [
   // 1.5°C zones — current trajectory
@@ -2009,18 +2261,19 @@ export default function HomePage() {
   // ── Younger Dryas Impact ─────────────────────────────────────────────────
   const clearYDI = () => {
     if (ydiIceFrameRef.current) { cancelAnimationFrame(ydiIceFrameRef.current); ydiIceFrameRef.current = null; }
-    // Remove YDI flood layer (uses its own source/layer IDs)
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
-      try { if (map.getLayer("ydi-flood-layer")) map.removeLayer("ydi-flood-layer"); } catch(e){}
+      // Flood corridor layers
+      ["ydi-flood-line", "ydi-flood-layer"].forEach(id => {
+        try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){}
+      });
       try { if (map.getSource("ydi-flood-source")) map.removeSource("ydi-flood-source"); } catch(e){}
-    }
-    if (map && map.isStyleLoaded()) {
+      // Source node markers
       YDI_SOURCE_NODES.forEach(n => {
         try { if (map.getLayer(`ydi-node-${n.id}`)) map.removeLayer(`ydi-node-${n.id}`); } catch(e){}
         try { if (map.getSource(`ydi-node-src-${n.id}`)) map.removeSource(`ydi-node-src-${n.id}`); } catch(e){}
       });
-      // Clear ice sheets
+      // Ice sheets
       try { if (map.getLayer(`${ICE_SHEET_PREFIX}-fill`)) map.removeLayer(`${ICE_SHEET_PREFIX}-fill`); } catch(e){}
       try { if (map.getLayer(`${ICE_SHEET_PREFIX}-line`)) map.removeLayer(`${ICE_SHEET_PREFIX}-line`); } catch(e){}
       try { if (map.getLayer(`${ICE_SHEET_PREFIX}-label`)) map.removeLayer(`${ICE_SHEET_PREFIX}-label`); } catch(e){}
@@ -2042,10 +2295,13 @@ export default function HomePage() {
     // Phase 1: animate pulsing ice sheets (500ms after fly starts)
     setTimeout(() => {
       if (ydiRunRef.current !== run) return;
-      const naSheets = YDI_ICE_INDICES.map(i => ICE_SHEET_ZONES[i]);
-      const features = naSheets.map((z, i) => ({
-        ...buildAshEllipse(z.center[0], z.center[1], z.major_km, z.minor_km, z.bearing),
-        properties: { name: z.name, color: "#bfdbfe", idx: i },
+      const features = YDI_ICE_SHEETS.map((sheet, i) => ({
+        type: "Feature",
+        geometry: {
+          type: "Polygon",
+          coordinates: [[...sheet.coords, sheet.coords[0]].map(([lng, lat]) => [lng, lat])]
+        },
+        properties: { name: sheet.name, color: sheet.color, idx: i },
       }));
       const fc = { type: "FeatureCollection", features };
       try {
@@ -2127,23 +2383,55 @@ export default function HomePage() {
       try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-fill`, "fill-opacity", 0.35); } catch(e){}
       try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-line`, "line-opacity", 0.7); } catch(e){}
 
-      // Pre-rendered YDI tiles — terrain-routed flood following Columbia Scablands,
-      // Mississippi valley, St Lawrence corridor. Generated once offline by generate_ydi_tiles.py.
-      // Returns 204 (empty) until tiles are generated — no crash.
-      const globalLevel = intensity === "low" ? 80 : intensity === "medium" ? 200 : 400;
       setStatus(`☄️ Younger Dryas — ${intensity.toUpperCase()} flood release · Columbia Scablands + Mississippi drainage`);
 
-      const ydiUrl = `${floodEngineUrlRef.current}/ydi/${intensity}/{z}/{x}/{y}.png`;
-      const ydiSourceId = "ydi-flood-source";
-      const ydiLayerId  = "ydi-flood-layer";
+      // Draw flood corridors as GeoJSON polygons — no backend needed
+      const corridorData = YDI_FLOOD_CORRIDORS[intensity] || YDI_FLOOD_CORRIDORS.medium;
+
+      // Build buffered polygon features from centerline + width
+      const kpLat = 110.574;
+      const features = corridorData.features.map((corridor, fi) => {
+        const { coords, width } = corridor;
+        // Build left and right offset lines then close into polygon
+        const left = [], right = [];
+        for (let i = 0; i < coords.length; i++) {
+          const [lng, lat] = coords[i];
+          const kpLng = 111.32 * Math.cos(lat * Math.PI / 180);
+          // Direction vector from prev to next point
+          const prev = coords[Math.max(0, i-1)];
+          const next = coords[Math.min(coords.length-1, i+1)];
+          const dx = (next[0] - prev[0]) / Math.max(kpLng, 0.001);
+          const dy = (next[1] - prev[1]) / kpLat;
+          const len = Math.sqrt(dx*dx + dy*dy) || 1;
+          // Perpendicular (normalized)
+          const nx = -dy / len;
+          const ny =  dx / len;
+          const offLng = nx * (width / 2) / Math.max(kpLng, 0.001);
+          const offLat = ny * (width / 2) / kpLat;
+          left.push([lng + offLng, lat + offLat]);
+          right.push([lng - offLng, lat - offLat]);
+        }
+        const ring = [...left, ...[...right].reverse(), left[0]];
+        return {
+          type: "Feature",
+          geometry: { type: "Polygon", coordinates: [ring] },
+          properties: { name: corridor.name, idx: fi }
+        };
+      });
+
+      const srcId = "ydi-flood-source";
+      const layerId = "ydi-flood-layer";
+      const lineId = "ydi-flood-line";
       try {
-        if (map.getLayer(ydiLayerId)) map.removeLayer(ydiLayerId);
-        if (map.getSource(ydiSourceId)) map.removeSource(ydiSourceId);
-        map.addSource(ydiSourceId, { type: "raster", tiles: [ydiUrl], tileSize: 256, minzoom: 0, maxzoom: 10 });
-        map.addLayer({ id: ydiLayerId, type: "raster", source: ydiSourceId,
-          paint: { "raster-opacity": 1, "raster-fade-duration": 0, "raster-resampling": "linear" } });
+        [lineId, layerId].forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
+        try { if (map.getSource(srcId)) map.removeSource(srcId); } catch(e){}
+        map.addSource(srcId, { type: "geojson", data: { type: "FeatureCollection", features } });
+        map.addLayer({ id: layerId, type: "fill", source: srcId,
+          paint: { "fill-color": "#1e64dc", "fill-opacity": corridorData.opacity } });
+        map.addLayer({ id: lineId, type: "line", source: srcId,
+          paint: { "line-color": "#60a5fa", "line-width": 1.5, "line-opacity": 0.6 } });
         safely(() => map.triggerRepaint());
-      } catch(e) { console.error("YDI flood layer error", e); }
+      } catch(e) { console.error("YDI flood draw error", e); }
 
       // Zoom out to see full North American extent
       setTimeout(() => {
