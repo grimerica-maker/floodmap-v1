@@ -2259,7 +2259,7 @@ export default function HomePage() {
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
       // Flood corridor layers
-      ["ydi-flood-line", "ydi-flood-layer"].forEach(id => {
+      ["ydi-flood-halo", "ydi-flood-core"].forEach(id => {
         try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){}
       });
       try { if (map.getSource("ydi-flood-source")) map.removeSource("ydi-flood-source"); } catch(e){}
@@ -2380,47 +2380,50 @@ export default function HomePage() {
 
       setStatus(`☄️ Younger Dryas — ${intensity.toUpperCase()} flood release · Columbia Scablands + Mississippi drainage`);
 
-      // Draw flood corridors as GeoJSON polygons — no backend needed
+      // Draw flood corridors using Mapbox line rendering — smooth halo + core
       const corridorData = YDI_FLOOD_CORRIDORS[intensity] || YDI_FLOOD_CORRIDORS.medium;
-
-      // Build buffered polygon features from centerline + width (in degrees)
-      const features = corridorData.features.map((corridor, fi) => {
-        const { coords, width } = corridor;
-        const half = width / 2;
-        const left = [], right = [];
-        for (let i = 0; i < coords.length; i++) {
-          const [lng, lat] = coords[i];
-          const prev = coords[Math.max(0, i-1)];
-          const next = coords[Math.min(coords.length-1, i+1)];
-          // Direction vector in degree space
-          const dx = next[0] - prev[0];
-          const dy = next[1] - prev[1];
-          const len = Math.sqrt(dx*dx + dy*dy) || 1;
-          // Perpendicular offset in degrees
-          const nx = -dy / len;
-          const ny =  dx / len;
-          left.push([lng + nx * half, lat + ny * half]);
-          right.push([lng - nx * half, lat - ny * half]);
-        }
-        const ring = [...left, ...[...right].reverse(), left[0]];
-        return {
-          type: "Feature",
-          geometry: { type: "Polygon", coordinates: [ring] },
-          properties: { name: corridor.name, idx: fi }
-        };
-      });
-
-      const srcId = "ydi-flood-source";
-      const layerId = "ydi-flood-layer";
-      const lineId = "ydi-flood-line";
+      const features = corridorData.features.map((corridor, fi) => ({
+        type: "Feature",
+        geometry: { type: "LineString", coordinates: corridor.coords },
+        properties: { name: corridor.name, width: corridor.width, idx: fi }
+      }));
+      const fc = { type: "FeatureCollection", features };
+      const srcId  = "ydi-flood-source";
+      const haloId = "ydi-flood-halo";
+      const coreId = "ydi-flood-core";
       try {
-        [lineId, layerId].forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
+        [haloId, coreId].forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
         try { if (map.getSource(srcId)) map.removeSource(srcId); } catch(e){}
-        map.addSource(srcId, { type: "geojson", data: { type: "FeatureCollection", features } });
-        map.addLayer({ id: layerId, type: "fill", source: srcId,
-          paint: { "fill-color": "#1a5fb4", "fill-opacity": corridorData.opacity } });
-        map.addLayer({ id: lineId, type: "line", source: srcId,
-          paint: { "line-color": "#93c5fd", "line-width": 2.5, "line-opacity": 0.85 } });
+        map.addSource(srcId, { type: "geojson", data: fc });
+        // Halo — wide, light blue, soft edges
+        map.addLayer({ id: haloId, type: "line", source: srcId,
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: {
+            "line-color": "#93c5fd",
+            "line-width": ["*", ["get", "width"], 22],
+            "line-opacity": 0.38,
+            "line-blur": ["*", ["get", "width"], 5],
+          }
+        });
+        // Core — narrower, solid dark blue
+        map.addLayer({ id: coreId, type: "line", source: srcId,
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: {
+            "line-color": "#1d4ed8",
+            "line-width": ["*", ["get", "width"], 10],
+            "line-opacity": 0.88,
+            "line-blur": 0.8,
+          }
+        });
+        // Click popup
+        map.on("click", haloId, (e) => {
+          if (scenarioModeRef.current !== "cataclysm" || cataclysmModelRef.current !== "ydi") return;
+          const name = e.features?.[0]?.properties?.name || "Flood Corridor";
+          const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: true, className: "elev-popup", maxWidth: "220px" });
+          popup.setLngLat(e.lngLat).setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px"><div style="color:#38bdf8;font-weight:700;margin-bottom:4px">🌊 ${name}</div><div style="color:#e2e8f0;margin-bottom:4px">Younger Dryas Meltwater Corridor</div><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><span style="color:#94a3b8;font-size:11px">Status:</span><span style="color:#ef4444;font-weight:700">Inundated</span></div><div style="color:#64748b;font-size:11px;font-style:italic">~12,900 BP · Laurentide meltwater drainage · Survival possible on high ground only</div></div>`).addTo(map);
+        });
+        map.on("mouseenter", haloId, () => { map.getCanvas().style.cursor = "pointer"; });
+        map.on("mouseleave", haloId, () => { map.getCanvas().style.cursor = "crosshair"; });
         safely(() => map.triggerRepaint());
       } catch(e) { console.error("YDI flood draw error", e); }
 
