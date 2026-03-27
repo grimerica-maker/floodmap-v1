@@ -900,7 +900,7 @@ export default function HomePage() {
   const drawLandImpactFromResult = (lng, lat, result, idx = null) => {
     const map = mapRef.current;
     console.log("[drawLandImpact] idx=", idx, "lng=", lng, "lat=", lat);
-    if (!map || !map.isStyleLoaded() || !result) return;
+    if (!map || !result) return;
     const craterKm = Number(result.crater_diameter_m ?? 0) / 2000;
     const blastKm = Number(result.blast_radius_m ?? 0) / 1000;
     const thermalKm = Number(result.thermal_radius_m ?? 0) / 1000;
