@@ -1111,13 +1111,18 @@ export default function HomePage() {
     // its chrome, maximising the visible viewport (works on Chrome/Android,
     // Safari respects dvh independently once the page is interaction-locked).
     if (window.innerWidth <= 640) {
-      // Small delay lets the page fully paint first
+      // Longer delay ensures full paint + interaction lock before nudge
       const t = setTimeout(() => {
         try {
-          window.scrollTo({ top: 1, behavior: "instant" });
-          requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "instant" }));
-        } catch (_) {}
-      }, 300);
+          document.documentElement.scrollTop = 1;
+          requestAnimationFrame(() => { document.documentElement.scrollTop = 0; });
+        } catch (_) {
+          try {
+            window.scrollTo({ top: 1, behavior: "instant" });
+            requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "instant" }));
+          } catch (_2) {}
+        }
+      }, 800);
       return () => { clearTimeout(t); window.removeEventListener("resize", check); };
     }
 
@@ -6035,13 +6040,14 @@ export default function HomePage() {
           borderRadius: "18px 18px 0 0",
           zIndex: 1002,
           transform: drawerOpen ? "translateY(0)" : "translateY(100%)",
+          transition: "transform 0.32s cubic-bezier(0.4,0,0.2,1)",
           boxShadow: "0 -4px 24px rgba(0,0,0,0.18)",
           pointerEvents: drawerOpen ? "auto" : "none",
         }}
       >
         {/* Drawer handle bar */}
         <div
-          onClick={() => setDrawerOpen(false)}
+          onPointerDown={(e) => { e.stopPropagation(); setDrawerOpen(false); }}
           style={{ flexShrink: 0, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "10px 0 8px 0", cursor: "pointer", gap: 4 }}
         >
           <div style={{ width: 40, height: 4, background: "#334155", borderRadius: 4 }} />
@@ -6085,7 +6091,7 @@ export default function HomePage() {
       >
         {/* Left: current level + mode pill */}
         <div
-          onClick={() => setDrawerOpen(true)}
+          onPointerDown={(e) => { e.stopPropagation(); setDrawerOpen(true); }}
           style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 3, cursor: "pointer", minWidth: 0 }}
         >
           <div style={{ fontSize: 18, fontWeight: 700, color: seaLevel > 0 ? "#3b82f6" : seaLevel < 0 ? "#f97316" : "#e2e8f0", lineHeight: 1 }}>
@@ -6135,7 +6141,7 @@ export default function HomePage() {
 
         {/* Right: chevron toggle to open drawer */}
         <button
-          onClick={() => setDrawerOpen((v) => !v)}
+          onPointerDown={(e) => { e.stopPropagation(); setDrawerOpen((v) => !v); }}
           style={{ flexShrink: 0, width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "1px solid #1e2d45", borderRadius: 10, cursor: "pointer", fontSize: 18, color: "#94a3b8" }}
         >
           {drawerOpen ? "⌄" : "⌃"}
