@@ -2916,7 +2916,7 @@ export default function HomePage() {
     }, 300);
 
     // Step 2: Natural Earth rotation — longitude moves W→E via setCenter
-    let spinLng = (model === "tes") ? 31 : -90; // Davidson starts on NA, TES on Africa
+    let spinLng = (model === "tes") ? -170 : -90; // Davidson starts on NA, TES starts mid-Pacific
     let lastT = null;
     const spin = (t) => {
       if (lastT !== null) {
@@ -2928,8 +2928,9 @@ export default function HomePage() {
     };
     setTimeout(() => {
       if (cataclysmRunRef.current !== thisRun) return;
-      // Force known start position so flip is consistent regardless of previous state
-      safely(() => map.jumpTo({ center: [spinLng, 20], bearing: 0, pitch: 0 }));
+      // Hard reset to known start — bearing 0, pitch 0, correct start lng
+      // Ensures consistent animation on retrigger/new mode/clear
+      safely(() => map.jumpTo({ center: [spinLng, 20], bearing: 0, pitch: 0, zoom: _catZoom }));
       setStatus(`☄️ ${info.name} — crustal displacement initiating…`);
       cataclysmSpinRef.current = requestAnimationFrame(spin);
     }, 1600);
