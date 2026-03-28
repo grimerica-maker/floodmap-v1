@@ -24,13 +24,19 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-const FRONTEND_BUILD_LABEL = "v249";
+const FRONTEND_BUILD_LABEL = "v250";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
 const FREE_SIM_PER_DAY  = 30;
 const PRO_SIM_PER_HOUR  = 50;
 const PRO_SIM_PER_DAY   = 200;
+
+// ── Paywall limits ────────────────────────────────────────────────────────────
+const FREE_MAX_IMPACT_DIAMETER = 5000;   // metres
+const PRO_MAX_IMPACT_DIAMETER  = 20000;
+const FREE_MAX_NUKE_YIELD_KT   = 1000;   // kt  (= 1 Mt)
+const PRO_MAX_NUKE_YIELD_KT    = 100000; // kt  (= 100 Mt)
 
 // ── Rate limit helpers (localStorage) ────────────────────────────────────────
 const RL_KEY = "dm_rl";
@@ -76,19 +82,545 @@ const PRESETS = [
   { label: "Fully Drained", value: -11000 },
 ];
 
+// Real Last Glacial Maximum ice sheet extents as lat/lng polygons
+// Sources: Dyke et al. 2002, Ehlers & Gibbard 2004, Hughes et al. 2016
+// Each sheet is a closed polygon following the actual glaciological margin
 const ICE_SHEET_ZONES = [
-  { name: "Laurentide", center: [-90.0, 55.0], major_km: 2372, minor_km: 1739, bearing: 10, color: "#bfdbfe" },
-  { name: "Fennoscandian", center: [18.0, 65.0], major_km: 1423, minor_km: 949, bearing: 20, color: "#bfdbfe" },
-  { name: "British-Irish", center: [-3.5, 56.0], major_km: 474, minor_km: 300, bearing: 10, color: "#bfdbfe" },
-  { name: "Patagonian", center: [-70.0, -48.0], major_km: 711, minor_km: 253, bearing: 170, color: "#bfdbfe" },
-  { name: "Greenland (Extended)", center: [-42.0, 72.0], major_km: 949, minor_km: 553, bearing: 10, color: "#e0f2fe" },
-  { name: "Antarctic (Extended)", center: [0.0, -82.0], major_km: 2213, minor_km: 2213, bearing: 0, color: "#e0f2fe" },
-  { name: "Barents-Kara", center: [55.0, 74.0], major_km: 1107, minor_km: 711, bearing: 80, color: "#bfdbfe" },
-  { name: "Cordilleran", center: [-126.0, 56.0], major_km: 949, minor_km: 474, bearing: 160, color: "#bfdbfe" },
+  {
+    name: "Laurentide Ice Sheet",
+    color: "#bfdbfe",
+    coords: [
+      // Southern margin — follows Missouri & Ohio rivers, then up Atlantic seaboard
+      [-76.5, 43.0],  // Finger Lakes / upstate NY
+      [-79.0, 42.5],  // Lake Erie south shore
+      [-82.5, 41.5],  // NW Ohio
+      [-85.5, 41.5],  // Indiana/Ohio border
+      [-87.5, 41.8],  // Chicago area
+      [-90.0, 42.5],  // Wisconsin
+      [-93.0, 43.5],  // Minnesota
+      [-96.5, 45.0],  // N Dakota border
+      [-99.5, 46.5],  // N Dakota
+      [-102.0, 47.5], // N Dakota/Montana
+      [-106.0, 48.5], // Montana
+      [-109.0, 49.0], // Montana/Alberta border
+      [-112.0, 49.0], // Alberta south — ice-free corridor starts here
+      // Ice-free corridor indent (Mackenzie Corridor)
+      [-113.5, 51.0], [-113.0, 53.5], [-113.5, 56.0], [-116.0, 58.0],
+      [-118.0, 59.5], [-120.0, 61.0],
+      // Arctic extent — follows actual northern coastline
+      [-125.0, 63.0], [-130.0, 65.0], [-135.0, 68.0], [-130.0, 70.0],
+      [-120.0, 72.0], [-105.0, 73.0], [-90.0, 73.5],  [-80.0, 74.0],
+      [-72.0, 74.5],  [-65.0, 73.0],  [-60.0, 70.0],  [-57.0, 65.0],
+      // Eastern margin — down Atlantic seaboard
+      [-59.0, 60.0],  [-63.0, 57.0],  [-66.0, 52.0],
+      [-69.0, 48.0],  [-71.0, 46.0],  [-73.5, 44.5],
+      [-76.5, 43.0],  // close
+    ]
+  },
+  {
+    name: "Cordilleran Ice Sheet",
+    color: "#bfdbfe",
+    coords: [
+      [-113.5, 49.0],  // BC/Alberta border — eastern limit
+      [-115.0, 48.0],  // N Idaho
+      [-117.0, 47.0],  // Washington state
+      [-119.5, 46.5],  // Central Washington
+      [-121.0, 45.5],  // Columbia River
+      [-122.0, 45.0],  // Portland — southern limit
+      [-123.5, 45.5],  // Oregon coast
+      [-124.0, 47.0],  // Olympic Peninsula
+      [-123.5, 48.5],  // Puget Sound
+      [-124.0, 50.0],  // Vancouver Island north
+      [-125.0, 52.0],  // BC coast
+      [-127.0, 54.0],  // BC north coast
+      [-129.0, 56.0],  // SE Alaska
+      [-132.0, 57.5],  [-135.0, 59.0], [-138.0, 60.5], [-141.0, 61.5],
+      [-140.0, 63.0],  [-136.0, 63.5], [-133.0, 62.5], [-129.0, 61.0],
+      [-125.0, 60.0],  [-121.0, 59.0], [-118.0, 57.5],
+      [-116.0, 55.5],  [-114.5, 53.0], [-113.5, 51.0],
+      [-113.5, 49.0],  // close
+    ]
+  },
+  {
+    name: "Fennoscandian Ice Sheet",
+    color: "#bfdbfe",
+    coords: [
+      // Southern margin — N Germany / Poland lobes
+      [8.0,  54.0], [10.0, 53.5], [13.0, 53.0], [16.0, 52.5],
+      [19.0, 52.0], [22.0, 52.5], [25.0, 53.0], [27.0, 53.5],
+      [30.0, 55.0], [32.0, 57.0], [34.0, 59.0],
+      // Eastern extent — Russia
+      [36.0, 61.0], [38.0, 63.0], [42.0, 65.0],
+      [48.0, 66.5], [55.0, 68.0], [60.0, 68.5],
+      // Northern tip — Arctic Ocean
+      [65.0, 70.0], [60.0, 71.0], [50.0, 71.5],
+      [30.0, 71.0], [15.0, 71.0], [5.0, 70.5],
+      // Western extent — North Sea, Scotland
+      [0.0,  68.0], [-2.0, 65.0], [-2.0, 62.0],
+      [2.0,  58.0], [5.0,  56.0], [8.0,  54.0], // close
+    ]
+  },
+  {
+    name: "British-Irish Ice Sheet",
+    color: "#bfdbfe",
+    // Two separate polygons — Great Britain and Ireland
+    rings: [
+      // Great Britain (main island)
+      [
+        [-2.0,  51.5], [-3.5,  51.5], [-5.0,  51.7], [-5.5,  52.0],
+        [-4.5,  52.5], [-3.5,  53.0], [-3.0,  53.5],
+        [-2.0,  53.8], [-1.5,  54.5],
+        [-2.0,  55.0], [-3.0,  55.5], [-4.5,  56.0],
+        [-5.0,  57.5], [-5.5,  58.5], [-4.5,  59.0],
+        [-3.5,  59.5], [-1.5,  60.0],
+        [0.0,   59.5], [0.5,   58.5],
+        [-0.5,  57.5], [0.0,   56.5], [0.0,   55.5],
+        [-1.0,  54.5], [-0.5,  53.5], [-0.5,  52.5],
+        [-1.0,  52.0], [-2.0,  51.5],
+      ],
+      // Ireland
+      [
+        [-10.0, 51.5], [-10.5, 52.5], [-10.0, 53.5],
+        [-9.5,  54.5], [-8.0,  55.5], [-7.0,  56.0],
+        [-6.0,  55.5], [-6.0,  54.5], [-7.0,  53.5],
+        [-8.0,  52.5], [-9.0,  52.0], [-10.0, 51.5],
+      ],
+    ],
+    // coords alias points to first ring for centroid calc
+    get coords() { return this.rings[0]; },
+  },
+  {
+    name: "Barents-Kara Ice Sheet",
+    color: "#bfdbfe",
+    coords: [
+      [30.0, 68.0], [35.0, 67.0], [40.0, 67.5], [45.0, 68.0],
+      [50.0, 68.5], [55.0, 69.5], [60.0, 70.0], [65.0, 71.0],
+      [70.0, 72.0], [75.0, 73.0], [80.0, 74.5],
+      [85.0, 76.0], [80.0, 78.0], [70.0, 79.0],
+      [55.0, 80.0], [40.0, 79.0], [25.0, 78.0],
+      [15.0, 76.0], [15.0, 74.0], [20.0, 72.0],
+      [25.0, 70.5], [28.0, 69.0], [30.0, 68.0], // close
+    ]
+  },
+  {
+    name: "Greenland Ice Sheet",
+    color: "#e0f2fe",
+    coords: [
+      // Extended LGM margin — slightly beyond modern ice sheet
+      [-52.0, 60.0], [-46.0, 59.5], [-42.0, 60.5], [-38.0, 62.0],
+      [-32.0, 63.5], [-26.0, 65.0], [-20.0, 66.5], [-17.0, 68.0],
+      [-18.0, 70.0], [-20.0, 72.0], [-22.0, 75.0], [-26.0, 77.0],
+      [-30.0, 78.5], [-35.0, 80.0], [-42.0, 81.5], [-52.0, 82.5],
+      [-62.0, 82.5], [-68.0, 81.0], [-70.0, 79.0], [-68.0, 77.0],
+      [-64.0, 75.0], [-60.0, 73.0], [-58.0, 71.0], [-56.0, 68.5],
+      [-54.0, 65.5], [-52.0, 63.0], [-52.0, 60.0], // close
+    ]
+  },
+  {
+    name: "Patagonian Ice Sheet",
+    color: "#bfdbfe",
+    coords: [
+      // Real southern South American glaciation
+      [-66.0, -39.0], [-68.0, -40.0], [-70.0, -41.0], [-72.0, -42.0],
+      [-73.0, -43.5], [-73.5, -45.0], [-74.0, -47.0], [-74.5, -49.0],
+      [-75.0, -51.0], [-75.5, -53.0], [-76.0, -55.0],
+      [-68.0, -55.5], [-66.0, -54.5], [-65.0, -53.0],
+      [-65.5, -51.0], [-66.0, -49.0], [-66.5, -47.0],
+      [-66.0, -45.0], [-65.5, -43.0], [-65.0, -41.0],
+      [-65.5, -39.5], [-66.0, -39.0], // close
+    ]
+  },
+  {
+    name: "Antarctic Ice Sheet (Extended)",
+    color: "#e0f2fe",
+    coords: (() => {
+      // Full LGM Antarctic extent — approximately 10% larger radius than modern
+      const pts = [];
+      const steps = 72;
+      for (let i = 0; i <= steps; i++) {
+        const angle = (i / steps) * Math.PI * 2;
+        // Vary radius by sector to approximate actual LGM grounding line
+        const baseR = 18.0; // degrees from pole
+        const r = baseR + Math.sin(angle * 3) * 2.5 + Math.cos(angle * 2) * 1.5;
+        const lng = (angle * 180 / Math.PI);
+        const lat = -90 + r;
+        pts.push([((lng + 180) % 360) - 180, lat]);
+      }
+      return pts;
+    })()
+  },
 ];
 
 const ICE_SHEET_SOURCE = "ice-sheet-source";
 const ICE_SHEET_PREFIX = "ice-sheet-zone";
+
+// ── Younger Dryas Impact flood scenario ────────────────────────────────────
+const YDI_SOURCE_NODES = [
+  { id: "bc",      name: "Cordilleran Ice Dam\n(Nechako / Prince George)", lat: 53.9,  lng: -122.7, reachM: 850000  },
+  { id: "nipigon", name: "Laurentide Collapse\n(Lake Nipigon)",            lat: 49.7,  lng: -88.3,  reachM: 700000  },
+  { id: "stjean",  name: "Eastern Outlet\n(Lac Saint-Jean)",               lat: 48.6,  lng: -72.0,  reachM: 550000  },
+  { id: "columbia",name: "Columbia Mouth\n(Pacific Discharge)",            lat: 46.2,  lng: -123.9, reachM: 320000  },
+];
+// YDI flood corridors — traced from Carlson/Kennett Younger Dryas flood reconstruction
+// Each corridor is a centerline with width_deg that gets buffered into a polygon
+// Low = main channels, Medium = widened + tributaries, High = full basin sheet flow
+const YDI_FLOOD_CORRIDORS = {
+  // LOW — main channels only, following existing river valleys precisely
+  low: {
+    opacity: 0.82,
+    features: [
+      // Columbia River Gorge — real channel through Cascade Mountains
+      { name: "Columbia River Gorge", flow_km3: 8400, dissipation: "Drains west through Cascades to Pacific — Columbia Bar discharge ~180,000 m³/s peak", width: 1.2, coords: [
+        [-117.4, 47.7], [-118.0, 47.2], [-118.5, 46.8], [-119.0, 46.4],
+        [-119.1, 46.2], [-119.3, 45.9], [-119.7, 45.7], [-120.2, 45.7],
+        [-120.7, 45.7], [-121.2, 45.7], [-121.5, 45.7], [-121.9, 45.6],
+        [-122.3, 45.6], [-122.7, 45.5], [-123.1, 46.1], [-123.8, 46.2],
+      ]},
+      // Channeled Scablands — real flood channels across eastern Washington
+      { name: "Channeled Scablands", flow_km3: 12000, dissipation: "Multiple simultaneous flood channels carved through basalt — converges on Columbia River at Pasco Basin", width: 1.4, coords: [
+        [-117.5, 47.8], [-117.8, 47.4], [-118.2, 47.0], [-118.6, 46.7],
+        [-118.9, 46.4], [-119.1, 46.2],
+      ]},
+      // Mississippi River — follows actual river course
+      { name: "Upper Mississippi", flow_km3: 9200, dissipation: "Flows south along existing Mississippi valley — peak discharge ~150,000 m³/s, dissipates into Gulf of Mexico", width: 1.8, coords: [
+        [-93.1, 44.9], [-92.8, 44.3], [-91.5, 43.5], [-91.1, 42.5],
+        [-90.6, 41.6], [-90.2, 40.6], [-89.9, 39.7], [-89.6, 38.9],
+        [-89.1, 37.1], [-89.2, 36.5], [-89.5, 35.9], [-89.8, 35.1],
+        [-90.4, 34.2], [-91.1, 33.2], [-91.5, 32.3], [-91.4, 31.2],
+        [-91.2, 30.4], [-89.9, 29.3],
+      ]},
+      // Finger Lakes drainage — Seneca/Cayuga drain east via Mohawk to Hudson
+      { name: "Finger Lakes Outlet", flow_km3: 1800, dissipation: "Seneca and Cayuga Lakes overflow east through Mohawk Valley — joins Hudson River at Troy, drains to Atlantic.", width: 0.8, coords: [
+        [-76.8, 42.7], [-76.2, 43.0], [-75.5, 43.1], [-74.8, 43.0],
+        [-74.2, 42.9], [-73.7, 42.7], [-73.7, 42.5], [-73.8, 42.0],
+        [-73.9, 41.5], [-74.0, 41.0], [-74.0, 40.7],
+      ]},
+      // St Lawrence — follows real valley
+      { name: "St Lawrence Outlet", flow_km3: 6800, dissipation: "Drains east through St Lawrence valley — peak discharge ~80,000 m³/s, dissipates into N Atlantic", width: 1.4, coords: [
+        [-79.1, 43.3], [-77.5, 43.0], [-76.5, 43.1], [-75.5, 43.5],
+        [-74.5, 43.8], [-74.0, 44.5], [-73.8, 45.5], [-73.5, 46.5],
+        [-72.5, 46.8], [-71.2, 46.8], [-69.5, 47.4],
+        [-67.5, 47.9], [-65.5, 48.4], [-64.0, 48.8], [-62.5, 48.5], [-61.5, 47.3],
+      ]},
+    ]
+  },
+
+  // MEDIUM — corridors widen + Missouri, Ohio, Great Lakes added
+  medium: {
+    opacity: 0.86,
+    features: [
+      // Columbia system wider
+      { name: "Columbia River System", flow_km3: 18000, dissipation: "Catastrophic flood pulse through Columbia Gorge — estimated 40x modern peak discharge. Pacific plume extended 300km offshore.", width: 2.6, coords: [
+        [-117.4, 47.7], [-117.8, 47.3], [-118.3, 46.9], [-118.8, 46.5],
+        [-119.1, 46.2], [-119.3, 45.9], [-119.7, 45.7], [-120.2, 45.7],
+        [-120.8, 45.7], [-121.3, 45.7], [-121.7, 45.7], [-122.0, 45.6],
+        [-122.3, 45.6], [-122.7, 45.5], [-123.1, 46.1], [-123.9, 46.2],
+      ]},
+      // Willamette Valley backflood — real Lake Allison extent
+      { name: "Willamette Backflood", flow_km3: 3200, dissipation: "Columbia backflood into Willamette Valley — ancient Lake Allison. Water ponded to ~120m elevation before draining south.", width: 1.6, coords: [
+        [-122.7, 45.5], [-123.0, 45.1], [-123.1, 44.6],
+        [-123.1, 44.1], [-122.9, 43.8], [-122.6, 43.4],
+      ]},
+      // Missouri River — follows actual river course from Montana to confluence
+      { name: "Missouri River Corridor", flow_km3: 14500, dissipation: "Drains southeast along Missouri valley into Mississippi — peak discharge ~200,000 m³/s. Sediment load turned Gulf of Mexico turbid for years.", width: 2.0, coords: [
+        [-112.5, 47.5], [-111.5, 47.2], [-110.5, 47.8], [-109.5, 47.5],
+        [-107.0, 47.8], [-106.0, 47.6], [-104.0, 47.1], [-101.8, 46.9],
+        [-100.4, 46.9], [-99.3, 46.4], [-98.0, 46.0], [-97.4, 46.9],
+        [-97.5, 46.0], [-96.8, 46.9], [-96.7, 46.2], [-96.5, 46.0],
+        [-96.8, 45.6], [-98.0, 44.5], [-99.3, 43.5], [-100.4, 43.7],
+        [-101.2, 42.9], [-99.3, 41.5], [-97.5, 41.2], [-96.8, 41.2],
+        [-96.2, 41.5], [-95.9, 41.3], [-95.7, 40.6], [-95.5, 39.9],
+        [-94.9, 39.3], [-94.6, 39.1], [-94.0, 39.0], [-93.4, 39.1],
+        [-93.0, 39.1], [-92.5, 38.8], [-91.7, 38.8],
+      ]},
+      // Mississippi wider
+      { name: "Lower Mississippi / Gulf", flow_km3: 22000, dissipation: "Combined Missouri + Upper Mississippi discharge — peak ~400,000 m³/s. Gulf of Mexico freshwater cap suppressed thermohaline circulation, triggering Younger Dryas cooling.", width: 2.6, coords: [
+        [-93.1, 44.9], [-92.8, 44.3], [-91.5, 43.5], [-91.1, 42.5],
+        [-90.6, 41.6], [-90.4, 40.5], [-90.0, 39.5], [-89.6, 38.5],
+        [-89.1, 37.1], [-89.5, 36.0], [-89.8, 35.1],
+        [-90.4, 34.2], [-91.1, 33.2], [-91.5, 32.3], [-91.4, 31.2],
+        [-91.2, 30.4], [-90.0, 29.5], [-89.2, 29.2],
+      ]},
+      // Ohio River — follows real valley
+      { name: "Ohio River Overflow", flow_km3: 4100, dissipation: "Proglacial lakes drained SW through Ohio valley. Joined Mississippi above Cairo IL.", width: 1.4, coords: [
+        [-80.5, 40.6], [-81.5, 40.4], [-82.9, 40.4], [-84.2, 39.1],
+        [-85.2, 38.8], [-86.8, 37.9], [-87.5, 37.8], [-88.1, 37.2],
+        [-88.7, 37.1], [-89.1, 37.1],
+      ]},
+      // Missouri → Mississippi confluence connector
+      { name: "Missouri-Mississippi Confluence", flow_km3: 5200, dissipation: "Missouri joins Mississippi at St Louis — combined flow overwhelms valley, backflooding both banks for 100km.", width: 1.6, coords: [
+        [-91.7, 38.8], [-91.4, 38.6], [-91.1, 38.3], [-90.8, 38.0],
+        [-90.5, 37.8], [-90.2, 37.5], [-89.8, 37.2], [-89.1, 37.1],
+      ]},
+      // Pennsylvania / Appalachian overflow — connects Ohio east toward Atlantic
+      { name: "Appalachian Overflow", flow_km3: 2800, dissipation: "Proglacial lake overflow across low Appalachian gaps — Potomac, Susquehanna, Delaware all at flood stage simultaneously.", width: 1.2, coords: [
+        [-80.5, 40.6], [-79.5, 40.4], [-78.5, 40.2], [-77.5, 40.3],
+        [-77.0, 40.0], [-76.5, 39.8], [-76.2, 39.5], [-75.8, 39.2],
+        [-75.5, 38.8], [-75.2, 38.5],
+      ]},
+      // Chicago outlet — Great Lakes drain SW into Illinois River
+      { name: "Chicago Outlet", flow_km3: 3100, dissipation: "Lake Michigan overflow through Chicago outlet into Illinois River — ancient drainage route reactivated at peak meltwater discharge.", width: 1.4, coords: [
+        [-87.8, 41.8], [-88.0, 41.5], [-88.5, 41.0], [-89.0, 40.5],
+        [-89.5, 40.0], [-90.0, 39.5], [-90.4, 39.0], [-90.5, 38.5],
+        [-90.5, 38.0], [-89.8, 37.2],
+      ]},
+      // Great Lakes overflow through Chicago outlet + Niagara
+      { name: "Great Lakes System", flow_km3: 8800, dissipation: "Proglacial Lake Agassiz + Great Lakes overflow. Multiple outlet phases — Port Huron, Kirkfield, North Bay outlets active simultaneously.", width: 2.2, coords: [
+        [-88.0, 46.0], [-87.2, 45.5], [-86.5, 44.8], [-85.5, 44.0],
+        [-84.5, 43.2], [-83.5, 42.5], [-82.8, 42.5], [-81.8, 42.8],
+        [-80.8, 42.8], [-80.0, 43.0], [-79.5, 43.3], [-79.1, 43.9],
+        [-78.2, 44.0], [-76.8, 44.2],
+      ]},
+      // Finger Lakes drainage — wider at medium
+      { name: "Finger Lakes Outlet", flow_km3: 3200, dissipation: "Seneca/Cayuga/Keuka overflow — Mohawk Valley corridor fills to 60m. Hudson gorge at maximum capacity draining to Atlantic.", width: 1.4, coords: [
+        [-77.1, 42.6], [-76.8, 42.7], [-76.2, 43.0], [-75.5, 43.1],
+        [-74.8, 43.0], [-74.2, 42.9], [-73.7, 42.7], [-73.7, 42.3],
+        [-73.8, 41.8], [-73.9, 41.2], [-74.0, 40.7],
+      ]},
+      // St Lawrence wider
+      { name: "St Lawrence Outlet", flow_km3: 11500, dissipation: "Combined Lake Agassiz + Great Lakes drainage east — primary trigger for AMOC disruption and Younger Dryas onset.", width: 2.0, coords: [
+        [-79.1, 43.3], [-77.5, 43.0], [-76.0, 43.2], [-75.0, 43.6],
+        [-74.3, 44.5], [-73.8, 45.5], [-73.5, 46.5],
+        [-72.5, 46.8], [-71.2, 46.8], [-69.5, 47.4], [-67.5, 47.9], [-65.5, 48.4],
+        [-64.0, 48.8], [-62.5, 48.5], [-61.5, 47.3],
+      ]},
+      // Mackenzie River — primary Arctic drainage
+      { name: "Mackenzie Corridor", flow_km3: 7200, dissipation: "Drains northwest through Mackenzie valley to Beaufort Sea — freshwater input suppressed Arctic thermohaline. Ice-free corridor drainage.", width: 1.8, coords: [
+        [-113.5, 56.0], [-117.0, 58.5], [-120.5, 61.5],
+        [-122.5, 63.5], [-126.0, 65.0], [-128.5, 67.0],
+        [-132.0, 68.5], [-134.5, 69.2],
+      ]},
+    ]
+  },
+
+  // HIGH — full continental sheet flow
+  high: {
+    opacity: 0.90,
+    features: [
+      // Columbia — catastrophic
+      { name: "Columbia River System", flow_km3: 32000, dissipation: "Maximum Missoula-scale discharge — Columbia Gorge walls carved, Channeled Scablands fully active. Pacific sediment plume visible 500km offshore.", width: 3.6, coords: [
+        [-117.4, 47.8], [-117.8, 47.4], [-118.2, 47.0], [-118.7, 46.6],
+        [-119.1, 46.2], [-119.3, 45.9], [-119.7, 45.7], [-120.2, 45.7],
+        [-120.8, 45.7], [-121.3, 45.7], [-121.7, 45.7], [-122.0, 45.6],
+        [-122.3, 45.6], [-122.7, 45.5], [-123.1, 46.1], [-123.9, 46.2],
+      ]},
+      { name: "Channeled Scablands", flow_km3: 18000, dissipation: "Full Scabland flood — Moses Coulee, Grand Coulee, Cheney-Palouse tract all active. Coulees carved in days.", width: 2.8, coords: [
+        [-117.5, 48.2], [-117.9, 47.7], [-118.3, 47.2], [-118.7, 46.8],
+        [-119.0, 46.5], [-119.1, 46.2],
+      ]},
+      { name: "Willamette Backflood", flow_km3: 5800, dissipation: "Lake Allison at maximum — Willamette Valley inundated to ~120m. Portland area under 30m of water.", width: 2.4, coords: [
+        [-122.7, 45.5], [-123.0, 45.1], [-123.1, 44.6],
+        [-123.1, 44.1], [-122.9, 43.8], [-122.6, 43.4],
+      ]},
+      // Missouri at maximum
+      { name: "Missouri River Sheet", flow_km3: 28000, dissipation: "Missouri at peak — overbank flooding across Great Plains 50-100km wide. Kansas City and St Louis under 15-40m.", width: 3.2, coords: [
+        [-112.5, 47.5], [-110.5, 47.8], [-107.0, 47.8],
+        [-104.0, 47.1], [-100.4, 46.9], [-97.4, 46.9],
+        [-96.5, 46.0], [-98.0, 44.5], [-99.3, 43.5],
+        [-101.2, 42.9], [-97.5, 41.2], [-96.2, 41.5],
+        [-95.5, 39.9], [-94.6, 39.1], [-92.5, 38.8], [-91.7, 38.8],
+      ]},
+      // Great Plains sheet flow
+      { name: "Great Plains Inundation", flow_km3: 16000, dissipation: "Overland sheet flow across flat Great Plains — no confining valley. Broad shallow flood 2-15m deep covering thousands of km².", width: 4.0, coords: [
+        [-100.0, 49.0], [-100.5, 47.5], [-100.0, 46.0],
+        [-99.5, 44.5], [-99.0, 43.0], [-98.5, 41.5],
+        [-98.0, 40.0], [-97.5, 38.5], [-97.0, 37.0],
+      ]},
+      // Mississippi at full capacity
+      { name: "Lower Mississippi / Gulf", flow_km3: 42000, dissipation: "Peak combined discharge — all N American drainages converging. Gulf of Mexico freshwater lid killed marine life for centuries. Primary AMOC shutdown mechanism.", width: 4.0, coords: [
+        [-93.1, 44.9], [-91.5, 43.5], [-90.6, 41.6],
+        [-90.0, 39.5], [-89.6, 38.5], [-89.1, 37.1],
+        [-89.5, 36.0], [-90.4, 34.2], [-91.1, 33.2],
+        [-91.5, 32.3], [-91.2, 30.4], [-89.5, 29.2],
+        [-88.8, 30.0],
+      ]},
+      // Ohio
+      { name: "Ohio River Overflow", flow_km3: 7800, dissipation: "Ohio valley at maximum — Cincinnati under 25m. Joins Mississippi adding massive discharge pulse.", width: 2.0, coords: [
+        [-80.5, 40.6], [-82.9, 40.4], [-84.2, 39.1],
+        [-86.8, 37.9], [-88.1, 37.2], [-89.1, 37.1],
+      ]},
+      // Missouri → Mississippi confluence
+      { name: "Missouri-Mississippi Confluence", flow_km3: 8500, dissipation: "Missouri meets Mississippi at St Louis — combined 500,000 m³/s overwhelms valley 150km wide.", width: 2.4, coords: [
+        [-91.7, 38.8], [-91.4, 38.5], [-91.1, 38.2],
+        [-90.8, 37.9], [-90.4, 37.5], [-89.9, 37.2], [-89.1, 37.1],
+      ]},
+      // Appalachian overflow — Ohio east to Atlantic
+      { name: "Appalachian Overflow", flow_km3: 4500, dissipation: "Proglacial lakes overflow Appalachian gaps — Susquehanna, Potomac, Delaware all at maximum flood stage.", width: 1.8, coords: [
+        [-80.5, 40.6], [-79.5, 40.3], [-78.5, 40.1],
+        [-77.5, 40.2], [-77.0, 39.9], [-76.5, 39.6],
+        [-76.0, 39.2], [-75.7, 38.8], [-75.3, 38.4],
+      ]},
+      // Finger Lakes → Chemung / Susquehanna drainage — westernmost channels
+      { name: "Chemung River Outflow", flow_km3: 1800, dissipation: "Seneca and Chemung lake overflow drains south through Chemung valley into Susquehanna.", width: 1.4, coords: [
+        [-76.9, 42.9], [-76.9, 42.4], [-77.0, 42.0],
+        [-76.9, 41.5], [-76.8, 41.0], [-76.5, 40.5], [-76.3, 40.0],
+      ]},
+      // Cayuga / Seneca outlet south
+      { name: "Cayuga Outlet", flow_km3: 1600, dissipation: "Cayuga Lake overflow — drains south through valleys carved by retreating ice margin.", width: 1.3, coords: [
+        [-76.5, 42.8], [-76.4, 42.3], [-76.3, 41.8],
+        [-76.2, 41.3], [-76.0, 40.8], [-75.8, 40.2],
+      ]},
+      // Oneida / Mohawk corridor south
+      { name: "Mohawk-Susquehanna", flow_km3: 2200, dissipation: "Mohawk valley overflow cuts south through Catskill gaps into Susquehanna — massive proglacial lake drainage.", width: 1.5, coords: [
+        [-75.5, 43.1], [-75.3, 42.6], [-75.1, 42.1],
+        [-75.0, 41.6], [-75.0, 41.1], [-74.9, 40.7], [-74.8, 40.2],
+      ]},
+      // Delaware River corridor
+      { name: "Delaware Outflow", flow_km3: 1900, dissipation: "Delaware River at maximum — Philadelphia region under 15-25m. Drains to Delaware Bay and Atlantic.", width: 1.4, coords: [
+        [-74.8, 42.5], [-74.9, 42.0], [-75.0, 41.5],
+        [-75.1, 41.0], [-75.1, 40.5], [-74.9, 40.0],
+        [-75.1, 39.7], [-75.2, 39.3], [-75.4, 39.0],
+      ]},
+      // Hudson River — direct Atlantic outlet
+      { name: "Hudson River Megaflood", flow_km3: 3200, dissipation: "Hudson at 50x modern discharge — New York Harbor under 40m. Continental shelf exposed by glacial low stand now reflooding from both directions.", width: 1.7, coords: [
+        [-73.9, 43.8], [-73.9, 43.3], [-73.9, 42.8],
+        [-73.9, 42.2], [-73.9, 41.7], [-74.0, 41.2],
+        [-74.0, 40.7], [-74.1, 40.5], [-74.0, 40.2],
+      ]},
+      // Connecticut / Rhode Island coastal flooding
+      { name: "New England Coast", flow_km3: 1400, dissipation: "Coastal flooding from Atlantic sea level rise + proglacial lake drainage. Long Island Sound fully inundated.", width: 1.2, coords: [
+        [-73.5, 41.5], [-72.8, 41.4], [-72.0, 41.4],
+        [-71.5, 41.5], [-71.0, 41.6], [-70.5, 41.8],
+        [-70.0, 42.0], [-69.8, 41.7],
+      ]},
+      // Chicago outlet — Lake Michigan → Illinois → Mississippi
+      { name: "Chicago Outlet", flow_km3: 5200, dissipation: "Lake Michigan overflows Chicago outlet into Illinois River — ancient glacial drainage route, reactivated.", width: 2.0, coords: [
+        [-87.8, 41.8], [-88.0, 41.4], [-88.5, 41.0],
+        [-89.0, 40.5], [-89.5, 40.0], [-90.0, 39.4],
+        [-90.4, 38.8], [-90.5, 38.2], [-89.8, 37.2],
+      ]},
+      // Great Lakes + Agassiz full flood
+      { name: "Lake Agassiz Overflow", flow_km3: 24000, dissipation: "Catastrophic Lake Agassiz outburst — largest lake in N American history. Eastern outlet flooded St Lawrence, Arctic outlet flooded Mackenzie. AMOC shutdown within decades.", width: 3.6, coords: [
+        [-99.0, 52.0], [-97.0, 50.5], [-96.5, 49.5],
+        [-96.8, 48.5], [-96.8, 47.5], [-96.5, 46.5],
+        [-96.8, 46.0], [-93.0, 46.5], [-90.0, 46.0],
+        [-88.0, 45.5], [-87.0, 44.5], [-86.0, 43.5],
+        [-85.0, 43.0], [-84.0, 42.5], [-83.0, 42.2],
+        [-82.0, 42.5], [-81.0, 42.8], [-80.0, 43.0],
+        [-79.5, 43.3], [-79.1, 43.9], [-77.5, 44.1],
+      ]},
+      // Finger Lakes megaflood — all lakes overflow simultaneously
+      { name: "Finger Lakes Megaflood", flow_km3: 5800, dissipation: "All 11 Finger Lakes overflow simultaneously — Mohawk corridor 80m deep. Hudson canyon fully inundated to Manhattan.", width: 2.0, coords: [
+        [-77.3, 42.5], [-77.0, 42.6], [-76.5, 42.8], [-76.0, 43.0],
+        [-75.4, 43.1], [-74.7, 43.0], [-74.2, 42.9], [-73.7, 42.7],
+        [-73.7, 42.2], [-73.8, 41.5], [-73.9, 41.0], [-74.0, 40.7],
+        [-74.0, 40.5], [-74.0, 40.3],
+      ]},
+      // St Lawrence at maximum
+      { name: "St Lawrence / Atlantic", flow_km3: 28000, dissipation: "Maximum Atlantic freshwater injection — Lake Agassiz + Great Lakes combined. Salinity drop of 3-5ppt across N Atlantic. Younger Dryas onset within 1-3 years of peak discharge.", width: 3.2, coords: [
+        [-79.1, 43.3], [-77.5, 43.0], [-76.0, 43.2], [-75.0, 43.6],
+        [-74.3, 44.5], [-73.8, 45.5], [-73.5, 46.5],
+        [-72.5, 46.8], [-71.2, 46.8], [-69.5, 47.4],
+        [-67.5, 47.9], [-65.5, 48.4], [-64.0, 48.8],
+        [-62.5, 48.5], [-61.5, 47.3],
+      ]},
+      // Mackenzie at maximum
+      { name: "Mackenzie Arctic Outlet", flow_km3: 14000, dissipation: "Lake Agassiz northern spillway — Beaufort Sea freshwater spike. Arctic sea ice formation disrupted for centuries.", width: 2.8, coords: [
+        [-113.5, 56.0], [-117.0, 58.5], [-120.5, 61.5],
+        [-122.5, 63.5], [-126.0, 65.0], [-128.5, 67.0],
+        [-132.0, 68.5], [-134.5, 69.2],
+      ]},
+      // Hudson Bay drainage
+      { name: "Hudson Bay Outlet", flow_km3: 9500, dissipation: "Laurentide ice margin retreat opened Hudson Bay — massive meltwater pulse to Labrador Sea and N Atlantic.", width: 2.6, coords: [
+        [-85.0, 56.0], [-83.5, 58.0], [-82.5, 60.0],
+        [-82.0, 62.0], [-82.5, 64.0], [-83.0, 66.0],
+      ]},
+      // Atlantic coastal flooding
+      { name: "Atlantic Seaboard", flow_km3: 4200, dissipation: "Coastal inundation from sea level rise + storm surge amplification. Continental shelf exposed during glacial low stand now reflooding.", width: 2.4, coords: [
+        [-75.5, 35.5], [-75.2, 37.0], [-74.8, 38.5],
+        [-74.2, 40.0], [-73.8, 41.5], [-72.5, 42.5],
+        [-71.0, 43.5], [-70.0, 44.5], [-68.0, 46.5],
+      ]},
+    ]
+  }
+};
+
+// Real Last Glacial Maximum ice sheet extents as lat/lng polygons
+// Pulled back slightly from maximum extent to show Finger Lakes region and ice-free corridor
+const YDI_ICE_SHEETS = [
+  {
+    name: "Laurentide Ice Sheet",
+    color: "#bfdbfe",
+    // Southern margin pulled north ~2-3° to show Finger Lakes, Erie, Ontario ice-free
+    coords: [
+      [-76.5, 43.0],  // Finger Lakes / upstate NY southern limit
+      [-79.0, 42.5],  // Lake Erie south shore
+      [-82.5, 41.5],  // NW Ohio
+      [-85.5, 41.5],  // Indiana/Ohio border
+      [-87.5, 41.8],  // Chicago area
+      [-90.0, 42.5],  // Wisconsin
+      [-93.0, 43.5],  // Minnesota
+      [-96.5, 45.0],  // N Dakota border
+      [-99.5, 46.5],  // N Dakota
+      [-102.0, 47.5], // N Dakota/Montana
+      [-106.0, 48.5], // Montana
+      [-109.0, 49.0], // Montana/Alberta border
+      [-112.0, 49.0], // Alberta south — ice-free corridor starts here
+      // Ice-free corridor (Mackenzie) — indent eastward
+      [-113.5, 51.0], // Corridor west edge
+      [-113.0, 53.5], // Corridor narrows
+      [-113.5, 56.0], // N Alberta corridor
+      [-116.0, 58.0], // NE BC — rejoins ice
+      [-118.0, 59.5], // Northern BC
+      [-120.0, 61.0], // Yukon border
+      // Arctic extent
+      [-125.0, 63.0],
+      [-130.0, 65.0],
+      [-135.0, 68.0],
+      [-130.0, 70.0],
+      [-120.0, 72.0],
+      [-105.0, 73.0],
+      [-90.0,  73.5],
+      [-80.0,  74.0],
+      [-72.0,  74.5],
+      [-65.0,  73.0],
+      [-60.0,  70.0],
+      [-57.0,  65.0],
+      [-59.0,  60.0],
+      [-63.0,  57.0],
+      [-66.0,  52.0],
+      [-69.0,  48.0],
+      [-71.0,  46.0],
+      [-73.5,  44.5],
+      [-76.5,  43.0],  // back to start
+    ]
+  },
+  {
+    name: "Cordilleran Ice Sheet",
+    color: "#bfdbfe",
+    // Stays west of ice-free corridor — doesn't reach Alberta plains
+    coords: [
+      [-113.5, 49.0],  // BC/Alberta border — eastern limit
+      [-115.0, 48.0],  // N Idaho limit
+      [-117.0, 47.0],  // Washington
+      [-119.5, 46.5],  // Central Washington
+      [-121.0, 45.5],  // Columbia River
+      [-122.0, 45.0],  // Portland area — southern limit
+      [-123.5, 45.5],  // Oregon coast
+      [-124.0, 47.0],  // Olympic Peninsula
+      [-123.5, 48.5],  // Puget Sound
+      [-124.0, 50.0],  // Vancouver Island north
+      [-125.0, 52.0],  // BC coast
+      [-127.0, 54.0],  // BC north coast
+      [-129.0, 56.0],  // SE Alaska
+      [-132.0, 57.5],
+      [-135.0, 59.0],
+      [-138.0, 60.5],
+      [-141.0, 61.5],  // Alaska border
+      [-140.0, 63.0],  // Yukon
+      [-136.0, 63.5],
+      [-133.0, 62.5],
+      [-129.0, 61.0],
+      [-125.0, 60.0],
+      [-121.0, 59.0],
+      [-118.0, 57.5],  // BC interior
+      [-116.0, 55.5],
+      [-114.5, 53.0],
+      [-113.5, 51.0],  // Ice-free corridor east edge
+      [-113.5, 49.0],  // back to start
+    ]
+  }
+];
 
 const WILDFIRE_ZONES = [
   // 1.5°C zones — current trajectory
@@ -185,6 +717,7 @@ const YELLOWSTONE_PRESETS = [
     desc: "Largest known — 1,000 km³ ejecta",
     vei: 8,
     color: "#ef4444",
+    blackout_pct: 70, blackout_duration_months: 36, blackout_severity: "Nuclear winter — mass starvation",
     zones: [
       { name: "Kill Zone", desc: "Total devastation, pyroclastic flows", survival: "0%", survivalNote: "Pyroclastic flows, 1000°C+. No survival possible.", ash_m: 100, major_km: 200, minor_km: 120, color: "#fef08a", opacity: 0.85 },
       { name: "Heavy Ash (>1m)", desc: "Structures collapse, crops destroyed", survival: "2-5%", survivalNote: "Roof collapse, water contamination, no food. Survival only with immediate evacuation.", ash_m: 1, major_km: 800, minor_km: 400, color: "#b91c1c", opacity: 0.55 },
@@ -198,6 +731,7 @@ const YELLOWSTONE_PRESETS = [
     desc: "Mid-size — 280 km³ ejecta",
     vei: 8,
     color: "#f97316",
+    blackout_pct: 40, blackout_duration_months: 18, blackout_severity: "Global dimming — crop failures likely",
     zones: [
       { name: "Kill Zone", desc: "Total devastation", survival: "0%", survivalNote: "Pyroclastic flows, 1000°C+. No survival possible.", ash_m: 50, major_km: 120, minor_km: 70, color: "#fef08a", opacity: 0.85 },
       { name: "Heavy Ash (>1m)", desc: "Structures collapse", survival: "2-5%", survivalNote: "Roof collapse, water contamination, no food. Survival only with immediate evacuation.", ash_m: 1, major_km: 450, minor_km: 220, color: "#b91c1c", opacity: 0.55 },
@@ -211,6 +745,7 @@ const YELLOWSTONE_PRESETS = [
     desc: "First eruption — 2,450 km³ ejecta",
     vei: 8,
     color: "#a855f7",
+    blackout_pct: 70, blackout_duration_months: 36, blackout_severity: "Nuclear winter — mass starvation",
     zones: [
       { name: "Kill Zone", desc: "Total devastation", survival: "0%", survivalNote: "Pyroclastic flows, 1000°C+. No survival possible.", ash_m: 200, major_km: 300, minor_km: 180, color: "#fef08a", opacity: 0.85 },
       { name: "Heavy Ash (>1m)", desc: "Structures collapse", survival: "2-5%", survivalNote: "Roof collapse, water contamination, no food. Survival only with immediate evacuation.", ash_m: 1, major_km: 1200, minor_km: 600, color: "#b91c1c", opacity: 0.55 },
@@ -266,6 +801,7 @@ const TOBA_PRESETS = [
     desc: "Largest eruption in 2M years — 2,800 km³ ejecta",
     vei: 8,
     color: "#ef4444",
+    blackout_pct: 80, blackout_duration_months: 48, blackout_severity: "Extinction winter — photosynthesis collapse",
     zones: [
       { name: "Kill Zone", desc: "Total devastation, pyroclastic flows", survival: "0%", survivalNote: "Pyroclastic flows 1000°C+. No survival possible.", major_km: 400, minor_km: 250, color: "#fef08a", opacity: 0.85 },
       { name: "Heavy Ash (>1m)", desc: "Structures collapse, crops destroyed", survival: "2-5%", survivalNote: "Roof collapse, water contamination. Evacuation only hope.", major_km: 1600, minor_km: 900, color: "#b91c1c", opacity: 0.55 },
@@ -285,6 +821,7 @@ const CAMPI_PRESETS = [
     desc: "Caldera collapse — ~500 km³ ejecta, Naples direct hit",
     vei: 8,
     color: "#f97316",
+    blackout_pct: 45, blackout_duration_months: 24, blackout_severity: "Global dimming — crop failures likely",
     zones: [
       { name: "Kill Zone", desc: "Total devastation — Naples destroyed", survival: "0%", survivalNote: "Pyroclastic flows obliterate Naples and surrounding area.", major_km: 150, minor_km: 100, color: "#fef08a", opacity: 0.85 },
       { name: "Heavy Ash (>1m)", desc: "Structures collapse across Italy", survival: "2-5%", survivalNote: "Roof collapse, water contamination. Immediate evacuation required.", major_km: 600, minor_km: 350, color: "#b91c1c", opacity: 0.55 },
@@ -308,15 +845,16 @@ const TSUNAMI_SOURCES = [
     desc: "Cumbre Vieja western flank — 500km³ into Atlantic",
     origin: [-17.8, 28.6],  // Canary Islands
     bearing: 270,            // waves propagate west toward Americas
+    spreadAngle: 75,         // wide spread — Atlantic basin
     color: "#0ea5e9",
     threat: "US East Coast, Caribbean, NW Africa, W Europe",
     maxWaveM: 100,
     bbox: { minLat: 5, maxLat: 65, minLng: -85, maxLng: 20 },
     rings: [
-      { hours: 1,  major_km: 600,  minor_km: 400,  waveM: 100, label: "1 hr" },
-      { hours: 2,  major_km: 1200, minor_km: 800,  waveM: 40, label: "2 hr" },
-      { hours: 4,  major_km: 2400, minor_km: 1600, waveM: 25,  label: "4 hr" },
-      { hours: 8,  major_km: 4320, minor_km: 2880, waveM: 10,  label: "8 hr" },
+      { hours: 1,  major_km: 540,  minor_km: 346,  waveM: 100, label: "1 hr" },
+      { hours: 2,  major_km: 1080, minor_km: 691,  waveM: 40, label: "2 hr" },
+      { hours: 4,  major_km: 2160, minor_km: 1382, waveM: 25,  label: "4 hr" },
+      { hours: 8,  major_km: 3780, minor_km: 2419, waveM: 10,  label: "8 hr" },
     ],
     inundation_km: 3,   // avg km inland at target coasts
   },
@@ -324,17 +862,18 @@ const TSUNAMI_SOURCES = [
     label: "Cumbre Vieja",
     name: "Cumbre Vieja Eruption",
     desc: "Full volcanic flank collapse — 1,500km³ ejecta",
-    origin: [-17.84, 36.07],
+    origin: [-17.84, 28.57],
     bearing: 265,
+    spreadAngle: 75,
     color: "#06b6d4",
     threat: "US East Coast, Brazil, Iberian Peninsula",
     maxWaveM: 650,
     bbox: { minLat: -35, maxLat: 65, minLng: -80, maxLng: 15 },
     rings: [
-      { hours: 1,  major_km: 700,  minor_km: 450,  waveM: 650, label: "1 hr" },
-      { hours: 2,  major_km: 1400, minor_km: 900,  waveM: 80, label: "2 hr" },
-      { hours: 4,  major_km: 2800, minor_km: 1800, waveM: 40, label: "4 hr" },
-      { hours: 9,  major_km: 4348, minor_km: 2767, waveM: 15,  label: "9 hr" },
+      { hours: 1,  major_km: 648,  minor_km: 410,  waveM: 650, label: "1 hr" },
+      { hours: 2,  major_km: 1296, minor_km: 821,  waveM: 80, label: "2 hr" },
+      { hours: 4,  major_km: 2592, minor_km: 1642, waveM: 40, label: "4 hr" },
+      { hours: 9,  major_km: 3888, minor_km: 2462, waveM: 15,  label: "9 hr" },
     ],
     inundation_km: 8,
   },
@@ -344,15 +883,16 @@ const TSUNAMI_SOURCES = [
     desc: "Mw 9.2 megathrust — entire 1,000km fault rupture",
     origin: [-125.0, 45.0],
     bearing: 250,
+    spreadAngle: 60,
     color: "#3b82f6",
     threat: "US/Canada West Coast, Hawaii, Japan, Alaska",
     maxWaveM: 30,
     bbox: { minLat: 15, maxLat: 72, minLng: 130, maxLng: -110 },
     rings: [
-      { hours: 0.5, major_km: 300,  minor_km: 200,  waveM: 30, label: "30 min" },
-      { hours: 1,   major_km: 600,  minor_km: 400,  waveM: 20, label: "1 hr" },
-      { hours: 3,   major_km: 1800, minor_km: 1200, waveM: 10, label: "3 hr" },
-      { hours: 9,   major_km: 5400, minor_km: 3600, waveM: 5,  label: "9 hr" },
+      { hours: 0.5, major_km: 324,  minor_km: 216,  waveM: 30, label: "30 min" },
+      { hours: 1,   major_km: 648,  minor_km: 432,  waveM: 20, label: "1 hr" },
+      { hours: 3,   major_km: 1944, minor_km: 1296, waveM: 10, label: "3 hr" },
+      { hours: 9,   major_km: 5832, minor_km: 3888, waveM: 5,  label: "9 hr" },
     ],
     inundation_km: 5,
   },
@@ -362,15 +902,16 @@ const TSUNAMI_SOURCES = [
     desc: "Anak Krakatau-scale submarine collapse — Gulf of Alaska",
     origin: [-152.0, 58.0],
     bearing: 200,
+    spreadAngle: 55,
     color: "#8b5cf6",
     threat: "Hawaii, US West Coast, Japan, Pacific Islands",
     maxWaveM: 50,
     bbox: { minLat: -5, maxLat: 72, minLng: 120, maxLng: -100 },
     rings: [
-      { hours: 1,  major_km: 500,  minor_km: 350,  waveM: 50, label: "1 hr" },
-      { hours: 2,  major_km: 1000, minor_km: 700,  waveM: 30, label: "2 hr" },
-      { hours: 5,  major_km: 2500, minor_km: 1750, waveM: 15,  label: "5 hr" },
-      { hours: 10, major_km: 5000, minor_km: 3500, waveM: 5,  label: "10 hr" },
+      { hours: 1,  major_km: 540,  minor_km: 378,  waveM: 50, label: "1 hr" },
+      { hours: 2,  major_km: 1080, minor_km: 756,  waveM: 30, label: "2 hr" },
+      { hours: 5,  major_km: 2700, minor_km: 1890, waveM: 15,  label: "5 hr" },
+      { hours: 10, major_km: 5400, minor_km: 3780, waveM: 5,  label: "10 hr" },
     ],
     inundation_km: 2,
   },
@@ -379,23 +920,23 @@ const TSUNAMI_SOURCES = [
 const TSUNAMI_SOURCE_ID = "tsunami-source";
 const TSUNAMI_LAYER_PREFIX = "tsunami-layer";
 
-const buildTsunamiEllipse = (originLng, originLat, majorKm, minorKm, bearingDeg, steps = 96) => {
+const buildTsunamiEllipse = (originLng, originLat, majorKm, minorKm, bearingDeg, steps = 96, spreadAngle = 65) => {
+  // Wedge/sector: tip at origin, arc at majorKm radius, spreadAngle degrees each side
   const kpLat = 110.574;
   const kpLng = 111.32 * Math.cos((originLat * Math.PI) / 180);
-  const bearingRad = (bearingDeg * Math.PI) / 180;
-  const dNorth = Math.cos(bearingRad);
-  const dEast  = Math.sin(bearingRad);
-  const cLat = originLat + (dNorth * majorKm * 0.85) / kpLat;
-  const cLng = originLng + (dEast  * majorKm * 0.85) / Math.max(kpLng, 0.0001);
   const coords = [];
+  // Tip at origin
+  coords.push([originLng, originLat]);
+  // Arc at majorKm from origin, from (bearing-spread) to (bearing+spread)
   for (let i = 0; i <= steps; i++) {
-    const t = (i / steps) * Math.PI * 2;
-    const along = Math.cos(t) * majorKm;
-    const perp  = Math.sin(t) * minorKm;
-    const nKm = dNorth * along - dEast * perp;
-    const eKm = dEast  * along + dNorth * perp;
-    coords.push([cLng + eKm / Math.max(kpLng, 0.0001), cLat + nKm / kpLat]);
+    const angleDeg = (bearingDeg - spreadAngle) + (spreadAngle * 2) * (i / steps);
+    const angleRad = angleDeg * Math.PI / 180;
+    const eKm = Math.sin(angleRad) * majorKm;
+    const nKm = Math.cos(angleRad) * majorKm;
+    coords.push([originLng + eKm / Math.max(kpLng, 0.0001), originLat + nKm / kpLat]);
   }
+  // Close back to tip
+  coords.push([originLng, originLat]);
   // Keep coords continuous — prevent jumps > 180 between consecutive points
   // This tells Mapbox to draw across the antimeridian correctly
   for (let i = 1; i < coords.length; i++) {
@@ -425,11 +966,15 @@ export default function HomePage() {
   const impactDiameterRef = useRef(1000);
   const floodEngineUrlRef = useRef(FLOOD_ENGINE_PROXY_PATH);
 
-  const impactPointRef = useRef(null);
+  const impactPointRef = useRef(null);       // last placed point (compat)
+  const impactPointsRef = useRef([]);         // [{lng, lat, marker, result}] multi-impact
   const impactResultRef = useRef(null);
   const activeFloodLevelRef = useRef(null);
   const initialViewAppliedRef = useRef(false);
   const impactRunSeqRef = useRef(0);
+  const impactCountRef = useRef(0);
+  const impactDrawingRef = useRef(false); // true while runImpact is drawing results
+  const impactFloodLayersRef = useRef([]); // [{sourceId, layerId}] cumulative flood tiles
 
   const [inputLevel, setInputLevel] = useState(0);
   const [inputText, setInputText] = useState("0");
@@ -438,6 +983,9 @@ export default function HomePage() {
   const [scenarioMode, setScenarioMode] = useState(null);
   const [impactDiameter, setImpactDiameter] = useState(1000);
   const [nukeYield, setNukeYield] = useState(15);
+  const nukeStrikesRef = useRef([]); // array of { lat, lng, marker }
+  const [nukeStrikes, setNukeStrikes] = useState([]); // mirror for UI
+  const MAX_NUKE_STRIKES = 5;
   const [yellowstonePreset, setYellowstonePreset] = useState(0);
   const [volcanoType, setVolcanoType] = useState("yellowstone"); // "yellowstone" | "toba" | "campi"
   const volcanoTypeRef = useRef("yellowstone");
@@ -454,6 +1002,10 @@ export default function HomePage() {
   const [cataclysmOverlay, setCataclysmOverlay] = useState("flood"); // "flood" | "wind" | "both"
   const cataclysmSpinRef = useRef(null);
   const cataclysmRunRef = useRef(0);
+  const [ydiIntensity, setYdiIntensity] = useState("medium"); // "low"|"medium"|"high"
+  const ydiIntensityRef = useRef("medium");
+  const ydiRunRef = useRef(0);
+  const ydiIceFrameRef = useRef(null);
   const [tsunamiResult, setTsunamiResult] = useState(null);
   const [tsunamiFloodLevel, setTsunamiFloodLevel] = useState(null);
   const tsunamiPopupRef = useRef(null); // 0=640k, 1=1.3M, 2=2.1M
@@ -461,16 +1013,28 @@ export default function HomePage() {
   const [yellowstoneActive, setYellowstoneActive] = useState(false);
   const [yellowstoneResult, setYellowstoneResult] = useState(null);
   const yellowstonePopupRef = useRef(null);
+  const impactZonePopupRef = useRef(null);
+  const nukeZonePopupRef = useRef(null);
+  // Paywall: track free popup clicks per session (resets on mode clear)
+  const impactPopupClickCountRef = useRef(0);
+  const nukePopupClickCountRef   = useRef(0);
   const [nukeBurst, setNukeBurst] = useState("airburst");
   const [nukeWindDeg, setNukeWindDeg] = useState(270);
+  const [nukeSubMode, setNukeSubMode] = useState("detonate"); // "detonate" | "emp"
+  const nukeSubModeRef = useRef("detonate");
+  const [empAltitudeKm, setEmpAltitudeKm] = useState(400);
+  const [empResult, setEmpResult] = useState(null);
+  const [empLoading, setEmpLoading] = useState(false);
   const [nukeResult, setNukeResult] = useState(null);
+  const nukeResultRef = useRef(null);
   const [nukeLoading, setNukeLoading] = useState(false);
   const [nukeError, setNukeError] = useState("");
-  const nukePointRef = useRef(null);
+  const nukePointRef = useRef(null); // kept for compatibility, points to last strike
   const [nukePointSet, setNukePointSet] = useState(false);
   const [impactResult, setImpactResult] = useState(null);
   const [impactLoading, setImpactLoading] = useState(false);
   const [impactError, setImpactError] = useState("");
+  const [impactPoints, setImpactPoints] = useState([]); // mirror of impactPointsRef for UI re-render
   const [unitMode, setUnitMode] = useState("m");
   const [floodDisplaced, setFloodDisplaced] = useState(null);
   const [status, setStatus] = useState("Loading map...");
@@ -494,8 +1058,12 @@ export default function HomePage() {
   const [paywallModal, setPaywallModal] = useState(null); // null | "pro" | "ultra" | "ratelimit"
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
   const [supportFormOpen, setSupportFormOpen] = useState(false);
+  // Onboarding — shown once on first /map visit, suppressed by localStorage flag
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingPage, setOnboardingPage] = useState(0); // 0 | 1 | 2
   const [supportMsg, setSupportMsg] = useState("");
   const [activeWarmingLevel, setActiveWarmingLevel] = useState(null);
+  const activeWarmingLevelRef = useRef(null);
   const [rlStatus, setRlStatus] = useState(() => getRLStatus());
 
   // Mobile-only UI state — purely cosmetic, zero effect on map/engine logic
@@ -534,14 +1102,49 @@ export default function HomePage() {
     setIsMobile(window.innerWidth <= 640);
     const check = () => setIsMobile(window.innerWidth <= 640);
     window.addEventListener("resize", check);
+
+    // ── Mobile browser-bar autohide ──────────────────────────────────────────
+    // On mobile, scroll 1px then back — this signals the browser it can hide
+    // its chrome, maximising the visible viewport (works on Chrome/Android,
+    // Safari respects dvh independently once the page is interaction-locked).
+    if (window.innerWidth <= 640) {
+      // Small delay lets the page fully paint first
+      const t = setTimeout(() => {
+        try {
+          window.scrollTo({ top: 1, behavior: "instant" });
+          requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "instant" }));
+        } catch (_) {}
+      }, 300);
+      return () => { clearTimeout(t); window.removeEventListener("resize", check); };
+    }
+
     return () => window.removeEventListener("resize", check);
   }, []);
+
+  // ── First-visit onboarding ────────────────────────────────────────────────
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem("dm_onboarding_v1")) {
+        const t = setTimeout(() => setShowOnboarding(true), 800);
+        return () => clearTimeout(t);
+      }
+    } catch(_) {}
+  }, []);
+
+  const dismissOnboarding = (dontShowAgain = false) => {
+    setShowOnboarding(false);
+    setOnboardingPage(0);
+    if (dontShowAgain) {
+      try { localStorage.setItem("dm_onboarding_v1", "1"); } catch(_) {}
+    }
+  };
 
   useEffect(() => { seaLevelRef.current = seaLevel; }, [seaLevel]);
   useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
   useEffect(() => { scenarioModeRef.current = scenarioMode; }, [scenarioMode]);
   useEffect(() => { impactDiameterRef.current = impactDiameter; }, [impactDiameter]);
   useEffect(() => { impactResultRef.current = impactResult; }, [impactResult]);
+  useEffect(() => { nukeResultRef.current = nukeResult; }, [nukeResult]);
   useEffect(() => { floodEngineUrlRef.current = floodEngineUrl; }, [floodEngineUrl]);
 
   // Star field animation
@@ -726,6 +1329,15 @@ export default function HomePage() {
     safely(() => map.dragRotate.disable()); safely(() => map.touchZoomRotate.disableRotation());
   };
 
+  const removeImpactFloodLayers = () => {
+    const map = mapRef.current;
+    impactFloodLayersRef.current.forEach(({ sourceId, layerId }) => {
+      try { if (map && map.getLayer(layerId)) map.removeLayer(layerId); } catch(e){}
+      try { if (map && map.getSource(sourceId)) map.removeSource(sourceId); } catch(e){}
+    });
+    impactFloodLayersRef.current = [];
+  };
+
   const removeFloodLayer = () => {
     const map = mapRef.current;
     if (!map) { activeFloodLevelRef.current = null; return; }
@@ -734,13 +1346,16 @@ export default function HomePage() {
       if (map.getSource(FLOOD_SOURCE_ID)) map.removeSource(FLOOD_SOURCE_ID);
     } catch (e) { console.warn("Failed removing flood layer:", e); }
     activeFloodLevelRef.current = null;
+    // Also clear any cumulative impact flood layers
+    removeImpactFloodLayers();
   };
 
   const removeImpactPreviewLayers = () => {
     const map = mapRef.current;
     if (!map) return;
     if (impactPulseFrameRef.current) { cancelAnimationFrame(impactPulseFrameRef.current); impactPulseFrameRef.current = null; }
-    const ids = [
+    // Base layer IDs (single impact or idx=0)
+    const baseIds = [
       `${IMPACT_CRATER_LAYER_ID}-pulse`, `${IMPACT_CRATER_LAYER_ID}-inner`,
       `${IMPACT_CRATER_LAYER_ID}-rim`, `${IMPACT_CRATER_LAYER_ID}-ejecta`,
       `${IMPACT_CRATER_LAYER_ID}-ejecta-line`,
@@ -748,16 +1363,39 @@ export default function HomePage() {
       `${IMPACT_THERMAL_LAYER_ID}-line`,
       IMPACT_BLAST_LAYER_ID, IMPACT_CRATER_LAYER_ID,
     ];
+    // Also remove indexed variants for multi-impact (up to 3)
+    const indexedIds = [];
+    for (let i = 0; i < 3; i++) {
+      indexedIds.push(
+        `${IMPACT_THERMAL_LAYER_ID}-${i}`, `${IMPACT_THERMAL_LAYER_ID}-line-${i}`,
+        `${IMPACT_BLAST_LAYER_ID}-fill-${i}`, `${IMPACT_BLAST_LAYER_ID}-${i}`,
+        `${IMPACT_CRATER_LAYER_ID}-ejecta-${i}`, `${IMPACT_CRATER_LAYER_ID}-ejecta-line-${i}`,
+        `${IMPACT_CRATER_LAYER_ID}-rim-${i}`, `${IMPACT_CRATER_LAYER_ID}-${i}`,
+        `${IMPACT_CRATER_LAYER_ID}-inner-${i}`, `${IMPACT_CRATER_LAYER_ID}-pulse-${i}`,
+        // Ocean marker layers (distinct prefix to avoid land layer collisions)
+        `impact-ocean-marker-${i}`, `impact-ocean-marker-pulse-${i}`,
+      );
+    }
     try {
-      ids.forEach((id) => { if (map.getLayer(id)) map.removeLayer(id); });
+      [...baseIds, ...indexedIds].forEach((id) => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
       if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID);
+      for (let i = 0; i < 3; i++) {
+        const srcId = `${IMPACT_PREVIEW_SOURCE_ID}-${i}`;
+        try { if (map.getSource(srcId)) map.removeSource(srcId); } catch(e){}
+        // Ocean marker sources
+        try { if (map.getSource(`impact-ocean-source-${i}`)) map.removeSource(`impact-ocean-source-${i}`); } catch(e){}
+      }
     } catch (e) { console.warn("Failed clearing impact preview layers:", e); }
   };
 
-  const clearImpactPreview = () => { removeFloodLayer(); removeImpactPreviewLayers(); };
+  const clearImpactPreview = () => { removeFloodLayer(); removeImpactPreviewLayers(); removeImpactFloodLayers(); impactDrawingRef.current = false; };
 
   const removeImpactPoint = () => {
     const map = mapRef.current;
+    // Remove all multi-impact markers
+    impactPointsRef.current.forEach(p => { try { p.marker && p.marker.remove(); } catch(e){} });
+    impactPointsRef.current = [];
+    setImpactPoints([]);
     if (!map) { impactPointRef.current = null; return; }
     try {
       if (map.getLayer(IMPACT_LAYER_ID)) map.removeLayer(IMPACT_LAYER_ID);
@@ -844,9 +1482,9 @@ export default function HomePage() {
     } catch (e) { console.error("Failed to draw impact preview", e); }
   };
 
-  const drawLandImpactFromResult = (lng, lat, result) => {
+  const drawLandImpactFromResult = (lng, lat, result, idx = null) => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !result) return;
+    if (!map || !result) return;
     const craterKm = Number(result.crater_diameter_m ?? 0) / 2000;
     const blastKm = Number(result.blast_radius_m ?? 0) / 1000;
     const thermalKm = Number(result.thermal_radius_m ?? 0) / 1000;
@@ -859,38 +1497,66 @@ export default function HomePage() {
       { ...kmCircle(lng, lat, craterKm), properties: { kind: "crater" } },
       { ...kmCircle(lng, lat, craterKm * 0.72), properties: { kind: "crater-inner" } },
     ]};
+    // Use indexed IDs for multi-impact so layers accumulate rather than replace
+    const srcId  = idx != null ? `${IMPACT_PREVIEW_SOURCE_ID}-${idx}` : IMPACT_PREVIEW_SOURCE_ID;
+    const thId   = idx != null ? `${IMPACT_THERMAL_LAYER_ID}-${idx}`  : IMPACT_THERMAL_LAYER_ID;
+    const blFId  = idx != null ? `${IMPACT_BLAST_LAYER_ID}-fill-${idx}` : `${IMPACT_BLAST_LAYER_ID}-fill`;
+    const blId   = idx != null ? `${IMPACT_BLAST_LAYER_ID}-${idx}`   : IMPACT_BLAST_LAYER_ID;
+    const ejId   = idx != null ? `${IMPACT_CRATER_LAYER_ID}-ejecta-${idx}` : `${IMPACT_CRATER_LAYER_ID}-ejecta`;
+    const ejLId  = idx != null ? `${IMPACT_CRATER_LAYER_ID}-ejecta-line-${idx}` : `${IMPACT_CRATER_LAYER_ID}-ejecta-line`;
+    const rimId  = idx != null ? `${IMPACT_CRATER_LAYER_ID}-rim-${idx}` : `${IMPACT_CRATER_LAYER_ID}-rim`;
+    const crId   = idx != null ? `${IMPACT_CRATER_LAYER_ID}-${idx}`  : IMPACT_CRATER_LAYER_ID;
+    const crInId = idx != null ? `${IMPACT_CRATER_LAYER_ID}-inner-${idx}` : `${IMPACT_CRATER_LAYER_ID}-inner`;
+    const pulId  = idx != null ? `${IMPACT_CRATER_LAYER_ID}-pulse-${idx}` : `${IMPACT_CRATER_LAYER_ID}-pulse`;
+    const thLId  = idx != null ? `${IMPACT_THERMAL_LAYER_ID}-line-${idx}` : `${IMPACT_THERMAL_LAYER_ID}-line`;
     try {
-      clearImpactPreview();
-      map.addSource(IMPACT_PREVIEW_SOURCE_ID, { type: "geojson", data });
-      // Thermal zone — orange fill + orange border
-      map.addLayer({ id: IMPACT_THERMAL_LAYER_ID, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "fill-color": "#f97316", "fill-opacity": 0.15 } });
-      map.addLayer({ id: `${IMPACT_THERMAL_LAYER_ID}-line`, type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "line-color": "#f97316", "line-width": 2, "line-opacity": 0.9 } });
-      // Blast zone — red fill + bright red border
-      map.addLayer({ id: `${IMPACT_BLAST_LAYER_ID}-fill`, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-fill"], paint: { "fill-color": "#ef4444", "fill-opacity": 0.25 } });
-      map.addLayer({ id: IMPACT_BLAST_LAYER_ID, type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast"], paint: { "line-color": "#ef4444", "line-width": 3, "line-opacity": 1 } });
-      // Ejecta ring — brown fill
-      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-ejecta`, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "ejecta"], paint: { "fill-color": "#92400e", "fill-opacity": 0.30 } });
-      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-ejecta-line`, type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "ejecta"], paint: { "line-color": "#b45309", "line-width": 2, "line-opacity": 0.8 } });
-      // Crater rim — dark red fill + pulsing red border
-      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-rim`, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "crater-rim"], paint: { "fill-color": "#7f1d1d", "fill-opacity": 0.50 } });
-      // Crater — black fill + bright yellow border
-      map.addLayer({ id: IMPACT_CRATER_LAYER_ID, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "crater"], paint: { "fill-color": "#000000", "fill-opacity": 0.90 } });
-      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-inner`, type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "crater-inner"], paint: { "fill-color": "#000000", "fill-opacity": 0.70 } });
-      // Pulsing rim outline
-      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-pulse`, type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "crater-rim"], paint: { "line-color": "#fde047", "line-width": 3, "line-opacity": 0.95 } });
+      // Clean up this specific indexed set if re-drawing (clearing is done by caller)
+      if (idx != null) {
+        [thId, thLId, blFId, blId, ejId, ejLId, rimId, crId, crInId, pulId].forEach(id => {
+          try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){}
+        });
+        try { if (map.getSource(srcId)) map.removeSource(srcId); } catch(e){}
+      }
+      map.addSource(srcId, { type: "geojson", data });
+      map.addLayer({ id: thId,   type: "fill", source: srcId, filter: ["==", ["get", "kind"], "thermal"],    paint: { "fill-color": "#f97316", "fill-opacity": 0.15 } });
+      map.addLayer({ id: thLId,  type: "line", source: srcId, filter: ["==", ["get", "kind"], "thermal"],    paint: { "line-color": "#f97316", "line-width": 2, "line-opacity": 0.9 } });
+      map.addLayer({ id: blFId,  type: "fill", source: srcId, filter: ["==", ["get", "kind"], "blast-fill"], paint: { "fill-color": "#ef4444", "fill-opacity": 0.25 } });
+      map.addLayer({ id: blId,   type: "line", source: srcId, filter: ["==", ["get", "kind"], "blast"],      paint: { "line-color": "#ef4444", "line-width": 3, "line-opacity": 1 } });
+      map.addLayer({ id: ejId,   type: "fill", source: srcId, filter: ["==", ["get", "kind"], "ejecta"],     paint: { "fill-color": "#92400e", "fill-opacity": 0.30 } });
+      map.addLayer({ id: ejLId,  type: "line", source: srcId, filter: ["==", ["get", "kind"], "ejecta"],     paint: { "line-color": "#b45309", "line-width": 2, "line-opacity": 0.8 } });
+      map.addLayer({ id: rimId,  type: "fill", source: srcId, filter: ["==", ["get", "kind"], "crater-rim"], paint: { "fill-color": "#7f1d1d", "fill-opacity": 0.50 } });
+      map.addLayer({ id: crId,   type: "fill", source: srcId, filter: ["==", ["get", "kind"], "crater"],     paint: { "fill-color": "#000000", "fill-opacity": 0.90 } });
+      map.addLayer({ id: crInId, type: "fill", source: srcId, filter: ["==", ["get", "kind"], "crater-inner"], paint: { "fill-color": "#000000", "fill-opacity": 0.70 } });
+      map.addLayer({ id: pulId,  type: "line", source: srcId, filter: ["==", ["get", "kind"], "crater-rim"], paint: { "line-color": "#fde047", "line-width": 3, "line-opacity": 0.95 } });
       safely(() => map.triggerRepaint());
       startImpactPulseAnimation();
     } catch (e) { console.error("Failed to draw land impact result", e); }
   };
 
-  const drawOceanImpactMarker = (lng, lat) => {
+  const drawOceanImpactMarker = (lng, lat, idx = null) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return false;
+    // Use a distinct "ocean-marker" prefix so these IDs never collide with land impact layer IDs
+    const srcId  = idx != null ? `impact-ocean-source-${idx}`       : IMPACT_PREVIEW_SOURCE_ID;
+    const crId   = idx != null ? `impact-ocean-marker-${idx}`       : IMPACT_CRATER_LAYER_ID;
+    const pulId  = idx != null ? `impact-ocean-marker-pulse-${idx}` : `${IMPACT_CRATER_LAYER_ID}-pulse`;
     try {
-      removeImpactPreviewLayers();
-      map.addSource(IMPACT_PREVIEW_SOURCE_ID, { type: "geojson", data: { type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Point", coordinates: [lng, lat] }, properties: { kind: "impact-core" } }] } });
-      map.addLayer({ id: IMPACT_CRATER_LAYER_ID, type: "circle", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "impact-core"], paint: { "circle-radius": 10, "circle-color": "#ef4444", "circle-stroke-width": 2, "circle-stroke-color": "#ffffff" } });
-      map.addLayer({ id: `${IMPACT_CRATER_LAYER_ID}-pulse`, type: "circle", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "impact-core"], paint: { "circle-radius": 28, "circle-color": "rgba(0,0,0,0)", "circle-stroke-width": 2, "circle-stroke-color": "#ef4444", "circle-stroke-opacity": 0.9 } });
+      if (idx != null) {
+        [crId, pulId].forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
+        try { if (map.getSource(srcId)) map.removeSource(srcId); } catch(e){}
+      } else {
+        // Single-point fallback: remove base layers only
+        const baseIds = [`${IMPACT_CRATER_LAYER_ID}-pulse`, `${IMPACT_CRATER_LAYER_ID}-inner`,
+          `${IMPACT_CRATER_LAYER_ID}-rim`, `${IMPACT_CRATER_LAYER_ID}-ejecta`,
+          `${IMPACT_CRATER_LAYER_ID}-ejecta-line`, `${IMPACT_BLAST_LAYER_ID}-fill`,
+          IMPACT_THERMAL_LAYER_ID, `${IMPACT_THERMAL_LAYER_ID}-line`,
+          IMPACT_BLAST_LAYER_ID, IMPACT_CRATER_LAYER_ID];
+        baseIds.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
+        try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e){}
+      }
+      map.addSource(srcId, { type: "geojson", data: { type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Point", coordinates: [lng, lat] }, properties: { kind: "impact-core" } }] } });
+      map.addLayer({ id: crId,  type: "circle", source: srcId, filter: ["==", ["get", "kind"], "impact-core"], paint: { "circle-radius": 10, "circle-color": "#ef4444", "circle-stroke-width": 2, "circle-stroke-color": "#ffffff" } });
+      map.addLayer({ id: pulId, type: "circle", source: srcId, filter: ["==", ["get", "kind"], "impact-core"], paint: { "circle-radius": 28, "circle-color": "rgba(0,0,0,0)", "circle-stroke-width": 2, "circle-stroke-color": "#ef4444", "circle-stroke-opacity": 0.9 } });
       safely(() => map.triggerRepaint());
       startImpactPulseAnimation();
       return true;
@@ -903,46 +1569,62 @@ export default function HomePage() {
     const normalizedLevel = Number(level);
     if (!Number.isFinite(normalizedLevel) || normalizedLevel === 0) return false;
 
-    const { impactLat, impactLng, reachM } = opts;
+    const { impactLat, impactLng, reachM, impactIdx } = opts;
     const isRegional = impactLat != null && impactLng != null && reachM != null && reachM > 0;
+    // impactIdx: if set, add as cumulative indexed layer (impact mode multi-point)
+    const isIndexed = impactIdx != null;
+    const sourceId = isIndexed ? `flood-source-impact-${impactIdx}` : FLOOD_SOURCE_ID;
+    const layerId  = isIndexed ? `flood-layer-impact-${impactIdx}`  : FLOOD_LAYER_ID;
 
     const tileUrl = isRegional
       ? `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(normalizedLevel)}/${encodeURIComponent(impactLat)}/${encodeURIComponent(impactLng)}/${encodeURIComponent(reachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`
       : `${floodEngineUrlRef.current}/flood/${encodeURIComponent(normalizedLevel)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
 
     try {
-      if (
-        activeFloodLevelRef.current === normalizedLevel &&
-        map.getLayer(FLOOD_LAYER_ID) &&
-        map.getSource(FLOOD_SOURCE_ID)
-      ) return true;
-      if (map.getLayer(FLOOD_LAYER_ID)) map.removeLayer(FLOOD_LAYER_ID);
-      if (map.getSource(FLOOD_SOURCE_ID)) map.removeSource(FLOOD_SOURCE_ID);
-      map.addSource(FLOOD_SOURCE_ID, { type: "raster", tiles: [tileUrl], tileSize: 256, minzoom: 0, maxzoom: 22 });
-      map.addLayer({ id: FLOOD_LAYER_ID, type: "raster", source: FLOOD_SOURCE_ID, paint: { "raster-opacity": 1, "raster-fade-duration": 0, "raster-resampling": "linear" } });
-      activeFloodLevelRef.current = normalizedLevel;
+      if (!isIndexed) {
+        if (
+          activeFloodLevelRef.current === normalizedLevel &&
+          map.getLayer(FLOOD_LAYER_ID) &&
+          map.getSource(FLOOD_SOURCE_ID)
+        ) return true;
+        if (map.getLayer(FLOOD_LAYER_ID)) map.removeLayer(FLOOD_LAYER_ID);
+        if (map.getSource(FLOOD_SOURCE_ID)) map.removeSource(FLOOD_SOURCE_ID);
+      } else {
+        // Remove existing indexed layer if already exists (re-run)
+        try { if (map.getLayer(layerId)) map.removeLayer(layerId); } catch(e){}
+        try { if (map.getSource(sourceId)) map.removeSource(sourceId); } catch(e){}
+      }
+      map.addSource(sourceId, { type: "raster", tiles: [tileUrl], tileSize: 256, minzoom: 0, maxzoom: 22 });
+      map.addLayer({ id: layerId, type: "raster", source: sourceId, paint: { "raster-opacity": 1, "raster-fade-duration": 0, "raster-resampling": "linear" } });
+      if (!isIndexed) {
+        activeFloodLevelRef.current = normalizedLevel;
+      } else {
+        // Track indexed layer for cleanup
+        impactFloodLayersRef.current = impactFloodLayersRef.current.filter(l => l.layerId !== layerId);
+        impactFloodLayersRef.current.push({ sourceId, layerId });
+      }
       safely(() => map.triggerRepaint());
-      if (DEBUG_FLOOD) console.log("FLOOD LAYER ADDED", { level: normalizedLevel, isRegional, tileUrl });
+      if (DEBUG_FLOOD) console.log("FLOOD LAYER ADDED", { level: normalizedLevel, isRegional, isIndexed, tileUrl });
       return true;
     } catch (e) {
       console.error("Failed to add flood layer", e);
-      activeFloodLevelRef.current = null;
+      if (!isIndexed) activeFloodLevelRef.current = null;
       return false;
     }
   };
 
-  const applyOceanImpactFlood = (result, lng, lat) => {
+  const applyOceanImpactFlood = (result, lng, lat, impactIdx = null) => {
     const waveHeight = Number(result.wave_height_m ?? 0);
     const reachM = Number(result.estimated_wave_reach_m ?? result.tsunami_radius_m ?? 0);
     if (waveHeight <= 0) return false;
     if (waveHeight >= EXTINCTION_WAVE_HEIGHT_M) {
-      const ok = addFloodLayer(waveHeight);
-      if (!ok) setTimeout(() => { addFloodLayer(waveHeight); }, 50);
+      const ok = addFloodLayer(waveHeight, { impactIdx });
+      if (!ok) setTimeout(() => { addFloodLayer(waveHeight, { impactIdx }); }, 50);
       return true;
     }
-    const ok = addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM });
+    const ok = addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM, impactIdx });
     if (!ok) {
-      setTimeout(() => { addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM }); }, 50);
+      setTimeout(() => { addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM, impactIdx }); }, 50);
     }
     return true;
   };
@@ -984,13 +1666,22 @@ export default function HomePage() {
     setSeaLevel(level); seaLevelRef.current = level; setInputLevel(level);
     if (scenarioModeRef.current !== "climate") setScenarioMode("flood");
     if (!floodAllowedInCurrentView()) { removeFloodLayer(); setStatus("Switch to a supported view mode"); return; }
-    if (level === 0) { removeFloodLayer(); setStatus("Flood cleared"); return; }
+    if (level === 0) { removeFloodLayer(); safely(() => clearIceSheets(mapRef.current)); setStatus("Flood cleared"); return; }
     if (!mapRef.current) { setStatus("Map not ready"); return; }
     if (!mapRef.current.isStyleLoaded()) { setStatus("Map style still loading..."); return; }
     removeImpactPoint(); setImpactResult(null); setImpactError("");
     closeElevPopup();
     setStatus(`Loading flood tiles at ${formatLevelForDisplay(level)}...`);
     if (!addFloodLayer(level)) setStatus("Flood layer failed to attach");
+    // Ice Age ice sheets — draw if level ≤ -100m, clear otherwise
+    const map = mapRef.current;
+    if (map && map.isStyleLoaded()) {
+      if (level <= -100) {
+        setTimeout(() => safely(() => drawIceSheets(map)), 200);
+      } else {
+        safely(() => clearIceSheets(map));
+      }
+    }
     // Flood displaced — Pro only
     setFloodDisplaced(null);
     if (proTier !== "free") {
@@ -1002,7 +1693,9 @@ export default function HomePage() {
   };
 
   const runImpact = async () => {
-    if (!impactPointRef.current) { setStatus("Place impact point first"); return; }
+    impactPopupClickCountRef.current = 0; // reset per-run popup counter
+    if (impactPointsRef.current.length === 0 && !impactPointRef.current) { setStatus("Place impact point first"); return; }
+    const points = impactPointsRef.current.length > 0 ? impactPointsRef.current : [impactPointRef.current];
     // Rate limit check
     const rl = checkAndIncrementRL(proTier !== "free");
     if (!rl.allowed) {
@@ -1012,46 +1705,84 @@ export default function HomePage() {
     }
     setRlStatus(getRLStatus());
     cancelPendingImpactRequest();
-    clearImpactPreview();
+    removeImpactFloodLayers();
+    removeImpactPreviewLayers(); // clear all before drawing fresh set
     const runSeq = impactRunSeqRef.current + 1;
     impactRunSeqRef.current = runSeq;
     const controller = new AbortController();
     impactRequestRef.current = controller;
-    impactTimeoutRef.current = setTimeout(() => { controller.abort(); }, 12000);
+    impactTimeoutRef.current = setTimeout(() => { controller.abort(); }, 30000);
     try {
       setImpactLoading(true); setImpactError(""); setImpactResult(null);
-      setStatus("Running impact simulation...");
-      const { lng, lat } = impactPointRef.current;
-      const res = await fetch(
-        `${floodEngineUrlRef.current}/impact?lat=${lat}&lng=${lng}&diameter=${impactDiameterRef.current}&_=${Date.now()}`,
-        { signal: controller.signal, cache: "no-store" }
-      );
-      if (!res.ok) throw new Error("Impact request failed");
-      const data = await res.json();
-      if (DEBUG_FLOOD) console.log("IMPACT RESULT", data);
-      if (impactRunSeqRef.current !== runSeq) return;
-      if (!impactPointRef.current) return;
-      if (scenarioModeRef.current !== "impact") return;
-      setImpactResult(data);
+      setStatus(`Running ${points.length} impact simulation${points.length > 1 ? "s" : ""}...`);
 
-      if (data.is_ocean_impact === true && Number(data.wave_height_m ?? 0) > 0) {
-        drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
-        applyOceanImpactFlood(data, impactPointRef.current.lng, impactPointRef.current.lat);
-        const wh = Math.round(Number(data.wave_height_m));
-        const reach = Math.round(Number(data.estimated_wave_reach_m ?? 0) / 1000);
-        const isExtinction = wh >= EXTINCTION_WAVE_HEIGHT_M;
-        setStatus(isExtinction
-          ? `Extinction scale impact — ${wh}m global wave`
-          : `Ocean impact — ${wh}m wave, ${reach}km reach`
+      // Run all points in parallel
+      const results = await Promise.all(points.map(async (pt, i) => {
+        const res = await fetch(
+          `${floodEngineUrlRef.current}/impact?lat=${pt.lat}&lng=${pt.lng}&diameter=${impactDiameterRef.current}&_=${Date.now()}_${i}`,
+          { signal: controller.signal, cache: "no-store" }
         );
+        if (!res.ok) throw new Error(`Impact request ${i+1} failed`);
+        return res.json();
+      }));
+
+      if (impactRunSeqRef.current !== runSeq) return;
+      if (scenarioModeRef.current !== "impact") return;
+
+      // Store results on points for redraw on style change
+      results.forEach((data, i) => { if (points[i]) points[i].result = data; });
+
+      // Aggregate stats
+      const totalDeaths = results.reduce((s, d) => s + (d.estimated_deaths || 0), 0);
+      const totalExposed = results.reduce((s, d) => s + (d.population_exposed || 0), 0);
+      // Worst-case blackout (most severe single impact dominates atmosphere)
+      const worstBlackout = results.reduce((best, d) => {
+        return (d.blackout_pct || 0) > (best.blackout_pct || 0) ? d : best;
+      }, results[0]);
+      // Combined result for stats panel
+      const combinedResult = {
+        ...results[0],
+        _count: results.length,
+        _results: results,
+        estimated_deaths: totalDeaths,
+        population_exposed: totalExposed,
+        blackout_pct: worstBlackout?.blackout_pct || 0,
+        blackout_duration_months: worstBlackout?.blackout_duration_months || 0,
+        blackout_severity: worstBlackout?.blackout_severity || "None",
+        famine_deaths_estimate: worstBlackout?.famine_deaths_estimate || 0,
+      };
+      setImpactResult(combinedResult);
+      impactResultRef.current = combinedResult;
+
+      // Draw each impact — set flag so handleStyleLoad doesn't interfere
+      impactDrawingRef.current = true;
+      results.forEach((data, i) => {
+        const pt = points[i];
+        if (!pt) return;
+        const drawIdx = pt.idx ?? i; // prefer stored idx; fallback to loop position
+        if (data.is_ocean_impact === true && Number(data.wave_height_m ?? 0) > 0) {
+          drawOceanImpactMarker(pt.lng, pt.lat, drawIdx);
+          applyOceanImpactFlood(data, pt.lng, pt.lat, drawIdx);
+        } else {
+          drawLandImpactFromResult(pt.lng, pt.lat, data, drawIdx);
+        }
+      });
+      impactDrawingRef.current = false;
+
+      const hasOcean = results.some(d => d.is_ocean_impact);
+      if (results.length > 1) {
+        setStatus(`${results.length} impacts — ${totalDeaths.toLocaleString()} est. deaths`);
+      } else if (hasOcean) {
+        const wh = Math.round(Number(results[0].wave_height_m));
+        const reach = Math.round(Number(results[0].estimated_wave_reach_m ?? 0) / 1000);
+        setStatus(wh >= EXTINCTION_WAVE_HEIGHT_M ? `Extinction scale — ${wh}m global wave` : `Ocean impact — ${wh}m wave, ${reach}km reach`);
       } else {
-        drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, data);
-        setStatus("Land impact simulation complete");
+        setStatus("Impact simulation complete — click map for zone details");
       }
     } catch (err) {
       if (impactRunSeqRef.current !== runSeq) return;
       console.error(err);
-      clearImpactPreview();
+      removeImpactFloodLayers();
       if (err?.name === "AbortError") { setImpactError("Impact simulation timed out"); setStatus("Impact simulation timed out"); }
       else { setImpactError("Impact simulation failed"); setStatus("Impact simulation failed"); }
     } finally {
@@ -1061,111 +1792,126 @@ export default function HomePage() {
     }
   };
 
-  const runNuke = async () => {
-    if (!nukePointRef.current) { setStatus("Place detonation point first"); return; }
-    // Rate limit check
-    const rl = checkAndIncrementRL(proTier !== "free");
-    if (!rl.allowed) {
-      setPaywallModal("ratelimit");
-      setRlStatus(getRLStatus());
-      return;
-    }
-    setRlStatus(getRLStatus());
-    const nukeLat = nukePointRef.current.lat;
-    const nukeLng = nukePointRef.current.lng;
-    setNukeLoading(true); setNukeError(""); setNukeResult(null);
-    setStatus("Detonating...");
+  const runEmp = async () => {
+    if (nukeStrikesRef.current.length === 0) { setStatus("Place EMP detonation point first"); return; }
+    const strike = nukeStrikesRef.current[0]; // EMP uses single point
+    setEmpLoading(true);
+    setEmpResult(null);
+    setStatus("Computing EMP footprint...");
     try {
-      const lat = nukeLat;
-      const lng = nukeLng;
       const res = await fetch(
-        `${floodEngineUrlRef.current}/nuke?lat=${lat}&lng=${lng}&yield_kt=${Number(nukeYield).toFixed(3)}&burst_type=${nukeBurst}&wind_deg=${Number(nukeWindDeg).toFixed(1)}&_=${Date.now()}`,
+        `${floodEngineUrlRef.current}/emp?lat=${strike.lat}&lng=${strike.lng}&yield_kt=${nukeYield.toFixed(3)}&altitude_km=${empAltitudeKm}&_=${Date.now()}`,
         { cache: "no-store" }
       );
-      if (!res.ok) throw new Error("Nuke request failed");
+      if (!res.ok) throw new Error("EMP request failed");
       const data = await res.json();
-      setNukeResult(data);
-      drawNukeResult(lng, lat, data);
-      const nukeLabel = data.severity_class === "Extinction scale" ? "Civilization ending" : data.severity_class;
-      setStatus(`${nukeLabel} — ${data.yield_kt >= 1000 ? (data.yield_kt/1000).toFixed(1)+"Mt" : data.yield_kt+"kt"} detonated`);
+      setEmpResult(data);
+      // Draw EMP ring on map
+      const map = mapRef.current;
+      if (map && map.isStyleLoaded()) {
+        clearNukeLayers(map);
+        const empKm = data.emp_r_km;
+        const features = [{ ...kmCircle(strike.lng, strike.lat, empKm), properties: { kind: "emp" } }];
+        map.addSource(NUKE_SRC, { type: "geojson", data: { type: "FeatureCollection", features } });
+        map.addLayer({ id: "nuke-emp", type: "fill", source: NUKE_SRC, filter: ["==", ["get", "kind"], "emp"], paint: { "fill-color": "#7c3aed", "fill-opacity": 0.08 } });
+        map.addLayer({ id: "nuke-emp-line", type: "line", source: NUKE_SRC, filter: ["==", ["get", "kind"], "emp"], paint: { "line-color": "#7c3aed", "line-width": 2, "line-opacity": 0.8, "line-dasharray": [6, 3] } });
+        safely(() => map.triggerRepaint());
+      }
+      setStatus(`EMP footprint: ${Math.round(data.emp_r_km).toLocaleString()} km radius · ${(data.population_at_risk/1e6).toFixed(1)}M at risk`);
+    } catch (e) {
+      setStatus("EMP simulation failed");
+    } finally {
+      setEmpLoading(false);
+    }
+  };
+
+  const runNuke = async () => {
+    nukePopupClickCountRef.current = 0; // reset per-run popup counter
+    if (nukeStrikesRef.current.length === 0) { setStatus("Place at least one strike point first"); return; }
+    const rl = checkAndIncrementRL(proTier !== "free");
+    if (!rl.allowed) { setPaywallModal("ratelimit"); setRlStatus(getRLStatus()); return; }
+    setRlStatus(getRLStatus());
+    setNukeLoading(true); setNukeError(""); setNukeResult(null);
+    setStatus(`Detonating ${nukeStrikesRef.current.length} strike${nukeStrikesRef.current.length > 1 ? "s" : ""}...`);
+    try {
+      const yieldKt = Number(nukeYield).toFixed(3);
+      const burst = nukeBurst;
+      const windDeg = Number(nukeWindDeg).toFixed(1);
+      const strikes = [...nukeStrikesRef.current];
+      const results = await Promise.all(strikes.map((strike, idx) =>
+        fetch(`${floodEngineUrlRef.current}/nuke?lat=${strike.lat}&lng=${strike.lng}&yield_kt=${yieldKt}&burst_type=${burst}&wind_deg=${windDeg}&_=${Date.now()}_${idx}`, { cache: "no-store" })
+          .then(r => r.ok ? r.json() : null)
+          .then(data => data ? { ...data, _lat: strike.lat, _lng: strike.lng } : null)
+          .catch(() => null)
+      ));
+      const valid = results.filter(Boolean);
+      console.log(`[nuke] ${strikes.length} fired, ${valid.length} valid results`);
+      if (valid.length === 0) throw new Error("All detonations failed");
+      drawAllNukeResults(valid);
+      const totalDeaths = valid.reduce((s, d) => s + (d.estimated_deaths || 0), 0);
+      const totalExposed = valid.reduce((s, d) => s + (d.population_exposed || 0), 0);
+      const combined = { ...valid[0], deaths: totalDeaths, exposed: totalExposed, _count: valid.length };
+      setNukeResult(combined);
+      setStatus(`${valid.length} detonation${valid.length > 1 ? "s" : ""} — ${(totalDeaths/1e6).toFixed(1)}M killed, ${(totalExposed/1e6).toFixed(1)}M exposed · click map for zone details`);
     } catch (err) {
-      setNukeError("Detonation failed");
-      setStatus("Detonation failed");
+      setNukeError("Detonation failed"); setStatus("Detonation failed");
     } finally {
       setNukeLoading(false);
     }
   };
 
-  const drawNukeResult = (lng, lat, data) => {
+  const NUKE_SRC = "nuke-combined-source";
+  const NUKE_LAYERS = ["nuke-emp","nuke-emp-line","nuke-thermal","nuke-thermal-line",
+    "nuke-blast-light","nuke-blast-light-line","nuke-blast-moderate","nuke-blast-moderate-line",
+    "nuke-blast-heavy","nuke-blast-heavy-line","nuke-fireball","nuke-fireball-line",
+    "nuke-radiation","nuke-fallout","nuke-fallout-line"];
+
+  const clearNukeLayers = (map) => {
+    NUKE_LAYERS.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
+    try { if (map.getSource(NUKE_SRC)) map.removeSource(NUKE_SRC); } catch(e){}
+    try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e){}
+  };
+
+  const drawAllNukeResults = (dataArr) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    const nukeLayers = ["nuke-emp","nuke-emp-line",
-      "nuke-thermal","nuke-thermal-line",
-      "nuke-blast-light","nuke-blast-light-line",
-      "nuke-blast-moderate","nuke-blast-moderate-line",
-      "nuke-blast-heavy","nuke-blast-heavy-line",
-      "nuke-fireball","nuke-fireball-line",
-      "nuke-radiation","nuke-fallout","nuke-fallout-line"];
-    nukeLayers.forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e) {} });
-    try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e) {}
-
+    clearNukeLayers(map);
     const features = [];
-
-    // EMP zone (airburst only) — huge, show first (bottom layer)
-    if (data.emp_r_m > 0) {
-      features.push({ ...kmCircle(lng, lat, data.emp_r_m / 1000), properties: { kind: "emp" } });
-    }
-    // Thermal zone
-    features.push({ ...kmCircle(lng, lat, data.thermal_r_m / 1000), properties: { kind: "thermal" } });
-    // Light blast
-    features.push({ ...kmCircle(lng, lat, data.blast_light_r_m / 1000), properties: { kind: "blast-light" } });
-    // Moderate blast
-    features.push({ ...kmCircle(lng, lat, data.blast_moderate_r_m / 1000), properties: { kind: "blast-moderate" } });
-    // Heavy blast
-    features.push({ ...kmCircle(lng, lat, data.blast_heavy_r_m / 1000), properties: { kind: "blast-heavy" } });
-    // Fireball
-    features.push({ ...kmCircle(lng, lat, data.fireball_r_m / 1000), properties: { kind: "fireball" } });
-    // Radiation (surface only)
-    if (data.radiation_r_m > 0) {
-      features.push({ ...kmCircle(lng, lat, data.radiation_r_m / 1000), properties: { kind: "radiation" } });
-    }
-    // Fallout ellipse (surface only) — approximate as elongated circle
-    if (data.fallout_major_km > 0) {
-      const falloutFeature = buildFalloutEllipse(lng, lat, data.fallout_major_km, data.fallout_minor_km, data.fallout_direction_deg);
-      features.push({ ...falloutFeature, properties: { kind: "fallout" } });
-    }
-
+    dataArr.forEach(data => {
+      const lng = data._lng, lat = data._lat;
+      // EMP ring intentionally not drawn — radius is continental scale and not visually useful
+      features.push({ ...kmCircle(lng, lat, data.thermal_r_m/1000), properties: { kind: "thermal" } });
+      features.push({ ...kmCircle(lng, lat, data.blast_light_r_m/1000), properties: { kind: "blast-light" } });
+      features.push({ ...kmCircle(lng, lat, data.blast_moderate_r_m/1000), properties: { kind: "blast-moderate" } });
+      features.push({ ...kmCircle(lng, lat, data.blast_heavy_r_m/1000), properties: { kind: "blast-heavy" } });
+      features.push({ ...kmCircle(lng, lat, data.fireball_r_m/1000), properties: { kind: "fireball" } });
+      if (data.radiation_r_m > 0) features.push({ ...kmCircle(lng, lat, data.radiation_r_m/1000), properties: { kind: "radiation" } });
+      if (data.fallout_major_km > 0) features.push({ ...buildFalloutEllipse(lng, lat, data.fallout_major_km, data.fallout_minor_km, data.fallout_direction_deg), properties: { kind: "fallout" } });
+    });
+    const hasRad = dataArr.some(d => d.radiation_r_m > 0);
+    const hasFallout = dataArr.some(d => d.fallout_major_km > 0);
     try {
-      map.addSource(IMPACT_PREVIEW_SOURCE_ID, { type: "geojson", data: { type: "FeatureCollection", features } });
-      if (data.emp_r_m > 0) {
-        map.addLayer({ id: "nuke-emp", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "emp"], paint: { "fill-color": "#7c3aed", "fill-opacity": 0.06 } });
-        map.addLayer({ id: "nuke-emp-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "emp"], paint: { "line-color": "#7c3aed", "line-width": 1.5, "line-opacity": 0.5, "line-dasharray": [4, 4] } });
-      }
-      // Thermal — orange fill + solid orange border
-      map.addLayer({ id: "nuke-thermal", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "fill-color": "#f97316", "fill-opacity": 0.18 } });
-      map.addLayer({ id: "nuke-thermal-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "thermal"], paint: { "line-color": "#f97316", "line-width": 2, "line-opacity": 0.9 } });
-      // Light blast — yellow fill + yellow border
-      map.addLayer({ id: "nuke-blast-light", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-light"], paint: { "fill-color": "#fbbf24", "fill-opacity": 0.20 } });
-      map.addLayer({ id: "nuke-blast-light-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-light"], paint: { "line-color": "#f59e0b", "line-width": 2, "line-opacity": 0.9 } });
-      // Moderate blast — red fill + red border
-      map.addLayer({ id: "nuke-blast-moderate", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-moderate"], paint: { "fill-color": "#ef4444", "fill-opacity": 0.30 } });
-      map.addLayer({ id: "nuke-blast-moderate-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-moderate"], paint: { "line-color": "#ef4444", "line-width": 2.5, "line-opacity": 1.0 } });
-      // Heavy blast — deep red fill + bright red border
-      map.addLayer({ id: "nuke-blast-heavy", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-heavy"], paint: { "fill-color": "#991b1b", "fill-opacity": 0.55 } });
-      map.addLayer({ id: "nuke-blast-heavy-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "blast-heavy"], paint: { "line-color": "#dc2626", "line-width": 3, "line-opacity": 1.0 } });
-      // Fireball — white core with bright yellow border
-      map.addLayer({ id: "nuke-fireball", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fireball"], paint: { "fill-color": "#ffffff", "fill-opacity": 0.98 } });
-      map.addLayer({ id: "nuke-fireball-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fireball"], paint: { "line-color": "#fde047", "line-width": 3, "line-opacity": 1.0 } });
-      if (data.radiation_r_m > 0) {
-        map.addLayer({ id: "nuke-radiation", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "radiation"], paint: { "line-color": "#4ade80", "line-width": 3, "line-opacity": 1.0, "line-dasharray": [5, 3] } });
-      }
-      if (data.fallout_major_km > 0) {
-        map.addLayer({ id: "nuke-fallout", type: "fill", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fallout"], paint: { "fill-color": "#84cc16", "fill-opacity": 0.15 } });
-        map.addLayer({ id: "nuke-fallout-line", type: "line", source: IMPACT_PREVIEW_SOURCE_ID, filter: ["==", ["get", "kind"], "fallout"], paint: { "line-color": "#84cc16", "line-width": 2.5, "line-opacity": 0.9, "line-dasharray": [6, 3] } });
-      }
+      map.addSource(NUKE_SRC, { type: "geojson", data: { type: "FeatureCollection", features } });
+      const L = (id, type, filter, paint) => map.addLayer({ id, type, source: NUKE_SRC, filter: ["==", ["get", "kind"], filter], paint });
+      // EMP layers not drawn
+      L("nuke-thermal","fill","thermal",{"fill-color":"#f97316","fill-opacity":0.18});
+      L("nuke-thermal-line","line","thermal",{"line-color":"#f97316","line-width":2,"line-opacity":0.9});
+      L("nuke-blast-light","fill","blast-light",{"fill-color":"#fbbf24","fill-opacity":0.20});
+      L("nuke-blast-light-line","line","blast-light",{"line-color":"#f59e0b","line-width":2,"line-opacity":0.9});
+      L("nuke-blast-moderate","fill","blast-moderate",{"fill-color":"#ef4444","fill-opacity":0.30});
+      L("nuke-blast-moderate-line","line","blast-moderate",{"line-color":"#ef4444","line-width":2.5,"line-opacity":1.0});
+      L("nuke-blast-heavy","fill","blast-heavy",{"fill-color":"#991b1b","fill-opacity":0.55});
+      L("nuke-blast-heavy-line","line","blast-heavy",{"line-color":"#dc2626","line-width":3,"line-opacity":1.0});
+      L("nuke-fireball","fill","fireball",{"fill-color":"#ffffff","fill-opacity":0.98});
+      L("nuke-fireball-line","line","fireball",{"line-color":"#fde047","line-width":3,"line-opacity":1.0});
+      if (hasRad) L("nuke-radiation","line","radiation",{"line-color":"#4ade80","line-width":3,"line-opacity":1.0,"line-dasharray":[5,3]});
+      if (hasFallout) { L("nuke-fallout","fill","fallout",{"fill-color":"#84cc16","fill-opacity":0.15}); L("nuke-fallout-line","line","fallout",{"line-color":"#84cc16","line-width":2.5,"line-opacity":0.9,"line-dasharray":[6,3]}); }
       safely(() => map.triggerRepaint());
-    } catch (e) { console.error("Failed to draw nuke result", e); }
+    } catch(e) { console.error("Failed to draw nuke results", e); }
   };
+
+  // Single-strike wrapper for style reload redraws
+  const drawNukeResult = (lng, lat, data) => drawAllNukeResults([{ ...data, _lng: lng, _lat: lat }]);
 
   const buildFalloutEllipse = (lng, lat, majorKm, minorKm, directionDeg, steps = 64) => {
     // directionDeg = compass bearing fallout travels TO (0=N,90=E,180=S,270=W)
@@ -1240,7 +1986,7 @@ export default function HomePage() {
 
     // Build rings largest first (outermost renders underneath)
     const features = [...src.rings].reverse().map((ring, i) => ({
-      ...buildTsunamiEllipse(oLng, oLat, ring.major_km, ring.minor_km, src.bearing),
+      ...buildTsunamiEllipse(oLng, oLat, ring.major_km, ring.minor_km, src.bearing, 96, src.spreadAngle || 65),
       properties: { ringIdx: src.rings.length - 1 - i, hours: ring.hours, waveM: ring.waveM, label: ring.label },
     }));
 
@@ -1289,7 +2035,7 @@ export default function HomePage() {
       // Fly to center of outermost ellipse, not the origin/collapse point
       const [oLngF, oLatF] = src.origin;
       const bearRad = (src.bearing * Math.PI) / 180;
-      const shiftKm = outerKm * 0.85 * 0.85;
+      const shiftKm = outerKm * 0.85 * 0.5;
       const R = 6371;
       const d = shiftKm / R;
       const lat1 = oLatF * Math.PI / 180;
@@ -1400,19 +2146,26 @@ export default function HomePage() {
     const dNorth = Math.cos(bearingRad);
     const dEast  = Math.sin(bearingRad);
 
-    // Find innermost ring containing this point
+    // Iterate outermost→innermost so distant clicks get far-travel low-height ring
     let ringInfo = null;
-    for (let i = 0; i < src.rings.length; i++) {
-      const ring = src.rings[i];
-      const eCLat = oLat + (dNorth * ring.major_km * 0.85) / kpLat;
-      const eCLng = oLng + (dEast  * ring.major_km * 0.85) / Math.max(kpLng, 0.0001);
-      const dLatKm = (lat - eCLat) * kpLat;
-      const dLngKm = (lng - eCLng) * Math.max(kpLng, 0.0001);
-      const along = dNorth * dLatKm + dEast * dLngKm;
-      const perp  = -dEast * dLatKm + dNorth * dLngKm;
-      if ((along / ring.major_km) ** 2 + (perp / ring.minor_km) ** 2 <= 1) {
-        ringInfo = ring; break;
+    const spreadAngle = src.spreadAngle || 65;
+    const dLatKmBase = (lat - oLat) * kpLat;
+    const dLngKmBase = (lng - oLng) * Math.max(kpLng, 0.0001);
+    const distKm = Math.sqrt(dLatKmBase * dLatKmBase + dLngKmBase * dLngKmBase);
+    const clickAngleDeg = Math.atan2(dLngKmBase, dLatKmBase) * 180 / Math.PI;
+    let angleDiff = ((clickAngleDeg - src.bearing) + 360) % 360;
+    if (angleDiff > 180) angleDiff -= 360;
+    const inCone = Math.abs(angleDiff) <= spreadAngle * 3.9;
+    if (inCone) {
+      // Find correct ring by distance — outermost first, use first ring that fits
+      for (let i = src.rings.length - 1; i >= 0; i--) {
+        if (distKm <= src.rings[i].major_km * 12) {
+          ringInfo = src.rings[i];
+          break;
+        }
       }
+      // If within innermost ring, use innermost
+      if (!ringInfo && distKm <= src.rings[0].major_km * 12) ringInfo = src.rings[0];
     }
 
     const content = ringInfo
@@ -1435,8 +2188,8 @@ export default function HomePage() {
   const clearYellowstone = () => {
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
-      // Remove all yellowstone layers
-      for (let i = 0; i < 4; i++) {
+      // Remove all yellowstone layers (up to 8 zones covers all volcano types)
+      for (let i = 0; i < 8; i++) {
         const id = `${YELLOWSTONE_LAYER_PREFIX}-${i}`;
         const lineId = `${YELLOWSTONE_LAYER_PREFIX}-line-${i}`;
         try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){}
@@ -1569,6 +2322,155 @@ export default function HomePage() {
     yellowstonePopupRef.current = popup;
   };
 
+  const showImpactZonePopup = (lng, lat) => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; }
+
+    const result = impactResultRef.current;
+    if (!result) return;
+
+    // Use haversine to find distance from each impact point, pick closest
+    const pts = impactPointsRef.current.length > 0 ? impactPointsRef.current : (impactPointRef.current ? [impactPointRef.current] : []);
+    if (pts.length === 0) return;
+
+    const haversineKm = (lat1, lng1, lat2, lng2) => {
+      const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+      return R * 2 * Math.asin(Math.sqrt(a));
+    };
+
+    // Find closest impact point and use its result
+    let closestPt = pts[0];
+    let closestResult = pts[0].result || result;
+    let closestDist = haversineKm(lat, lng, pts[0].lat, pts[0].lng);
+    for (const pt of pts) {
+      const d = haversineKm(lat, lng, pt.lat, pt.lng);
+      if (d < closestDist) { closestDist = d; closestPt = pt; closestResult = pt.result || result; }
+    }
+
+    const distKm = haversineKm(lat, lng, closestPt.lat, closestPt.lng);
+    const craterR  = (closestResult.crater_diameter_m ?? 0) / 2000;
+    const blastR   = (closestResult.blast_radius_m ?? 0) / 1000;
+    const thermalR = (closestResult.thermal_radius_m ?? 0) / 1000;
+
+    let zone = null;
+    if (distKm <= craterR) {
+      zone = { name: "Crater Zone", color: "#fde047", survival: "0%",
+        desc: `Direct impact — ${Math.round(closestResult.crater_diameter_m ?? 0).toLocaleString()}m diameter crater`,
+        note: "Total vaporisation. No survival possible within crater radius." };
+    } else if (distKm <= blastR) {
+      const pct = Math.max(0, Math.round((1 - (distKm - craterR) / (blastR - craterR)) * 100));
+      zone = { name: "Blast Zone", color: "#ef4444", survival: "~5-15%",
+        desc: `${Math.round(closestResult.blast_radius_m ?? 0).toLocaleString()}m blast radius · ${Math.round(distKm).toLocaleString()}km from impact`,
+        note: "Lethal overpressure. Reinforced underground shelter only. Most buildings destroyed." };
+    } else if (distKm <= thermalR) {
+      zone = { name: "Thermal Zone", color: "#f97316", survival: "~40-60%",
+        desc: `${Math.round(closestResult.thermal_radius_m ?? 0).toLocaleString()}m thermal radius · ${Math.round(distKm).toLocaleString()}km from impact`,
+        note: "Severe burns, fires ignite. Shelter underground or in concrete structure. Evacuate if possible." };
+    } else {
+      zone = { name: "Outside effect zones", color: "#94a3b8", survival: "High",
+        desc: `${Math.round(distKm).toLocaleString()}km from nearest impact`,
+        note: "Seismic effects possible. Monitor emergency broadcasts." };
+    }
+
+    const energyMt = Number(closestResult.energy_mt_tnt ?? closestResult.energy_mt ?? 0).toFixed(1);
+    const content = `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+      <div style="color:${zone.color};font-weight:700;margin-bottom:4px">💥 ${zone.name}</div>
+      <div style="color:#e2e8f0;margin-bottom:4px">${zone.desc}</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span style="color:#94a3b8;font-size:11px">Survival odds:</span>
+        <span style="color:${zone.survival === '0%' ? '#ef4444' : zone.survival === 'High' ? '#4ade80' : '#fbbf24'};font-weight:700;font-size:13px">${zone.survival}</span>
+      </div>
+      <div style="color:#64748b;font-size:11px;font-style:italic">${zone.note}</div>
+      <div style="color:#475569;font-size:10px;margin-top:4px">${closestResult.severity_class ?? ""} · ${energyMt} Mt</div>
+    </div>`;
+
+    const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: false, className: "elev-popup", maxWidth: "260px" });
+    popup.setLngLat([lng, lat]).setHTML(content).addTo(map);
+    impactZonePopupRef.current = popup;
+  };
+
+  const showNukeZonePopup = (lng, lat) => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; }
+
+    const result = nukeResultRef.current;
+    if (!result) return;
+
+    // Find closest strike point
+    const strikes = nukeStrikesRef.current;
+    if (strikes.length === 0) return;
+
+    const haversineKm = (lat1, lng1, lat2, lng2) => {
+      const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+      return R * 2 * Math.asin(Math.sqrt(a));
+    };
+
+    // Find the closest strike's result data
+    let closestStrike = strikes[0];
+    let closestDist = haversineKm(lat, lng, strikes[0].lat, strikes[0].lng);
+    for (const s of strikes) {
+      const d = haversineKm(lat, lng, s.lat, s.lng);
+      if (d < closestDist) { closestDist = d; closestStrike = s; }
+    }
+
+    // Use the first result (all strikes same yield) — nukeResult is combined
+    const r = result;
+    const distKm = haversineKm(lat, lng, closestStrike.lat, closestStrike.lng);
+    const fireballR  = (r.fireball_r_m ?? 0) / 1000;
+    const heavyR     = (r.blast_heavy_r_m ?? 0) / 1000;
+    const moderateR  = (r.blast_moderate_r_m ?? 0) / 1000;
+    const lightR     = (r.blast_light_r_m ?? 0) / 1000;
+    const thermalR   = (r.thermal_r_m ?? 0) / 1000;
+
+    const NUKE_ZONES = [
+      { name: "Fireball", maxR: fireballR,  color: "#ffffff", survival: "0%",
+        psi: ">200 psi", desc: "Nuclear fireball — total vaporisation",
+        note: "Everything within this radius ceases to exist. Temperatures exceed the surface of the sun briefly." },
+      { name: "Heavy Blast", maxR: heavyR,  color: "#dc2626", survival: "~0-2%",
+        psi: "20 psi", desc: "Severe structural damage — reinforced concrete destroyed",
+        note: "Only deep underground bunkers survive. All above-ground structures obliterated." },
+      { name: "Moderate Blast", maxR: moderateR, color: "#ef4444", survival: "~5-15%",
+        psi: "5 psi", desc: "Moderate blast — most buildings collapse",
+        note: "Reinforced concrete may survive. Injuries from debris near-universal. Immediate evacuation essential." },
+      { name: "Light Blast", maxR: lightR,  color: "#f59e0b", survival: "~40-60%",
+        psi: "1 psi", desc: "Light blast — windows shatter, doors blown off",
+        note: "Equivalent to strong hurricane. Shelter in sturdy building away from windows. Flying glass is main hazard." },
+      { name: "Thermal Zone", maxR: thermalR, color: "#f97316", survival: "~50-70%",
+        psi: "<1 psi", desc: "Thermal radiation — severe burns",
+        note: "Third-degree burns on exposed skin. Seek shelter immediately, cover skin. Fire risk." },
+    ];
+
+    let zone = null;
+    for (const z of NUKE_ZONES) {
+      if (distKm <= z.maxR) { zone = z; break; }
+    }
+    if (!zone) {
+      zone = { name: "Outside blast zones", color: "#94a3b8", survival: "High", psi: "<0.5 psi",
+        desc: `${Math.round(distKm).toLocaleString()}km from nearest detonation`,
+        note: "Possible fallout depending on wind direction. Monitor emergency broadcasts." };
+    }
+
+    const yieldStr = r.yield_kt >= 1000 ? `${(r.yield_kt/1000).toFixed(1)}Mt` : `${r.yield_kt}kt`;
+    const content = `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+      <div style="color:${zone.color};font-weight:700;margin-bottom:4px">☢️ ${zone.name}</div>
+      <div style="color:#e2e8f0;margin-bottom:4px">${zone.desc}</div>
+      <div style="display:flex;gap:12px;margin-bottom:4px">
+        <div><span style="color:#94a3b8;font-size:11px">Overpressure: </span><span style="color:#e2e8f0;font-weight:700;font-size:12px">${zone.psi}</span></div>
+        <div><span style="color:#94a3b8;font-size:11px">Survival: </span><span style="color:${zone.survival === '0%' ? '#ef4444' : zone.survival === '~0-2%' ? '#ef4444' : zone.survival === 'High' ? '#4ade80' : '#fbbf24'};font-weight:700;font-size:12px">${zone.survival}</span></div>
+      </div>
+      <div style="color:#64748b;font-size:11px;font-style:italic">${zone.note}</div>
+      <div style="color:#475569;font-size:10px;margin-top:4px">${yieldStr} ${r.burst_type ?? "airburst"} · ${Math.round(distKm).toLocaleString()}km from detonation</div>
+    </div>`;
+
+    const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: false, className: "elev-popup", maxWidth: "270px" });
+    popup.setLngLat([lng, lat]).setHTML(content).addTo(map);
+    nukeZonePopupRef.current = popup;
+  };
+
   // Wind kill zone data — centered on max displacement point and new equator midpoint
   const CATACLYSM_WIND = {
     davidson: {
@@ -1655,6 +2557,7 @@ export default function HomePage() {
     const map = mapRef.current;
     setCataclysmActive(false);
     setCataclysmAnimating(false);
+    clearYDI(); // also cleans up YDI flood layers and ice sheets
     if (window._cataclysmPoleMarker) { try { window._cataclysmPoleMarker.remove(); } catch(e){} window._cataclysmPoleMarker = null; }
     setViewMode("map");
     // Stop spin animation
@@ -1688,25 +2591,331 @@ export default function HomePage() {
     }
   };
 
+  // ── Younger Dryas Impact ─────────────────────────────────────────────────
+  const clearYDI = () => {
+    if (ydiIceFrameRef.current) { cancelAnimationFrame(ydiIceFrameRef.current); ydiIceFrameRef.current = null; }
+    const map = mapRef.current;
+    if (map && map.isStyleLoaded()) {
+      // Flood corridor layers
+      ["ydi-flood-halo", "ydi-flood-mid", "ydi-flood-core"].forEach(id => {
+        try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){}
+      });
+      try { if (map.getSource("ydi-flood-source")) map.removeSource("ydi-flood-source"); } catch(e){}
+      // Source node markers
+      YDI_SOURCE_NODES.forEach(n => {
+        try { if (map.getLayer(`ydi-node-${n.id}`)) map.removeLayer(`ydi-node-${n.id}`); } catch(e){}
+        try { if (map.getSource(`ydi-node-src-${n.id}`)) map.removeSource(`ydi-node-src-${n.id}`); } catch(e){}
+      });
+      // Ice sheets
+      try { if (map.getLayer(`${ICE_SHEET_PREFIX}-fill`)) map.removeLayer(`${ICE_SHEET_PREFIX}-fill`); } catch(e){}
+      try { if (map.getLayer(`${ICE_SHEET_PREFIX}-line`)) map.removeLayer(`${ICE_SHEET_PREFIX}-line`); } catch(e){}
+      try { if (map.getLayer(`${ICE_SHEET_PREFIX}-label`)) map.removeLayer(`${ICE_SHEET_PREFIX}-label`); } catch(e){}
+      try { if (map.getSource(ICE_SHEET_SOURCE)) map.removeSource(ICE_SHEET_SOURCE); } catch(e){}
+    }
+  };
+
+  const triggerYDI = (intensity = ydiIntensityRef.current) => {
+    const map = mapRef.current;
+    if (!map) return;
+    clearYDI();
+    const run = ++ydiRunRef.current;
+    setStatus("☄️ Younger Dryas Impact — Laurentide ice collapse initiating…");
+    safely(() => map.setProjection("mercator"));
+
+    // Fly to North America
+    safely(() => map.flyTo({ center: [-96, 50], zoom: 3.2, duration: 1400, essential: true }));
+
+    // Phase 1: animate pulsing ice sheets (500ms after fly starts)
+    setTimeout(() => {
+      if (ydiRunRef.current !== run) return;
+      const features = YDI_ICE_SHEETS.map((sheet, i) => ({
+        type: "Feature",
+        geometry: {
+          type: "Polygon",
+          coordinates: [[...sheet.coords, sheet.coords[0]].map(([lng, lat]) => [lng, lat])]
+        },
+        properties: { name: sheet.name, color: sheet.color, idx: i },
+      }));
+      const fc = { type: "FeatureCollection", features };
+      try {
+        if (map.getSource(ICE_SHEET_SOURCE)) {
+          map.getSource(ICE_SHEET_SOURCE).setData(fc);
+        } else {
+          map.addSource(ICE_SHEET_SOURCE, { type: "geojson", data: fc });
+          map.addLayer({ id: `${ICE_SHEET_PREFIX}-fill`, type: "fill", source: ICE_SHEET_SOURCE,
+            paint: { "fill-color": ["get", "color"], "fill-opacity": 0.0 } });
+          map.addLayer({ id: `${ICE_SHEET_PREFIX}-line`, type: "line", source: ICE_SHEET_SOURCE,
+            paint: { "line-color": "#93c5fd", "line-width": 1.8, "line-opacity": 0.0 } });
+        }
+      } catch(e) {}
+      setStatus("☄️ Younger Dryas — Laurentide & Cordilleran ice sheets at maximum extent");
+
+      // Fade ice sheets in
+      let t = 0;
+      const fadeIn = () => {
+        if (ydiRunRef.current !== run) return;
+        t += 0.03;
+        const op = Math.min(t, 1);
+        try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-fill`, "fill-opacity", op * 0.5); } catch(e){}
+        try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-line`, "line-opacity", op * 0.9); } catch(e){}
+        if (t < 1) { ydiIceFrameRef.current = requestAnimationFrame(fadeIn); }
+        else { ydiIceFrameRef.current = null; }
+      };
+      ydiIceFrameRef.current = requestAnimationFrame(fadeIn);
+    }, 600);
+
+    // Phase 2: pulse ice sheets 3 times then release floods (3s)
+    setTimeout(() => {
+      if (ydiRunRef.current !== run) return;
+      let pulseCount = 0;
+      const maxPulses = 3;
+      let pulsing = true;
+      const pulse = (timestamp) => {
+        if (ydiRunRef.current !== run || !pulsing) return;
+        const cycle = (Math.sin(timestamp / 280) + 1) / 2; // 0→1 pulse
+        try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-fill`, "fill-opacity", 0.25 + cycle * 0.45); } catch(e){}
+        try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-line`, "line-opacity", 0.5 + cycle * 0.5); } catch(e){}
+        ydiIceFrameRef.current = requestAnimationFrame(pulse);
+      };
+      ydiIceFrameRef.current = requestAnimationFrame(pulse);
+
+      // Add source node markers
+      YDI_SOURCE_NODES.forEach(n => {
+        try {
+          if (!map.getSource(`ydi-node-src-${n.id}`)) {
+            map.addSource(`ydi-node-src-${n.id}`, { type: "geojson", data: {
+              type: "Feature", geometry: { type: "Point", coordinates: [n.lng, n.lat] }, properties: {}
+            }});
+            map.addLayer({ id: `ydi-node-${n.id}`, type: "circle", source: `ydi-node-src-${n.id}`,
+              paint: { "circle-radius": 8, "circle-color": "#38bdf8", "circle-stroke-width": 2,
+                "circle-stroke-color": "#ffffff", "circle-opacity": 0.0, "circle-stroke-opacity": 0.0 } });
+          }
+        } catch(e){}
+      });
+
+      // Fade nodes in
+      let nt = 0;
+      const fadeNodes = () => {
+        if (ydiRunRef.current !== run) return;
+        nt = Math.min(nt + 0.05, 1);
+        YDI_SOURCE_NODES.forEach(n => {
+          try { map.setPaintProperty(`ydi-node-${n.id}`, "circle-opacity", nt); } catch(e){}
+          try { map.setPaintProperty(`ydi-node-${n.id}`, "circle-stroke-opacity", nt); } catch(e){}
+        });
+        if (nt < 1) requestAnimationFrame(fadeNodes);
+      };
+      requestAnimationFrame(fadeNodes);
+      setStatus("☄️ Younger Dryas — meltwater surge initiating…");
+    }, 2200);
+
+    // Phase 3: release floods (5.5s after trigger)
+    setTimeout(() => {
+      if (ydiRunRef.current !== run) return;
+      // Stop pulse, settle ice at medium opacity
+      if (ydiIceFrameRef.current) { cancelAnimationFrame(ydiIceFrameRef.current); ydiIceFrameRef.current = null; }
+      try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-fill`, "fill-opacity", 0.35); } catch(e){}
+      try { map.setPaintProperty(`${ICE_SHEET_PREFIX}-line`, "line-opacity", 0.7); } catch(e){}
+
+      // Draw flood corridors — split each into segments with tapering width
+      // Width starts at 100% at source, tapers to 30% at terminus (hydrologically correct)
+      const corridorData = YDI_FLOOD_CORRIDORS[intensity] || YDI_FLOOD_CORRIDORS.medium;
+
+      // Calculate total flow volume across all corridors
+      const totalFlow = corridorData.features.reduce((sum, c) => sum + (c.flow_km3 || 0), 0);
+      const totalFlowStr = totalFlow > 0 ? totalFlow.toLocaleString() : "";
+      setStatus(`☄️ Younger Dryas — ${intensity.toUpperCase()} flood release · ~${totalFlowStr} km³ total meltwater`);
+      const features = [];
+      corridorData.features.forEach((corridor, fi) => {
+        const n = corridor.coords.length;
+        if (n < 2) return;
+        // Split into segments, each with its own width based on position along corridor
+        for (let i = 0; i < n - 1; i++) {
+          const t0 = i / (n - 1);           // 0 = source, 1 = terminus
+          const t1 = (i + 1) / (n - 1);
+          const tMid = (t0 + t1) / 2;
+          // Taper: starts wide, narrows toward end (100% → 30%)
+          const taper = 1.0 - (tMid * 0.7);
+          features.push({
+            type: "Feature",
+            geometry: { type: "LineString", coordinates: [corridor.coords[i], corridor.coords[i+1]] },
+            properties: {
+              name: corridor.name,
+              width: corridor.width * taper,
+              idx: fi,
+              flow_km3: corridor.flow_km3 || 0,
+              dissipation: corridor.dissipation || "",
+              seg: i,
+            }
+          });
+        }
+      });
+      const fc = { type: "FeatureCollection", features };
+      const srcId  = "ydi-flood-source";
+      const haloId = "ydi-flood-halo";
+      const coreId = "ydi-flood-core";
+      try {
+        [haloId, coreId].forEach(id => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
+        try { if (map.getSource(srcId)) map.removeSource(srcId); } catch(e){}
+        map.addSource(srcId, { type: "geojson", data: fc });
+        // Zoom-interpolated widths — corridors scale with map so they don't shrink on zoom
+        // Base multipliers: halo=4x, mid=2x, core=1x relative to width property
+        // Zoom-interpolated widths — doubled for visibility
+        const zoomWidth = (base) => ["interpolate", ["linear"], ["zoom"],
+          2,  ["*", ["get", "width"], base * 4],
+          4,  ["*", ["get", "width"], base * 12],
+          6,  ["*", ["get", "width"], base * 32],
+          8,  ["*", ["get", "width"], base * 80],
+          10, ["*", ["get", "width"], base * 180],
+        ];
+
+        // Outer halo — 4x core, lightest blue, 150% per side fringe, semi-transparent
+        map.addLayer({ id: haloId, type: "line", source: srcId,
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: {
+            "line-color": "#bfdbfe",
+            "line-width": zoomWidth(4),
+            "line-opacity": 0.32,
+            "line-blur": 8,
+          }
+        });
+        // Mid layer — 2x core, medium blue, semi-transparent
+        map.addLayer({ id: "ydi-flood-mid", type: "line", source: srcId,
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: {
+            "line-color": "#3b82f6",
+            "line-width": zoomWidth(2),
+            "line-opacity": 0.52,
+            "line-blur": 2,
+          }
+        });
+        // Core — solid dark blue, main channel
+        map.addLayer({ id: coreId, type: "line", source: srcId,
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: {
+            "line-color": "#1e40af",
+            "line-width": zoomWidth(1),
+            "line-opacity": 0.78,
+            "line-blur": 0.5,
+          }
+        });
+        // Click popup
+        map.on("click", haloId, (e) => {
+          if (scenarioModeRef.current !== "cataclysm" || cataclysmModelRef.current !== "ydi") return;
+          const name = e.features?.[0]?.properties?.name || "Flood Corridor";
+          const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: true, className: "elev-popup", maxWidth: "220px" });
+          const props = e.features?.[0]?.properties || {};
+          const intens = ydiIntensityRef.current;
+          const depthCore = intens === "high" ? "150-300m" : intens === "medium" ? "80-150m" : "30-80m";
+          const depthMid  = intens === "high" ? "50-150m"  : intens === "medium" ? "30-80m"  : "10-30m";
+          const depthHalo = intens === "high" ? "10-50m"   : intens === "medium" ? "5-30m"   : "1-10m";
+          const flowKm3   = props.flow_km3 ? `${(props.flow_km3).toLocaleString()} km³` : "—";
+          const dissip    = props.dissipation || "Drains southward following terrain gradient";
+          popup.setLngLat(e.lngLat).setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+            <div style="color:#38bdf8;font-weight:700;margin-bottom:4px">🌊 ${name}</div>
+            <div style="color:#e2e8f0;font-size:11px;margin-bottom:6px">Younger Dryas Meltwater · ~12,900 BP</div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #1e2d45">
+              <span style="font-size:11px;color:#94a3b8">Est. flow volume</span>
+              <span style="font-size:12px;font-weight:700;color:#38bdf8">${flowKm3}</span>
+            </div>
+            <div style="margin-bottom:6px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+                <span style="font-size:11px;color:#1e3a8a;font-weight:700">■ Core channel</span>
+                <span style="font-size:11px;color:#e2e8f0">${depthCore} deep</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+                <span style="font-size:11px;color:#2563eb;font-weight:700">■ Mid zone</span>
+                <span style="font-size:11px;color:#e2e8f0">${depthMid} deep</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+                <span style="font-size:11px;color:#60a5fa;font-weight:700">■ Shallow fringe</span>
+                <span style="font-size:11px;color:#e2e8f0">${depthHalo} deep</span>
+              </div>
+            </div>
+            <div style="font-size:11px;color:#64748b;font-style:italic;margin-bottom:4px;line-height:1.4">${dissip}</div>
+            <div style="color:#ef4444;font-weight:700;font-size:11px">⚠ Inundated — high ground survival only</div>
+          </div>`).addTo(map);
+        });
+        map.on("mouseenter", haloId, () => { map.getCanvas().style.cursor = "pointer"; });
+        map.on("mouseleave", haloId, () => { map.getCanvas().style.cursor = "crosshair"; });
+        safely(() => map.triggerRepaint());
+      } catch(e) { console.error("YDI flood draw error", e); }
+
+      // Zoom out to see full North American extent
+      setTimeout(() => {
+        if (ydiRunRef.current !== run) return;
+        safely(() => map.flyTo({ center: [-96, 46], zoom: 2.8, duration: 2000, essential: true }));
+      }, 800);
+
+    }, 5500);
+  };
+
   const drawIceSheets = (map) => {
-    const features = ICE_SHEET_ZONES.map((z, i) => ({
-      ...buildAshEllipse(z.center[0], z.center[1], z.major_km, z.minor_km, z.bearing),
-      properties: { name: z.name, color: z.color, idx: i },
-    }));
+    // Build features — zones with `rings` become MultiPolygon, others become Polygon
+    const features = ICE_SHEET_ZONES.map((z, i) => {
+      let geometry;
+      if (z.rings) {
+        // MultiPolygon — each ring is a separate polygon (e.g. Britain + Ireland)
+        const closeRing = (r) => {
+          const c = [...r];
+          if (c[0][0] !== c[c.length-1][0] || c[0][1] !== c[c.length-1][1]) c.push(c[0]);
+          return c;
+        };
+        geometry = { type: "MultiPolygon", coordinates: z.rings.map(r => [closeRing(r)]) };
+      } else {
+        const ring = z.coords;
+        const closed = [...ring];
+        if (closed[0][0] !== closed[closed.length-1][0] || closed[0][1] !== closed[closed.length-1][1]) closed.push(closed[0]);
+        geometry = { type: "Polygon", coordinates: [closed] };
+      }
+      return { type: "Feature", geometry, properties: { name: z.name, color: z.color, idx: i } };
+    });
+
+    // Label points — centroid of bounding box of coords (or first ring)
+    const labelFeatures = ICE_SHEET_ZONES.map((z, i) => {
+      const coords = z.rings ? z.rings[0] : z.coords;
+      const lngs = coords.map(c => c[0]);
+      const lats = coords.map(c => c[1]);
+      const cLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+      const cLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+      return {
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [cLng, cLat] },
+        properties: { name: z.name, color: z.color, idx: i },
+      };
+    });
+
+    const fc      = { type: "FeatureCollection", features };
+    const labelFc = { type: "FeatureCollection", features: labelFeatures };
+
     try {
       if (map.getSource(ICE_SHEET_SOURCE)) {
-        map.getSource(ICE_SHEET_SOURCE).setData({ type: "FeatureCollection", features });
+        map.getSource(ICE_SHEET_SOURCE).setData(fc);
+        if (map.getSource(`${ICE_SHEET_SOURCE}-labels`)) {
+          map.getSource(`${ICE_SHEET_SOURCE}-labels`).setData(labelFc);
+        }
       } else {
-        map.addSource(ICE_SHEET_SOURCE, { type: "geojson", data: { type: "FeatureCollection", features } });
-        map.addLayer({ id: `${ICE_SHEET_PREFIX}-fill`, type: "fill", source: ICE_SHEET_SOURCE,
-          paint: { "fill-color": ["get", "color"], "fill-opacity": 0.45 } });
-        map.addLayer({ id: `${ICE_SHEET_PREFIX}-line`, type: "line", source: ICE_SHEET_SOURCE,
-          paint: { "line-color": "#93c5fd", "line-width": 1.5, "line-opacity": 0.9 } });
-        map.addLayer({ id: `${ICE_SHEET_PREFIX}-label`, type: "symbol", source: ICE_SHEET_SOURCE,
-          layout: { "symbol-placement": "line", "text-field": ["get", "name"],
-                    "text-size": 11, "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-                    "text-offset": [0, -0.8], "symbol-spacing": 400 },
-          paint: { "text-color": "#bfdbfe", "text-halo-color": "#0a0f1e", "text-halo-width": 2 } });
+        map.addSource(ICE_SHEET_SOURCE, { type: "geojson", data: fc });
+        map.addSource(`${ICE_SHEET_SOURCE}-labels`, { type: "geojson", data: labelFc });
+        map.addLayer({
+          id: `${ICE_SHEET_PREFIX}-fill`, type: "fill", source: ICE_SHEET_SOURCE,
+          paint: { "fill-color": ["get", "color"], "fill-opacity": 0.45 }
+        });
+        map.addLayer({
+          id: `${ICE_SHEET_PREFIX}-line`, type: "line", source: ICE_SHEET_SOURCE,
+          paint: { "line-color": "#93c5fd", "line-width": 1.5, "line-opacity": 0.9 }
+        });
+        map.addLayer({
+          id: `${ICE_SHEET_PREFIX}-label`, type: "symbol",
+          source: `${ICE_SHEET_SOURCE}-labels`,
+          layout: {
+            "text-field": ["get", "name"],
+            "text-size": 11,
+            "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+            "text-offset": [0, 0],
+            "text-anchor": "center",
+          },
+          paint: { "text-color": "#bfdbfe", "text-halo-color": "#0a0f1e", "text-halo-width": 2 }
+        });
       }
     } catch(e) { console.warn("Ice sheet error", e); }
   };
@@ -1715,6 +2924,7 @@ export default function HomePage() {
     try { if (map.getLayer(`${ICE_SHEET_PREFIX}-label`)) map.removeLayer(`${ICE_SHEET_PREFIX}-label`); } catch(e){}
     try { if (map.getLayer(`${ICE_SHEET_PREFIX}-line`)) map.removeLayer(`${ICE_SHEET_PREFIX}-line`); } catch(e){}
     try { if (map.getLayer(`${ICE_SHEET_PREFIX}-fill`)) map.removeLayer(`${ICE_SHEET_PREFIX}-fill`); } catch(e){}
+    try { if (map.getSource(`${ICE_SHEET_SOURCE}-labels`)) map.removeSource(`${ICE_SHEET_SOURCE}-labels`); } catch(e){}
     try { if (map.getSource(ICE_SHEET_SOURCE)) map.removeSource(ICE_SHEET_SOURCE); } catch(e){}
   };
 
@@ -1960,8 +3170,8 @@ export default function HomePage() {
     if (!map) return;
     const model = cataclysmModelRef.current;
     const info = model === "davidson"
-      ? { name: "Davidson / Suspicious Observers", flipBearing: -90, newPoleLat: 22, newPoleLng: 90, newPoleLabel: "New N. Pole (Bay of Bengal)", finalBearing: -90, startBearing: 0 }
-      : { name: "The Ethical Skeptic ECDO", flipBearing: 104, newPoleLat: -13.5, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: 123, startBearing: 0 };
+      ? { name: "Davidson / Suspicious Observers", flipBearing: 90, newPoleLat: 22, newPoleLng: 90, newPoleLabel: "New N. Pole (Bay of Bengal)", finalBearing: 90, startBearing: 0, snapLat: 22, snapLng: 0 }
+      : { name: "The Ethical Skeptic ECDO", flipBearing: 110, newPoleLat: -13.5, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: 110, startBearing: 0, snapLat: 20, snapLng: -20 };
 
     clearCataclysm();
     cataclysmRunRef.current += 1;
@@ -1982,7 +3192,7 @@ export default function HomePage() {
     }, 300);
 
     // Step 2: Natural Earth rotation — longitude moves W→E via setCenter
-    let spinLng = (model === "tes") ? 31 : map.getCenter().lng;
+    let spinLng = (model === "tes") ? -170 : -90; // Davidson starts on NA, TES starts mid-Pacific
     let lastT = null;
     const spin = (t) => {
       if (lastT !== null) {
@@ -1994,24 +3204,52 @@ export default function HomePage() {
     };
     setTimeout(() => {
       if (cataclysmRunRef.current !== thisRun) return;
+      // Hard reset to known start — bearing 0, pitch 0, correct start lng
+      // Ensures consistent animation on retrigger/new mode/clear
+      safely(() => map.jumpTo({ center: [spinLng, 20], bearing: 0, pitch: 0, zoom: _catZoom }));
       setStatus(`☄️ ${info.name} — crustal displacement initiating…`);
       cataclysmSpinRef.current = requestAnimationFrame(spin);
     }, 1600);
 
-    // Step 3: Ease bearing to start position WHILE spin continues, then flip
+    // Step 3: Single rAF loop — bearing flip + longitude spin simultaneously
+    // On completion: flyTo new pole centered, then bearing-spin post-flip
     setTimeout(() => {
-      // Ease bearing smoothly to start position over 2s — spin keeps going via setCenter
       safely(() => map.easeTo({ bearing: info.startBearing, duration: 2000 }));
       if (cataclysmRunRef.current !== thisRun) return;
       setStatus(`☄️ ${info.name} — CRUSTAL DISPLACEMENT IN PROGRESS`);
-      // After bearing settles, stop spin and do the flip
       setTimeout(() => {
         if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-        safely(() => map.rotateTo(info.flipBearing, {
-          duration: 8000,
-          easing: t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
-        }));
-        // No bearing correction — let flip land naturally
+        const flipStart = performance.now();
+        const flipDuration = 8000;
+        const startBearing = map.getBearing();
+        const targetBearing = info.flipBearing;
+        const bearingDelta = targetBearing - startBearing;
+        const easeInOut = t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+        let flipLng = map.getCenter().lng;
+        let flipLastT = null;
+        const startLat = 20;
+        const flipLoop = (now) => {
+          if (cataclysmRunRef.current !== thisRun) return;
+          const elapsed = now - flipStart;
+          const progress = Math.min(elapsed / flipDuration, 1);
+          const eased = easeInOut(progress);
+          const newBearing = startBearing + bearingDelta * eased;
+          if (flipLastT !== null) flipLng -= (now - flipLastT) * 0.018;
+          flipLastT = now;
+          // For Davidson: shift lat toward new pole (22°N) so spin axis tracks with tilt
+          // For TES: keep lat fixed at 20 — pole is southern hemisphere, lat shift causes chaos
+          const centerLat = model === "davidson"
+            ? startLat + (info.snapLat - startLat) * eased
+            : 20;
+          safely(() => map.jumpTo({ bearing: newBearing, center: [flipLng, centerLat] }));
+          if (progress < 1) {
+            cataclysmSpinRef.current = requestAnimationFrame(flipLoop);
+          } else {
+            cataclysmSpinRef.current = null;
+            // Flip done — just stop, no snap
+          }
+        };
+        cataclysmSpinRef.current = requestAnimationFrame(flipLoop);
       }, 2100);
     }, model === "tes" ? 5200 : 5600);
 
@@ -2066,35 +3304,19 @@ export default function HomePage() {
       // Interaction already handled below with currentTier check
       // Post-flip: same left-to-right longitude spin as before
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-      // Free: allow pan but lock zoom — can explore but not zoom in
+      // Free: full zoom + pan — paywall after 30s
       if ((proTierRef.current ?? proTier ?? "free") === "free") {
         safely(() => {
           map.dragPan.enable();
-          map.scrollZoom.disable();
-          map.doubleClickZoom.disable();
-          map.touchZoomRotate.disable();
+          map.scrollZoom.enable();
+          map.doubleClickZoom.enable();
+          map.touchZoomRotate.enable();
         });
       }
-      // Post-flip spin — continue from wherever the globe landed, drift right to left
-      const currentCenter = map.getCenter();
-      let lat2 = currentCenter.lat;
-      let lng2p = currentCenter.lng;
-      let lt2 = null;
-      let spinActive = true; // flag — set false to stop immediately
-      const spin2 = (t) => {
-        if (!spinActive) return; // bail out — don't reschedule
-        if (lt2 !== null) {
-          const delta = (t - lt2) * 0.005;
-          // Drift latitude gradually toward new pole over time
-          lng2p -= delta * 0.174; // right to left
-          if (lat2 < -85) lat2 = -85;
-          if (lat2 > 85) lat2 = 85;
-          safely(() => map.setCenter([lng2p, lat2]));
-        }
-        lt2 = t;
-        cataclysmSpinRef.current = requestAnimationFrame(spin2);
-      };
-      cataclysmSpinRef.current = requestAnimationFrame(spin2);
+      // Post-flip spin — bearing decrements (right to left) around centered new pole
+      // Small delay lets the easeTo finish landing before spin takes over
+      // Hard stop — no post-flip spin
+      cataclysmSpinRef.current = null;
 
       // Enable interaction for pro, lock for free
       const isFree = (proTierRef.current ?? proTier ?? "free") === "free";
@@ -2111,6 +3333,10 @@ export default function HomePage() {
         });
       } else {
         safely(() => {
+          map.dragPan.enable();
+          map.scrollZoom.enable();
+          map.doubleClickZoom.enable();
+          map.touchZoomRotate.enable();
           map.dragRotate.enable();
           map.setMaxBounds(null);
         });
@@ -2119,61 +3345,64 @@ export default function HomePage() {
       // Free mobile: spin 10 more seconds then show paywall
       const isFreeUser = (proTierRef.current ?? proTier ?? "free") === "free";
       const isMobileUser = window.innerWidth <= 640;
-      if (isFreeUser && isMobileUser) {
+      if (isFreeUser) {
         setTimeout(() => {
           spinActive = false;
           if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
           setPaywallModal("pro");
-        }, 20000);
+        }, 30000);
       }
 
       // Stop spin on first interaction (pro: keep map, free: show paywall)
       const stopSpin = () => {
-        spinActive = false;
-        if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-        map.off("wheel", stopSpin);
-        map.off("zoomstart", stopSpin);
-        if ((proTierRef.current ?? proTier ?? "free") === "free") {
-          // Free: pan allowed, zoom triggers paywall
-          safely(() => { map.dragPan.enable(); });
-          map.on("wheel", () => setPaywallModal("pro"));
-          map.on("zoomstart", () => setPaywallModal("pro"));
-        } else {
-          safely(() => {
-            map.dragPan.enable();
-            map.scrollZoom.enable();
-            map.doubleClickZoom.enable();
-            map.touchZoomRotate.enable();
-          });
-        }
+        try {
+          spinActive = false;
+          if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
+          try { map.off("wheel", stopSpin); } catch(e){}
+          try { map.off("zoomstart", stopSpin); } catch(e){}
+          if ((proTierRef.current ?? proTier ?? "free") === "free") {
+            safely(() => { map.dragPan.enable(); });
+            try { map.on("wheel", () => setPaywallModal("pro")); } catch(e){}
+            try { map.on("zoomstart", () => setPaywallModal("pro")); } catch(e){}
+          } else {
+            safely(() => {
+              map.dragPan.enable();
+              map.scrollZoom.enable();
+              map.doubleClickZoom.enable();
+              map.touchZoomRotate.enable();
+            });
+          }
+        } catch(e) { console.warn("stopSpin error", e); }
       };
-      map.on("wheel", stopSpin);
-      map.once("zoomstart", stopSpin);
-    }, 14000);
+      try { map.on("wheel", stopSpin); } catch(e){}
+      try { map.once("zoomstart", stopSpin); } catch(e){}
+    }, 17500);
   };
 
   const clearNuke = () => {
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
-      const nukeLayers = ["nuke-emp","nuke-emp-line","nuke-thermal","nuke-thermal-line",
-        "nuke-blast-light","nuke-blast-light-line","nuke-blast-moderate","nuke-blast-moderate-line",
-        "nuke-blast-heavy","nuke-blast-heavy-line","nuke-fireball","nuke-fireball-line",
-        "nuke-radiation","nuke-fallout","nuke-fallout-line"];
-      nukeLayers.forEach((id) => { try { if (map.getLayer(id)) map.removeLayer(id); } catch(e){} });
-      try { if (map.getSource(IMPACT_PREVIEW_SOURCE_ID)) map.removeSource(IMPACT_PREVIEW_SOURCE_ID); } catch(e){}
+      clearNukeLayers(map);
       try { if (map.getLayer(IMPACT_LAYER_ID)) map.removeLayer(IMPACT_LAYER_ID); } catch(e){}
       try { if (map.getSource(IMPACT_SOURCE_ID)) map.removeSource(IMPACT_SOURCE_ID); } catch(e){}
     }
+    if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; }
+    nukeStrikesRef.current.forEach(s => { try { s.marker.remove(); } catch(e){} });
+    nukeStrikesRef.current = [];
+    setNukeStrikes([]);
     nukePointRef.current = null;
     setNukePointSet(false);
     setNukeResult(null);
+    nukeResultRef.current = null;
     setNukeError("");
+    setNukeLoading(false);
+    setEmpResult(null);
     setStatus("Nuke cleared");
   };
 
   const clearFlood = () => {
     const map = mapRef.current;
-    if (map && map.isStyleLoaded()) { try { clearWildfireZones(map); } catch(e){} try { clearIceSheets(map); } catch(e){} } setActiveWarmingLevel(null);
+    if (map && map.isStyleLoaded()) { try { clearWildfireZones(map); } catch(e){} try { clearIceSheets(map); } catch(e){} } setActiveWarmingLevel(null); activeWarmingLevelRef.current = null;
     cancelPendingImpactRequest();
     impactRunSeqRef.current += 1;
     setImpactLoading(false);
@@ -2198,6 +3427,8 @@ export default function HomePage() {
     const params = new URLSearchParams(window.location.search);
     const scenario = params.get("scenario");
     if (!scenario) return;
+    // Store full query string in sessionStorage as backup
+    try { sessionStorage.setItem("dm_permalink", window.location.search); } catch(e) {}
     // Clean URL immediately
     window.history.replaceState({}, "", window.location.pathname);
     // Store params for map-ready trigger
@@ -2222,7 +3453,10 @@ export default function HomePage() {
 
     mapRef.current = map;
     applyProjectionForMode("map");
-    map.addControl(new mapboxgl.NavigationControl(), "top-right");
+    // Zoom controls only on desktop — mobile uses pinch-to-zoom
+    if (typeof window !== "undefined" && window.innerWidth > 640) {
+      map.addControl(new mapboxgl.NavigationControl(), "top-right");
+    }
     map.getCanvas().style.cursor = "crosshair";
 
     const handleError = (e) => {
@@ -2236,14 +3470,27 @@ export default function HomePage() {
       if ((scenarioModeRef.current === "flood" || scenarioModeRef.current === "climate") && Number(seaLevelRef.current) !== 0 && floodAllowedInCurrentView()) {
         setTimeout(() => { syncFloodScenario(); }, 50);
       } else { removeFloodLayer(); }
-      if (scenarioModeRef.current === "impact" && impactPointRef.current && impactResultRef.current) {
-        const result = impactResultRef.current;
+      // Re-draw ice sheets if Ice Age sea level is active
+      if ((scenarioModeRef.current === "flood" || scenarioModeRef.current === "climate") && seaLevelRef.current <= -100) {
+        setTimeout(() => safely(() => drawIceSheets(mapRef.current)), 100);
+      }
+      if (scenarioModeRef.current === "impact" && impactResultRef.current && !impactDrawingRef.current) {
+        const points = impactPointsRef.current.length > 0 ? impactPointsRef.current : (impactPointRef.current ? [impactPointRef.current] : []);
         setTimeout(() => {
-          drawImpactPoint(impactPointRef.current.lng, impactPointRef.current.lat);
-          if (result.is_ocean_impact === true && Number(result.wave_height_m ?? 0) > 0) {
-            drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
-            setTimeout(() => { applyOceanImpactFlood(result, impactPointRef.current.lng, impactPointRef.current.lat); }, 50);
-          } else { drawLandImpactFromResult(impactPointRef.current.lng, impactPointRef.current.lat, result); }
+          // If runImpact started drawing while we waited, skip — it owns the canvas
+          if (impactDrawingRef.current) return;
+          points.forEach((pt) => {
+            if (!pt) return;
+            const drawIdx = pt.idx ?? 0; // always use the point's own stable idx
+            const result = pt.result || impactResultRef.current;
+            if (!result) return;
+            if (result.is_ocean_impact === true && Number(result.wave_height_m ?? 0) > 0) {
+              drawOceanImpactMarker(pt.lng, pt.lat, drawIdx);
+              setTimeout(() => { applyOceanImpactFlood(result, pt.lng, pt.lat, drawIdx); }, 50);
+            } else {
+              drawLandImpactFromResult(pt.lng, pt.lat, result, drawIdx);
+            }
+          });
         }, 50);
       }
     };
@@ -2270,24 +3517,104 @@ export default function HomePage() {
       const { lng, lat } = e.lngLat;
 
       if (scenarioModeRef.current === "impact") {
-        cancelPendingImpactRequest();
-        impactRunSeqRef.current += 1;
-        setImpactLoading(false);
-        clearImpactPreview();
-        drawImpactPoint(lng, lat);
+        // If results exist, show zone popup; otherwise place a new impact point
+        if (impactResultRef.current) {
+          if (proTierRef.current === "free") {
+            impactPopupClickCountRef.current += 1;
+            if (impactPopupClickCountRef.current > 1) { setPaywallModal("pro"); return; }
+          }
+          showImpactZonePopup(lng, lat);
+          return;
+        }
+        const MAX_IMPACT_POINTS = proTierRef.current !== "free" ? 3 : 1;
+        if (impactPointsRef.current.length >= MAX_IMPACT_POINTS) {
+          if (proTierRef.current === "free") {
+            setPaywallModal("pro");
+          } else {
+            setStatus("Maximum 3 impact points — clear to reset");
+          }
+          return;
+        }
+        // Add new point as numbered marker
+        const idx = impactPointsRef.current.length;
+        const el = document.createElement("div");
+        el.style.cssText = "width:26px;height:26px;border-radius:50%;background:#ef4444;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.5);";
+        el.innerText = idx + 1;
+        const marker = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([lng, lat]).addTo(mapRef.current);
+        const point = { lng, lat, marker, idx, result: null };
+        el.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          point.marker.remove();
+          // Remove indexed flood layer for this point
+          const fl = impactFloodLayersRef.current.find(l => l.layerId === `flood-layer-impact-${idx}`);
+          if (fl) {
+            try { if (mapRef.current.getLayer(fl.layerId)) mapRef.current.removeLayer(fl.layerId); } catch(e){}
+            try { if (mapRef.current.getSource(fl.sourceId)) mapRef.current.removeSource(fl.sourceId); } catch(e){}
+            impactFloodLayersRef.current = impactFloodLayersRef.current.filter(l => l !== fl);
+          }
+          impactPointsRef.current = impactPointsRef.current.filter(p => p !== point);
+          impactPointRef.current = impactPointsRef.current.length > 0 ? impactPointsRef.current[impactPointsRef.current.length - 1] : null;
+          setImpactPoints([...impactPointsRef.current]);
+          setImpactResult(null);
+          setStatus(`Impact point removed`);
+        });
+        impactPointsRef.current.push(point);
+        impactPointRef.current = point; // compat
+        setImpactPoints([...impactPointsRef.current]);
         drawImpactPreview(lng, lat, impactDiameterRef.current);
         setImpactResult(null); setImpactError("");
-        setStatus("Impact preview ready");
+        setStatus(impactPointsRef.current.length > 1 ? `${impactPointsRef.current.length} impact points placed — Run Impact` : "Impact point placed — Run Impact");
         return;
       }
 
       if (scenarioModeRef.current === "nuke") {
-        nukePointRef.current = { lng, lat };
+        // If detonation results exist, show zone popup on click
+        if (nukeResultRef.current && nukeSubModeRef.current === "detonate") {
+          if (proTierRef.current === "free") {
+            nukePopupClickCountRef.current += 1;
+            if (nukePopupClickCountRef.current > 1) { setPaywallModal("pro"); return; }
+          }
+          showNukeZonePopup(lng, lat);
+          return;
+        }
+        // EMP mode: single point only
+        if (nukeSubModeRef.current === "emp" && nukeStrikesRef.current.length >= 1) {
+          setStatus("EMP mode uses a single detonation point — clear first to reposition");
+          return;
+        }
+        // Multi-strike is pro only — free users get 1 strike
+        const maxStrikes = (proTierRef.current !== "free") ? MAX_NUKE_STRIKES : 1;
+        if (nukeStrikesRef.current.length >= maxStrikes) {
+          if (proTierRef.current === "free") {
+            setPaywallModal("pro");
+          } else {
+            setStatus(`Maximum ${MAX_NUKE_STRIKES} strike points reached`);
+          }
+          return;
+        }
+        const map = mapRef.current;
+        // Create marker for this strike point
+        const el = document.createElement("div");
+        const idx = nukeStrikesRef.current.length;
+        el.style.cssText = "width:22px;height:22px;border-radius:50%;background:#7c3aed;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.5);";
+        el.innerText = idx + 1;
+        el.title = "Click to remove";
+        const marker = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([lng, lat]).addTo(map);
+        const strike = { lat, lng, marker, idx };
+        el.addEventListener("click", (e) => {
+          e.stopPropagation();
+          strike.marker.remove();
+          nukeStrikesRef.current = nukeStrikesRef.current.filter(s => s !== strike);
+          setNukeStrikes([...nukeStrikesRef.current]);
+          setNukePointSet(nukeStrikesRef.current.length > 0);
+          nukePointRef.current = nukeStrikesRef.current.length > 0 ? nukeStrikesRef.current[nukeStrikesRef.current.length - 1] : null;
+        });
+        nukeStrikesRef.current.push(strike);
+        nukePointRef.current = strike;
+        setNukeStrikes([...nukeStrikesRef.current]);
         setNukePointSet(true);
-        clearImpactPreview();
-        drawImpactPoint(lng, lat);
         setNukeResult(null); setNukeError("");
-        setStatus("Nuke point placed — set yield and detonate");
+        setStatus(`Strike ${idx + 1} placed — add more or detonate`);
         return;
       }
 
@@ -2307,6 +3634,48 @@ export default function HomePage() {
         // wind only — no popup
         return;
       }
+      // In climate mode, check if click is inside a wildfire zone
+      if (scenarioModeRef.current === "climate" && activeWarmingLevelRef.current) {
+        const wLevel = activeWarmingLevelRef.current;
+        const activeZones = WILDFIRE_ZONES.filter(z => z.minLevel <= wLevel);
+        const kpLat = 110.574;
+        const bearingDeg = 70;
+        const bearingRad = bearingDeg * Math.PI / 180;
+        const dN = Math.cos(bearingRad), dE = Math.sin(bearingRad);
+        let hitZone = null;
+        for (const z of activeZones) {
+          const kpLng = 111.32 * Math.cos(z.center[1] * Math.PI / 180);
+          const cLat = z.center[1] + (dN * z.major_km * 0.3) / kpLat;
+          const cLng = z.center[0] + (dE * z.major_km * 0.3) / Math.max(kpLng, 0.001);
+          const dLatKm = (lat - cLat) * kpLat;
+          const dLngKm = (lng - cLng) * Math.max(kpLng, 0.001);
+          const along = dN * dLatKm + dE * dLngKm;
+          const perp  = -dE * dLatKm + dN * dLngKm;
+          if ((along / z.major_km) ** 2 + (perp / z.minor_km) ** 2 <= 1) { hitZone = z; break; }
+        }
+        if (hitZone) {
+          closeElevPopup();
+          const riskLabel = hitZone.minLevel >= 4 ? "Extreme — year-round fire risk" : hitZone.minLevel >= 3 ? "Severe — multi-month fire seasons" : hitZone.minLevel >= 2 ? "High — extended fire season" : "Elevated — worsening drought/fire";
+          const riskColor = hitZone.minLevel >= 4 ? "#b91c1c" : hitZone.minLevel >= 3 ? "#dc2626" : hitZone.minLevel >= 2 ? "#ef4444" : "#f97316";
+          const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: false, className: "elev-popup", maxWidth: "240px" });
+          popup.setLngLat([lng, lat]).setHTML(`
+            <div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+              <div style="color:${riskColor};font-weight:700;margin-bottom:4px">🔥 ${hitZone.name}</div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                <span style="color:#94a3b8;font-size:11px">Activates at</span>
+                <span style="color:#e2e8f0;font-weight:700">+${hitZone.minLevel}°C</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+                <span style="color:#94a3b8;font-size:11px">Current risk level</span>
+                <span style="color:${riskColor};font-weight:700">${wLevel}°C scenario</span>
+              </div>
+              <div style="color:${riskColor};font-size:11px;font-style:italic">${riskLabel}</div>
+              <div style="color:#475569;font-size:10px;margin-top:4px">⚠ Worst-case projection — actual risk varies by local conditions</div>
+            </div>`).addTo(map);
+          elevPopupRef.current = popup;
+          return;
+        }
+      }
       showElevPopup(lng, lat);
     };
 
@@ -2314,12 +3683,29 @@ export default function HomePage() {
     map.on("load", handleLoad);
     map.on("load", () => {
       // Auto-trigger from permalink
-      const pp = window._permalinkParams;
+      // Check sessionStorage backup if _permalinkParams was cleared (e.g. SSR/hydration)
+      let pp = window._permalinkParams;
+      if (!pp) {
+        try {
+          const stored = sessionStorage.getItem("dm_permalink");
+          if (stored) {
+            const p2 = new URLSearchParams(stored);
+            const s2 = p2.get("scenario");
+            if (s2) pp = { scenario: s2, params: p2 };
+            sessionStorage.removeItem("dm_permalink");
+          }
+        } catch(e) {}
+      }
       if (!pp) return;
       window._permalinkParams = null;
       const { scenario, params } = pp;
       setTimeout(() => {
         try {
+          // Restore map view if encoded in link
+          const cx = parseFloat(params.get("cx")), cy = parseFloat(params.get("cy")), cz = parseFloat(params.get("cz"));
+          if (!isNaN(cx) && !isNaN(cy) && !isNaN(cz)) {
+            safely(() => map.jumpTo({ center: [cx, cy], zoom: cz }));
+          }
           if (scenario === "flood") {
             const level = parseFloat(params.get("level") || "0");
             setInputLevel(level); setInputText(String(level)); setSeaLevel(level); seaLevelRef.current = level;
@@ -2330,36 +3716,55 @@ export default function HomePage() {
             const warming = parseFloat(params.get("warming") || "0");
             setInputLevel(level); setInputText(String(level)); setSeaLevel(level); seaLevelRef.current = level;
             setScenarioMode("climate"); scenarioModeRef.current = "climate";
-            if (warming) setActiveWarmingLevel(warming);
+            if (warming) { setActiveWarmingLevel(warming); activeWarmingLevelRef.current = warming; }
             setTimeout(() => { executeFlood(); if (warming) setTimeout(() => safely(() => drawWildfireZones(mapRef.current, warming)), 600); }, 100);
           } else if (scenario === "impact") {
-            const lat = parseFloat(params.get("lat")); const lng = parseFloat(params.get("lng"));
-            const diameter = parseInt(params.get("diameter") || "1000");
             setScenarioMode("impact"); scenarioModeRef.current = "impact";
+            const diameter = Math.min(parseInt(params.get("diameter") || "1000"), proTierRef.current !== "free" ? PRO_MAX_IMPACT_DIAMETER : FREE_MAX_IMPACT_DIAMETER);
             setImpactDiameter(diameter); impactDiameterRef.current = diameter;
-            if (!isNaN(lat) && !isNaN(lng)) {
-              impactPointRef.current = { lat, lng };
+            const pointsStr = params.get("points");
+            if (pointsStr) {
+              // Multi-impact
+              const pts = decodeURIComponent(pointsStr).split("|").map(s => { const [la, ln] = s.split(","); return { lat: parseFloat(la), lng: parseFloat(ln) }; }).filter(p => !isNaN(p.lat));
+              pts.forEach((p, i) => { impactPointsRef.current.push({ lat: p.lat, lng: p.lng, idx: i, marker: null, result: null }); });
+              impactPointRef.current = pts[pts.length - 1];
               setTimeout(() => runImpact(), 200);
+            } else {
+              const lat = parseFloat(params.get("lat")), lng = parseFloat(params.get("lng"));
+              if (!isNaN(lat) && !isNaN(lng)) { impactPointRef.current = { lat, lng }; setTimeout(() => runImpact(), 200); }
             }
           } else if (scenario === "nuke") {
-            const lat = parseFloat(params.get("lat")); const lng = parseFloat(params.get("lng"));
-            const yieldKt = parseInt(params.get("yield") || "1000");
-            const burst = params.get("burst") || "airburst";
             setScenarioMode("nuke"); scenarioModeRef.current = "nuke";
+            const yieldKt = Math.min(parseInt(params.get("yield") || "1000"), proTierRef.current !== "free" ? PRO_MAX_NUKE_YIELD_KT : FREE_MAX_NUKE_YIELD_KT);
+            const burst = params.get("burst") || "airburst";
             setNukeYield(yieldKt); setNukeBurst(burst);
-            nukePointRef.current = { lat, lng }; setNukePointSet(true);
-            setTimeout(() => executeNuke(), 200);
+            const pointsStr = params.get("points");
+            if (pointsStr) {
+              const pts = decodeURIComponent(pointsStr).split("|").map(s => { const [la, ln] = s.split(","); return { lat: parseFloat(la), lng: parseFloat(ln) }; }).filter(p => !isNaN(p.lat));
+              pts.forEach((p, i) => {
+                const el = document.createElement("div");
+                el.style.cssText = "width:14px;height:14px;background:#dc2626;border:2px solid #fff;border-radius:50%;cursor:pointer;";
+                const marker = new mapboxgl.Marker({ element: el }).setLngLat([p.lng, p.lat]).addTo(map);
+                nukeStrikesRef.current.push({ lat: p.lat, lng: p.lng, marker, idx: i });
+              });
+              nukePointRef.current = pts[pts.length - 1]; setNukePointSet(true);
+              setNukeStrikes([...nukeStrikesRef.current]);
+              setTimeout(() => executeNuke(), 200);
+            } else {
+              const lat = parseFloat(params.get("lat")), lng = parseFloat(params.get("lng"));
+              if (!isNaN(lat) && !isNaN(lng)) { nukePointRef.current = { lat, lng }; setNukePointSet(true); setTimeout(() => executeNuke(), 200); }
+            }
           } else if (scenario === "volcano") {
             const type = params.get("type") || "yellowstone";
             const preset = parseInt(params.get("preset") || "0");
             setScenarioMode("yellowstone"); scenarioModeRef.current = "yellowstone";
-            setVolcanoType(type); setYellowstonePreset(preset);
-            setTimeout(() => executeYellowstone(), 200);
+            setVolcanoType(type); volcanoTypeRef.current = type; setYellowstonePreset(preset); yellowstonePresetRef.current = preset;
+            setTimeout(() => drawYellowstone(preset), 200);
           } else if (scenario === "tsunami") {
             const source = parseInt(params.get("source") || "0");
             setScenarioMode("tsunami"); scenarioModeRef.current = "tsunami";
             setTsunamiSource(source); tsunamiSourceRef.current = source;
-            setTimeout(() => drawTsunami(), 200);
+            setTimeout(() => drawTsunami(source), 200);
           } else if (scenario === "cataclysm") {
             const model = params.get("model") || "davidson";
             setScenarioMode("cataclysm"); scenarioModeRef.current = "cataclysm";
@@ -2367,6 +3772,14 @@ export default function HomePage() {
             setTimeout(() => triggerCataclysm(), 500);
           }
         } catch(e) { console.warn("Permalink trigger failed", e); }
+
+        // Show pro CTA if free user arrives at paywalled scenario via share link
+        const isFreeUser = (proTierRef.current ?? "free") === "free";
+        if (isFreeUser && ["impact", "nuke", "cataclysm"].includes(scenario)) {
+          setTimeout(() => {
+            setStatus("🔓 Viewing shared scenario — upgrade to Pro to run your own simulations & unlock full detail");
+          }, 3000);
+        }
       }, 800);
     });
     map.on("style.load", handleStyleLoad);
@@ -2412,7 +3825,10 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!mapRef.current || !mapRef.current.isStyleLoaded()) return;
-    if (scenarioMode !== "impact" || !impactResult || !impactPointRef.current) return;
+    if (scenarioMode !== "impact" || !impactResult) return;
+    // Multi-impact: results are drawn inside runImpact, don't redraw here
+    if (impactResult._count > 1) return;
+    if (!impactPointRef.current) return;
     if (impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0) {
       drawOceanImpactMarker(impactPointRef.current.lng, impactPointRef.current.lat);
       setTimeout(() => { applyOceanImpactFlood(impactResult, impactPointRef.current.lng, impactPointRef.current.lat); }, 50);
@@ -2468,10 +3884,17 @@ export default function HomePage() {
       return;
     }
     if (scenarioMode === "nuke") {
-      setStatus(nukePointSet
-        ? nukeLoading ? "Detonating..." : nukeResult ? `${nukeResult.severity_class === "Extinction scale" ? "Civilization ending" : nukeResult.severity_class} — ${nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"}` : "Nuke point placed — detonate"
-        : "Click map to place detonation point"
-      );
+      if (nukeSubMode === "emp") {
+        setStatus(nukePointSet
+          ? empLoading ? "Computing EMP footprint..." : empResult ? `EMP footprint: ${Math.round(empResult.emp_r_km).toLocaleString()} km · ${(empResult.population_at_risk/1e6).toFixed(1)}M at risk` : "Place point then Launch EMP"
+          : "Click map to place EMP detonation point"
+        );
+      } else {
+        setStatus(nukePointSet
+          ? nukeLoading ? "Detonating..." : nukeResult ? `${nukeResult._count > 1 ? nukeResult._count + " strikes" : nukeResult.severity_class === "Extinction scale" ? "Civilization ending" : nukeResult.severity_class} — ${nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"}` : `${nukeStrikes.length} strike${nukeStrikes.length !== 1 ? "s" : ""} placed — detonate`
+          : "Click map to place strike points (up to 5)"
+        );
+      }
       return;
     }
     if (viewMode === "globe" && seaLevel === 0) { setStatus("Globe mode"); return; }
@@ -2569,13 +3992,13 @@ export default function HomePage() {
       <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Scenario Mode</div>
       <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
         <button
-          onClick={() => { if (scenarioModeRef.current === "nuke") clearNuke(); if (scenarioModeRef.current === "yellowstone") clearYellowstone(); if (scenarioModeRef.current === "tsunami") clearTsunami(); if (scenarioModeRef.current === "cataclysm") clearCataclysm(); unlockMapControls(); setScenarioMode("flood"); }}
+          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("flood"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "flood" ? "#1e3a5f" : "#111827", color: scenarioMode === "flood" ? "#60a5fa" : "#94a3b8", border: scenarioMode === "flood" ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>Flood</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Sea level up / down</div>
         </button>
         <button
-          onClick={() => { if (scenarioModeRef.current === "nuke") clearNuke(); if (scenarioModeRef.current === "yellowstone") clearYellowstone(); if (scenarioModeRef.current === "tsunami") clearTsunami(); if (scenarioModeRef.current === "cataclysm") clearCataclysm(); unlockMapControls(); setScenarioMode("impact"); }}
+          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("impact"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "impact" ? "#1e3a5f" : "#111827", color: scenarioMode === "impact" ? "#60a5fa" : "#94a3b8", border: scenarioMode === "impact" ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>Impact</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Click map to place impact point</div>
@@ -2594,31 +4017,25 @@ export default function HomePage() {
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Sea level rise projections</div>
         </button>
         <button
-          onClick={() => { if (scenarioModeRef.current === "tsunami") clearTsunami(); if (scenarioModeRef.current === "cataclysm") clearCataclysm(); unlockMapControls(); setScenarioMode("nuke"); clearImpactPreview(); setNukeResult(null); setNukeError(""); setNukePointSet(false); nukePointRef.current = null; }}
+          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("nuke"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "nuke" ? "#4c1d95" : "#111827", color: scenarioMode === "nuke" ? "#c4b5fd" : "#94a3b8", border: scenarioMode === "nuke" ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>☢️ Nuke</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Click map to place detonation point</div>
         </button>
         <button
-          onClick={() => { if (scenarioModeRef.current === "tsunami") clearTsunami(); if (scenarioModeRef.current === "cataclysm") clearCataclysm(); unlockMapControls(); setScenarioMode("yellowstone"); clearImpactPreview(); clearNuke(); clearYellowstone(); }}
+          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("yellowstone"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "yellowstone" ? "#431407" : "#111827", color: scenarioMode === "yellowstone" ? "#fb923c" : "#94a3b8", border: scenarioMode === "yellowstone" ? "1px solid #ea580c" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>🌋 Super Volcano</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Supervolcano eruption scenarios</div>
         </button>
         <button
-          onClick={() => { if (scenarioModeRef.current === "cataclysm") clearCataclysm(); unlockMapControls(); scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); clearImpactPreview(); setImpactResult(null); setImpactError(""); clearNuke(); clearYellowstone(); }}
+          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "tsunami" ? "#0c2a4a" : "#111827", color: scenarioMode === "tsunami" ? "#38bdf8" : "#94a3b8", border: scenarioMode === "tsunami" ? "1px solid #0ea5e9" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>🌊 Mega-Tsunami</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Ocean collapse wave propagation</div>
         </button>
         <button
-          onClick={() => {
-            unlockMapControls();
-            scenarioModeRef.current = "cataclysm";
-            setScenarioMode("cataclysm");
-            clearImpactPreview(); setImpactResult(null); setImpactError("");
-            clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm();
-          }}
+          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); scenarioModeRef.current = "cataclysm"; setScenarioMode("cataclysm"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "cataclysm" ? "#1a0505" : "#111827", color: scenarioMode === "cataclysm" ? "#ef4444" : "#94a3b8", border: scenarioMode === "cataclysm" ? "1px solid #dc2626" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>☄️ Cataclysm</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Pole shift inundation models</div>
@@ -2637,7 +4054,9 @@ export default function HomePage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
                 {IMPACT_PRESETS.filter(p => p.category === cat).map(p => (
                   <button key={p.label}
-                    onClick={() => setImpactDiameter(p.diameter)}
+                    onClick={() => {
+                      setImpactDiameter(p.diameter);
+                    }}
                     style={{ padding: "8px 10px", background: impactDiameter === p.diameter ? "#7f1d1d" : "#111827", color: impactDiameter === p.diameter ? "#fca5a5" : "#94a3b8", border: impactDiameter === p.diameter ? "1px solid #ef4444" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, textAlign: "left" }}>
                     <div style={{ fontSize: 12 }}>{p.label}</div>
                     <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{p.sub}</div>
@@ -2646,26 +4065,53 @@ export default function HomePage() {
               </div>
             </div>
           ))}
-          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, marginTop: 4, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Custom Size</div>
-          <input
-            type="range" min="50" max="20000" step="50" value={impactDiameter}
-            onChange={(e) => setImpactDiameter(Number(e.target.value))}
-            style={{ width: "100%", marginBottom: 10, height: 6, cursor: "pointer" }}
-          />
-          <input
-            type="number" min="50" max="20000" step="50" value={impactDiameter}
-            onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n)) setImpactDiameter(Math.max(50, Math.min(20000, n))); }}
-            style={{ width: "100%", padding: "12px 14px", fontSize: 17, border: "1px solid #1e2d45", marginBottom: 10, boxSizing: "border-box", borderRadius: 8, minHeight: 48, background: "#111827", color: "#e2e8f0" }}
-          />
-          <div style={{ fontSize: 13, marginBottom: 16, color: "#64748b" }}>
-            Diameter: <b>{impactDiameter.toLocaleString()} m</b>
-          </div>
-          <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-            <button onClick={runImpact} disabled={!impactPointRef.current || impactLoading}
-              style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#ef4444", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15, opacity: !impactPointRef.current || impactLoading ? 0.65 : 1 }}>
-              {impactLoading ? "Running..." : "Run Impact"}
+          {proTier !== "free" ? (<>
+            <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, marginTop: 4, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Custom Size</div>
+            <input
+              type="range" min="50" max="20000" step="50" value={impactDiameter}
+              onChange={(e) => {
+                const maxD = proTier !== "free" ? PRO_MAX_IMPACT_DIAMETER : FREE_MAX_IMPACT_DIAMETER;
+                const val = Math.min(Number(e.target.value), maxD);
+                if (proTier === "free" && Number(e.target.value) > FREE_MAX_IMPACT_DIAMETER) setPaywallModal("pro");
+                setImpactDiameter(val);
+              }}
+              style={{ width: "100%", marginBottom: 10, height: 6, cursor: "pointer" }}
+            />
+            <input
+              type="number" min="50" max="20000" step="50" value={impactDiameter}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                if (!Number.isFinite(n)) return;
+                const maxD = proTier !== "free" ? PRO_MAX_IMPACT_DIAMETER : FREE_MAX_IMPACT_DIAMETER;
+                if (proTier === "free" && n > FREE_MAX_IMPACT_DIAMETER) { setPaywallModal("pro"); setImpactDiameter(FREE_MAX_IMPACT_DIAMETER); return; }
+                setImpactDiameter(Math.max(50, Math.min(maxD, n)));
+              }}
+              style={{ width: "100%", padding: "12px 14px", fontSize: 17, border: "1px solid #1e2d45", marginBottom: 10, boxSizing: "border-box", borderRadius: 8, minHeight: 48, background: "#111827", color: "#e2e8f0" }}
+            />
+            <div style={{ fontSize: 13, marginBottom: proTier === "free" ? 6 : 16, color: "#64748b" }}>
+              Diameter: <b>{impactDiameter.toLocaleString()} m</b>
+            </div>
+            {proTier === "free" && (
+              <div onClick={() => setPaywallModal("pro")} style={{ fontSize: 11, color: "#f97316", marginBottom: 12, cursor: "pointer", padding: "5px 8px", background: "#1a0d00", border: "1px solid #7c2d00", borderRadius: 6 }}>
+                🔒 Free cap: 5,000 m — <span style={{ color: "#fb923c", textDecoration: "underline" }}>Pro unlocks 20,000 m</span>
+              </div>
+            )}
+          </>) : (
+            <button onClick={() => setPaywallModal("pro")} style={{ width: "100%", padding: "10px 14px", marginBottom: 16, marginTop: 4, background: "#0f172a", border: "1px solid #1e2d45", borderRadius: 8, color: "#475569", cursor: "pointer", textAlign: "left", fontSize: 12 }}>
+              🔒 Custom size — <span style={{ color: "#7c3aed" }}>Pro</span>
             </button>
-            <button onClick={() => { clearImpactPreview(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setStatus("Impact cleared"); }}
+          )}
+          {proTier !== "free" && (
+            <div style={{ fontSize: 11, color: "#475569", marginBottom: 8 }}>
+              {impactPoints.length > 0 ? `${impactPoints.length}/3 impact points placed` : "Click map to place up to 3 impact points"}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+            <button onClick={runImpact} disabled={impactPoints.length === 0 && !impactPointRef.current || impactLoading}
+              style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#ef4444", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15, opacity: (impactPoints.length === 0 && !impactPointRef.current) || impactLoading ? 0.65 : 1 }}>
+              {impactLoading ? "Running..." : impactPoints.length > 1 ? `Run ${impactPoints.length} Impacts` : "Run Impact"}
+            </button>
+            <button onClick={() => { clearImpactPreview(); removeImpactPoint(); setImpactResult(null); setImpactError(""); if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } setStatus("Impact cleared"); }}
               style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15 }}>
               Clear
             </button>
@@ -2733,7 +4179,8 @@ export default function HomePage() {
                   const map = mapRef.current;
                   if (map && map.isStyleLoaded()) {
                     if (preset.label === "Ice Age") {
-                      setTimeout(() => safely(() => drawIceSheets(map)), 400);
+                      // Draw ice sheets on whatever view the user is in — no forced globe switch
+                      setTimeout(() => safely(() => drawIceSheets(map)), 200);
                     } else {
                       safely(() => clearIceSheets(map));
                     }
@@ -2764,10 +4211,10 @@ export default function HomePage() {
               const map = mapRef.current;
               if (map) {
                 if (warmingLevel) {
-                  setActiveWarmingLevel(warmingLevel);
+                  setActiveWarmingLevel(warmingLevel); activeWarmingLevelRef.current = warmingLevel;
                   setTimeout(() => safely(() => drawWildfireZones(map, warmingLevel)), 400);
                 } else {
-                  setActiveWarmingLevel(null);
+                  setActiveWarmingLevel(null); activeWarmingLevelRef.current = null;
                   safely(() => clearWildfireZones(map));
                 }
               }
@@ -2827,22 +4274,97 @@ export default function HomePage() {
       {/* ── NUKE CONTROLS ── */}
       {scenarioMode === "nuke" && (
         <>
-          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Yield</div>
-          <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"} style={{ marginBottom: 12 }}>
-            {NUKE_PRESETS.map((p) => (
-              <button key={p.label} onClick={() => setNukeYield(p.yield_kt)}
-                style={{ padding: "10px 8px", minHeight: 48, border: "1px solid #d1d5db", background: nukeYield === p.yield_kt ? "#7c3aed" : "white", color: nukeYield === p.yield_kt ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700, whiteSpace: "nowrap", fontSize: 13 }}>
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <input type="range" min="0.001" max="50000" step="1" value={nukeYield}
-            onChange={(e) => setNukeYield(Number(e.target.value))}
-            style={{ width: "100%", marginBottom: 6, cursor: "pointer" }} />
-          <div style={{ fontSize: 13, marginBottom: 12, color: "#64748b" }}>
-            Yield: <b>{nukeYield >= 1000 ? (nukeYield/1000).toFixed(2)+" Mt" : nukeYield+" kt"}</b>
+          {/* Sub-mode toggle */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            <button onClick={() => { setNukeSubMode("detonate"); nukeSubModeRef.current = "detonate"; setEmpResult(null); }}
+              style={{ flex: 1, padding: "10px 8px", minHeight: 44, background: nukeSubMode === "detonate" ? "#7c3aed" : "#111827", color: nukeSubMode === "detonate" ? "white" : "#94a3b8", border: nukeSubMode === "detonate" ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 13 }}>
+              ☢️ Detonation
+            </button>
+            <button onClick={() => { setNukeSubMode("emp"); nukeSubModeRef.current = "emp"; setNukeResult(null); setNukeYield(475); }}
+              style={{ flex: 1, padding: "10px 8px", minHeight: 44, background: nukeSubMode === "emp" ? "#7c3aed" : "#111827", color: nukeSubMode === "emp" ? "white" : "#94a3b8", border: nukeSubMode === "emp" ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 13 }}>
+              ⚡ Strategic EMP
+            </button>
           </div>
 
+          {nukeSubMode === "emp" && (
+            <div style={{ background: "#0f0a2a", border: "1px solid #4c1d95", borderRadius: 10, padding: "10px 12px", marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8, lineHeight: 1.5 }}>
+                High-altitude detonation (~400km). No blast or thermal at ground level. EMP disables unshielded electronics across the footprint.
+              </div>
+              <div style={{ fontSize: 12, color: "#7c3aed", fontWeight: 700, marginBottom: 6 }}>Burst Altitude: {empAltitudeKm} km</div>
+              <input type="range" min="200" max="600" step="10" value={empAltitudeKm}
+                onChange={e => setEmpAltitudeKm(Number(e.target.value))}
+                style={{ width: "100%", marginBottom: 10, cursor: "pointer" }} />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#475569", marginBottom: 4 }}>
+                <span>200km (regional)</span><span>400km (optimal)</span><span>600km (global)</span>
+              </div>
+            </div>
+          )}
+
+          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Yield</div>
+          {nukeSubMode === "emp" ? (
+            // EMP mode — presets only, no slider (yield affects E1 intensity, not footprint size)
+            <>
+            <div style={{ fontSize: 11, color: "#a78bfa", marginBottom: 8 }}>Yield affects E1 pulse intensity — what electronics survive.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+              {[
+                { label: "Hiroshima · 15kt", e1: "~5 kV/m", effect: "Disrupts phones, computers, consumer electronics", yield_kt: 15 },
+                { label: "W76 · 100kt",      e1: "~13 kV/m", effect: "Damages vehicle electronics, grid control systems", yield_kt: 100 },
+                { label: "W88 · 475kt",      e1: "~29 kV/m", effect: "Destroys civilian infrastructure, unhardened military", yield_kt: 475 },
+                { label: "B83 · 1.2Mt",      e1: "~46 kV/m", effect: "Damages lightly hardened military systems", yield_kt: 1200 },
+                { label: "Tsar Bomba · 50Mt", e1: "~200 kV/m", effect: "Destroys hardened systems, Faraday-caged equipment", yield_kt: 50000 },
+              ].map((p) => (
+                <button key={p.label} onClick={() => {
+                  setNukeYield(p.yield_kt);
+                }}
+                  style={{ padding: "9px 12px", background: nukeYield === p.yield_kt ? "#1e0a3c" : "#0f0a2a", border: nukeYield === p.yield_kt ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 8, textAlign: "left", width: "100%" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+                    <span style={{ fontWeight: 700, fontSize: 12, color: nukeYield === p.yield_kt ? "#c4b5fd" : "#94a3b8" }}>{p.label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#7c3aed" }}>{p.e1}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#475569" }}>{p.effect}</div>
+                </button>
+              ))}
+            </div>
+            </>
+          ) : (
+            <>
+              <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"} style={{ marginBottom: 12 }}>
+                {NUKE_PRESETS.map((p) => (
+                  <button key={p.label} onClick={() => {
+                    setNukeYield(p.yield_kt);
+                  }}
+                    style={{ padding: "10px 8px", minHeight: 48, border: "1px solid #d1d5db", background: nukeYield === p.yield_kt ? "#7c3aed" : "white", color: nukeYield === p.yield_kt ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700, whiteSpace: "nowrap", fontSize: 13 }}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              {proTier !== "free" ? (<>
+                <input type="range" min="0.001" max="50000" step="1" value={nukeYield}
+                  onChange={(e) => {
+                    const maxY = proTier !== "free" ? PRO_MAX_NUKE_YIELD_KT : FREE_MAX_NUKE_YIELD_KT;
+                    const val = Number(e.target.value);
+                    if (proTier === "free" && val > FREE_MAX_NUKE_YIELD_KT) { setPaywallModal("pro"); return; }
+                    setNukeYield(Math.min(val, maxY));
+                  }}
+                  style={{ width: "100%", marginBottom: 6, cursor: "pointer" }} />
+                <div style={{ fontSize: 13, marginBottom: proTier === "free" ? 4 : 12, color: "#64748b" }}>
+                  Yield: <b>{nukeYield >= 1000 ? (nukeYield/1000).toFixed(2)+" Mt" : nukeYield+" kt"}</b>
+                </div>
+                {proTier === "free" && (
+                  <div onClick={() => setPaywallModal("pro")} style={{ fontSize: 11, color: "#f97316", marginBottom: 10, cursor: "pointer", padding: "5px 8px", background: "#1a0d00", border: "1px solid #7c2d00", borderRadius: 6 }}>
+                    🔒 Free cap: 1 Mt — <span style={{ color: "#fb923c", textDecoration: "underline" }}>Pro unlocks 100 Mt</span>
+                  </div>
+                )}
+              </>) : (
+                <button onClick={() => setPaywallModal("pro")} style={{ width: "100%", padding: "10px 14px", marginBottom: 12, background: "#0f172a", border: "1px solid #1e2d45", borderRadius: 8, color: "#475569", cursor: "pointer", textAlign: "left", fontSize: 12 }}>
+                  🔒 Custom yield — <span style={{ color: "#7c3aed" }}>Pro</span>
+                </button>
+              )}
+            </>
+          )}
+
+          {nukeSubMode === "detonate" && (<>
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Burst Type</div>
           <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
             <button onClick={() => setNukeBurst("airburst")}
@@ -2890,11 +4412,136 @@ export default function HomePage() {
                 style={{ width: "100%", marginBottom: 14, cursor: "pointer" }} />
             </>
           )}
+          </>)} {/* end nukeSubMode === "detonate" burst type section */}
+
+          {/* Nuclear war presets — detonate mode only; multi-strike presets require pro */}
+          {nukeSubMode === "detonate" && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#7c3aed", textTransform: "uppercase" }}>⚡ Conflict Scenarios</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {[
+                  {
+                    label: "🇷🇺→🇺🇸 Russia First Strike",
+                    sub: "RS-28 Sarmat MIRVs · 800kt each",
+                    yield_kt: 800, burst: "airburst",
+                    strikes: [
+                      { lat: 38.87, lng: -77.15, name: "Pentagon" },
+                      { lat: 41.07, lng: -95.91, name: "Offutt AFB" },
+                      { lat: 40.71, lng: -74.01, name: "New York" },
+                      { lat: 47.87, lng: -117.56, name: "Fairchild AFB" },
+                      { lat: 34.05, lng: -118.24, name: "Los Angeles" },
+                    ]
+                  },
+                  {
+                    label: "🇺🇸→🇷🇺 US Retaliation",
+                    sub: "W88 Trident MIRVs · 475kt each",
+                    yield_kt: 475, burst: "airburst",
+                    strikes: [
+                      { lat: 55.75, lng: 37.62, name: "Moscow" },
+                      { lat: 59.95, lng: 30.32, name: "St Petersburg" },
+                      { lat: 56.85, lng: 60.60, name: "Yekaterinburg" },
+                      { lat: 54.99, lng: 82.90, name: "Novosibirsk" },
+                      { lat: 43.11, lng: 131.90, name: "Vladivostok" },
+                    ]
+                  },
+                  {
+                    label: "☢️ Full Annihilation",
+                    sub: "Both sides · simultaneous · 475–800kt",
+                    yield_kt: 600, burst: "airburst",
+                    strikes: [
+                      { lat: 55.75, lng: 37.62, name: "Moscow" },
+                      { lat: 40.71, lng: -74.01, name: "New York" },
+                      { lat: 38.91, lng: -77.04, name: "Washington DC" },
+                      { lat: 59.95, lng: 30.32, name: "St Petersburg" },
+                      { lat: 34.05, lng: -118.24, name: "Los Angeles" },
+                    ]
+                  },
+                  {
+                    label: "🇵🇰↔🇮🇳 Kashmir Escalation",
+                    sub: "Shaheen-III / Agni-V · 45kt each",
+                    yield_kt: 45, burst: "airburst",
+                    strikes: [
+                      { lat: 33.72, lng: 73.06, name: "Islamabad" },
+                      { lat: 31.55, lng: 74.34, name: "Lahore" },
+                      { lat: 28.61, lng: 77.21, name: "New Delhi" },
+                      { lat: 19.08, lng: 72.88, name: "Mumbai" },
+                      { lat: 22.57, lng: 88.36, name: "Kolkata" },
+                    ]
+                  },
+                  {
+                    label: "🇰🇵 NK Strikes Seoul & Tokyo",
+                    sub: "Hwasong-17 · 250kt each",
+                    yield_kt: 250, burst: "airburst",
+                    strikes: [
+                      { lat: 37.57, lng: 126.98, name: "Seoul" },
+                      { lat: 37.45, lng: 126.89, name: "Incheon" },
+                      { lat: 35.69, lng: 139.69, name: "Tokyo" },
+                      { lat: 34.69, lng: 135.50, name: "Osaka" },
+                      { lat: 37.39, lng: 127.05, name: "US Forces Korea" },
+                    ]
+                  },
+                ].map(preset => (
+                  <button key={preset.label} onClick={() => {
+                    clearNuke();
+                    setNukeYield(preset.yield_kt);
+                    setNukeBurst(preset.burst);
+                    const map = mapRef.current;
+                    if (!map) return;
+                    preset.strikes.forEach((s, i) => {
+                      const el = document.createElement("div");
+                      el.style.cssText = "width:22px;height:22px;border-radius:50%;background:#7c3aed;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.5);";
+                      el.innerText = i + 1;
+                      const marker = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([s.lng, s.lat]).addTo(map);
+                      const strike = { lat: s.lat, lng: s.lng, marker, idx: i };
+                      el.addEventListener("click", (ev) => {
+                        ev.stopPropagation();
+                        strike.marker.remove();
+                        nukeStrikesRef.current = nukeStrikesRef.current.filter(x => x !== strike);
+                        setNukeStrikes([...nukeStrikesRef.current]);
+                        setNukePointSet(nukeStrikesRef.current.length > 0);
+                      });
+                      nukeStrikesRef.current.push(strike);
+                    });
+                    setNukeStrikes([...nukeStrikesRef.current]);
+                    setNukePointSet(true);
+                    setStatus(`${preset.strikes.length} targets loaded · ${preset.yield_kt >= 1000 ? (preset.yield_kt/1000).toFixed(1)+"Mt" : preset.yield_kt+"kt"} — detonate when ready`);
+                  }}
+                  style={{ padding: "8px 10px", fontWeight: 700, background: "#0f172a", color: "#a78bfa", border: "1px solid #312e81", borderRadius: 8, cursor: "pointer", textAlign: "left", lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700 }}>{preset.label}</div>
+                    <div style={{ fontSize: 10, color: "#6d6d9e", marginTop: 1 }}>{preset.sub}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Strike queue */}
+          {nukeStrikes.length > 0 && (
+            <div style={{ marginBottom: 12, padding: "8px 10px", background: "#0f172a", borderRadius: 8, border: "1px solid #1e2d45" }}>
+              <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6, fontWeight: 700 }}>
+                {nukeStrikes.length}/{nukeSubMode === "emp" ? 1 : proTier !== "free" ? MAX_NUKE_STRIKES : 1} STRIKE{nukeStrikes.length > 1 ? "S" : ""} QUEUED
+              </div>
+              {nukeStrikes.map((s, i) => (
+                <div key={i} style={{ fontSize: 11, color: "#cbd5e1", display: "flex", justifyContent: "space-between" }}>
+                  <span>#{i+1} {s.lat.toFixed(2)}°, {s.lng.toFixed(2)}°</span>
+                  <span style={{ color: "#ef4444", cursor: "pointer" }} onClick={() => {
+                    s.marker.remove();
+                    nukeStrikesRef.current = nukeStrikesRef.current.filter(x => x !== s);
+                    setNukeStrikes([...nukeStrikesRef.current]);
+                    setNukePointSet(nukeStrikesRef.current.length > 0);
+                  }}>✕</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-            <button onClick={runNuke} disabled={!nukePointSet || nukeLoading}
-              style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#7c3aed", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15, opacity: !nukePointSet || nukeLoading ? 0.65 : 1 }}>
-              {nukeLoading ? "Detonating..." : "☢️ Detonate"}
+            <button onClick={nukeSubMode === "emp" ? runEmp : runNuke}
+              disabled={!nukePointSet || nukeLoading || empLoading}
+              style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#7c3aed", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15, opacity: !nukePointSet || nukeLoading || empLoading ? 0.65 : 1 }}>
+              {nukeSubMode === "emp"
+                ? (empLoading ? "Computing..." : "⚡ Launch EMP")
+                : (nukeLoading ? "Detonating..." : `☢️ Detonate${nukeStrikes.length > 1 ? ` (${nukeStrikes.length})` : ""}`)}
             </button>
             <button onClick={clearNuke}
               style={{ flex: 1, padding: "14px 10px", minHeight: 52, background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 15 }}>
@@ -2923,48 +4570,86 @@ export default function HomePage() {
               </button>
             ))}
           </div>
-          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12, fontStyle: "italic", lineHeight: 1.5 }}>
-            {cataclysmModel === "davidson"
-              ? "~90° crustal displacement. New pole: Bay of Bengal. Americas flood 500-800m. Himalayas become new polar region."
-              : "104° rotation along 31°E meridian. New pole: S. Africa. Global inundation 120-1200m. Based on TES ECDO Theory."}
+          {/* Younger Dryas — Coming Soon */}
+          <div style={{ width: "100%", padding: "10px 14px", minHeight: 52, marginBottom: 14, border: "1px solid #1e2d45", background: "#0a0f1a", color: "#334155", borderRadius: 10, fontWeight: 700, fontSize: 12, textAlign: "left", cursor: "not-allowed", opacity: 0.6 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span>☄️ Younger Dryas Impact</span>
+              <span style={{ fontSize: 10, color: "#0ea5e9", fontWeight: 700, background: "#0c1a2e", border: "1px solid #0ea5e9", borderRadius: 6, padding: "2px 7px" }}>COMING SOON</span>
+            </div>
+            <div style={{ fontSize: 10, opacity: 0.5, marginTop: 2 }}>~12,900 BP · Laurentide collapse · Columbia Scablands</div>
           </div>
-          <div style={{ fontSize: 11, color: "#475569", marginBottom: 10, lineHeight: 1.4 }}>
-            ⚠ Theoretical model. Globe rotates to show displacement, then flood tiles render.
-          </div>
+          {cataclysmModel !== "ydi" && (
+            <div>
+              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12, fontStyle: "italic", lineHeight: 1.5 }}>
+                {cataclysmModel === "davidson"
+                  ? "~90° crustal displacement. New pole: Bay of Bengal. Americas flood 500-800m. Himalayas become new polar region."
+                  : "104° rotation along 31°E meridian. New pole: S. Africa. Global inundation 120-1200m. Based on TES ECDO Theory."}
+              </div>
+              <div style={{ fontSize: 11, color: "#475569", marginBottom: 10, lineHeight: 1.4 }}>
+                ⚠ Theoretical model. Globe rotates to show displacement, then flood tiles render.
+              </div>
+            </div>
+          )}
+          {cataclysmModel === "ydi" && (
+            <div>
+              <div style={{ fontSize: 11, color: "#38bdf8", marginBottom: 8, lineHeight: 1.5 }}>
+                Laurentide & Cordilleran ice sheets at ~12,900 BP extent, with ice-free corridor visible. Flood corridors show meltwater drainage through Columbia Scablands, Mississippi basin, and St. Lawrence outlet.
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#38bdf8", textTransform: "uppercase" }}>Flood Scale</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 6 }}>
+                {[
+                  { key: "low",    label: "Low",    sub: "~80m" },
+                  { key: "medium", label: "Medium", sub: "~200m" },
+                  { key: "high",   label: "High",   sub: "~400m" },
+                ].map(({ key, label, sub }) => (
+                  <button key={key}
+                    onClick={() => { setYdiIntensity(key); ydiIntensityRef.current = key; }}
+                    style={{ padding: "9px 6px", border: ydiIntensity === key ? "1px solid #0ea5e9" : "1px solid #1e2d45", background: ydiIntensity === key ? "#0c2a4a" : "#111827", color: ydiIntensity === key ? "#38bdf8" : "#94a3b8", cursor: "pointer", borderRadius: 8, fontWeight: 700, fontSize: 12, textAlign: "center" }}>
+                    <div>{label}</div>
+                    <div style={{ fontSize: 10, opacity: 0.7, marginTop: 1 }}>{sub}</div>
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize: 10, color: "#475569", marginBottom: 12, fontStyle: "italic" }}>
+                Controls flood extent and basin fill. Not a physical water volume.
+              </div>
+            </div>
+          )}
 
           {cataclysmActive && (
             <>
               <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#ef4444", textTransform: "uppercase" }}>Overlay</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
                 {[
-                  { key: "flood", label: "🌊 Flood" },
-                  { key: "wind",  label: "💨 Wind" },
-                  { key: "both",  label: "⚡ Both" },
-                ].map(({ key, label }) => (
+                  { key: "flood", label: "🌊 Flood", pro: false },
+                  { key: "wind",  label: "💨 Wind",  pro: true  },
+                  { key: "both",  label: "⚡ Both",  pro: true  },
+                ].map(({ key, label, pro }) => (
                   <button key={key}
                     onClick={() => {
+                      if (pro && proTier === "free") { setPaywallModal("pro"); return; }
                       setCataclysmOverlay(key);
                       const map = mapRef.current;
                       if (map) applyCataclysmOverlay(map, cataclysmModelRef.current, key);
                     }}
-                    style={{ padding: "8px 4px", border: cataclysmOverlay === key ? "1px solid #dc2626" : "1px solid #1e2d45", background: cataclysmOverlay === key ? "#1a0505" : "#111827", color: cataclysmOverlay === key ? "#f87171" : "#64748b", cursor: "pointer", borderRadius: 8, fontWeight: 700, fontSize: 12 }}>
-                    {label}
+                    style={{ padding: "8px 4px", border: cataclysmOverlay === key ? "1px solid #dc2626" : "1px solid #1e2d45", background: cataclysmOverlay === key ? "#1a0505" : "#111827", color: cataclysmOverlay === key ? "#f87171" : pro && proTier === "free" ? "#4b5563" : "#64748b", cursor: "pointer", borderRadius: 8, fontWeight: 700, fontSize: 12, position: "relative" }}>
+                    {pro && proTier === "free" ? "🔒 " : ""}{label}
                   </button>
                 ))}
               </div>
             </>
           )}
           {cataclysmActive && proTier === "free" && (
-            <div style={{ fontSize: 11, color: "#f97316", marginBottom: 8, textAlign: "center", padding: "6px 8px", border: "1px solid #431407", borderRadius: 6, background: "#1a0a02" }}>
-              🔒 <strong>Pro</strong> — unlock zoom &amp; pan to explore the new world
+            <div onClick={() => setPaywallModal("pro")} style={{ fontSize: 11, color: "#f97316", marginBottom: 8, textAlign: "center", padding: "6px 8px", border: "1px solid #431407", borderRadius: 6, background: "#1a0a02", cursor: "pointer" }}>
+              🔒 <strong>Pro</strong> — unlock Wind &amp; Both overlays + zoom &amp; pan to explore the new world
             </div>
           )}
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
             <button
-              onClick={triggerCataclysm}
+              onClick={cataclysmModel === "ydi" ? () => triggerYDI(ydiIntensityRef.current) : triggerCataclysm}
               disabled={cataclysmAnimating}
-              style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "#dc2626", color: "white", border: "none", fontWeight: 700, cursor: cataclysmAnimating ? "not-allowed" : "pointer", borderRadius: 8, fontSize: 15, opacity: cataclysmAnimating ? 0.65 : 1 }}>
-              {cataclysmAnimating ? "Displacing…" : "☄️ Trigger"}
+              style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: cataclysmModel === "ydi" ? "#0369a1" : "#dc2626", color: "white", border: "none", fontWeight: 700, cursor: cataclysmAnimating ? "not-allowed" : "pointer", borderRadius: 8, fontSize: 15, opacity: cataclysmAnimating ? 0.65 : 1 }}>
+              {cataclysmModel === "ydi" ? "🌊 Run Flood" : cataclysmAnimating ? "Displacing…" : "☄️ Trigger"}
             </button>
             <button
               onClick={clearCataclysm}
@@ -3166,6 +4851,35 @@ export default function HomePage() {
         </>
       )}
 
+      {scenarioMode === "climate" && activeWarmingLevel && (() => {
+        const CS = {
+          1.5: { coral: "70-90%", arctic: "once per century", drought: "1.7×", flood: "100M+", species: "6%", label: "1.5°C — Paris Agreement limit" },
+          2.0: { coral: "99%", arctic: "once per decade", drought: "2.4×", flood: "130M+", species: "13%", label: "2°C — significant ecosystem disruption" },
+          3.0: { coral: "virtually all", arctic: "yearly summers", drought: "4×", flood: "280M+", species: "29%", label: "3°C — catastrophic irreversible changes" },
+          4.0: { coral: "functionally extinct", arctic: "ice-free year-round", drought: "6×", flood: "600M+", species: "49%", label: "4°C — civilisation-level disruption" },
+        };
+        const s = CS[activeWarmingLevel];
+        if (!s) return null;
+        return (
+          <>
+            <hr style={{ margin: "10px 0", opacity: 0.25 }} />
+            <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6, color: "#22c55e" }}>🌡️ {s.label}</div>
+            {[
+              { label: "Coral reef loss", val: s.coral, color: "#f97316" },
+              { label: "Ice-free Arctic", val: s.arctic, color: "#38bdf8" },
+              { label: "Drought intensity", val: s.drought, color: "#f59e0b" },
+              { label: "At-risk population", val: s.flood, color: "#3b82f6" },
+              { label: "Species threatened", val: s.species, color: "#a78bfa" },
+            ].map(r => (
+              <div key={r.label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 11, color: "#64748b" }}>{r.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: r.color }}>{r.val}</span>
+              </div>
+            ))}
+          </>
+        );
+      })()}
+
       {impactError && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
@@ -3176,26 +4890,76 @@ export default function HomePage() {
       {impactResult && scenarioMode !== "tsunami" && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
-          <div style={{ fontWeight: 700 }}>Impact Results</div>
-          <div>Energy: {Number(impactResult.energy_mt_tnt ?? impactResult.energy_mt ?? 0).toFixed(2)} Mt</div>
-          <div style={{ color: "#fde047" }}>● Crater: {Math.round(Number(impactResult.crater_diameter_m ?? 0)).toLocaleString()} m dia</div>
-          <div style={{ color: "#b45309" }}>● Ejecta: {Math.round(Number(impactResult.crater_diameter_m ?? 0) * 1.55).toLocaleString()} m</div>
-          <div style={{ color: "#ef4444" }}>● Blast: {Math.round(Number(impactResult.blast_radius_m ?? 0)).toLocaleString()} m</div>
-          <div style={{ color: "#f97316" }}>● Thermal: {Math.round(Number(impactResult.thermal_radius_m ?? 0)).toLocaleString()} m</div>
-          {impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0 && (
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>
+            💥 {impactResult._count > 1 ? `${impactResult._count} Impact Results` : "Impact Results"}
+          </div>
+          {impactResult._count > 1 ? (
+            // Multi-impact: show per-impact summary
+            impactResult._results.map((r, i) => (
+              <div key={i} style={{ marginBottom: 6, padding: "6px 8px", background: "#0f0a0a", borderRadius: 6, border: "1px solid #3f1515" }}>
+                <div style={{ fontSize: 11, color: "#f97316", fontWeight: 700, marginBottom: 2 }}>Impact {i+1} · {Number(r.energy_mt_tnt ?? 0).toFixed(1)} Mt · {r.severity_class}</div>
+                {r.is_ocean_impact ? (
+                  <div style={{ fontSize: 11, color: "#60a5fa" }}>🌊 Ocean · {Math.round(r.wave_height_m ?? 0).toLocaleString()}m wave · {Math.round((r.estimated_wave_reach_m ?? 0)/1000).toLocaleString()}km reach</div>
+                ) : (
+                  <div style={{ fontSize: 11, color: "#fde047" }}>🏔 Land · Crater {Math.round(r.crater_diameter_m ?? 0).toLocaleString()}m</div>
+                )}
+              </div>
+            ))
+          ) : (
+            // Single impact: full detail
             <>
-              <div>Wave Height: {Math.round(Number(impactResult.wave_height_m ?? 0)).toLocaleString()} m</div>
-              {Number(impactResult.wave_height_m ?? 0) < EXTINCTION_WAVE_HEIGHT_M && (
-                <div>Tsunami Reach: {Math.round(Number(impactResult.estimated_wave_reach_m ?? 0) / 1000).toLocaleString()} km</div>
+              <div>Energy: {Number(impactResult.energy_mt_tnt ?? impactResult.energy_mt ?? 0).toFixed(2)} Mt</div>
+              <div style={{ color: "#fde047" }}>● Crater: {Math.round(Number(impactResult.crater_diameter_m ?? 0)).toLocaleString()} m dia</div>
+              <div style={{ color: "#b45309" }}>● Ejecta: {Math.round(Number(impactResult.crater_diameter_m ?? 0) * 1.55).toLocaleString()} m</div>
+              <div style={{ color: "#ef4444" }}>● Blast: {Math.round(Number(impactResult.blast_radius_m ?? 0)).toLocaleString()} m</div>
+              <div style={{ color: "#f97316" }}>● Thermal: {Math.round(Number(impactResult.thermal_radius_m ?? 0)).toLocaleString()} m</div>
+              {impactResult.is_ocean_impact === true && Number(impactResult.wave_height_m ?? 0) > 0 && (
+                <>
+                  <div>Wave Height: {Math.round(Number(impactResult.wave_height_m ?? 0)).toLocaleString()} m</div>
+                  {Number(impactResult.wave_height_m ?? 0) < EXTINCTION_WAVE_HEIGHT_M && (
+                    <div>Tsunami Reach: {Math.round(Number(impactResult.estimated_wave_reach_m ?? 0) / 1000).toLocaleString()} km</div>
+                  )}
+                </>
               )}
+              <div>Severity: {impactResult.severity_class ?? "--"}</div>
             </>
           )}
-          <div>Severity: {impactResult.severity_class ?? "--"}</div>
-          <hr style={{ margin: "10px 0", opacity: 0.2 }} />
-          <div style={{ fontWeight: 700 }}>Casualty Estimate</div>
-          <div>Population Exposed: {impactResult.population_exposed != null ? formatCompactCount(impactResult.population_exposed) : "Coming soon"}</div>
-          <div>Estimated Deaths: {impactResult.estimated_deaths != null ? formatCompactCount(impactResult.estimated_deaths) : "Coming soon"}</div>
-          <div style={{ fontSize: 12, opacity: 0.8 }}>Confidence: low / rough estimate</div>
+          <hr style={{ margin: "8px 0", opacity: 0.2 }} />
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Casualties{impactResult._count > 1 ? " (Combined)" : ""}</div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>Population exposed</span>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>{impactResult.population_exposed != null ? formatCompactCount(impactResult.population_exposed) : "—"}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ fontSize: 12, color: "#94a3b8" }}>Estimated deaths</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#ef4444" }}>{impactResult.estimated_deaths != null ? formatCompactCount(impactResult.estimated_deaths) : "—"}</span>
+          </div>
+          {Number(impactResult.blackout_pct ?? 0) > 0 && (
+            <div style={{ marginTop: 4, padding: "8px 10px", background: "#0a0a1a", borderRadius: 8, border: "1px solid #1e2d45" }}>
+              <div style={{ fontWeight: 700, fontSize: 12, color: "#a78bfa", marginBottom: 4 }}>🌑 Atmospheric Blackout</div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>Sunlight reduction</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{impactResult.blackout_pct}%</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>Duration</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{impactResult.blackout_duration_months} months</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic" }}>{impactResult.blackout_severity}</div>
+              {Number(impactResult.famine_deaths_estimate ?? 0) > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTop: "1px solid #1e2d45" }}>
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>Est. indirect famine deaths</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316" }}>{formatCompactCount(impactResult.famine_deaths_estimate)}</span>
+                </div>
+              )}
+            </div>
+          )}
+          <div style={{ fontSize: 11, opacity: 0.6, marginTop: 6 }}>Confidence: low / rough estimate</div>
+          {proTier === "free" && (
+            <div onClick={() => setPaywallModal("pro")} style={{ fontSize: 11, color: "#f97316", marginTop: 8, cursor: "pointer", padding: "5px 8px", background: "#1a0d00", border: "1px solid #7c2d00", borderRadius: 6, textAlign: "center" }}>
+              💥 1 free zone click · <span style={{ color: "#fb923c", textDecoration: "underline" }}>Pro unlocks unlimited</span>
+            </div>
+          )}
         </>
       )}
 
@@ -3277,12 +5041,26 @@ export default function HomePage() {
           </>
         )}
 
-      {scenarioMode === "yellowstone" && yellowstoneActive && (
+      {scenarioMode === "yellowstone" && yellowstoneActive && (() => {
+        const _vPresets = volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
+        const _p = _vPresets[Math.min(yellowstonePreset, _vPresets.length - 1)];
+        if (!_p) return null;
+        // Famine deaths — prefer API result, fallback to frontend calc
+        const _famineAPI = Number(yellowstoneResult?.famine_deaths_estimate ?? 0);
+        const GLOBAL_POP = 8_100_000_000;
+        const _famineFront = (_p.blackout_pct >= 5 && _p.blackout_duration_months >= 1)
+          ? Math.round(GLOBAL_POP * Math.pow(_p.blackout_pct / 100, 1.5) * (_p.blackout_duration_months / 12) * 0.15) : 0;
+        const _famine = _famineAPI > 0 ? _famineAPI : _famineFront;
+        // Blackout data — prefer API result
+        const _bPct = yellowstoneResult?.blackout_pct ?? _p.blackout_pct;
+        const _bDur = yellowstoneResult?.blackout_duration_months ?? _p.blackout_duration_months;
+        const _bSev = yellowstoneResult?.blackout_severity ?? _p.blackout_severity;
+        return (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>🌋 {(volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS)[Math.min(yellowstonePreset, (volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS).length - 1)].name}</div>
-          <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8 }}>{(volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS)[Math.min(yellowstonePreset, (volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS).length - 1)].desc}</div>
-          {(volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS)[Math.min(yellowstonePreset, (volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS).length - 1)].zones.map((z, i) => (
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>🌋 {_p.name}</div>
+          <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8 }}>{_p.desc}</div>
+          {_p.zones.map((z, i) => (
             <div key={i} style={{ marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -3313,32 +5091,109 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
-          ) : yellowstoneActive ? (
+          ) : (
             <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>Calculating casualties...</div>
-          ) : null}
+          )}
+          {_bPct > 0 && (
+            <div style={{ marginTop: 8, padding: "8px 10px", background: "#0a0a1a", borderRadius: 8, border: "1px solid #1e2d45" }}>
+              <div style={{ fontWeight: 700, fontSize: 12, color: "#a78bfa", marginBottom: 4 }}>🌑 Atmospheric Blackout</div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>Sunlight reduction</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{_bPct}%</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>Duration</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{_bDur} months</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic" }}>{_bSev}</div>
+              {_famine > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTop: "1px solid #1e2d45" }}>
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>Est. indirect famine deaths</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316" }}>{formatCompactCount(_famine)}</span>
+                </div>
+              )}
+            </div>
+          )}
           <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>Click map for zone details</div>
+        </>
+        );
+      })()}
+
+      {scenarioMode === "nuke" && empResult && (
+        <>
+          <hr style={{ margin: "10px 0", opacity: 0.25 }} />
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>⚡ Strategic EMP Results</div>
+          <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 6 }}>
+            {empResult.yield_kt >= 1000 ? (empResult.yield_kt/1000).toFixed(1)+"Mt" : empResult.yield_kt+"kt"} · {empResult.burst_altitude_km}km altitude
+          </div>
+          <div style={{ color: "#a78bfa" }}>◌ Footprint radius: {Math.round(empResult.emp_r_km).toLocaleString()} km</div>
+          <div style={{ color: "#a78bfa", marginTop: 2 }}>◌ E1 pulse: ~{empResult.e1_field_kvm} kV/m</div>
+          <div style={{ marginTop: 6, padding: "8px 10px", background: "#0f0a2a", borderRadius: 8, border: "1px solid #4c1d95" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <span style={{ fontSize: 12, color: "#94a3b8" }}>Population at risk</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#a78bfa" }}>{empResult.population_at_risk?.toLocaleString() ?? "—"}</span>
+            </div>
+            <div style={{ fontSize: 11, color: "#7c3aed", marginBottom: 3 }}>
+              Footprint = geometric horizon only. No EMP beyond this line.
+            </div>
+            <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic", lineHeight: 1.5 }}>
+              ⚠ No direct casualties — detonation is above the atmosphere. Grid collapse causes indirect deaths over weeks/months.
+            </div>
+          </div>
         </>
       )}
 
       {scenarioMode === "nuke" && nukeResult && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>☢️ Detonation Results</div>
-          <div>Yield: {nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(2)+" Mt" : nukeResult.yield_kt+" kt"}</div>
-          <div>Type: {nukeResult.burst_type}</div>
-          <hr style={{ margin: "8px 0", opacity: 0.2 }} />
-          <div style={{ color: "#fde047" }}>● Fireball: {Math.round(nukeResult.fireball_r_m).toLocaleString()} m</div>
-          <div style={{ color: "#dc2626" }}>● Heavy blast: {(Math.round(nukeResult.blast_heavy_r_m)/1000).toFixed(1)} km</div>
-          <div style={{ color: "#ef4444" }}>● Moderate blast: {(Math.round(nukeResult.blast_moderate_r_m)/1000).toFixed(1)} km</div>
-          <div style={{ color: "#f97316" }}>● Thermal (3rd°): {(Math.round(nukeResult.thermal_r_m)/1000).toFixed(1)} km</div>
-          <div style={{ color: "#f59e0b" }}>● Light blast: {(Math.round(nukeResult.blast_light_r_m)/1000).toFixed(1)} km</div>
-          {nukeResult.radiation_r_m > 0 && <div style={{ color: "#4ade80" }}>◌ Radiation 500rem: {Math.round(nukeResult.radiation_r_m).toLocaleString()} m</div>}
-          {nukeResult.emp_r_m > 0 && <div style={{ color: "#a78bfa" }}>◌ EMP radius: {(Math.round(nukeResult.emp_r_m)/1000).toFixed(0)} km</div>}
-          {nukeResult.fallout_major_km > 0 && <div style={{ color: "#84cc16" }}>◌ Fallout: {Math.round(nukeResult.fallout_major_km)} × {Math.round(nukeResult.fallout_minor_km)} km</div>}
-          <hr style={{ margin: "8px 0", opacity: 0.2 }} />
-          <div style={{ fontWeight: 700 }}>Casualties</div>
-          <div>Exposed: {nukeResult.population_exposed != null ? nukeResult.population_exposed.toLocaleString() : "—"}</div>
-          <div>Est. deaths: {nukeResult.estimated_deaths != null ? nukeResult.estimated_deaths.toLocaleString() : "—"}</div>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>☢️ {nukeResult._count > 1 ? `${nukeResult._count} Strikes` : "Detonation"} Results</div>
+          {nukeResult._count > 1 ? (
+            <>
+              <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 6 }}>
+                {nukeResult._count} simultaneous detonations · {nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"} each
+              </div>
+              <hr style={{ margin: "8px 0", opacity: 0.2 }} />
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>Per-Strike Zones</div>
+              <div style={{ color: "#fde047" }}>● Fireball: {Math.round(nukeResult.fireball_r_m).toLocaleString()} m</div>
+              <div style={{ color: "#dc2626" }}>● Heavy blast: {(Math.round(nukeResult.blast_heavy_r_m)/1000).toFixed(1)} km</div>
+              <div style={{ color: "#f97316" }}>● Thermal (3rd°): {(Math.round(nukeResult.thermal_r_m)/1000).toFixed(1)} km</div>
+              {nukeResult.radiation_r_m > 0 && <div style={{ color: "#4ade80" }}>◌ Radiation 500rem: {Math.round(nukeResult.radiation_r_m).toLocaleString()} m</div>}
+              {nukeResult.fallout_major_km > 0 && <div style={{ color: "#84cc16" }}>◌ Fallout: {Math.round(nukeResult.fallout_major_km)} × {Math.round(nukeResult.fallout_minor_km)} km</div>}
+              <hr style={{ margin: "8px 0", opacity: 0.2 }} />
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>Combined Casualties</div>
+              <div>Total exposed: {nukeResult.exposed != null ? nukeResult.exposed.toLocaleString() : "—"}</div>
+              <div style={{ color: "#ef4444", fontWeight: 700 }}>Total deaths: {nukeResult.deaths != null ? nukeResult.deaths.toLocaleString() : "—"}</div>
+              {nukeResult.radiation_deaths != null && nukeResult.radiation_deaths > 0 && (
+                <div style={{ color: "#4ade80" }}>◌ Lethal radiation deaths: {(nukeResult.radiation_deaths * nukeResult._count).toLocaleString()}</div>
+              )}
+            </>
+          ) : (
+            <>
+              <div>Yield: {nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(2)+" Mt" : nukeResult.yield_kt+" kt"}</div>
+              <div>Type: {nukeResult.burst_type}</div>
+              <hr style={{ margin: "8px 0", opacity: 0.2 }} />
+              <div style={{ color: "#fde047" }}>● Fireball: {Math.round(nukeResult.fireball_r_m).toLocaleString()} m</div>
+              <div style={{ color: "#dc2626" }}>● Heavy blast: {(Math.round(nukeResult.blast_heavy_r_m)/1000).toFixed(1)} km</div>
+              <div style={{ color: "#ef4444" }}>● Moderate blast: {(Math.round(nukeResult.blast_moderate_r_m)/1000).toFixed(1)} km</div>
+              <div style={{ color: "#f97316" }}>● Thermal (3rd°): {(Math.round(nukeResult.thermal_r_m)/1000).toFixed(1)} km</div>
+              <div style={{ color: "#f59e0b" }}>● Light blast: {(Math.round(nukeResult.blast_light_r_m)/1000).toFixed(1)} km</div>
+              {nukeResult.radiation_r_m > 0 && <div style={{ color: "#4ade80" }}>◌ Radiation 500rem: {Math.round(nukeResult.radiation_r_m).toLocaleString()} m</div>}
+              {/* EMP not shown here — use Strategic EMP mode for HEMP scenarios */}
+              {nukeResult.fallout_major_km > 0 && <div style={{ color: "#84cc16" }}>◌ Fallout: {Math.round(nukeResult.fallout_major_km)} × {Math.round(nukeResult.fallout_minor_km)} km</div>}
+              <hr style={{ margin: "8px 0", opacity: 0.2 }} />
+              <div style={{ fontWeight: 700 }}>Casualties</div>
+              <div>Exposed: {nukeResult.population_exposed != null ? nukeResult.population_exposed.toLocaleString() : "—"}</div>
+              <div>Est. deaths: {nukeResult.estimated_deaths != null ? nukeResult.estimated_deaths.toLocaleString() : "—"}</div>
+              {nukeResult.radiation_deaths != null && nukeResult.radiation_deaths > 0 && (
+                <div style={{ color: "#4ade80" }}>◌ Lethal radiation deaths: {nukeResult.radiation_deaths.toLocaleString()}</div>
+              )}
+            </>
+          )}
+          {proTier === "free" && (
+            <div onClick={() => setPaywallModal("pro")} style={{ fontSize: 11, color: "#f97316", marginTop: 8, cursor: "pointer", padding: "5px 8px", background: "#1a0d00", border: "1px solid #7c2d00", borderRadius: 6, textAlign: "center" }}>
+              ☢️ 1 free zone click · <span style={{ color: "#fb923c", textDecoration: "underline" }}>Pro unlocks unlimited</span>
+            </div>
+          )}
         </>
       )}
 
@@ -3347,33 +5202,70 @@ export default function HomePage() {
         window.buildPermalink = () => {
           const base = "https://www.disastermap.ca/map";
           const m = scenarioModeRef.current;
-          if (m === "flood") return `${base}?scenario=flood&level=${seaLevel}`;
-          if (m === "climate") return `${base}?scenario=climate&level=${seaLevel}${activeWarmingLevel ? "&warming=" + activeWarmingLevel : ""}`;
-          if (m === "impact" && impactPointRef.current) return `${base}?scenario=impact&lat=${impactPointRef.current.lat.toFixed(4)}&lng=${impactPointRef.current.lng.toFixed(4)}&diameter=${impactDiameter}`;
-          if (m === "nuke" && nukePointRef.current) return `${base}?scenario=nuke&lat=${nukePointRef.current.lat.toFixed(4)}&lng=${nukePointRef.current.lng.toFixed(4)}&yield=${nukeYield}&burst=${nukeBurst}`;
-          if (m === "yellowstone") return `${base}?scenario=volcano&type=${volcanoType}&preset=${yellowstonePreset}`;
-          if (m === "tsunami") return `${base}?scenario=tsunami&source=${tsunamiSource}`;
-          if (m === "cataclysm") return `${base}?scenario=cataclysm&model=${cataclysmModelRef.current}`;
+          const map = mapRef.current;
+          // Include map center+zoom so link opens at same view
+          const c = map ? map.getCenter() : null;
+          const z = map ? map.getZoom().toFixed(1) : "3";
+          const view = c ? `&cx=${c.lng.toFixed(4)}&cy=${c.lat.toFixed(4)}&cz=${z}` : "";
+          if (m === "flood") return `${base}?scenario=flood&level=${seaLevel}${view}`;
+          if (m === "climate") return `${base}?scenario=climate&level=${seaLevel}${activeWarmingLevel ? "&warming=" + activeWarmingLevel : ""}${view}`;
+          if (m === "impact") {
+            const pts = impactPointsRef.current;
+            if (pts.length > 1) {
+              // Multi-impact — encode all points
+              const latlngs = pts.map(p => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`).join("|");
+              return `${base}?scenario=impact&points=${encodeURIComponent(latlngs)}&diameter=${impactDiameter}${view}`;
+            }
+            if (impactPointRef.current) return `${base}?scenario=impact&lat=${impactPointRef.current.lat.toFixed(4)}&lng=${impactPointRef.current.lng.toFixed(4)}&diameter=${impactDiameter}${view}`;
+          }
+          if (m === "nuke") {
+            const strikes = nukeStrikesRef.current;
+            if (strikes.length > 1) {
+              const latlngs = strikes.map(s => `${s.lat.toFixed(4)},${s.lng.toFixed(4)}`).join("|");
+              return `${base}?scenario=nuke&points=${encodeURIComponent(latlngs)}&yield=${nukeYield}&burst=${nukeBurst}${view}`;
+            }
+            if (nukePointRef.current) return `${base}?scenario=nuke&lat=${nukePointRef.current.lat.toFixed(4)}&lng=${nukePointRef.current.lng.toFixed(4)}&yield=${nukeYield}&burst=${nukeBurst}${view}`;
+          }
+          if (m === "yellowstone") return `${base}?scenario=volcano&type=${volcanoType}&preset=${yellowstonePreset}${view}`;
+          if (m === "tsunami") return `${base}?scenario=tsunami&source=${tsunamiSource}${view}`;
+          if (m === "cataclysm") return `${base}?scenario=cataclysm&model=${cataclysmModelRef.current}${view}`;
           return base;
         };
         window.saveScreenshot = () => {
           const map = mapRef.current;
           if (!map) return;
+          // Preserve drawing buffer must be true (set in map init) for canvas capture
           map.getCanvas().toBlob((blob) => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `disastermap-${scenarioModeRef.current || "map"}-${Date.now()}.png`;
+            const mode = scenarioModeRef.current || "map";
+            const ts = new Date().toISOString().slice(0,10);
+            a.download = `disastermap-${mode}-${ts}.png`;
             a.click();
             URL.revokeObjectURL(url);
-          });
+          }, "image/png");
+        };
+        window.copyScreenshot = () => {
+          const map = mapRef.current;
+          if (!map) return;
+          map.getCanvas().toBlob(async (blob) => {
+            try {
+              await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+              setStatus("Screenshot copied to clipboard!");
+              setTimeout(() => setStatus(""), 2000);
+            } catch(e) {
+              // Fallback — just download
+              window.saveScreenshot();
+            }
+          }, "image/png");
         };
         const buildPermalink = window.buildPermalink;
         const saveScreenshot = window.saveScreenshot;
         return null;
       })()}
 
-      {(impactResult || nukeResult || (scenarioMode === "flood" && seaLevel !== 0) || (scenarioMode === "climate" && seaLevel !== 0) || (scenarioMode === "yellowstone" && yellowstoneActive) || (scenarioMode === "tsunami" && tsunamiActive) || (scenarioMode === "cataclysm" && cataclysmActive)) && (
+      {(impactResult || nukeResult || empResult || (scenarioMode === "flood" && seaLevel !== 0) || (scenarioMode === "climate" && seaLevel !== 0) || (scenarioMode === "yellowstone" && yellowstoneActive) || (scenarioMode === "tsunami" && tsunamiActive) || (scenarioMode === "cataclysm" && cataclysmActive)) && (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.2 }} />
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#f97316" }}>SHARE</div>
@@ -3412,6 +5304,10 @@ export default function HomePage() {
               style={{ background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45" }}>
               📷 Save Image
             </button>
+            <button className="share-btn" onClick={window.copyScreenshot}
+              style={{ background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45" }}>
+              📋 Copy Image
+            </button>
           </div>
           <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
             <a href="https://x.com/grimerica" target="_blank"
@@ -3429,7 +5325,7 @@ export default function HomePage() {
   );
 
   return (
-    <div style={{ width: "100%", height: "100vh", position: "relative", overflow: "hidden" }}>
+    <div className="fm-map-root" style={{ width: "100%", height: "100dvh", position: "relative", overflow: "hidden" }}>
       <style>{`
         /* ── Mapbox popup ── */
         /* ── Dark panel theme ── */
@@ -3518,6 +5414,81 @@ export default function HomePage() {
           gap: 10px;
           margin-bottom: 24px;
         }
+
+        /* ── Mobile: autohide browser bar + full bleed ── */
+        @media (max-width: 640px) {
+          /* Use dynamic viewport units so layout shrinks when browser chrome hides */
+          :root {
+            --vh: 1dvh;
+          }
+          /* Prevent any scrolling that would re-show browser bar */
+          html, body {
+            overscroll-behavior: none !important;
+            overscroll-behavior-y: none !important;
+            touch-action: none;
+          }
+          /* Make the map container exploit full dynamic height */
+          .fm-map-root {
+            height: 100dvh !important;
+          }
+          /* Sliders: bigger touch targets on mobile */
+          input[type="range"] {
+            height: 28px !important;
+            cursor: pointer;
+            touch-action: pan-x;
+          }
+          input[type="range"]::-webkit-slider-thumb {
+            width: 26px !important;
+            height: 26px !important;
+            border-radius: 50%;
+          }
+          input[type="range"]::-moz-range-thumb {
+            width: 26px !important;
+            height: 26px !important;
+            border-radius: 50%;
+          }
+          /* Number inputs: full-width, comfortable tap height */
+          input[type="number"] {
+            min-height: 48px !important;
+            font-size: 16px !important; /* prevents iOS zoom-on-focus */
+          }
+          /* Select dropdowns */
+          select {
+            min-height: 44px !important;
+            font-size: 16px !important;
+          }
+          /* Buttons: min 44px tap target (Apple HIG / WCAG) */
+          button {
+            min-height: 44px;
+          }
+          /* Bottom drawer: use dvh so it doesn't overlap browser chrome */
+          .fm-mobile-drawer {
+            max-height: 80dvh !important;
+          }
+          /* Drawer scrollable area: allow touch scroll inside */
+          .fm-drawer-scroll {
+            touch-action: pan-y !important;
+            -webkit-overflow-scrolling: touch;
+          }
+          /* Hide mapbox zoom +/- controls on mobile (use pinch) */
+          .mapboxgl-ctrl-zoom-in,
+          .mapboxgl-ctrl-zoom-out,
+          .mapboxgl-ctrl-group {
+            display: none !important;
+          }
+          /* Hide mapbox compass on mobile */
+          .mapboxgl-ctrl-compass {
+            display: none !important;
+          }
+          /* Stats pill: push below status bar / notch */
+          .fm-mobile-stats-pill {
+            top: max(10px, env(safe-area-inset-top, 10px)) !important;
+          }
+          /* Popups: limit width on narrow screens */
+          .mapboxgl-popup-content {
+            max-width: min(280px, 90vw) !important;
+          }
+        }
       `}</style>
 
       {/* ── Map canvas ── */}
@@ -3553,6 +5524,212 @@ export default function HomePage() {
         </div>
       )}
 
+      {/* ── Onboarding modal ── */}
+      {showOnboarding && (
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "fixed", inset: 0, zIndex: 3000,
+            background: "rgba(0,0,0,0.82)", backdropFilter: "blur(6px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "Arial, sans-serif",
+          }}
+        >
+          <div style={{
+            background: "#0a0f1e", border: "1px solid #1e2d45", borderRadius: 18,
+            padding: "28px 28px 22px", maxWidth: 420, width: "92%",
+            boxShadow: "0 24px 72px rgba(0,0,0,0.7)",
+            display: "flex", flexDirection: "column", gap: 0,
+          }}>
+            {/* Logo + title */}
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
+              <img src={LOGO_DATA} alt="Disaster Map" style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 10 }} />
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "#e2e8f0", lineHeight: 1.1 }}>DisasterMap.ca</div>
+                <div style={{ fontSize: 12, color: "#f97316", fontWeight: 700, marginTop: 3, letterSpacing: "0.05em" }}>INTERACTIVE CATASTROPHE SIMULATOR</div>
+              </div>
+            </div>
+
+            {/* Page dots */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 18, justifyContent: "center" }}>
+              {[0,1,2].map(i => (
+                <div key={i} onClick={() => setOnboardingPage(i)} style={{
+                  width: i === onboardingPage ? 22 : 8, height: 8,
+                  borderRadius: 4, cursor: "pointer",
+                  background: i === onboardingPage ? "#f97316" : "#1e3a5f",
+                  transition: "all 0.2s",
+                }} />
+              ))}
+            </div>
+
+            {/* Page 0 — What is this */}
+            {onboardingPage === 0 && (
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
+                  Welcome to the Disaster Simulator 🌍
+                </div>
+                <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.65, marginBottom: 14 }}>
+                  Explore real-world catastrophe scenarios on a live map. Flood any coastline, detonate nuclear weapons, simulate asteroid impacts, model ice ages, and more — all backed by real geophysical models.
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 4 }}>
+                  {[
+                    { icon: "🌊", label: "Flood & Sea Rise", desc: "Drag sea level from −120 m to +70 m" },
+                    { icon: "💥", label: "Asteroid Impact", desc: "From Chelyabinsk to Chicxulub" },
+                    { icon: "☢️", label: "Nuclear Detonation", desc: "Tactical nukes to Tsar Bomba" },
+                    { icon: "☄️", label: "Cataclysm", desc: "Pole shift & global displacement" },
+                    { icon: "🌋", label: "Supervolcano", desc: "Yellowstone, Toba, Campi Flegrei" },
+                    { icon: "🌡️", label: "Climate Change", desc: "Warming levels with wildfire zones" },
+                  ].map(({ icon, label, desc }) => (
+                    <div key={label} style={{ background: "#111827", border: "1px solid #1e2d45", borderRadius: 10, padding: "10px 12px" }}>
+                      <div style={{ fontSize: 18, marginBottom: 3 }}>{icon}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4 }}>{desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Page 1 — How to use */}
+            {onboardingPage === 1 && (
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
+                  How to use it 🗺️
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 4 }}>
+                  {[
+                    {
+                      step: "1",
+                      color: "#3b82f6",
+                      title: isMobile ? "Tap ⌃ to open the control panel" : "Use the left panel to choose a scenario",
+                      desc: isMobile
+                        ? "The strip at the bottom is your control centre. Tap the chevron to open the full panel and choose a scenario."
+                        : "Select Flood, Impact, Nuke, Yellowstone, Tsunami, Cataclysm, or Climate from the left sidebar.",
+                    },
+                    {
+                      step: "2",
+                      color: "#f97316",
+                      title: "Configure your disaster",
+                      desc: "Set sea level, asteroid diameter, nuke yield, or explosion point using the controls. Historical presets are available for each mode.",
+                    },
+                    {
+                      step: "3",
+                      color: "#ef4444",
+                      title: "Click / tap the map",
+                      desc: "For Impact and Nuke modes, tap the map to place a strike point. After running, tap any zone to see survival odds and damage details.",
+                    },
+                    {
+                      step: "4",
+                      color: "#22c55e",
+                      title: "Share your scenario",
+                      desc: "Use the Share button to copy a permalink. Anyone can open it and see exactly what you simulated.",
+                    },
+                  ].map(({ step, color, title, desc }) => (
+                    <div key={step} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                      <div style={{ flexShrink: 0, width: 26, height: 26, borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: "white" }}>{step}</div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 2 }}>{title}</div>
+                        <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>{desc}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Page 2 — Pro CTA */}
+            {onboardingPage === 2 && (
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
+                  Free vs Pro ⚡
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+                  {[
+                    { free: "30 simulations / day",         pro: "200 simulations / day" },
+                    { free: "Asteroid up to 5,000 m",       pro: "Asteroid up to 20,000 m" },
+                    { free: "Nuke up to 1 Mt",              pro: "Nuke up to 100 Mt" },
+                    { free: "Flood only in Cataclysm",      pro: "Wind + Both overlays" },
+                    { free: "1 zone click popup",           pro: "Unlimited zone popups" },
+                    { free: "Map view only",                pro: "Satellite + Globe view" },
+                    { free: "—",                            pro: "Flood displaced counts" },
+                    { free: "—",                            pro: "🌊 Mega-Tsunami" },
+                  ].map(({ free, pro }, i) => (
+                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                      <div style={{ background: "#0f172a", border: "1px solid #1e2d45", borderRadius: 8, padding: "7px 10px", fontSize: 12, color: free === "—" ? "#334155" : "#64748b" }}>
+                        {free !== "—" ? "✓ " : ""}{free}
+                      </div>
+                      <div style={{ background: "#1a0a00", border: "1px solid #7c2d12", borderRadius: 8, padding: "7px 10px", fontSize: 12, color: "#fb923c", fontWeight: 600 }}>
+                        ⚡ {pro}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ background: "#111827", border: "1px solid #f97316", borderRadius: 12, padding: "14px 16px", marginBottom: 4, position: "relative" }}>
+                  <div style={{ position: "absolute", top: -10, right: 12, background: "#f97316", color: "white", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, letterSpacing: "0.08em" }}>FOUNDERS PRICE</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <span style={{ color: "#60a5fa", fontWeight: 700, fontSize: 15 }}>⚡ Pro Lifetime</span>
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ color: "#f97316", fontWeight: 800, fontSize: 17 }}>$18.99</span>
+                      <span style={{ color: "#64748b", fontSize: 12, marginLeft: 4 }}>once</span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#f97316", marginBottom: 10 }}>Price going to $24.99 soon — lock in now</div>
+                  <button
+                    onClick={() => { dismissOnboarding(true); window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank"); }}
+                    style={{ width: "100%", padding: "11px", background: "#f97316", color: "white", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}
+                  >
+                    Unlock Pro — $18.99 →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Navigation footer */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16 }}>
+              {onboardingPage > 0 && (
+                <button
+                  onClick={() => setOnboardingPage(p => p - 1)}
+                  style={{ padding: "10px 16px", background: "#111827", border: "1px solid #1e2d45", borderRadius: 8, color: "#94a3b8", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
+                >
+                  ← Back
+                </button>
+              )}
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={() => dismissOnboarding(false)}
+                style={{ padding: "10px 14px", background: "transparent", border: "none", color: "#475569", cursor: "pointer", fontSize: 12 }}
+              >
+                Skip
+              </button>
+              {onboardingPage < 2 ? (
+                <button
+                  onClick={() => setOnboardingPage(p => p + 1)}
+                  style={{ padding: "10px 20px", background: "#f97316", border: "none", borderRadius: 8, color: "white", cursor: "pointer", fontSize: 13, fontWeight: 700 }}
+                >
+                  Next →
+                </button>
+              ) : (
+                <button
+                  onClick={() => dismissOnboarding(true)}
+                  style={{ padding: "10px 20px", background: "#1e3a5f", border: "1px solid #3b82f6", borderRadius: 8, color: "#60a5fa", cursor: "pointer", fontSize: 13, fontWeight: 700 }}
+                >
+                  Start Exploring ✓
+                </button>
+              )}
+            </div>
+
+            {/* Don't show again */}
+            <button
+              onClick={() => dismissOnboarding(true)}
+              style={{ marginTop: 10, background: "none", border: "none", color: "#334155", fontSize: 11, cursor: "pointer", textAlign: "center", textDecoration: "underline" }}
+            >
+              Don't show again
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Paywall modal ── */}
       {paywallModal && (
         <div onPointerDown={(e) => e.stopPropagation()} onClick={() => setPaywallModal(null)} style={{
@@ -3580,9 +5757,13 @@ export default function HomePage() {
               </div>
               <div style={{ color: "#64748b", fontSize: 13, textAlign: "center", marginBottom: 20, lineHeight: 1.6 }}>
                 {paywallModal === "pro" && scenarioMode === "cataclysm"
-                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the post-cataclysm world. Founders price $18.99 lifetime — going up to $24.99 soon.</>
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to access Wind &amp; Both overlays and zoom/pan the post-cataclysm world. Founders price $18.99 lifetime — going up to $24.99 soon.</>
                   : paywallModal === "pro" && scenarioMode === "tsunami"
                   ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the tsunami inundation zone. Founders price $18.99 lifetime — going up to $24.99 soon.</>
+                  : paywallModal === "pro" && scenarioMode === "impact"
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to simulate asteroids up to <strong style={{ color: "#e2e8f0" }}>20,000 m</strong> diameter (free: 5,000 m) and click any zone for detailed survival data. Founders price $18.99 lifetime — going up to $24.99 soon.</>
+                  : paywallModal === "pro" && scenarioMode === "nuke"
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to detonate up to <strong style={{ color: "#e2e8f0" }}>100 Mt</strong> (free: 1 Mt) and click any blast zone for detailed analysis. Founders price $18.99 lifetime — going up to $24.99 soon.</>
                   : "This feature requires Pro. Founders price $18.99 lifetime — going up to $24.99 soon."}
               </div>
             </>)}
@@ -3597,6 +5778,10 @@ export default function HomePage() {
               <div style={{ fontSize: 11, color: "#f97316", marginBottom: 8 }}>Price going up to $24.99 soon — lock in now</div>
               <div style={{ color: "#94a3b8", fontSize: 12, lineHeight: 1.7 }}>
                 ✓ {PRO_SIM_PER_HOUR} simulations/hour, {PRO_SIM_PER_DAY}/day<br/>
+                ✓ Impact diameter up to <strong style={{ color: "#e2e8f0" }}>20,000 m</strong> (free: 5,000 m)<br/>
+                ✓ Nuke yield up to <strong style={{ color: "#e2e8f0" }}>100 Mt</strong> (free: 1 Mt)<br/>
+                ✓ Wind &amp; Both cataclysm overlays<br/>
+                ✓ Unlimited zone click popups<br/>
                 ✓ Satellite + Globe view<br/>
                 ✓ Flood displaced counts<br/>
                 ✓ 🌊 Mega-Tsunami scenarios<br/>
@@ -3650,8 +5835,8 @@ export default function HomePage() {
       )}
 
       <canvas id="star-canvas" className={viewMode === "globe" ? "visible" : ""} />
-      <div ref={mapContainerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0 }} />
-      <style>{`html, body { overflow: hidden !important; height: 100% !important; }`}</style>
+      <div ref={mapContainerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0, touchAction: "none" }} />
+      <style>{`html, body { overflow: hidden !important; height: 100% !important; overscroll-behavior: none; touch-action: none; }`}</style>
       {/* Disaster Map wordmark — top center, unobtrusive */}
       <div style={{
         position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)",
@@ -3729,7 +5914,7 @@ export default function HomePage() {
               fontSize: 13, lineHeight: 1.5,
               zIndex: 1050, minWidth: 320,
               boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-              maxHeight: "70vh", overflowY: "auto",
+              maxHeight: "70dvh", overflowY: "auto",
             }}
           >
             {statsContent}
@@ -3780,7 +5965,7 @@ export default function HomePage() {
           fontSize: 13, lineHeight: 1.5,
           zIndex: 1050,
           boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-          maxHeight: "55vh", overflowY: "auto",
+          maxHeight: "55dvh", overflowY: "auto",
         }}
       >
         {statsContent}
@@ -3797,8 +5982,8 @@ export default function HomePage() {
           display: isMobile ? "flex" : "none",
           flexDirection: "column",
           position: "fixed", bottom: 0, left: 0, right: 0,
-          height: "76vh",
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          height: "80dvh",
+          paddingBottom: "max(env(safe-area-inset-bottom, 0px), 8px)",
           background: "#0a0f1e",
           borderTop: "1px solid #1e2d45",
           borderRadius: "18px 18px 0 0",
@@ -3818,7 +6003,7 @@ export default function HomePage() {
         </div>
 
         {/* Scrollable panel content inside drawer */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "4px 16px 32px 16px" }}>
+        <div className="fm-drawer-scroll" style={{ flex: 1, overflowY: "auto", padding: "4px 16px 32px 16px" }}>
           {panelContent}
         </div>
       </div>
@@ -3833,14 +6018,16 @@ export default function HomePage() {
         style={{
           display: isMobile ? "flex" : "none",
           position: "fixed", bottom: 0, left: 0, right: 0,
-          height: 72,
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          minHeight: 72,
+          paddingTop: 0,
+          paddingLeft: 12,
+          paddingRight: 12,
+          paddingBottom: "max(env(safe-area-inset-bottom, 0px), 8px)",
           background: "#0a0f1e",
           borderTop: "1px solid #1e2d45",
           borderRadius: "14px 14px 0 0",
           zIndex: 1001,
           alignItems: "center",
-          padding: "0 12px",
           gap: 10,
           boxShadow: "0 -2px 12px rgba(0,0,0,0.1)",
           fontFamily: "Arial, sans-serif",

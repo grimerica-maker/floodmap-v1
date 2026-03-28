@@ -389,6 +389,32 @@ export default function Homepage() {
                       </li>
                     ))}
                   </ul>
+                  {p.tier === "Pro Lifetime" && (
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ fontSize: 11, letterSpacing: "0.12em", color: "#475569", textTransform: "uppercase", marginBottom: 10, fontWeight: 700 }}>Free vs Pro</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {[
+                          { free: "30 simulations / day",    pro: "200 simulations / day" },
+                          { free: "Asteroid up to 5,000 m",  pro: "Asteroid up to 20,000 m" },
+                          { free: "Nuke up to 1 Mt",         pro: "Nuke up to 100 Mt" },
+                          { free: "Flood only cataclysm",    pro: "Wind + Both overlays" },
+                          { free: "1 zone click popup",      pro: "Unlimited zone popups" },
+                          { free: "Map view only",           pro: "Satellite + Globe view" },
+                          { free: "—",                       pro: "Displaced population count" },
+                          { free: "—",                       pro: "🌊 Mega-Tsunami" },
+                        ].map(({ free, pro }, i) => (
+                          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, fontSize: 12 }}>
+                            <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid #1e2d45", borderRadius: 6, padding: "5px 8px", color: free === "—" ? "#334155" : "#64748b" }}>
+                              {free !== "—" ? "✓ " : ""}{free}
+                            </div>
+                            <div style={{ background: "rgba(249,115,22,0.07)", border: "1px solid rgba(249,115,22,0.25)", borderRadius: 6, padding: "5px 8px", color: "#fb923c", fontWeight: 600 }}>
+                              ⚡ {pro}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {p.cta
                     ? <>
                         <a href={p.cta} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: p.color, color: "#fff", padding: "13px", borderRadius: 8, textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: 14, marginBottom: 8 }}>{p.ctaLabel} →</a>
@@ -448,11 +474,35 @@ export default function Homepage() {
             <div style={{ color: "#334155", fontSize: 13, marginBottom: 18 }}>
               © 2025 DisasterMap.ca · Built by <a href="https://x.com/grimerica" target="_blank" rel="noopener noreferrer" style={{ color: "#f97316", textDecoration: "none" }}>@grimerica</a>
             </div>
-            <div style={{ display: "flex", gap: 28, justifyContent: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 28, justifyContent: "center", flexWrap: "wrap", marginBottom: 24 }}>
               {[["Launch App","/map"],["Privacy Policy","/privacy"],["Terms of Use","/terms"],["Contact","https://formspree.io/f/xgopwayn"],["Manage Billing","https://billing.stripe.com/p/login/00w28rcyY4bM8Oy1b7a3u00"]].map(([l,h]) => (
                 <a key={l} href={h} style={{ color: "#475569", fontSize: 13, textDecoration: "none" }}
                   onMouseEnter={e=>e.currentTarget.style.color="#f97316"} onMouseLeave={e=>e.currentTarget.style.color="#475569"}>{l}</a>
               ))}
+            </div>
+            {/* Donate */}
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 12, color: "#334155", marginBottom: 10 }}>Like the project? Help keep the servers running.</div>
+              <a
+                href="https://www.paypal.com/donate/?hosted_button_id=D7GYDV9ETEPX6"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 8,
+                  background: "#0070ba", color: "#fff",
+                  padding: "10px 22px", borderRadius: 8,
+                  textDecoration: "none", fontWeight: 700, fontSize: 14,
+                  fontFamily: "sans-serif",
+                  boxShadow: "0 2px 12px rgba(0,112,186,0.35)",
+                }}
+                onMouseEnter={e=>e.currentTarget.style.background="#005ea6"}
+                onMouseLeave={e=>e.currentTarget.style.background="#0070ba"}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                  <path d="M7.144 19.532l1.049-5.751c.11-.604.699-1.038 1.316-.948 1.65.237 5.543.48 7.369-2.34 2.195-3.393-.44-7.077-5.123-7.077H6.584a1.33 1.33 0 0 0-1.316 1.13L3.1 18.42a.776.776 0 0 0 .766.897h2.545c.377 0 .688-.267.733-.785zm9.012-12.94c.96 1.38.894 3.42-.334 5.28-1.458 2.197-4.213 2.65-6.63 2.463l-.74 4.063h-1.99l1.03-5.674c1.989.218 6.305.187 8.143-3.11.47-.849.693-1.728.52-3.022z"/>
+                </svg>
+                Donate via PayPal
+              </a>
             </div>
           </footer>
 
