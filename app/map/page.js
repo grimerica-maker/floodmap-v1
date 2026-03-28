@@ -964,6 +964,7 @@ export default function HomePage() {
   const viewModeRef = useRef("map");
   const scenarioModeRef = useRef(null);
   const impactDiameterRef = useRef(1000);
+  const impactVelocityRef = useRef(20);
   const floodEngineUrlRef = useRef(FLOOD_ENGINE_PROXY_PATH);
 
   const impactPointRef = useRef(null);       // last placed point (compat)
@@ -982,6 +983,7 @@ export default function HomePage() {
   const [viewMode, setViewMode] = useState("map");
   const [scenarioMode, setScenarioMode] = useState(null);
   const [impactDiameter, setImpactDiameter] = useState(1000);
+  const [impactVelocity, setImpactVelocity] = useState(20); // km/s
   const [nukeYield, setNukeYield] = useState(15);
   const nukeStrikesRef = useRef([]); // array of { lat, lng, marker }
   const [nukeStrikes, setNukeStrikes] = useState([]); // mirror for UI
@@ -1109,13 +1111,18 @@ export default function HomePage() {
     // its chrome, maximising the visible viewport (works on Chrome/Android,
     // Safari respects dvh independently once the page is interaction-locked).
     if (window.innerWidth <= 640) {
-      // Small delay lets the page fully paint first
+      // Longer delay ensures full paint + interaction lock before nudge
       const t = setTimeout(() => {
         try {
-          window.scrollTo({ top: 1, behavior: "instant" });
-          requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "instant" }));
-        } catch (_) {}
-      }, 300);
+          document.documentElement.scrollTop = 1;
+          requestAnimationFrame(() => { document.documentElement.scrollTop = 0; });
+        } catch (_) {
+          try {
+            window.scrollTo({ top: 1, behavior: "instant" });
+            requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "instant" }));
+          } catch (_2) {}
+        }
+      }, 800);
       return () => { clearTimeout(t); window.removeEventListener("resize", check); };
     }
 
@@ -1144,6 +1151,7 @@ export default function HomePage() {
   useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
   useEffect(() => { scenarioModeRef.current = scenarioMode; }, [scenarioMode]);
   useEffect(() => { impactDiameterRef.current = impactDiameter; }, [impactDiameter]);
+  useEffect(() => { impactVelocityRef.current = impactVelocity; }, [impactVelocity]);
   useEffect(() => { impactResultRef.current = impactResult; }, [impactResult]);
   useEffect(() => { nukeResultRef.current = nukeResult; }, [nukeResult]);
   useEffect(() => { floodEngineUrlRef.current = floodEngineUrl; }, [floodEngineUrl]);
@@ -1619,13 +1627,19 @@ export default function HomePage() {
     const reachM = Number(result.estimated_wave_reach_m ?? result.tsunami_radius_m ?? 0);
     if (waveHeight <= 0) return false;
     if (waveHeight >= EXTINCTION_WAVE_HEIGHT_M) {
-      const ok = addFloodLayer(waveHeight, { impactIdx });
-      if (!ok) setTimeout(() => { addFloodLayer(waveHeight, { impactIdx }); }, 50);
+      // Extinction-scale — still pass origin so tile server can centre the flood correctly
+      const extinctionReach = reachM > 0 ? reachM : 20000000; // ~half Earth circumference
+      const ok = addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM: extinctionReach, impactIdx });
+      if (!ok) setTimeout(() => { addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM: extinctionReach, impactIdx }); }, 50);
       return true;
     }
-    const ok = addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM, impactIdx });
+    // Cap reach to prevent bleeding into a de-facto global flood for large-but-sub-extinction impacts
+    // If backend didn't return a reach, derive one from wave height (~1km reach per metre of wave height, capped)
+    const effectiveReach = reachM > 0 ? reachM : Math.min(waveHeight * 1000, 5000000);
+    const cappedReach = Math.min(effectiveReach, 10000000); // 10,000 km max regional reach
+    const ok = addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM: cappedReach, impactIdx });
     if (!ok) {
-      setTimeout(() => { addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM, impactIdx }); }, 50);
+      setTimeout(() => { addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM: cappedReach, impactIdx }); }, 50);
     }
     return true;
   };
@@ -1720,7 +1734,7 @@ export default function HomePage() {
       // Run all points in parallel
       const results = await Promise.all(points.map(async (pt, i) => {
         const res = await fetch(
-          `${floodEngineUrlRef.current}/impact?lat=${pt.lat}&lng=${pt.lng}&diameter=${impactDiameterRef.current}&_=${Date.now()}_${i}`,
+          `${floodEngineUrlRef.current}/impact?lat=${pt.lat}&lng=${pt.lng}&diameter=${impactDiameterRef.current}&velocity_km_s=${impactVelocityRef.current}&_=${Date.now()}_${i}`,
           { signal: controller.signal, cache: "no-store" }
         );
         if (!res.ok) throw new Error(`Impact request ${i+1} failed`);
@@ -3302,24 +3316,10 @@ export default function HomePage() {
 
       // Allow full globe navigation — remove lat restrictions
       safely(() => { map.setMaxBounds(null); });
-      // Interaction already handled below with currentTier check
-      // Post-flip: same left-to-right longitude spin as before
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-      // Free: full zoom + pan — paywall after 30s
-      if ((proTierRef.current ?? proTier ?? "free") === "free") {
-        safely(() => {
-          map.dragPan.enable();
-          map.scrollZoom.enable();
-          map.doubleClickZoom.enable();
-          map.touchZoomRotate.enable();
-        });
-      }
-      // Post-flip spin — bearing decrements (right to left) around centered new pole
-      // Small delay lets the easeTo finish landing before spin takes over
-      // Hard stop — no post-flip spin
       cataclysmSpinRef.current = null;
 
-      // Enable interaction for pro, lock for free
+      // Enable interaction for pro, cap zoom for free
       const isFree = (proTierRef.current ?? proTier ?? "free") === "free";
       if (!isFree) {
         safely(() => {
@@ -3333,25 +3333,19 @@ export default function HomePage() {
           map.setMaxBounds(null);
         });
       } else {
+        // Free: pan + limited zoom (can see hemisphere, can't drill into detail)
         safely(() => {
           map.dragPan.enable();
           map.scrollZoom.enable();
-          map.doubleClickZoom.enable();
+          map.doubleClickZoom.disable();
           map.touchZoomRotate.enable();
           map.dragRotate.enable();
+          map.setMinZoom(0);
+          map.setMaxZoom(3);
           map.setMaxBounds(null);
         });
-      }
-
-      // Free mobile: spin 10 more seconds then show paywall
-      const isFreeUser = (proTierRef.current ?? proTier ?? "free") === "free";
-      const isMobileUser = window.innerWidth <= 640;
-      if (isFreeUser) {
-        setTimeout(() => {
-          spinActive = false;
-          if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-          setPaywallModal("pro");
-        }, 30000);
+        // Pop paywall if they hit the zoom cap
+        try { map.on("zoomend", () => { if (map.getZoom() >= 2.9) setPaywallModal("pro"); }); } catch(e){}
       }
 
       // Stop spin on first interaction (pro: keep map, free: show paywall)
@@ -3362,9 +3356,7 @@ export default function HomePage() {
           try { map.off("wheel", stopSpin); } catch(e){}
           try { map.off("zoomstart", stopSpin); } catch(e){}
           if ((proTierRef.current ?? proTier ?? "free") === "free") {
-            safely(() => { map.dragPan.enable(); });
-            try { map.on("wheel", () => setPaywallModal("pro")); } catch(e){}
-            try { map.on("zoomstart", () => setPaywallModal("pro")); } catch(e){}
+            // Keep zoom cap in place — no further changes needed
           } else {
             safely(() => {
               map.dragPan.enable();
@@ -4102,9 +4094,43 @@ export default function HomePage() {
               🔒 Custom size — <span style={{ color: "#7c3aed" }}>Pro</span>
             </button>
           )}
-          {proTier !== "free" && (
+
+          {/* Velocity slider — Pro only */}
+          {proTier !== "free" ? (
+            <>
+              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, marginTop: 4, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Impact Velocity</div>
+              <input
+                type="range" min="11" max="72" step="1" value={impactVelocity}
+                onChange={(e) => { setImpactVelocity(Number(e.target.value)); impactVelocityRef.current = Number(e.target.value); }}
+                style={{ width: "100%", marginBottom: 6, height: 6, cursor: "pointer" }}
+              />
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 11, color: "#475569" }}>
+                <span>11 km/s (slow)</span>
+                <span>72 km/s (comet)</span>
+              </div>
+              <div style={{ fontSize: 13, marginBottom: 4, color: "#64748b" }}>
+                Velocity: <b>{impactVelocity} km/s</b>
+                {impactVelocity <= 15 && <span style={{ color: "#94a3b8", fontSize: 11, marginLeft: 6 }}>— slow asteroid</span>}
+                {impactVelocity > 15 && impactVelocity <= 25 && <span style={{ color: "#f97316", fontSize: 11, marginLeft: 6 }}>— typical Apollo</span>}
+                {impactVelocity > 25 && impactVelocity <= 45 && <span style={{ color: "#ef4444", fontSize: 11, marginLeft: 6 }}>— fast asteroid</span>}
+                {impactVelocity > 45 && <span style={{ color: "#a78bfa", fontSize: 11, marginLeft: 6 }}>— cometary</span>}
+              </div>
+              <div style={{ fontSize: 11, color: "#475569", marginBottom: 14, lineHeight: 1.5 }}>
+                KE scales as v² — doubling velocity quadruples energy, crater, blast &amp; tsunami.
+              </div>
+            </>
+          ) : (
+            <div onClick={() => setPaywallModal("pro")} style={{ fontSize: 11, color: "#f97316", marginBottom: 12, cursor: "pointer", padding: "5px 8px", background: "#1a0d00", border: "1px solid #7c2d00", borderRadius: 6 }}>
+              🔒 Impact velocity (11–72 km/s) — <span style={{ color: "#fb923c", textDecoration: "underline" }}>Pro feature</span>
+            </div>
+          )}
+          {proTier !== "free" ? (
             <div style={{ fontSize: 11, color: "#475569", marginBottom: 8 }}>
               {impactPoints.length > 0 ? `${impactPoints.length}/3 impact points placed` : "Click map to place up to 3 impact points"}
+            </div>
+          ) : (
+            <div onClick={() => setPaywallModal("pro")} style={{ fontSize: 11, color: "#f97316", marginBottom: 8, cursor: "pointer", padding: "5px 8px", background: "#1a0d00", border: "1px solid #7c2d00", borderRadius: 6 }}>
+              🔒 Multiple impacts (up to 3) — <span style={{ color: "#fb923c", textDecoration: "underline" }}>Pro feature</span>
             </div>
           )}
           <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
@@ -5659,7 +5685,10 @@ export default function HomePage() {
                   {[
                     { free: "30 simulations / day",         pro: "200 simulations / day" },
                     { free: "Asteroid up to 5,000 m",       pro: "Asteroid up to 20,000 m" },
+                    { free: "1 impact point",               pro: "Up to 3 simultaneous impacts" },
+                    { free: "Fixed velocity (20 km/s)",     pro: "Velocity slider (11–72 km/s)" },
                     { free: "Nuke up to 1 Mt",              pro: "Nuke up to 100 Mt" },
+                    { free: "1 nuke strike",                pro: "Up to 5 simultaneous strikes" },
                     { free: "Flood only in Cataclysm",      pro: "Wind + Both overlays" },
                     { free: "1 zone click popup",           pro: "Unlimited zone popups" },
                     { free: "Map view only",                pro: "Satellite + Globe view" },
@@ -5772,9 +5801,9 @@ export default function HomePage() {
                   : paywallModal === "pro" && scenarioMode === "tsunami"
                   ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the tsunami inundation zone. Founders price $18.99 lifetime — going up to $24.99 soon.</>
                   : paywallModal === "pro" && scenarioMode === "impact"
-                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to simulate asteroids up to <strong style={{ color: "#e2e8f0" }}>20,000 m</strong> diameter (free: 5,000 m) and click any zone for detailed survival data. Founders price $18.99 lifetime — going up to $24.99 soon.</>
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to simulate asteroids up to <strong style={{ color: "#e2e8f0" }}>20,000 m</strong> diameter, place up to <strong style={{ color: "#e2e8f0" }}>3 simultaneous impacts</strong>, adjust <strong style={{ color: "#e2e8f0" }}>impact velocity</strong> (11–72 km/s), and click any zone for detailed survival data. Founders price $18.99 lifetime — going up to $24.99 soon.</>
                   : paywallModal === "pro" && scenarioMode === "nuke"
-                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to detonate up to <strong style={{ color: "#e2e8f0" }}>100 Mt</strong> (free: 1 Mt) and click any blast zone for detailed analysis. Founders price $18.99 lifetime — going up to $24.99 soon.</>
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to detonate up to <strong style={{ color: "#e2e8f0" }}>100 Mt</strong> (free: 1 Mt), place up to <strong style={{ color: "#e2e8f0" }}>5 simultaneous strikes</strong>, and click any blast zone for detailed analysis. Founders price $18.99 lifetime — going up to $24.99 soon.</>
                   : "This feature requires Pro. Founders price $18.99 lifetime — going up to $24.99 soon."}
               </div>
             </>)}
@@ -5790,7 +5819,10 @@ export default function HomePage() {
               <div style={{ color: "#94a3b8", fontSize: 12, lineHeight: 1.7 }}>
                 ✓ {PRO_SIM_PER_HOUR} simulations/hour, {PRO_SIM_PER_DAY}/day<br/>
                 ✓ Impact diameter up to <strong style={{ color: "#e2e8f0" }}>20,000 m</strong> (free: 5,000 m)<br/>
+                ✓ Up to <strong style={{ color: "#e2e8f0" }}>3 simultaneous impact points</strong><br/>
+                ✓ <strong style={{ color: "#e2e8f0" }}>Impact velocity</strong> slider (11–72 km/s)<br/>
                 ✓ Nuke yield up to <strong style={{ color: "#e2e8f0" }}>100 Mt</strong> (free: 1 Mt)<br/>
+                ✓ Up to <strong style={{ color: "#e2e8f0" }}>5 simultaneous nuke strikes</strong><br/>
                 ✓ Wind &amp; Both cataclysm overlays<br/>
                 ✓ Unlimited zone click popups<br/>
                 ✓ Satellite + Globe view<br/>
@@ -6000,13 +6032,14 @@ export default function HomePage() {
           borderRadius: "18px 18px 0 0",
           zIndex: 1002,
           transform: drawerOpen ? "translateY(0)" : "translateY(100%)",
+          transition: "transform 0.32s cubic-bezier(0.4,0,0.2,1)",
           boxShadow: "0 -4px 24px rgba(0,0,0,0.18)",
           pointerEvents: drawerOpen ? "auto" : "none",
         }}
       >
         {/* Drawer handle bar */}
         <div
-          onClick={() => setDrawerOpen(false)}
+          onPointerDown={(e) => { e.stopPropagation(); setDrawerOpen(false); }}
           style={{ flexShrink: 0, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "10px 0 8px 0", cursor: "pointer", gap: 4 }}
         >
           <div style={{ width: 40, height: 4, background: "#334155", borderRadius: 4 }} />
@@ -6050,7 +6083,7 @@ export default function HomePage() {
       >
         {/* Left: current level + mode pill */}
         <div
-          onClick={() => setDrawerOpen(true)}
+          onPointerDown={(e) => { e.stopPropagation(); setDrawerOpen(true); }}
           style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 3, cursor: "pointer", minWidth: 0 }}
         >
           <div style={{ fontSize: 18, fontWeight: 700, color: seaLevel > 0 ? "#3b82f6" : seaLevel < 0 ? "#f97316" : "#e2e8f0", lineHeight: 1 }}>
@@ -6100,7 +6133,7 @@ export default function HomePage() {
 
         {/* Right: chevron toggle to open drawer */}
         <button
-          onClick={() => setDrawerOpen((v) => !v)}
+          onPointerDown={(e) => { e.stopPropagation(); setDrawerOpen((v) => !v); }}
           style={{ flexShrink: 0, width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "1px solid #1e2d45", borderRadius: 10, cursor: "pointer", fontSize: 18, color: "#94a3b8" }}
         >
           {drawerOpen ? "⌄" : "⌃"}
