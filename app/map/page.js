@@ -3934,33 +3934,6 @@ export default function HomePage() {
             </div>
           </div>
         ))}
-        {activeWarmingLevel && (() => {
-          const stats = {
-            1.5: { coral: "70-90%", arctic: "once per century", drought: "1.7×", flood: "100M+", species: "6%", label: "1.5°C — Paris Agreement limit" },
-            2.0: { coral: "99%", arctic: "once per decade", drought: "2.4×", flood: "130M+", species: "13%", label: "2°C — significant ecosystem disruption" },
-            3.0: { coral: "virtually all", arctic: "yearly summers", drought: "4×", flood: "280M+", species: "29%", label: "3°C — catastrophic irreversible changes" },
-            4.0: { coral: "functionally extinct", arctic: "ice-free year-round", drought: "6×", flood: "600M+", species: "49%", label: "4°C — civilisation-level disruption" },
-          };
-          const s = stats[activeWarmingLevel];
-          if (!s) return null;
-          return (
-            <div style={{ background: "#0a1a0a", border: "1px solid #14532d", borderRadius: 10, padding: "10px 14px", marginBottom: 12, marginTop: 8 }}>
-              <div style={{ fontSize: 11, color: "#22c55e", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>🌡️ {s.label}</div>
-              {[
-                { label: "Coral reef loss", val: s.coral, color: "#f97316" },
-                { label: "Ice-free Arctic", val: s.arctic, color: "#38bdf8" },
-                { label: "Drought intensity", val: s.drought, color: "#f59e0b" },
-                { label: "At-risk population", val: s.flood, color: "#3b82f6" },
-                { label: "Species threatened", val: s.species, color: "#a78bfa" },
-              ].map(r => (
-                <div key={r.label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontSize: 11, color: "#64748b" }}>{r.label}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: r.color }}>{r.val}</span>
-                </div>
-              ))}
-            </div>
-          );
-        })()}
         {(proTierRef.current ?? proTier ?? "free") !== "free" && floodDisplaced !== null && (
           <div style={{ background: "#111827", border: "1px solid #22c55e", borderRadius: 10, padding: "10px 14px", marginBottom: 12, marginTop: 8 }}>
             <div style={{ fontSize: 11, color: "#22c55e", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Displaced Population</div>
@@ -4542,6 +4515,35 @@ export default function HomePage() {
           ))}
         </>
       )}
+
+      {scenarioMode === "climate" && activeWarmingLevel && (() => {
+        const CS = {
+          1.5: { coral: "70-90%", arctic: "once per century", drought: "1.7×", flood: "100M+", species: "6%", label: "1.5°C — Paris Agreement limit" },
+          2.0: { coral: "99%", arctic: "once per decade", drought: "2.4×", flood: "130M+", species: "13%", label: "2°C — significant ecosystem disruption" },
+          3.0: { coral: "virtually all", arctic: "yearly summers", drought: "4×", flood: "280M+", species: "29%", label: "3°C — catastrophic irreversible changes" },
+          4.0: { coral: "functionally extinct", arctic: "ice-free year-round", drought: "6×", flood: "600M+", species: "49%", label: "4°C — civilisation-level disruption" },
+        };
+        const s = CS[activeWarmingLevel];
+        if (!s) return null;
+        return (
+          <>
+            <hr style={{ margin: "10px 0", opacity: 0.25 }} />
+            <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6, color: "#22c55e" }}>🌡️ {s.label}</div>
+            {[
+              { label: "Coral reef loss", val: s.coral, color: "#f97316" },
+              { label: "Ice-free Arctic", val: s.arctic, color: "#38bdf8" },
+              { label: "Drought intensity", val: s.drought, color: "#f59e0b" },
+              { label: "At-risk population", val: s.flood, color: "#3b82f6" },
+              { label: "Species threatened", val: s.species, color: "#a78bfa" },
+            ].map(r => (
+              <div key={r.label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 11, color: "#64748b" }}>{r.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: r.color }}>{r.val}</span>
+              </div>
+            ))}
+          </>
+        );
+      })()}
 
       {impactError && (
         <>
