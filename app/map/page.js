@@ -1058,6 +1058,9 @@ export default function HomePage() {
   const [paywallModal, setPaywallModal] = useState(null); // null | "pro" | "ultra" | "ratelimit"
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
   const [supportFormOpen, setSupportFormOpen] = useState(false);
+  // Onboarding — shown once on first /map visit, suppressed by localStorage flag
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingPage, setOnboardingPage] = useState(0); // 0 | 1 | 2
   const [supportMsg, setSupportMsg] = useState("");
   const [activeWarmingLevel, setActiveWarmingLevel] = useState(null);
   const activeWarmingLevelRef = useRef(null);
@@ -1117,6 +1120,24 @@ export default function HomePage() {
 
     return () => window.removeEventListener("resize", check);
   }, []);
+
+  // ── First-visit onboarding ────────────────────────────────────────────────
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem("dm_onboarding_v1")) {
+        const t = setTimeout(() => setShowOnboarding(true), 800);
+        return () => clearTimeout(t);
+      }
+    } catch(_) {}
+  }, []);
+
+  const dismissOnboarding = (dontShowAgain = false) => {
+    setShowOnboarding(false);
+    setOnboardingPage(0);
+    if (dontShowAgain) {
+      try { localStorage.setItem("dm_onboarding_v1", "1"); } catch(_) {}
+    }
+  };
 
   useEffect(() => { seaLevelRef.current = seaLevel; }, [seaLevel]);
   useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
@@ -5501,6 +5522,212 @@ export default function HomePage() {
             }} style={{ width: "100%", padding: "8px", background: "transparent",
               color: "#475569", border: "1px solid #1e2d45", borderRadius: 8,
               fontSize: 13, cursor: "pointer" }}>
+              Don't show again
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Onboarding modal ── */}
+      {showOnboarding && (
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "fixed", inset: 0, zIndex: 3000,
+            background: "rgba(0,0,0,0.82)", backdropFilter: "blur(6px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "Arial, sans-serif",
+          }}
+        >
+          <div style={{
+            background: "#0a0f1e", border: "1px solid #1e2d45", borderRadius: 18,
+            padding: "28px 28px 22px", maxWidth: 420, width: "92%",
+            boxShadow: "0 24px 72px rgba(0,0,0,0.7)",
+            display: "flex", flexDirection: "column", gap: 0,
+          }}>
+            {/* Logo + title */}
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
+              <img src={LOGO_DATA} alt="Disaster Map" style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 10 }} />
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "#e2e8f0", lineHeight: 1.1 }}>DisasterMap.ca</div>
+                <div style={{ fontSize: 12, color: "#f97316", fontWeight: 700, marginTop: 3, letterSpacing: "0.05em" }}>INTERACTIVE CATASTROPHE SIMULATOR</div>
+              </div>
+            </div>
+
+            {/* Page dots */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 18, justifyContent: "center" }}>
+              {[0,1,2].map(i => (
+                <div key={i} onClick={() => setOnboardingPage(i)} style={{
+                  width: i === onboardingPage ? 22 : 8, height: 8,
+                  borderRadius: 4, cursor: "pointer",
+                  background: i === onboardingPage ? "#f97316" : "#1e3a5f",
+                  transition: "all 0.2s",
+                }} />
+              ))}
+            </div>
+
+            {/* Page 0 — What is this */}
+            {onboardingPage === 0 && (
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
+                  Welcome to the Disaster Simulator 🌍
+                </div>
+                <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.65, marginBottom: 14 }}>
+                  Explore real-world catastrophe scenarios on a live map. Flood any coastline, detonate nuclear weapons, simulate asteroid impacts, model ice ages, and more — all backed by real geophysical models.
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 4 }}>
+                  {[
+                    { icon: "🌊", label: "Flood & Sea Rise", desc: "Drag sea level from −120 m to +70 m" },
+                    { icon: "💥", label: "Asteroid Impact", desc: "From Chelyabinsk to Chicxulub" },
+                    { icon: "☢️", label: "Nuclear Detonation", desc: "Tactical nukes to Tsar Bomba" },
+                    { icon: "☄️", label: "Cataclysm", desc: "Pole shift & global displacement" },
+                    { icon: "🌋", label: "Supervolcano", desc: "Yellowstone, Toba, Campi Flegrei" },
+                    { icon: "🌡️", label: "Climate Change", desc: "Warming levels with wildfire zones" },
+                  ].map(({ icon, label, desc }) => (
+                    <div key={label} style={{ background: "#111827", border: "1px solid #1e2d45", borderRadius: 10, padding: "10px 12px" }}>
+                      <div style={{ fontSize: 18, marginBottom: 3 }}>{icon}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4 }}>{desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Page 1 — How to use */}
+            {onboardingPage === 1 && (
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
+                  How to use it 🗺️
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 4 }}>
+                  {[
+                    {
+                      step: "1",
+                      color: "#3b82f6",
+                      title: isMobile ? "Tap ⌃ to open the control panel" : "Use the left panel to choose a scenario",
+                      desc: isMobile
+                        ? "The strip at the bottom is your control centre. Tap the chevron to open the full panel and choose a scenario."
+                        : "Select Flood, Impact, Nuke, Yellowstone, Tsunami, Cataclysm, or Climate from the left sidebar.",
+                    },
+                    {
+                      step: "2",
+                      color: "#f97316",
+                      title: "Configure your disaster",
+                      desc: "Set sea level, asteroid diameter, nuke yield, or explosion point using the controls. Historical presets are available for each mode.",
+                    },
+                    {
+                      step: "3",
+                      color: "#ef4444",
+                      title: "Click / tap the map",
+                      desc: "For Impact and Nuke modes, tap the map to place a strike point. After running, tap any zone to see survival odds and damage details.",
+                    },
+                    {
+                      step: "4",
+                      color: "#22c55e",
+                      title: "Share your scenario",
+                      desc: "Use the Share button to copy a permalink. Anyone can open it and see exactly what you simulated.",
+                    },
+                  ].map(({ step, color, title, desc }) => (
+                    <div key={step} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                      <div style={{ flexShrink: 0, width: 26, height: 26, borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: "white" }}>{step}</div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 2 }}>{title}</div>
+                        <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>{desc}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Page 2 — Pro CTA */}
+            {onboardingPage === 2 && (
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
+                  Free vs Pro ⚡
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+                  {[
+                    { free: "30 simulations / day",         pro: "200 simulations / day" },
+                    { free: "Asteroid up to 5,000 m",       pro: "Asteroid up to 20,000 m" },
+                    { free: "Nuke up to 1 Mt",              pro: "Nuke up to 100 Mt" },
+                    { free: "Flood only in Cataclysm",      pro: "Wind + Both overlays" },
+                    { free: "1 zone click popup",           pro: "Unlimited zone popups" },
+                    { free: "Map view only",                pro: "Satellite + Globe view" },
+                    { free: "—",                            pro: "Flood displaced counts" },
+                    { free: "—",                            pro: "🌊 Mega-Tsunami" },
+                  ].map(({ free, pro }, i) => (
+                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                      <div style={{ background: "#0f172a", border: "1px solid #1e2d45", borderRadius: 8, padding: "7px 10px", fontSize: 12, color: free === "—" ? "#334155" : "#64748b" }}>
+                        {free !== "—" ? "✓ " : ""}{free}
+                      </div>
+                      <div style={{ background: "#1a0a00", border: "1px solid #7c2d12", borderRadius: 8, padding: "7px 10px", fontSize: 12, color: "#fb923c", fontWeight: 600 }}>
+                        ⚡ {pro}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ background: "#111827", border: "1px solid #f97316", borderRadius: 12, padding: "14px 16px", marginBottom: 4, position: "relative" }}>
+                  <div style={{ position: "absolute", top: -10, right: 12, background: "#f97316", color: "white", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, letterSpacing: "0.08em" }}>FOUNDERS PRICE</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <span style={{ color: "#60a5fa", fontWeight: 700, fontSize: 15 }}>⚡ Pro Lifetime</span>
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ color: "#f97316", fontWeight: 800, fontSize: 17 }}>$18.99</span>
+                      <span style={{ color: "#64748b", fontSize: 12, marginLeft: 4 }}>once</span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#f97316", marginBottom: 10 }}>Price going to $24.99 soon — lock in now</div>
+                  <button
+                    onClick={() => { dismissOnboarding(true); window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank"); }}
+                    style={{ width: "100%", padding: "11px", background: "#f97316", color: "white", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}
+                  >
+                    Unlock Pro — $18.99 →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Navigation footer */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16 }}>
+              {onboardingPage > 0 && (
+                <button
+                  onClick={() => setOnboardingPage(p => p - 1)}
+                  style={{ padding: "10px 16px", background: "#111827", border: "1px solid #1e2d45", borderRadius: 8, color: "#94a3b8", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
+                >
+                  ← Back
+                </button>
+              )}
+              <div style={{ flex: 1 }} />
+              <button
+                onClick={() => dismissOnboarding(false)}
+                style={{ padding: "10px 14px", background: "transparent", border: "none", color: "#475569", cursor: "pointer", fontSize: 12 }}
+              >
+                Skip
+              </button>
+              {onboardingPage < 2 ? (
+                <button
+                  onClick={() => setOnboardingPage(p => p + 1)}
+                  style={{ padding: "10px 20px", background: "#f97316", border: "none", borderRadius: 8, color: "white", cursor: "pointer", fontSize: 13, fontWeight: 700 }}
+                >
+                  Next →
+                </button>
+              ) : (
+                <button
+                  onClick={() => dismissOnboarding(true)}
+                  style={{ padding: "10px 20px", background: "#1e3a5f", border: "1px solid #3b82f6", borderRadius: 8, color: "#60a5fa", cursor: "pointer", fontSize: 13, fontWeight: 700 }}
+                >
+                  Start Exploring ✓
+                </button>
+              )}
+            </div>
+
+            {/* Don't show again */}
+            <button
+              onClick={() => dismissOnboarding(true)}
+              style={{ marginTop: 10, background: "none", border: "none", color: "#334155", fontSize: 11, cursor: "pointer", textAlign: "center", textDecoration: "underline" }}
+            >
               Don't show again
             </button>
           </div>
