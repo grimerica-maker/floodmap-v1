@@ -4605,12 +4605,26 @@ export default function HomePage() {
           </>
         )}
 
-      {scenarioMode === "yellowstone" && yellowstoneActive && (
+      {scenarioMode === "yellowstone" && yellowstoneActive && (() => {
+        const _vPresets = volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
+        const _p = _vPresets[Math.min(yellowstonePreset, _vPresets.length - 1)];
+        if (!_p) return null;
+        // Famine deaths — prefer API result, fallback to frontend calc
+        const _famineAPI = Number(yellowstoneResult?.famine_deaths_estimate ?? 0);
+        const GLOBAL_POP = 8_100_000_000;
+        const _famineFront = (_p.blackout_pct >= 5 && _p.blackout_duration_months >= 1)
+          ? Math.round(GLOBAL_POP * Math.pow(_p.blackout_pct / 100, 1.5) * (_p.blackout_duration_months / 12) * 0.15) : 0;
+        const _famine = _famineAPI > 0 ? _famineAPI : _famineFront;
+        // Blackout data — prefer API result
+        const _bPct = yellowstoneResult?.blackout_pct ?? _p.blackout_pct;
+        const _bDur = yellowstoneResult?.blackout_duration_months ?? _p.blackout_duration_months;
+        const _bSev = yellowstoneResult?.blackout_severity ?? _p.blackout_severity;
+        return (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>🌋 {(volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS)[Math.min(yellowstonePreset, (volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS).length - 1)].name}</div>
-          <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8 }}>{(volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS)[Math.min(yellowstonePreset, (volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS).length - 1)].desc}</div>
-          {(volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS)[Math.min(yellowstonePreset, (volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS).length - 1)].zones.map((z, i) => (
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>🌋 {_p.name}</div>
+          <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8 }}>{_p.desc}</div>
+          {_p.zones.map((z, i) => (
             <div key={i} style={{ marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -4640,67 +4654,34 @@ export default function HomePage() {
                   <span style={{ fontSize: 11, color: "#94a3b8" }}>{z.deaths.toLocaleString()} deaths ({z.mortality_pct}%)</span>
                 </div>
               ))}
-              {Number(yellowstoneResult.blackout_pct ?? 0) > 0 && (
-                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #3f1515" }}>
-                  <div style={{ fontWeight: 700, fontSize: 12, color: "#a78bfa", marginBottom: 4 }}>🌑 Atmospheric Blackout</div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                    <span style={{ fontSize: 12, color: "#94a3b8" }}>Sunlight reduction</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{yellowstoneResult.blackout_pct}%</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, color: "#94a3b8" }}>Duration</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{yellowstoneResult.blackout_duration_months} months</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic" }}>{yellowstoneResult.blackout_severity}</div>
-                  {Number(yellowstoneResult.famine_deaths_estimate ?? 0) > 0 && (
-                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTop: "1px solid #1e2d45" }}>
-                      <span style={{ fontSize: 12, color: "#94a3b8" }}>Est. indirect famine deaths</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316" }}>{formatCompactCount(yellowstoneResult.famine_deaths_estimate)}</span>
-                    </div>
-                  )}
+            </div>
+          ) : (
+            <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>Calculating casualties...</div>
+          )}
+          {_bPct > 0 && (
+            <div style={{ marginTop: 8, padding: "8px 10px", background: "#0a0a1a", borderRadius: 8, border: "1px solid #1e2d45" }}>
+              <div style={{ fontWeight: 700, fontSize: 12, color: "#a78bfa", marginBottom: 4 }}>🌑 Atmospheric Blackout</div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>Sunlight reduction</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{_bPct}%</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: "#94a3b8" }}>Duration</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{_bDur} months</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic" }}>{_bSev}</div>
+              {_famine > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTop: "1px solid #1e2d45" }}>
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>Est. indirect famine deaths</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316" }}>{formatCompactCount(_famine)}</span>
                 </div>
               )}
             </div>
-          ) : yellowstoneActive ? (
-            <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>Calculating casualties...</div>
-          ) : null}
-          {/* Blackout from frontend preset — always shown for all volcano types */}
-          {(() => {
-            const activePresets = volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
-            const p = activePresets[Math.min(yellowstonePreset, activePresets.length - 1)];
-            // Only show if not already shown inside yellowstoneResult block
-            if (yellowstoneResult) return null;
-            if (!p?.blackout_pct) return null;
-            return (
-              <div style={{ marginTop: 8, padding: "8px 10px", background: "#0a0a1a", borderRadius: 8, border: "1px solid #1e2d45" }}>
-                <div style={{ fontWeight: 700, fontSize: 12, color: "#a78bfa", marginBottom: 4 }}>🌑 Atmospheric Blackout</div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                  <span style={{ fontSize: 12, color: "#94a3b8" }}>Sunlight reduction</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{p.blackout_pct}%</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontSize: 12, color: "#94a3b8" }}>Duration</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "#a78bfa" }}>{p.blackout_duration_months} months</span>
-                </div>
-                <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic" }}>{p.blackout_severity}</div>
-                {(() => {
-                  const GLOBAL_POP = 8_100_000_000;
-                  const fd = (p.blackout_pct >= 5 && p.blackout_duration_months >= 1)
-                    ? Math.round(GLOBAL_POP * Math.pow(p.blackout_pct / 100, 1.5) * (p.blackout_duration_months / 12) * 0.15)
-                    : 0;
-                  return fd > 0 ? (
-                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTop: "1px solid #1e2d45" }}>
-                      <span style={{ fontSize: 12, color: "#94a3b8" }}>Est. indirect famine deaths</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316" }}>{formatCompactCount(fd)}</span>
-                    </div>
-                  ) : null;
-                })()}
-              </div>
-            );
-          })()}
+          )}
           <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>Click map for zone details</div>
         </>
-      )}
+        );
+      })()}
 
       {scenarioMode === "nuke" && empResult && (
         <>
