@@ -3408,6 +3408,11 @@ export default function HomePage() {
       const { scenario, params } = pp;
       setTimeout(() => {
         try {
+          // Restore map view if encoded in link
+          const cx = parseFloat(params.get("cx")), cy = parseFloat(params.get("cy")), cz = parseFloat(params.get("cz"));
+          if (!isNaN(cx) && !isNaN(cy) && !isNaN(cz)) {
+            safely(() => map.jumpTo({ center: [cx, cy], zoom: cz }));
+          }
           if (scenario === "flood") {
             const level = parseFloat(params.get("level") || "0");
             setInputLevel(level); setInputText(String(level)); setSeaLevel(level); seaLevelRef.current = level;
@@ -3421,33 +3426,52 @@ export default function HomePage() {
             if (warming) { setActiveWarmingLevel(warming); activeWarmingLevelRef.current = warming; }
             setTimeout(() => { executeFlood(); if (warming) setTimeout(() => safely(() => drawWildfireZones(mapRef.current, warming)), 600); }, 100);
           } else if (scenario === "impact") {
-            const lat = parseFloat(params.get("lat")); const lng = parseFloat(params.get("lng"));
-            const diameter = parseInt(params.get("diameter") || "1000");
             setScenarioMode("impact"); scenarioModeRef.current = "impact";
+            const diameter = parseInt(params.get("diameter") || "1000");
             setImpactDiameter(diameter); impactDiameterRef.current = diameter;
-            if (!isNaN(lat) && !isNaN(lng)) {
-              impactPointRef.current = { lat, lng };
+            const pointsStr = params.get("points");
+            if (pointsStr) {
+              // Multi-impact
+              const pts = decodeURIComponent(pointsStr).split("|").map(s => { const [la, ln] = s.split(","); return { lat: parseFloat(la), lng: parseFloat(ln) }; }).filter(p => !isNaN(p.lat));
+              pts.forEach((p, i) => { impactPointsRef.current.push({ lat: p.lat, lng: p.lng, idx: i, marker: null, result: null }); });
+              impactPointRef.current = pts[pts.length - 1];
               setTimeout(() => runImpact(), 200);
+            } else {
+              const lat = parseFloat(params.get("lat")), lng = parseFloat(params.get("lng"));
+              if (!isNaN(lat) && !isNaN(lng)) { impactPointRef.current = { lat, lng }; setTimeout(() => runImpact(), 200); }
             }
           } else if (scenario === "nuke") {
-            const lat = parseFloat(params.get("lat")); const lng = parseFloat(params.get("lng"));
+            setScenarioMode("nuke"); scenarioModeRef.current = "nuke";
             const yieldKt = parseInt(params.get("yield") || "1000");
             const burst = params.get("burst") || "airburst";
-            setScenarioMode("nuke"); scenarioModeRef.current = "nuke";
             setNukeYield(yieldKt); setNukeBurst(burst);
-            nukePointRef.current = { lat, lng }; setNukePointSet(true);
-            setTimeout(() => executeNuke(), 200);
+            const pointsStr = params.get("points");
+            if (pointsStr) {
+              const pts = decodeURIComponent(pointsStr).split("|").map(s => { const [la, ln] = s.split(","); return { lat: parseFloat(la), lng: parseFloat(ln) }; }).filter(p => !isNaN(p.lat));
+              pts.forEach((p, i) => {
+                const el = document.createElement("div");
+                el.style.cssText = "width:14px;height:14px;background:#dc2626;border:2px solid #fff;border-radius:50%;cursor:pointer;";
+                const marker = new mapboxgl.Marker({ element: el }).setLngLat([p.lng, p.lat]).addTo(map);
+                nukeStrikesRef.current.push({ lat: p.lat, lng: p.lng, marker, idx: i });
+              });
+              nukePointRef.current = pts[pts.length - 1]; setNukePointSet(true);
+              setNukeStrikes([...nukeStrikesRef.current]);
+              setTimeout(() => executeNuke(), 200);
+            } else {
+              const lat = parseFloat(params.get("lat")), lng = parseFloat(params.get("lng"));
+              if (!isNaN(lat) && !isNaN(lng)) { nukePointRef.current = { lat, lng }; setNukePointSet(true); setTimeout(() => executeNuke(), 200); }
+            }
           } else if (scenario === "volcano") {
             const type = params.get("type") || "yellowstone";
             const preset = parseInt(params.get("preset") || "0");
             setScenarioMode("yellowstone"); scenarioModeRef.current = "yellowstone";
-            setVolcanoType(type); setYellowstonePreset(preset);
-            setTimeout(() => executeYellowstone(), 200);
+            setVolcanoType(type); volcanoTypeRef.current = type; setYellowstonePreset(preset); yellowstonePresetRef.current = preset;
+            setTimeout(() => drawYellowstone(preset), 200);
           } else if (scenario === "tsunami") {
             const source = parseInt(params.get("source") || "0");
             setScenarioMode("tsunami"); scenarioModeRef.current = "tsunami";
             setTsunamiSource(source); tsunamiSourceRef.current = source;
-            setTimeout(() => drawTsunami(), 200);
+            setTimeout(() => drawTsunami(source), 200);
           } else if (scenario === "cataclysm") {
             const model = params.get("model") || "davidson";
             setScenarioMode("cataclysm"); scenarioModeRef.current = "cataclysm";
@@ -4831,26 +4855,63 @@ export default function HomePage() {
         window.buildPermalink = () => {
           const base = "https://www.disastermap.ca/map";
           const m = scenarioModeRef.current;
-          if (m === "flood") return `${base}?scenario=flood&level=${seaLevel}`;
-          if (m === "climate") return `${base}?scenario=climate&level=${seaLevel}${activeWarmingLevel ? "&warming=" + activeWarmingLevel : ""}`;
-          if (m === "impact" && impactPointRef.current) return `${base}?scenario=impact&lat=${impactPointRef.current.lat.toFixed(4)}&lng=${impactPointRef.current.lng.toFixed(4)}&diameter=${impactDiameter}`;
-          if (m === "nuke" && nukePointRef.current) return `${base}?scenario=nuke&lat=${nukePointRef.current.lat.toFixed(4)}&lng=${nukePointRef.current.lng.toFixed(4)}&yield=${nukeYield}&burst=${nukeBurst}`;
-          if (m === "yellowstone") return `${base}?scenario=volcano&type=${volcanoType}&preset=${yellowstonePreset}`;
-          if (m === "tsunami") return `${base}?scenario=tsunami&source=${tsunamiSource}`;
-          if (m === "cataclysm") return `${base}?scenario=cataclysm&model=${cataclysmModelRef.current}`;
+          const map = mapRef.current;
+          // Include map center+zoom so link opens at same view
+          const c = map ? map.getCenter() : null;
+          const z = map ? map.getZoom().toFixed(1) : "3";
+          const view = c ? `&cx=${c.lng.toFixed(4)}&cy=${c.lat.toFixed(4)}&cz=${z}` : "";
+          if (m === "flood") return `${base}?scenario=flood&level=${seaLevel}${view}`;
+          if (m === "climate") return `${base}?scenario=climate&level=${seaLevel}${activeWarmingLevel ? "&warming=" + activeWarmingLevel : ""}${view}`;
+          if (m === "impact") {
+            const pts = impactPointsRef.current;
+            if (pts.length > 1) {
+              // Multi-impact — encode all points
+              const latlngs = pts.map(p => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`).join("|");
+              return `${base}?scenario=impact&points=${encodeURIComponent(latlngs)}&diameter=${impactDiameter}${view}`;
+            }
+            if (impactPointRef.current) return `${base}?scenario=impact&lat=${impactPointRef.current.lat.toFixed(4)}&lng=${impactPointRef.current.lng.toFixed(4)}&diameter=${impactDiameter}${view}`;
+          }
+          if (m === "nuke") {
+            const strikes = nukeStrikesRef.current;
+            if (strikes.length > 1) {
+              const latlngs = strikes.map(s => `${s.lat.toFixed(4)},${s.lng.toFixed(4)}`).join("|");
+              return `${base}?scenario=nuke&points=${encodeURIComponent(latlngs)}&yield=${nukeYield}&burst=${nukeBurst}${view}`;
+            }
+            if (nukePointRef.current) return `${base}?scenario=nuke&lat=${nukePointRef.current.lat.toFixed(4)}&lng=${nukePointRef.current.lng.toFixed(4)}&yield=${nukeYield}&burst=${nukeBurst}${view}`;
+          }
+          if (m === "yellowstone") return `${base}?scenario=volcano&type=${volcanoType}&preset=${yellowstonePreset}${view}`;
+          if (m === "tsunami") return `${base}?scenario=tsunami&source=${tsunamiSource}${view}`;
+          if (m === "cataclysm") return `${base}?scenario=cataclysm&model=${cataclysmModelRef.current}${view}`;
           return base;
         };
         window.saveScreenshot = () => {
           const map = mapRef.current;
           if (!map) return;
+          // Preserve drawing buffer must be true (set in map init) for canvas capture
           map.getCanvas().toBlob((blob) => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `disastermap-${scenarioModeRef.current || "map"}-${Date.now()}.png`;
+            const mode = scenarioModeRef.current || "map";
+            const ts = new Date().toISOString().slice(0,10);
+            a.download = `disastermap-${mode}-${ts}.png`;
             a.click();
             URL.revokeObjectURL(url);
-          });
+          }, "image/png");
+        };
+        window.copyScreenshot = () => {
+          const map = mapRef.current;
+          if (!map) return;
+          map.getCanvas().toBlob(async (blob) => {
+            try {
+              await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+              setStatus("Screenshot copied to clipboard!");
+              setTimeout(() => setStatus(""), 2000);
+            } catch(e) {
+              // Fallback — just download
+              window.saveScreenshot();
+            }
+          }, "image/png");
         };
         const buildPermalink = window.buildPermalink;
         const saveScreenshot = window.saveScreenshot;
@@ -4895,6 +4956,10 @@ export default function HomePage() {
             <button className="share-btn" onClick={window.saveScreenshot}
               style={{ background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45" }}>
               📷 Save Image
+            </button>
+            <button className="share-btn" onClick={window.copyScreenshot}
+              style={{ background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45" }}>
+              📋 Copy Image
             </button>
           </div>
           <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
