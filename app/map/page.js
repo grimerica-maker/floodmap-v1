@@ -681,15 +681,16 @@ const TSUNAMI_SOURCES = [
     desc: "Cumbre Vieja western flank — 500km³ into Atlantic",
     origin: [-17.8, 28.6],  // Canary Islands
     bearing: 270,            // waves propagate west toward Americas
+    spreadAngle: 75,         // wide spread — Atlantic basin
     color: "#0ea5e9",
     threat: "US East Coast, Caribbean, NW Africa, W Europe",
     maxWaveM: 100,
     bbox: { minLat: 5, maxLat: 65, minLng: -85, maxLng: 20 },
     rings: [
-      { hours: 1,  major_km: 500,  minor_km: 320,  waveM: 100, label: "1 hr" },
-      { hours: 2,  major_km: 1000, minor_km: 640,  waveM: 40, label: "2 hr" },
-      { hours: 4,  major_km: 2000, minor_km: 1280, waveM: 25,  label: "4 hr" },
-      { hours: 8,  major_km: 3500, minor_km: 2240, waveM: 10,  label: "8 hr" },
+      { hours: 1,  major_km: 450,  minor_km: 288,  waveM: 100, label: "1 hr" },
+      { hours: 2,  major_km: 900, minor_km: 576,  waveM: 40, label: "2 hr" },
+      { hours: 4,  major_km: 1800, minor_km: 1152, waveM: 25,  label: "4 hr" },
+      { hours: 8,  major_km: 3150, minor_km: 2016, waveM: 10,  label: "8 hr" },
     ],
     inundation_km: 3,   // avg km inland at target coasts
   },
@@ -699,15 +700,16 @@ const TSUNAMI_SOURCES = [
     desc: "Full volcanic flank collapse — 1,500km³ ejecta",
     origin: [-17.84, 28.57],
     bearing: 265,
+    spreadAngle: 75,
     color: "#06b6d4",
     threat: "US East Coast, Brazil, Iberian Peninsula",
     maxWaveM: 650,
     bbox: { minLat: -35, maxLat: 65, minLng: -80, maxLng: 15 },
     rings: [
-      { hours: 1,  major_km: 600,  minor_km: 380,  waveM: 650, label: "1 hr" },
-      { hours: 2,  major_km: 1200, minor_km: 760,  waveM: 80, label: "2 hr" },
-      { hours: 4,  major_km: 2400, minor_km: 1520, waveM: 40, label: "4 hr" },
-      { hours: 9,  major_km: 3600, minor_km: 2280, waveM: 15,  label: "9 hr" },
+      { hours: 1,  major_km: 540,  minor_km: 342,  waveM: 650, label: "1 hr" },
+      { hours: 2,  major_km: 1080, minor_km: 684,  waveM: 80, label: "2 hr" },
+      { hours: 4,  major_km: 2160, minor_km: 1368, waveM: 40, label: "4 hr" },
+      { hours: 9,  major_km: 3240, minor_km: 2052, waveM: 15,  label: "9 hr" },
     ],
     inundation_km: 8,
   },
@@ -717,15 +719,16 @@ const TSUNAMI_SOURCES = [
     desc: "Mw 9.2 megathrust — entire 1,000km fault rupture",
     origin: [-125.0, 45.0],
     bearing: 250,
+    spreadAngle: 60,
     color: "#3b82f6",
     threat: "US/Canada West Coast, Hawaii, Japan, Alaska",
     maxWaveM: 30,
     bbox: { minLat: 15, maxLat: 72, minLng: 130, maxLng: -110 },
     rings: [
-      { hours: 0.5, major_km: 300,  minor_km: 200,  waveM: 30, label: "30 min" },
-      { hours: 1,   major_km: 600,  minor_km: 400,  waveM: 20, label: "1 hr" },
-      { hours: 3,   major_km: 1800, minor_km: 1200, waveM: 10, label: "3 hr" },
-      { hours: 9,   major_km: 5400, minor_km: 3600, waveM: 5,  label: "9 hr" },
+      { hours: 0.5, major_km: 270,  minor_km: 180,  waveM: 30, label: "30 min" },
+      { hours: 1,   major_km: 540,  minor_km: 360,  waveM: 20, label: "1 hr" },
+      { hours: 3,   major_km: 1620, minor_km: 1080, waveM: 10, label: "3 hr" },
+      { hours: 9,   major_km: 4860, minor_km: 3240, waveM: 5,  label: "9 hr" },
     ],
     inundation_km: 5,
   },
@@ -735,15 +738,16 @@ const TSUNAMI_SOURCES = [
     desc: "Anak Krakatau-scale submarine collapse — Gulf of Alaska",
     origin: [-152.0, 58.0],
     bearing: 200,
+    spreadAngle: 55,
     color: "#8b5cf6",
     threat: "Hawaii, US West Coast, Japan, Pacific Islands",
     maxWaveM: 50,
     bbox: { minLat: -5, maxLat: 72, minLng: 120, maxLng: -100 },
     rings: [
-      { hours: 1,  major_km: 500,  minor_km: 350,  waveM: 50, label: "1 hr" },
-      { hours: 2,  major_km: 1000, minor_km: 700,  waveM: 30, label: "2 hr" },
-      { hours: 5,  major_km: 2500, minor_km: 1750, waveM: 15,  label: "5 hr" },
-      { hours: 10, major_km: 5000, minor_km: 3500, waveM: 5,  label: "10 hr" },
+      { hours: 1,  major_km: 450,  minor_km: 315,  waveM: 50, label: "1 hr" },
+      { hours: 2,  major_km: 900, minor_km: 630,  waveM: 30, label: "2 hr" },
+      { hours: 5,  major_km: 2250, minor_km: 1575, waveM: 15,  label: "5 hr" },
+      { hours: 10, major_km: 4500, minor_km: 3150, waveM: 5,  label: "10 hr" },
     ],
     inundation_km: 2,
   },
@@ -752,23 +756,24 @@ const TSUNAMI_SOURCES = [
 const TSUNAMI_SOURCE_ID = "tsunami-source";
 const TSUNAMI_LAYER_PREFIX = "tsunami-layer";
 
-const buildTsunamiEllipse = (originLng, originLat, majorKm, minorKm, bearingDeg, steps = 96) => {
+const buildTsunamiEllipse = (originLng, originLat, majorKm, minorKm, bearingDeg, steps = 96, spreadAngle = 65) => {
+  // Wedge/sector shape — origin at tip, fans out in propagation direction
   const kpLat = 110.574;
   const kpLng = 111.32 * Math.cos((originLat * Math.PI) / 180);
-  const bearingRad = (bearingDeg * Math.PI) / 180;
-  const dNorth = Math.cos(bearingRad);
-  const dEast  = Math.sin(bearingRad);
-  const cLat = originLat + (dNorth * majorKm * 0.25) / kpLat;
-  const cLng = originLng + (dEast  * majorKm * 0.25) / Math.max(kpLng, 0.0001);
+  const startAngle = (bearingDeg - spreadAngle) * Math.PI / 180;
+  const endAngle   = (bearingDeg + spreadAngle) * Math.PI / 180;
   const coords = [];
+  // Start at origin
+  coords.push([originLng, originLat]);
+  // Arc from startAngle to endAngle at radius majorKm
   for (let i = 0; i <= steps; i++) {
-    const t = (i / steps) * Math.PI * 2;
-    const along = Math.cos(t) * majorKm;
-    const perp  = Math.sin(t) * minorKm;
-    const nKm = dNorth * along - dEast * perp;
-    const eKm = dEast  * along + dNorth * perp;
-    coords.push([cLng + eKm / Math.max(kpLng, 0.0001), cLat + nKm / kpLat]);
+    const angle = startAngle + (endAngle - startAngle) * (i / steps);
+    const eKm = Math.sin(angle) * majorKm;
+    const nKm = Math.cos(angle) * majorKm;
+    coords.push([originLng + eKm / Math.max(kpLng, 0.0001), originLat + nKm / kpLat]);
   }
+  // Close back to origin
+  coords.push([originLng, originLat]);
   // Keep coords continuous — prevent jumps > 180 between consecutive points
   // This tells Mapbox to draw across the antimeridian correctly
   for (let i = 1; i < coords.length; i++) {
@@ -1766,7 +1771,7 @@ export default function HomePage() {
 
     // Build rings largest first (outermost renders underneath)
     const features = [...src.rings].reverse().map((ring, i) => ({
-      ...buildTsunamiEllipse(oLng, oLat, ring.major_km, ring.minor_km, src.bearing),
+      ...buildTsunamiEllipse(oLng, oLat, ring.major_km, ring.minor_km, src.bearing, 96, src.spreadAngle || 65),
       properties: { ringIdx: src.rings.length - 1 - i, hours: ring.hours, waveM: ring.waveM, label: ring.label },
     }));
 
@@ -1930,8 +1935,8 @@ export default function HomePage() {
     let ringInfo = null;
     for (let i = 0; i < src.rings.length; i++) {
       const ring = src.rings[i];
-      const eCLat = oLat + (dNorth * ring.major_km * 0.25) / kpLat;
-      const eCLng = oLng + (dEast  * ring.major_km * 0.25) / Math.max(kpLng, 0.0001);
+      const eCLat = oLat;
+      const eCLng = oLng;
       const dLatKm = (lat - eCLat) * kpLat;
       const dLngKm = (lng - eCLng) * Math.max(kpLng, 0.0001);
       const along = dNorth * dLatKm + dEast * dLngKm;
