@@ -687,10 +687,10 @@ const TSUNAMI_SOURCES = [
     maxWaveM: 100,
     bbox: { minLat: 5, maxLat: 65, minLng: -85, maxLng: 20 },
     rings: [
-      { hours: 1,  major_km: 450,  minor_km: 288,  waveM: 100, label: "1 hr" },
-      { hours: 2,  major_km: 900, minor_km: 576,  waveM: 40, label: "2 hr" },
-      { hours: 4,  major_km: 1800, minor_km: 1152, waveM: 25,  label: "4 hr" },
-      { hours: 8,  major_km: 3150, minor_km: 2016, waveM: 10,  label: "8 hr" },
+      { hours: 1,  major_km: 540,  minor_km: 346,  waveM: 100, label: "1 hr" },
+      { hours: 2,  major_km: 1080, minor_km: 691,  waveM: 40, label: "2 hr" },
+      { hours: 4,  major_km: 2160, minor_km: 1382, waveM: 25,  label: "4 hr" },
+      { hours: 8,  major_km: 3780, minor_km: 2419, waveM: 10,  label: "8 hr" },
     ],
     inundation_km: 3,   // avg km inland at target coasts
   },
@@ -706,10 +706,10 @@ const TSUNAMI_SOURCES = [
     maxWaveM: 650,
     bbox: { minLat: -35, maxLat: 65, minLng: -80, maxLng: 15 },
     rings: [
-      { hours: 1,  major_km: 540,  minor_km: 342,  waveM: 650, label: "1 hr" },
-      { hours: 2,  major_km: 1080, minor_km: 684,  waveM: 80, label: "2 hr" },
-      { hours: 4,  major_km: 2160, minor_km: 1368, waveM: 40, label: "4 hr" },
-      { hours: 9,  major_km: 3240, minor_km: 2052, waveM: 15,  label: "9 hr" },
+      { hours: 1,  major_km: 648,  minor_km: 410,  waveM: 650, label: "1 hr" },
+      { hours: 2,  major_km: 1296, minor_km: 821,  waveM: 80, label: "2 hr" },
+      { hours: 4,  major_km: 2592, minor_km: 1642, waveM: 40, label: "4 hr" },
+      { hours: 9,  major_km: 3888, minor_km: 2462, waveM: 15,  label: "9 hr" },
     ],
     inundation_km: 8,
   },
@@ -725,10 +725,10 @@ const TSUNAMI_SOURCES = [
     maxWaveM: 30,
     bbox: { minLat: 15, maxLat: 72, minLng: 130, maxLng: -110 },
     rings: [
-      { hours: 0.5, major_km: 270,  minor_km: 180,  waveM: 30, label: "30 min" },
-      { hours: 1,   major_km: 540,  minor_km: 360,  waveM: 20, label: "1 hr" },
-      { hours: 3,   major_km: 1620, minor_km: 1080, waveM: 10, label: "3 hr" },
-      { hours: 9,   major_km: 4860, minor_km: 3240, waveM: 5,  label: "9 hr" },
+      { hours: 0.5, major_km: 324,  minor_km: 216,  waveM: 30, label: "30 min" },
+      { hours: 1,   major_km: 648,  minor_km: 432,  waveM: 20, label: "1 hr" },
+      { hours: 3,   major_km: 1944, minor_km: 1296, waveM: 10, label: "3 hr" },
+      { hours: 9,   major_km: 5832, minor_km: 3888, waveM: 5,  label: "9 hr" },
     ],
     inundation_km: 5,
   },
@@ -744,10 +744,10 @@ const TSUNAMI_SOURCES = [
     maxWaveM: 50,
     bbox: { minLat: -5, maxLat: 72, minLng: 120, maxLng: -100 },
     rings: [
-      { hours: 1,  major_km: 450,  minor_km: 315,  waveM: 50, label: "1 hr" },
-      { hours: 2,  major_km: 900, minor_km: 630,  waveM: 30, label: "2 hr" },
-      { hours: 5,  major_km: 2250, minor_km: 1575, waveM: 15,  label: "5 hr" },
-      { hours: 10, major_km: 4500, minor_km: 3150, waveM: 5,  label: "10 hr" },
+      { hours: 1,  major_km: 540,  minor_km: 378,  waveM: 50, label: "1 hr" },
+      { hours: 2,  major_km: 1080, minor_km: 756,  waveM: 30, label: "2 hr" },
+      { hours: 5,  major_km: 2700, minor_km: 1890, waveM: 15,  label: "5 hr" },
+      { hours: 10, major_km: 5400, minor_km: 3780, waveM: 5,  label: "10 hr" },
     ],
     inundation_km: 2,
   },
@@ -3617,13 +3617,13 @@ export default function HomePage() {
       <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Scenario Mode</div>
       <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
         <button
-          onClick={() => { if (scenarioModeRef.current === "nuke") clearNuke(); if (scenarioModeRef.current === "yellowstone") clearYellowstone(); if (scenarioModeRef.current === "tsunami") clearTsunami(); if (scenarioModeRef.current === "cataclysm") clearCataclysm(); unlockMapControls(); setScenarioMode("flood"); }}
+          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukePointSet(false); nukePointRef.current = null; unlockMapControls(); setScenarioMode("flood"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "flood" ? "#1e3a5f" : "#111827", color: scenarioMode === "flood" ? "#60a5fa" : "#94a3b8", border: scenarioMode === "flood" ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>Flood</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Sea level up / down</div>
         </button>
         <button
-          onClick={() => { if (scenarioModeRef.current === "nuke") clearNuke(); if (scenarioModeRef.current === "yellowstone") clearYellowstone(); if (scenarioModeRef.current === "tsunami") clearTsunami(); if (scenarioModeRef.current === "cataclysm") clearCataclysm(); unlockMapControls(); setScenarioMode("impact"); }}
+          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukePointSet(false); nukePointRef.current = null; unlockMapControls(); setScenarioMode("impact"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "impact" ? "#1e3a5f" : "#111827", color: scenarioMode === "impact" ? "#60a5fa" : "#94a3b8", border: scenarioMode === "impact" ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>Impact</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Click map to place impact point</div>
@@ -3642,31 +3642,25 @@ export default function HomePage() {
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Sea level rise projections</div>
         </button>
         <button
-          onClick={() => { if (scenarioModeRef.current === "tsunami") clearTsunami(); if (scenarioModeRef.current === "cataclysm") clearCataclysm(); unlockMapControls(); setScenarioMode("nuke"); clearImpactPreview(); setNukeResult(null); setNukeError(""); setNukePointSet(false); nukePointRef.current = null; }}
+          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukePointSet(false); nukePointRef.current = null; unlockMapControls(); setScenarioMode("nuke"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "nuke" ? "#4c1d95" : "#111827", color: scenarioMode === "nuke" ? "#c4b5fd" : "#94a3b8", border: scenarioMode === "nuke" ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>☢️ Nuke</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Click map to place detonation point</div>
         </button>
         <button
-          onClick={() => { if (scenarioModeRef.current === "tsunami") clearTsunami(); if (scenarioModeRef.current === "cataclysm") clearCataclysm(); unlockMapControls(); setScenarioMode("yellowstone"); clearImpactPreview(); clearNuke(); clearYellowstone(); }}
+          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukePointSet(false); nukePointRef.current = null; unlockMapControls(); setScenarioMode("yellowstone"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "yellowstone" ? "#431407" : "#111827", color: scenarioMode === "yellowstone" ? "#fb923c" : "#94a3b8", border: scenarioMode === "yellowstone" ? "1px solid #ea580c" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>🌋 Super Volcano</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Supervolcano eruption scenarios</div>
         </button>
         <button
-          onClick={() => { if (scenarioModeRef.current === "cataclysm") clearCataclysm(); unlockMapControls(); scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); clearImpactPreview(); setImpactResult(null); setImpactError(""); clearNuke(); clearYellowstone(); }}
+          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukePointSet(false); nukePointRef.current = null; unlockMapControls(); scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "tsunami" ? "#0c2a4a" : "#111827", color: scenarioMode === "tsunami" ? "#38bdf8" : "#94a3b8", border: scenarioMode === "tsunami" ? "1px solid #0ea5e9" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>🌊 Mega-Tsunami</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Ocean collapse wave propagation</div>
         </button>
         <button
-          onClick={() => {
-            unlockMapControls();
-            scenarioModeRef.current = "cataclysm";
-            setScenarioMode("cataclysm");
-            clearImpactPreview(); setImpactResult(null); setImpactError("");
-            clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm();
-          }}
+          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukePointSet(false); nukePointRef.current = null; unlockMapControls(); scenarioModeRef.current = "cataclysm"; setScenarioMode("cataclysm"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "cataclysm" ? "#1a0505" : "#111827", color: scenarioMode === "cataclysm" ? "#ef4444" : "#94a3b8", border: scenarioMode === "cataclysm" ? "1px solid #dc2626" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>☄️ Cataclysm</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Pole shift inundation models</div>
