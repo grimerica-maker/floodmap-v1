@@ -893,6 +893,7 @@ export default function HomePage() {
   const [supportFormOpen, setSupportFormOpen] = useState(false);
   const [supportMsg, setSupportMsg] = useState("");
   const [activeWarmingLevel, setActiveWarmingLevel] = useState(null);
+  const activeWarmingLevelRef = useRef(null);
   const [rlStatus, setRlStatus] = useState(() => getRLStatus());
 
   // Mobile-only UI state — purely cosmetic, zero effect on map/engine logic
@@ -3137,7 +3138,7 @@ export default function HomePage() {
 
   const clearFlood = () => {
     const map = mapRef.current;
-    if (map && map.isStyleLoaded()) { try { clearWildfireZones(map); } catch(e){} try { clearIceSheets(map); } catch(e){} } setActiveWarmingLevel(null);
+    if (map && map.isStyleLoaded()) { try { clearWildfireZones(map); } catch(e){} try { clearIceSheets(map); } catch(e){} } setActiveWarmingLevel(null); activeWarmingLevelRef.current = null;
     cancelPendingImpactRequest();
     impactRunSeqRef.current += 1;
     setImpactLoading(false);
@@ -3352,6 +3353,48 @@ export default function HomePage() {
         // wind only — no popup
         return;
       }
+      // In climate mode, check if click is inside a wildfire zone
+      if (scenarioModeRef.current === "climate" && activeWarmingLevelRef.current) {
+        const wLevel = activeWarmingLevelRef.current;
+        const activeZones = WILDFIRE_ZONES.filter(z => z.minLevel <= wLevel);
+        const kpLat = 110.574;
+        const bearingDeg = 70;
+        const bearingRad = bearingDeg * Math.PI / 180;
+        const dN = Math.cos(bearingRad), dE = Math.sin(bearingRad);
+        let hitZone = null;
+        for (const z of activeZones) {
+          const kpLng = 111.32 * Math.cos(z.center[1] * Math.PI / 180);
+          const cLat = z.center[1] + (dN * z.major_km * 0.3) / kpLat;
+          const cLng = z.center[0] + (dE * z.major_km * 0.3) / Math.max(kpLng, 0.001);
+          const dLatKm = (lat - cLat) * kpLat;
+          const dLngKm = (lng - cLng) * Math.max(kpLng, 0.001);
+          const along = dN * dLatKm + dE * dLngKm;
+          const perp  = -dE * dLatKm + dN * dLngKm;
+          if ((along / z.major_km) ** 2 + (perp / z.minor_km) ** 2 <= 1) { hitZone = z; break; }
+        }
+        if (hitZone) {
+          closeElevPopup();
+          const riskLabel = hitZone.minLevel >= 4 ? "Extreme — year-round fire risk" : hitZone.minLevel >= 3 ? "Severe — multi-month fire seasons" : hitZone.minLevel >= 2 ? "High — extended fire season" : "Elevated — worsening drought/fire";
+          const riskColor = hitZone.minLevel >= 4 ? "#b91c1c" : hitZone.minLevel >= 3 ? "#dc2626" : hitZone.minLevel >= 2 ? "#ef4444" : "#f97316";
+          const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: false, className: "elev-popup", maxWidth: "240px" });
+          popup.setLngLat([lng, lat]).setHTML(`
+            <div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+              <div style="color:${riskColor};font-weight:700;margin-bottom:4px">🔥 ${hitZone.name}</div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                <span style="color:#94a3b8;font-size:11px">Activates at</span>
+                <span style="color:#e2e8f0;font-weight:700">+${hitZone.minLevel}°C</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+                <span style="color:#94a3b8;font-size:11px">Current risk level</span>
+                <span style="color:${riskColor};font-weight:700">${wLevel}°C scenario</span>
+              </div>
+              <div style="color:${riskColor};font-size:11px;font-style:italic">${riskLabel}</div>
+              <div style="color:#475569;font-size:10px;margin-top:4px">⚠ Worst-case projection — actual risk varies by local conditions</div>
+            </div>`).addTo(map);
+          elevPopupRef.current = popup;
+          return;
+        }
+      }
       showElevPopup(lng, lat);
     };
 
@@ -3375,7 +3418,7 @@ export default function HomePage() {
             const warming = parseFloat(params.get("warming") || "0");
             setInputLevel(level); setInputText(String(level)); setSeaLevel(level); seaLevelRef.current = level;
             setScenarioMode("climate"); scenarioModeRef.current = "climate";
-            if (warming) setActiveWarmingLevel(warming);
+            if (warming) { setActiveWarmingLevel(warming); activeWarmingLevelRef.current = warming; }
             setTimeout(() => { executeFlood(); if (warming) setTimeout(() => safely(() => drawWildfireZones(mapRef.current, warming)), 600); }, 100);
           } else if (scenario === "impact") {
             const lat = parseFloat(params.get("lat")); const lng = parseFloat(params.get("lng"));
@@ -3824,10 +3867,10 @@ export default function HomePage() {
               const map = mapRef.current;
               if (map) {
                 if (warmingLevel) {
-                  setActiveWarmingLevel(warmingLevel);
+                  setActiveWarmingLevel(warmingLevel); activeWarmingLevelRef.current = warmingLevel;
                   setTimeout(() => safely(() => drawWildfireZones(map, warmingLevel)), 400);
                 } else {
-                  setActiveWarmingLevel(null);
+                  setActiveWarmingLevel(null); activeWarmingLevelRef.current = null;
                   safely(() => clearWildfireZones(map));
                 }
               }
@@ -3867,6 +3910,33 @@ export default function HomePage() {
             </div>
           </div>
         ))}
+        {activeWarmingLevel && (() => {
+          const stats = {
+            1.5: { coral: "70-90%", arctic: "once per century", drought: "1.7×", flood: "100M+", species: "6%", label: "1.5°C — Paris Agreement limit" },
+            2.0: { coral: "99%", arctic: "once per decade", drought: "2.4×", flood: "130M+", species: "13%", label: "2°C — significant ecosystem disruption" },
+            3.0: { coral: "virtually all", arctic: "yearly summers", drought: "4×", flood: "280M+", species: "29%", label: "3°C — catastrophic irreversible changes" },
+            4.0: { coral: "functionally extinct", arctic: "ice-free year-round", drought: "6×", flood: "600M+", species: "49%", label: "4°C — civilisation-level disruption" },
+          };
+          const s = stats[activeWarmingLevel];
+          if (!s) return null;
+          return (
+            <div style={{ background: "#0a1a0a", border: "1px solid #14532d", borderRadius: 10, padding: "10px 14px", marginBottom: 12, marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: "#22c55e", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>🌡️ {s.label}</div>
+              {[
+                { label: "Coral reef loss", val: s.coral, color: "#f97316" },
+                { label: "Ice-free Arctic", val: s.arctic, color: "#38bdf8" },
+                { label: "Drought intensity", val: s.drought, color: "#f59e0b" },
+                { label: "At-risk population", val: s.flood, color: "#3b82f6" },
+                { label: "Species threatened", val: s.species, color: "#a78bfa" },
+              ].map(r => (
+                <div key={r.label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, color: "#64748b" }}>{r.label}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: r.color }}>{r.val}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
         {(proTierRef.current ?? proTier ?? "free") !== "free" && floodDisplaced !== null && (
           <div style={{ background: "#111827", border: "1px solid #22c55e", borderRadius: 10, padding: "10px 14px", marginBottom: 12, marginTop: 8 }}>
             <div style={{ fontSize: 11, color: "#22c55e", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Displaced Population</div>
