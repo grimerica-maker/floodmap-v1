@@ -4735,11 +4735,18 @@ export default function HomePage() {
                 {nukeResult._count} simultaneous detonations · {nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"} each
               </div>
               <hr style={{ margin: "8px 0", opacity: 0.2 }} />
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>Per-Strike Zones</div>
+              <div style={{ color: "#fde047" }}>● Fireball: {Math.round(nukeResult.fireball_r_m).toLocaleString()} m</div>
+              <div style={{ color: "#dc2626" }}>● Heavy blast: {(Math.round(nukeResult.blast_heavy_r_m)/1000).toFixed(1)} km</div>
+              <div style={{ color: "#f97316" }}>● Thermal (3rd°): {(Math.round(nukeResult.thermal_r_m)/1000).toFixed(1)} km</div>
+              {nukeResult.radiation_r_m > 0 && <div style={{ color: "#4ade80" }}>◌ Radiation 500rem: {Math.round(nukeResult.radiation_r_m).toLocaleString()} m</div>}
+              {nukeResult.fallout_major_km > 0 && <div style={{ color: "#84cc16" }}>◌ Fallout: {Math.round(nukeResult.fallout_major_km)} × {Math.round(nukeResult.fallout_minor_km)} km</div>}
+              <hr style={{ margin: "8px 0", opacity: 0.2 }} />
               <div style={{ fontWeight: 700, marginBottom: 4 }}>Combined Casualties</div>
               <div>Total exposed: {nukeResult.exposed != null ? nukeResult.exposed.toLocaleString() : "—"}</div>
               <div style={{ color: "#ef4444", fontWeight: 700 }}>Total deaths: {nukeResult.deaths != null ? nukeResult.deaths.toLocaleString() : "—"}</div>
               {nukeResult.radiation_deaths != null && nukeResult.radiation_deaths > 0 && (
-                <div style={{ color: "#4ade80" }}>◌ Lethal radiation deaths: {nukeResult.radiation_deaths.toLocaleString()}</div>
+                <div style={{ color: "#4ade80" }}>◌ Lethal radiation deaths: {(nukeResult.radiation_deaths * nukeResult._count).toLocaleString()}</div>
               )}
             </>
           ) : (
