@@ -1062,6 +1062,7 @@ export default function HomePage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingPage, setOnboardingPage] = useState(0); // 0 | 1 | 2
   const [supportMsg, setSupportMsg] = useState("");
+  const [supportEmail, setSupportEmail] = useState("");
   const [activeWarmingLevel, setActiveWarmingLevel] = useState(null);
   const activeWarmingLevelRef = useRef(null);
   const [rlStatus, setRlStatus] = useState(() => getRLStatus());
@@ -1618,13 +1619,19 @@ export default function HomePage() {
     const reachM = Number(result.estimated_wave_reach_m ?? result.tsunami_radius_m ?? 0);
     if (waveHeight <= 0) return false;
     if (waveHeight >= EXTINCTION_WAVE_HEIGHT_M) {
-      const ok = addFloodLayer(waveHeight, { impactIdx });
-      if (!ok) setTimeout(() => { addFloodLayer(waveHeight, { impactIdx }); }, 50);
+      // Extinction-scale — still pass origin so tile server can centre the flood correctly
+      const extinctionReach = reachM > 0 ? reachM : 20000000; // ~half Earth circumference
+      const ok = addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM: extinctionReach, impactIdx });
+      if (!ok) setTimeout(() => { addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM: extinctionReach, impactIdx }); }, 50);
       return true;
     }
-    const ok = addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM, impactIdx });
+    // Cap reach to prevent bleeding into a de-facto global flood for large-but-sub-extinction impacts
+    // If backend didn't return a reach, derive one from wave height (~1km reach per metre of wave height, capped)
+    const effectiveReach = reachM > 0 ? reachM : Math.min(waveHeight * 1000, 5000000);
+    const cappedReach = Math.min(effectiveReach, 10000000); // 10,000 km max regional reach
+    const ok = addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM: cappedReach, impactIdx });
     if (!ok) {
-      setTimeout(() => { addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM, impactIdx }); }, 50);
+      setTimeout(() => { addFloodLayer(waveHeight, { impactLat: lat, impactLng: lng, reachM: cappedReach, impactIdx }); }, 50);
     }
     return true;
   };
@@ -4753,19 +4760,29 @@ export default function HomePage() {
           </div>
         ) : (
           <div>
+            <input
+              type="email"
+              placeholder="Your email (required)"
+              required
+              value={supportEmail}
+              onChange={e => setSupportEmail(e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", background: "#111827", color: "#e2e8f0", border: `1px solid ${supportEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail) ? "#ef4444" : "#1e3a5f"}`, borderRadius: 8, fontSize: 12, boxSizing: "border-box", marginBottom: 8, fontFamily: "Arial,sans-serif" }}
+            />
             <textarea placeholder="Describe your issue..."
               value={supportMsg} onChange={e => setSupportMsg(e.target.value)}
               style={{ width: "100%", padding: "8px 10px", background: "#111827", color: "#e2e8f0", border: "1px solid #1e3a5f", borderRadius: 8, fontSize: 12, resize: "none", height: 80, boxSizing: "border-box", marginBottom: 8, fontFamily: "Arial,sans-serif" }} />
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={async () => {
-                if (!supportMsg.trim()) return;
+                if (!supportEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) { setStatus("Please enter a valid email address"); setTimeout(() => setStatus(""), 3000); return; }
+                if (!supportMsg.trim()) { setStatus("Please describe your issue"); setTimeout(() => setStatus(""), 3000); return; }
                 try {
                   await fetch("https://formspree.io/f/xgopwayn", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: supportMsg, source: "DisasterMap app" })
+                    body: JSON.stringify({ email: supportEmail, message: supportMsg, source: "DisasterMap app" })
                   });
                   setSupportMsg("");
+                  setSupportEmail("");
                   setSupportFormOpen(false);
                   setStatus("Message sent! We'll get back to you.");
                   setTimeout(() => setStatus(""), 4000);
@@ -4776,7 +4793,7 @@ export default function HomePage() {
               }} style={{ flex: 1, padding: "8px", background: "#1e3a5f", color: "#60a5fa", border: "1px solid #3b82f6", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                 Send
               </button>
-              <button onClick={() => { setSupportFormOpen(false); setSupportMsg(""); }}
+              <button onClick={() => { setSupportFormOpen(false); setSupportMsg(""); setSupportEmail(""); }}
                 style={{ padding: "8px 12px", background: "transparent", color: "#475569", border: "1px solid #1e2d45", borderRadius: 8, fontSize: 12, cursor: "pointer" }}>
                 Cancel
               </button>
