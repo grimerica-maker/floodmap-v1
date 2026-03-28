@@ -941,6 +941,22 @@ export default function HomePage() {
     setIsMobile(window.innerWidth <= 640);
     const check = () => setIsMobile(window.innerWidth <= 640);
     window.addEventListener("resize", check);
+
+    // ── Mobile browser-bar autohide ──────────────────────────────────────────
+    // On mobile, scroll 1px then back — this signals the browser it can hide
+    // its chrome, maximising the visible viewport (works on Chrome/Android,
+    // Safari respects dvh independently once the page is interaction-locked).
+    if (window.innerWidth <= 640) {
+      // Small delay lets the page fully paint first
+      const t = setTimeout(() => {
+        try {
+          window.scrollTo({ top: 1, behavior: "instant" });
+          requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "instant" }));
+        } catch (_) {}
+      }, 300);
+      return () => { clearTimeout(t); window.removeEventListener("resize", check); };
+    }
+
     return () => window.removeEventListener("resize", check);
   }, []);
 
@@ -3200,7 +3216,10 @@ export default function HomePage() {
 
     mapRef.current = map;
     applyProjectionForMode("map");
-    map.addControl(new mapboxgl.NavigationControl(), "top-right");
+    // Zoom controls only on desktop — mobile uses pinch-to-zoom
+    if (typeof window !== "undefined" && window.innerWidth > 640) {
+      map.addControl(new mapboxgl.NavigationControl(), "top-right");
+    }
     map.getCanvas().style.cursor = "crosshair";
 
     const handleError = (e) => {
@@ -5068,7 +5087,7 @@ export default function HomePage() {
   );
 
   return (
-    <div style={{ width: "100%", height: "100vh", position: "relative", overflow: "hidden" }}>
+    <div className="fm-map-root" style={{ width: "100%", height: "100dvh", position: "relative", overflow: "hidden" }}>
       <style>{`
         /* ── Mapbox popup ── */
         /* ── Dark panel theme ── */
@@ -5156,6 +5175,81 @@ export default function HomePage() {
           grid-template-columns: 1fr 1fr;
           gap: 10px;
           margin-bottom: 24px;
+        }
+
+        /* ── Mobile: autohide browser bar + full bleed ── */
+        @media (max-width: 640px) {
+          /* Use dynamic viewport units so layout shrinks when browser chrome hides */
+          :root {
+            --vh: 1dvh;
+          }
+          /* Prevent any scrolling that would re-show browser bar */
+          html, body {
+            overscroll-behavior: none !important;
+            overscroll-behavior-y: none !important;
+            touch-action: none;
+          }
+          /* Make the map container exploit full dynamic height */
+          .fm-map-root {
+            height: 100dvh !important;
+          }
+          /* Sliders: bigger touch targets on mobile */
+          input[type="range"] {
+            height: 28px !important;
+            cursor: pointer;
+            touch-action: pan-x;
+          }
+          input[type="range"]::-webkit-slider-thumb {
+            width: 26px !important;
+            height: 26px !important;
+            border-radius: 50%;
+          }
+          input[type="range"]::-moz-range-thumb {
+            width: 26px !important;
+            height: 26px !important;
+            border-radius: 50%;
+          }
+          /* Number inputs: full-width, comfortable tap height */
+          input[type="number"] {
+            min-height: 48px !important;
+            font-size: 16px !important; /* prevents iOS zoom-on-focus */
+          }
+          /* Select dropdowns */
+          select {
+            min-height: 44px !important;
+            font-size: 16px !important;
+          }
+          /* Buttons: min 44px tap target (Apple HIG / WCAG) */
+          button {
+            min-height: 44px;
+          }
+          /* Bottom drawer: use dvh so it doesn't overlap browser chrome */
+          .fm-mobile-drawer {
+            max-height: 80dvh !important;
+          }
+          /* Drawer scrollable area: allow touch scroll inside */
+          .fm-drawer-scroll {
+            touch-action: pan-y !important;
+            -webkit-overflow-scrolling: touch;
+          }
+          /* Hide mapbox zoom +/- controls on mobile (use pinch) */
+          .mapboxgl-ctrl-zoom-in,
+          .mapboxgl-ctrl-zoom-out,
+          .mapboxgl-ctrl-group {
+            display: none !important;
+          }
+          /* Hide mapbox compass on mobile */
+          .mapboxgl-ctrl-compass {
+            display: none !important;
+          }
+          /* Stats pill: push below status bar / notch */
+          .fm-mobile-stats-pill {
+            top: max(10px, env(safe-area-inset-top, 10px)) !important;
+          }
+          /* Popups: limit width on narrow screens */
+          .mapboxgl-popup-content {
+            max-width: min(280px, 90vw) !important;
+          }
         }
       `}</style>
 
@@ -5297,8 +5391,8 @@ export default function HomePage() {
       )}
 
       <canvas id="star-canvas" className={viewMode === "globe" ? "visible" : ""} />
-      <div ref={mapContainerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0 }} />
-      <style>{`html, body { overflow: hidden !important; height: 100% !important; }`}</style>
+      <div ref={mapContainerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0, touchAction: "none" }} />
+      <style>{`html, body { overflow: hidden !important; height: 100% !important; overscroll-behavior: none; touch-action: none; }`}</style>
       {/* Disaster Map wordmark — top center, unobtrusive */}
       <div style={{
         position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)",
@@ -5376,7 +5470,7 @@ export default function HomePage() {
               fontSize: 13, lineHeight: 1.5,
               zIndex: 1050, minWidth: 320,
               boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-              maxHeight: "70vh", overflowY: "auto",
+              maxHeight: "70dvh", overflowY: "auto",
             }}
           >
             {statsContent}
@@ -5427,7 +5521,7 @@ export default function HomePage() {
           fontSize: 13, lineHeight: 1.5,
           zIndex: 1050,
           boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-          maxHeight: "55vh", overflowY: "auto",
+          maxHeight: "55dvh", overflowY: "auto",
         }}
       >
         {statsContent}
@@ -5444,8 +5538,8 @@ export default function HomePage() {
           display: isMobile ? "flex" : "none",
           flexDirection: "column",
           position: "fixed", bottom: 0, left: 0, right: 0,
-          height: "76vh",
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          height: "80dvh",
+          paddingBottom: "max(env(safe-area-inset-bottom, 0px), 8px)",
           background: "#0a0f1e",
           borderTop: "1px solid #1e2d45",
           borderRadius: "18px 18px 0 0",
@@ -5465,7 +5559,7 @@ export default function HomePage() {
         </div>
 
         {/* Scrollable panel content inside drawer */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "4px 16px 32px 16px" }}>
+        <div className="fm-drawer-scroll" style={{ flex: 1, overflowY: "auto", padding: "4px 16px 32px 16px" }}>
           {panelContent}
         </div>
       </div>
@@ -5480,14 +5574,16 @@ export default function HomePage() {
         style={{
           display: isMobile ? "flex" : "none",
           position: "fixed", bottom: 0, left: 0, right: 0,
-          height: 72,
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          minHeight: 72,
+          paddingTop: 0,
+          paddingLeft: 12,
+          paddingRight: 12,
+          paddingBottom: "max(env(safe-area-inset-bottom, 0px), 8px)",
           background: "#0a0f1e",
           borderTop: "1px solid #1e2d45",
           borderRadius: "14px 14px 0 0",
           zIndex: 1001,
           alignItems: "center",
-          padding: "0 12px",
           gap: 10,
           boxShadow: "0 -2px 12px rgba(0,0,0,0.1)",
           fontFamily: "Arial, sans-serif",
