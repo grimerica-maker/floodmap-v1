@@ -1940,7 +1940,7 @@ export default function HomePage() {
       const dLngKm = (lng - eCLng) * Math.max(kpLng, 0.0001);
       const along = dNorth * dLatKm + dEast * dLngKm;
       const perp  = -dEast * dLatKm + dNorth * dLngKm;
-      if ((along / ring.major_km) ** 2 + (perp / ring.minor_km) ** 2 <= 1) {
+      if ((along / (ring.major_km * 1.3)) ** 2 + (perp / (ring.minor_km * 1.3)) ** 2 <= 1) {
         ringInfo = ring; break;
       }
     }
