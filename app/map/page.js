@@ -32,6 +32,12 @@ const FREE_SIM_PER_DAY  = 30;
 const PRO_SIM_PER_HOUR  = 50;
 const PRO_SIM_PER_DAY   = 200;
 
+// ── Paywall limits ────────────────────────────────────────────────────────────
+const FREE_MAX_IMPACT_DIAMETER = 5000;   // metres
+const PRO_MAX_IMPACT_DIAMETER  = 20000;
+const FREE_MAX_NUKE_YIELD_KT   = 1000;   // kt  (= 1 Mt)
+const PRO_MAX_NUKE_YIELD_KT    = 100000; // kt  (= 100 Mt)
+
 // ── Rate limit helpers (localStorage) ────────────────────────────────────────
 const RL_KEY = "dm_rl";
 const getRLData = () => {
@@ -851,6 +857,9 @@ export default function HomePage() {
   const yellowstonePopupRef = useRef(null);
   const impactZonePopupRef = useRef(null);
   const nukeZonePopupRef = useRef(null);
+  // Paywall: track free popup clicks per session (resets on mode clear)
+  const impactPopupClickCountRef = useRef(0);
+  const nukePopupClickCountRef   = useRef(0);
   const [nukeBurst, setNukeBurst] = useState("airburst");
   const [nukeWindDeg, setNukeWindDeg] = useState(270);
   const [nukeSubMode, setNukeSubMode] = useState("detonate"); // "detonate" | "emp"
@@ -1480,6 +1489,7 @@ export default function HomePage() {
   };
 
   const runImpact = async () => {
+    impactPopupClickCountRef.current = 0; // reset per-run popup counter
     if (impactPointsRef.current.length === 0 && !impactPointRef.current) { setStatus("Place impact point first"); return; }
     const points = impactPointsRef.current.length > 0 ? impactPointsRef.current : [impactPointRef.current];
     // Rate limit check
@@ -1612,6 +1622,7 @@ export default function HomePage() {
   };
 
   const runNuke = async () => {
+    nukePopupClickCountRef.current = 0; // reset per-run popup counter
     if (nukeStrikesRef.current.length === 0) { setStatus("Place at least one strike point first"); return; }
     const rl = checkAndIncrementRL(proTier !== "free");
     if (!rl.allowed) { setPaywallModal("ratelimit"); setRlStatus(getRLStatus()); return; }
@@ -3248,6 +3259,10 @@ export default function HomePage() {
       if (scenarioModeRef.current === "impact") {
         // If results exist, show zone popup; otherwise place a new impact point
         if (impactResultRef.current) {
+          if (proTierRef.current === "free") {
+            impactPopupClickCountRef.current += 1;
+            if (impactPopupClickCountRef.current > 1) { setPaywallModal("pro"); return; }
+          }
           showImpactZonePopup(lng, lat);
           return;
         }
@@ -3295,6 +3310,10 @@ export default function HomePage() {
       if (scenarioModeRef.current === "nuke") {
         // If detonation results exist, show zone popup on click
         if (nukeResultRef.current && nukeSubModeRef.current === "detonate") {
+          if (proTierRef.current === "free") {
+            nukePopupClickCountRef.current += 1;
+            if (nukePopupClickCountRef.current > 1) { setPaywallModal("pro"); return; }
+          }
           showNukeZonePopup(lng, lat);
           return;
         }
@@ -3441,7 +3460,7 @@ export default function HomePage() {
             setTimeout(() => { executeFlood(); if (warming) setTimeout(() => safely(() => drawWildfireZones(mapRef.current, warming)), 600); }, 100);
           } else if (scenario === "impact") {
             setScenarioMode("impact"); scenarioModeRef.current = "impact";
-            const diameter = parseInt(params.get("diameter") || "1000");
+            const diameter = Math.min(parseInt(params.get("diameter") || "1000"), proTierRef.current !== "free" ? PRO_MAX_IMPACT_DIAMETER : FREE_MAX_IMPACT_DIAMETER);
             setImpactDiameter(diameter); impactDiameterRef.current = diameter;
             const pointsStr = params.get("points");
             if (pointsStr) {
@@ -3456,7 +3475,7 @@ export default function HomePage() {
             }
           } else if (scenario === "nuke") {
             setScenarioMode("nuke"); scenarioModeRef.current = "nuke";
-            const yieldKt = parseInt(params.get("yield") || "1000");
+            const yieldKt = Math.min(parseInt(params.get("yield") || "1000"), proTierRef.current !== "free" ? PRO_MAX_NUKE_YIELD_KT : FREE_MAX_NUKE_YIELD_KT);
             const burst = params.get("burst") || "airburst";
             setNukeYield(yieldKt); setNukeBurst(burst);
             const pointsStr = params.get("points");
@@ -3775,7 +3794,10 @@ export default function HomePage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
                 {IMPACT_PRESETS.filter(p => p.category === cat).map(p => (
                   <button key={p.label}
-                    onClick={() => setImpactDiameter(p.diameter)}
+                    onClick={() => {
+                      if (proTier === "free" && p.diameter > FREE_MAX_IMPACT_DIAMETER) { setPaywallModal("pro"); return; }
+                      setImpactDiameter(p.diameter);
+                    }}
                     style={{ padding: "8px 10px", background: impactDiameter === p.diameter ? "#7f1d1d" : "#111827", color: impactDiameter === p.diameter ? "#fca5a5" : "#94a3b8", border: impactDiameter === p.diameter ? "1px solid #ef4444" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, textAlign: "left" }}>
                     <div style={{ fontSize: 12 }}>{p.label}</div>
                     <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{p.sub}</div>
@@ -3788,17 +3810,33 @@ export default function HomePage() {
             <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, marginTop: 4, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Custom Size</div>
             <input
               type="range" min="50" max="20000" step="50" value={impactDiameter}
-              onChange={(e) => setImpactDiameter(Number(e.target.value))}
+              onChange={(e) => {
+                const maxD = proTier !== "free" ? PRO_MAX_IMPACT_DIAMETER : FREE_MAX_IMPACT_DIAMETER;
+                const val = Math.min(Number(e.target.value), maxD);
+                if (proTier === "free" && Number(e.target.value) > FREE_MAX_IMPACT_DIAMETER) setPaywallModal("pro");
+                setImpactDiameter(val);
+              }}
               style={{ width: "100%", marginBottom: 10, height: 6, cursor: "pointer" }}
             />
             <input
               type="number" min="50" max="20000" step="50" value={impactDiameter}
-              onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n)) setImpactDiameter(Math.max(50, Math.min(20000, n))); }}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                if (!Number.isFinite(n)) return;
+                const maxD = proTier !== "free" ? PRO_MAX_IMPACT_DIAMETER : FREE_MAX_IMPACT_DIAMETER;
+                if (proTier === "free" && n > FREE_MAX_IMPACT_DIAMETER) { setPaywallModal("pro"); setImpactDiameter(FREE_MAX_IMPACT_DIAMETER); return; }
+                setImpactDiameter(Math.max(50, Math.min(maxD, n)));
+              }}
               style={{ width: "100%", padding: "12px 14px", fontSize: 17, border: "1px solid #1e2d45", marginBottom: 10, boxSizing: "border-box", borderRadius: 8, minHeight: 48, background: "#111827", color: "#e2e8f0" }}
             />
-            <div style={{ fontSize: 13, marginBottom: 16, color: "#64748b" }}>
+            <div style={{ fontSize: 13, marginBottom: proTier === "free" ? 6 : 16, color: "#64748b" }}>
               Diameter: <b>{impactDiameter.toLocaleString()} m</b>
             </div>
+            {proTier === "free" && (
+              <div onClick={() => setPaywallModal("pro")} style={{ fontSize: 11, color: "#f97316", marginBottom: 12, cursor: "pointer", padding: "5px 8px", background: "#1a0d00", border: "1px solid #7c2d00", borderRadius: 6 }}>
+                🔒 Free cap: 5,000 m — <span style={{ color: "#fb923c", textDecoration: "underline" }}>Pro unlocks 20,000 m</span>
+              </div>
+            )}
           </>) : (
             <button onClick={() => setPaywallModal("pro")} style={{ width: "100%", padding: "10px 14px", marginBottom: 16, marginTop: 4, background: "#0f172a", border: "1px solid #1e2d45", borderRadius: 8, color: "#475569", cursor: "pointer", textAlign: "left", fontSize: 12 }}>
               🔒 Custom size — <span style={{ color: "#7c3aed" }}>Pro</span>
@@ -4016,7 +4054,10 @@ export default function HomePage() {
                 { label: "B83 · 1.2Mt",      e1: "~46 kV/m", effect: "Damages lightly hardened military systems", yield_kt: 1200 },
                 { label: "Tsar Bomba · 50Mt", e1: "~200 kV/m", effect: "Destroys hardened systems, Faraday-caged equipment", yield_kt: 50000 },
               ].map((p) => (
-                <button key={p.label} onClick={() => setNukeYield(p.yield_kt)}
+                <button key={p.label} onClick={() => {
+                  if (proTier === "free" && p.yield_kt > FREE_MAX_NUKE_YIELD_KT) { setPaywallModal("pro"); return; }
+                  setNukeYield(p.yield_kt);
+                }}
                   style={{ padding: "9px 12px", background: nukeYield === p.yield_kt ? "#1e0a3c" : "#0f0a2a", border: nukeYield === p.yield_kt ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 8, textAlign: "left", width: "100%" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
                     <span style={{ fontWeight: 700, fontSize: 12, color: nukeYield === p.yield_kt ? "#c4b5fd" : "#94a3b8" }}>{p.label}</span>
@@ -4031,7 +4072,10 @@ export default function HomePage() {
             <>
               <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"} style={{ marginBottom: 12 }}>
                 {NUKE_PRESETS.map((p) => (
-                  <button key={p.label} onClick={() => setNukeYield(p.yield_kt)}
+                  <button key={p.label} onClick={() => {
+                    if (proTier === "free" && p.yield_kt > FREE_MAX_NUKE_YIELD_KT) { setPaywallModal("pro"); return; }
+                    setNukeYield(p.yield_kt);
+                  }}
                     style={{ padding: "10px 8px", minHeight: 48, border: "1px solid #d1d5db", background: nukeYield === p.yield_kt ? "#7c3aed" : "white", color: nukeYield === p.yield_kt ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700, whiteSpace: "nowrap", fontSize: 13 }}>
                     {p.label}
                   </button>
@@ -4039,11 +4083,21 @@ export default function HomePage() {
               </div>
               {proTier !== "free" ? (<>
                 <input type="range" min="0.001" max="50000" step="1" value={nukeYield}
-                  onChange={(e) => setNukeYield(Number(e.target.value))}
+                  onChange={(e) => {
+                    const maxY = proTier !== "free" ? PRO_MAX_NUKE_YIELD_KT : FREE_MAX_NUKE_YIELD_KT;
+                    const val = Number(e.target.value);
+                    if (proTier === "free" && val > FREE_MAX_NUKE_YIELD_KT) { setPaywallModal("pro"); return; }
+                    setNukeYield(Math.min(val, maxY));
+                  }}
                   style={{ width: "100%", marginBottom: 6, cursor: "pointer" }} />
-                <div style={{ fontSize: 13, marginBottom: 12, color: "#64748b" }}>
+                <div style={{ fontSize: 13, marginBottom: proTier === "free" ? 4 : 12, color: "#64748b" }}>
                   Yield: <b>{nukeYield >= 1000 ? (nukeYield/1000).toFixed(2)+" Mt" : nukeYield+" kt"}</b>
                 </div>
+                {proTier === "free" && (
+                  <div onClick={() => setPaywallModal("pro")} style={{ fontSize: 11, color: "#f97316", marginBottom: 10, cursor: "pointer", padding: "5px 8px", background: "#1a0d00", border: "1px solid #7c2d00", borderRadius: 6 }}>
+                    🔒 Free cap: 1 Mt — <span style={{ color: "#fb923c", textDecoration: "underline" }}>Pro unlocks 100 Mt</span>
+                  </div>
+                )}
               </>) : (
                 <button onClick={() => setPaywallModal("pro")} style={{ width: "100%", padding: "10px 14px", marginBottom: 12, background: "#0f172a", border: "1px solid #1e2d45", borderRadius: 8, color: "#475569", cursor: "pointer", textAlign: "left", fontSize: 12 }}>
                   🔒 Custom yield — <span style={{ color: "#7c3aed" }}>Pro</span>
@@ -4170,6 +4224,7 @@ export default function HomePage() {
                   },
                 ].map(preset => (
                   <button key={preset.label} onClick={() => {
+                    if (proTier === "free" && preset.yield_kt > FREE_MAX_NUKE_YIELD_KT) { setPaywallModal("pro"); return; }
                     clearNuke();
                     setNukeYield(preset.yield_kt);
                     setNukeBurst(preset.burst);
@@ -4309,26 +4364,27 @@ export default function HomePage() {
               <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#ef4444", textTransform: "uppercase" }}>Overlay</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
                 {[
-                  { key: "flood", label: "🌊 Flood" },
-                  { key: "wind",  label: "💨 Wind" },
-                  { key: "both",  label: "⚡ Both" },
-                ].map(({ key, label }) => (
+                  { key: "flood", label: "🌊 Flood", pro: false },
+                  { key: "wind",  label: "💨 Wind",  pro: true  },
+                  { key: "both",  label: "⚡ Both",  pro: true  },
+                ].map(({ key, label, pro }) => (
                   <button key={key}
                     onClick={() => {
+                      if (pro && proTier === "free") { setPaywallModal("pro"); return; }
                       setCataclysmOverlay(key);
                       const map = mapRef.current;
                       if (map) applyCataclysmOverlay(map, cataclysmModelRef.current, key);
                     }}
-                    style={{ padding: "8px 4px", border: cataclysmOverlay === key ? "1px solid #dc2626" : "1px solid #1e2d45", background: cataclysmOverlay === key ? "#1a0505" : "#111827", color: cataclysmOverlay === key ? "#f87171" : "#64748b", cursor: "pointer", borderRadius: 8, fontWeight: 700, fontSize: 12 }}>
-                    {label}
+                    style={{ padding: "8px 4px", border: cataclysmOverlay === key ? "1px solid #dc2626" : "1px solid #1e2d45", background: cataclysmOverlay === key ? "#1a0505" : "#111827", color: cataclysmOverlay === key ? "#f87171" : pro && proTier === "free" ? "#4b5563" : "#64748b", cursor: "pointer", borderRadius: 8, fontWeight: 700, fontSize: 12, position: "relative" }}>
+                    {pro && proTier === "free" ? "🔒 " : ""}{label}
                   </button>
                 ))}
               </div>
             </>
           )}
           {cataclysmActive && proTier === "free" && (
-            <div style={{ fontSize: 11, color: "#f97316", marginBottom: 8, textAlign: "center", padding: "6px 8px", border: "1px solid #431407", borderRadius: 6, background: "#1a0a02" }}>
-              🔒 <strong>Pro</strong> — unlock zoom &amp; pan to explore the new world
+            <div onClick={() => setPaywallModal("pro")} style={{ fontSize: 11, color: "#f97316", marginBottom: 8, textAlign: "center", padding: "6px 8px", border: "1px solid #431407", borderRadius: 6, background: "#1a0a02", cursor: "pointer" }}>
+              🔒 <strong>Pro</strong> — unlock Wind &amp; Both overlays + zoom &amp; pan to explore the new world
             </div>
           )}
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
@@ -4642,6 +4698,11 @@ export default function HomePage() {
             </div>
           )}
           <div style={{ fontSize: 11, opacity: 0.6, marginTop: 6 }}>Confidence: low / rough estimate</div>
+          {proTier === "free" && (
+            <div onClick={() => setPaywallModal("pro")} style={{ fontSize: 11, color: "#f97316", marginTop: 8, cursor: "pointer", padding: "5px 8px", background: "#1a0d00", border: "1px solid #7c2d00", borderRadius: 6, textAlign: "center" }}>
+              💥 1 free zone click · <span style={{ color: "#fb923c", textDecoration: "underline" }}>Pro unlocks unlimited</span>
+            </div>
+          )}
         </>
       )}
 
@@ -4870,6 +4931,11 @@ export default function HomePage() {
                 <div style={{ color: "#4ade80" }}>◌ Lethal radiation deaths: {nukeResult.radiation_deaths.toLocaleString()}</div>
               )}
             </>
+          )}
+          {proTier === "free" && (
+            <div onClick={() => setPaywallModal("pro")} style={{ fontSize: 11, color: "#f97316", marginTop: 8, cursor: "pointer", padding: "5px 8px", background: "#1a0d00", border: "1px solid #7c2d00", borderRadius: 6, textAlign: "center" }}>
+              ☢️ 1 free zone click · <span style={{ color: "#fb923c", textDecoration: "underline" }}>Pro unlocks unlimited</span>
+            </div>
           )}
         </>
       )}
@@ -5153,9 +5219,13 @@ export default function HomePage() {
               </div>
               <div style={{ color: "#64748b", fontSize: 13, textAlign: "center", marginBottom: 20, lineHeight: 1.6 }}>
                 {paywallModal === "pro" && scenarioMode === "cataclysm"
-                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the post-cataclysm world. Founders price $18.99 lifetime — going up to $24.99 soon.</>
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to access Wind &amp; Both overlays and zoom/pan the post-cataclysm world. Founders price $18.99 lifetime — going up to $24.99 soon.</>
                   : paywallModal === "pro" && scenarioMode === "tsunami"
                   ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the tsunami inundation zone. Founders price $18.99 lifetime — going up to $24.99 soon.</>
+                  : paywallModal === "pro" && scenarioMode === "impact"
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to simulate asteroids up to <strong style={{ color: "#e2e8f0" }}>20,000 m</strong> diameter (free: 5,000 m) and click any zone for detailed survival data. Founders price $18.99 lifetime — going up to $24.99 soon.</>
+                  : paywallModal === "pro" && scenarioMode === "nuke"
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to detonate up to <strong style={{ color: "#e2e8f0" }}>100 Mt</strong> (free: 1 Mt) and click any blast zone for detailed analysis. Founders price $18.99 lifetime — going up to $24.99 soon.</>
                   : "This feature requires Pro. Founders price $18.99 lifetime — going up to $24.99 soon."}
               </div>
             </>)}
@@ -5170,6 +5240,10 @@ export default function HomePage() {
               <div style={{ fontSize: 11, color: "#f97316", marginBottom: 8 }}>Price going up to $24.99 soon — lock in now</div>
               <div style={{ color: "#94a3b8", fontSize: 12, lineHeight: 1.7 }}>
                 ✓ {PRO_SIM_PER_HOUR} simulations/hour, {PRO_SIM_PER_DAY}/day<br/>
+                ✓ Impact diameter up to <strong style={{ color: "#e2e8f0" }}>20,000 m</strong> (free: 5,000 m)<br/>
+                ✓ Nuke yield up to <strong style={{ color: "#e2e8f0" }}>100 Mt</strong> (free: 1 Mt)<br/>
+                ✓ Wind &amp; Both cataclysm overlays<br/>
+                ✓ Unlimited zone click popups<br/>
                 ✓ Satellite + Globe view<br/>
                 ✓ Flood displaced counts<br/>
                 ✓ 🌊 Mega-Tsunami scenarios<br/>
