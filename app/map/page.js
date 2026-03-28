@@ -1062,6 +1062,7 @@ export default function HomePage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingPage, setOnboardingPage] = useState(0); // 0 | 1 | 2
   const [supportMsg, setSupportMsg] = useState("");
+  const [supportEmail, setSupportEmail] = useState("");
   const [activeWarmingLevel, setActiveWarmingLevel] = useState(null);
   const activeWarmingLevelRef = useRef(null);
   const [rlStatus, setRlStatus] = useState(() => getRLStatus());
@@ -4753,19 +4754,29 @@ export default function HomePage() {
           </div>
         ) : (
           <div>
+            <input
+              type="email"
+              placeholder="Your email (required)"
+              required
+              value={supportEmail}
+              onChange={e => setSupportEmail(e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", background: "#111827", color: "#e2e8f0", border: `1px solid ${supportEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail) ? "#ef4444" : "#1e3a5f"}`, borderRadius: 8, fontSize: 12, boxSizing: "border-box", marginBottom: 8, fontFamily: "Arial,sans-serif" }}
+            />
             <textarea placeholder="Describe your issue..."
               value={supportMsg} onChange={e => setSupportMsg(e.target.value)}
               style={{ width: "100%", padding: "8px 10px", background: "#111827", color: "#e2e8f0", border: "1px solid #1e3a5f", borderRadius: 8, fontSize: 12, resize: "none", height: 80, boxSizing: "border-box", marginBottom: 8, fontFamily: "Arial,sans-serif" }} />
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={async () => {
-                if (!supportMsg.trim()) return;
+                if (!supportEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) { setStatus("Please enter a valid email address"); setTimeout(() => setStatus(""), 3000); return; }
+                if (!supportMsg.trim()) { setStatus("Please describe your issue"); setTimeout(() => setStatus(""), 3000); return; }
                 try {
                   await fetch("https://formspree.io/f/xgopwayn", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: supportMsg, source: "DisasterMap app" })
+                    body: JSON.stringify({ email: supportEmail, message: supportMsg, source: "DisasterMap app" })
                   });
                   setSupportMsg("");
+                  setSupportEmail("");
                   setSupportFormOpen(false);
                   setStatus("Message sent! We'll get back to you.");
                   setTimeout(() => setStatus(""), 4000);
@@ -4776,7 +4787,7 @@ export default function HomePage() {
               }} style={{ flex: 1, padding: "8px", background: "#1e3a5f", color: "#60a5fa", border: "1px solid #3b82f6", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                 Send
               </button>
-              <button onClick={() => { setSupportFormOpen(false); setSupportMsg(""); }}
+              <button onClick={() => { setSupportFormOpen(false); setSupportMsg(""); setSupportEmail(""); }}
                 style={{ padding: "8px 12px", background: "transparent", color: "#475569", border: "1px solid #1e2d45", borderRadius: 8, fontSize: 12, cursor: "pointer" }}>
                 Cancel
               </button>
