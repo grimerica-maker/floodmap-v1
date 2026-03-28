@@ -757,22 +757,21 @@ const TSUNAMI_SOURCE_ID = "tsunami-source";
 const TSUNAMI_LAYER_PREFIX = "tsunami-layer";
 
 const buildTsunamiEllipse = (originLng, originLat, majorKm, minorKm, bearingDeg, steps = 96, spreadAngle = 65) => {
-  // Wedge/sector shape — origin at tip, fans out in propagation direction
+  // Wedge/sector: tip at origin, arc at majorKm radius, spreadAngle degrees each side
   const kpLat = 110.574;
   const kpLng = 111.32 * Math.cos((originLat * Math.PI) / 180);
-  const startAngle = (bearingDeg - spreadAngle) * Math.PI / 180;
-  const endAngle   = (bearingDeg + spreadAngle) * Math.PI / 180;
   const coords = [];
-  // Start at origin
+  // Tip at origin
   coords.push([originLng, originLat]);
-  // Arc from startAngle to endAngle at radius majorKm
+  // Arc at majorKm from origin, from (bearing-spread) to (bearing+spread)
   for (let i = 0; i <= steps; i++) {
-    const angle = startAngle + (endAngle - startAngle) * (i / steps);
-    const eKm = Math.sin(angle) * majorKm;
-    const nKm = Math.cos(angle) * majorKm;
+    const angleDeg = (bearingDeg - spreadAngle) + (spreadAngle * 2) * (i / steps);
+    const angleRad = angleDeg * Math.PI / 180;
+    const eKm = Math.sin(angleRad) * majorKm;
+    const nKm = Math.cos(angleRad) * majorKm;
     coords.push([originLng + eKm / Math.max(kpLng, 0.0001), originLat + nKm / kpLat]);
   }
-  // Close back to origin
+  // Close back to tip
   coords.push([originLng, originLat]);
   // Keep coords continuous — prevent jumps > 180 between consecutive points
   // This tells Mapbox to draw across the antimeridian correctly
@@ -1820,7 +1819,7 @@ export default function HomePage() {
       // Fly to center of outermost ellipse, not the origin/collapse point
       const [oLngF, oLatF] = src.origin;
       const bearRad = (src.bearing * Math.PI) / 180;
-      const shiftKm = outerKm * 0.4; // center view on midpoint of wedge
+      const shiftKm = outerKm * 0.85 * 0.5;
       const R = 6371;
       const d = shiftKm / R;
       const lat1 = oLatF * Math.PI / 180;
@@ -1847,7 +1846,7 @@ export default function HomePage() {
       const outerRing = src.rings[src.rings.length - 1];
       const outerWave = outerRing.waveM;
       const [oLng, oLat] = src.origin;
-      const floodParams = `origin_lat=${oLat}&major_km=${outerRing.major_km}&minor_km=${outerRing.minor_km}&bearing_deg=${src.bearing}&shift=0`;
+      const floodParams = `origin_lat=${oLat}&major_km=${outerRing.major_km}&minor_km=${outerRing.minor_km}&bearing_deg=${src.bearing}&shift=0.85`;
       // Primary source — covers origin side of antimeridian
       const floodUrl = `${floodEngineUrlRef.current}/flood-bbox/${outerWave}/{z}/{x}/{y}.png?origin_lng=${oLng}&${floodParams}`;
       // Secondary source — shifted +360° to cover the other side of the antimeridian
