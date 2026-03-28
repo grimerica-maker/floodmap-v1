@@ -3814,7 +3814,6 @@ export default function HomePage() {
                 {IMPACT_PRESETS.filter(p => p.category === cat).map(p => (
                   <button key={p.label}
                     onClick={() => {
-                      if (proTier === "free" && p.diameter > FREE_MAX_IMPACT_DIAMETER) { setPaywallModal("pro"); return; }
                       setImpactDiameter(p.diameter);
                     }}
                     style={{ padding: "8px 10px", background: impactDiameter === p.diameter ? "#7f1d1d" : "#111827", color: impactDiameter === p.diameter ? "#fca5a5" : "#94a3b8", border: impactDiameter === p.diameter ? "1px solid #ef4444" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, textAlign: "left" }}>
@@ -4074,7 +4073,6 @@ export default function HomePage() {
                 { label: "Tsar Bomba · 50Mt", e1: "~200 kV/m", effect: "Destroys hardened systems, Faraday-caged equipment", yield_kt: 50000 },
               ].map((p) => (
                 <button key={p.label} onClick={() => {
-                  if (proTier === "free" && p.yield_kt > FREE_MAX_NUKE_YIELD_KT) { setPaywallModal("pro"); return; }
                   setNukeYield(p.yield_kt);
                 }}
                   style={{ padding: "9px 12px", background: nukeYield === p.yield_kt ? "#1e0a3c" : "#0f0a2a", border: nukeYield === p.yield_kt ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 8, textAlign: "left", width: "100%" }}>
@@ -4092,7 +4090,6 @@ export default function HomePage() {
               <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"} style={{ marginBottom: 12 }}>
                 {NUKE_PRESETS.map((p) => (
                   <button key={p.label} onClick={() => {
-                    if (proTier === "free" && p.yield_kt > FREE_MAX_NUKE_YIELD_KT) { setPaywallModal("pro"); return; }
                     setNukeYield(p.yield_kt);
                   }}
                     style={{ padding: "10px 8px", minHeight: 48, border: "1px solid #d1d5db", background: nukeYield === p.yield_kt ? "#7c3aed" : "white", color: nukeYield === p.yield_kt ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700, whiteSpace: "nowrap", fontSize: 13 }}>
@@ -4243,7 +4240,6 @@ export default function HomePage() {
                   },
                 ].map(preset => (
                   <button key={preset.label} onClick={() => {
-                    if (proTier === "free" && preset.yield_kt > FREE_MAX_NUKE_YIELD_KT) { setPaywallModal("pro"); return; }
                     clearNuke();
                     setNukeYield(preset.yield_kt);
                     setNukeBurst(preset.burst);
