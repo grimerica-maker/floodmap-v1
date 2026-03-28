@@ -4179,12 +4179,8 @@ export default function HomePage() {
                   const map = mapRef.current;
                   if (map && map.isStyleLoaded()) {
                     if (preset.label === "Ice Age") {
-                      // Switch to globe so ice sheets render properly at planetary scale
-                      setViewMode("globe");
-                      viewModeRef.current = "globe";
-                      safely(() => map.setProjection("globe"));
-                      map.easeTo({ center: [-30, 45], zoom: 1.5, duration: 1000, essential: true });
-                      setTimeout(() => safely(() => drawIceSheets(map)), 600);
+                      // Draw ice sheets on whatever view the user is in — no forced globe switch
+                      setTimeout(() => safely(() => drawIceSheets(map)), 200);
                     } else {
                       safely(() => clearIceSheets(map));
                     }
