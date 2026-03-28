@@ -964,6 +964,7 @@ export default function HomePage() {
   const viewModeRef = useRef("map");
   const scenarioModeRef = useRef(null);
   const impactDiameterRef = useRef(1000);
+  const impactVelocityRef = useRef(20);
   const floodEngineUrlRef = useRef(FLOOD_ENGINE_PROXY_PATH);
 
   const impactPointRef = useRef(null);       // last placed point (compat)
@@ -982,6 +983,7 @@ export default function HomePage() {
   const [viewMode, setViewMode] = useState("map");
   const [scenarioMode, setScenarioMode] = useState(null);
   const [impactDiameter, setImpactDiameter] = useState(1000);
+  const [impactVelocity, setImpactVelocity] = useState(20); // km/s
   const [nukeYield, setNukeYield] = useState(15);
   const nukeStrikesRef = useRef([]); // array of { lat, lng, marker }
   const [nukeStrikes, setNukeStrikes] = useState([]); // mirror for UI
@@ -1144,6 +1146,7 @@ export default function HomePage() {
   useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
   useEffect(() => { scenarioModeRef.current = scenarioMode; }, [scenarioMode]);
   useEffect(() => { impactDiameterRef.current = impactDiameter; }, [impactDiameter]);
+  useEffect(() => { impactVelocityRef.current = impactVelocity; }, [impactVelocity]);
   useEffect(() => { impactResultRef.current = impactResult; }, [impactResult]);
   useEffect(() => { nukeResultRef.current = nukeResult; }, [nukeResult]);
   useEffect(() => { floodEngineUrlRef.current = floodEngineUrl; }, [floodEngineUrl]);
@@ -1726,7 +1729,7 @@ export default function HomePage() {
       // Run all points in parallel
       const results = await Promise.all(points.map(async (pt, i) => {
         const res = await fetch(
-          `${floodEngineUrlRef.current}/impact?lat=${pt.lat}&lng=${pt.lng}&diameter=${impactDiameterRef.current}&_=${Date.now()}_${i}`,
+          `${floodEngineUrlRef.current}/impact?lat=${pt.lat}&lng=${pt.lng}&diameter=${impactDiameterRef.current}&velocity_km_s=${impactVelocityRef.current}&_=${Date.now()}_${i}`,
           { signal: controller.signal, cache: "no-store" }
         );
         if (!res.ok) throw new Error(`Impact request ${i+1} failed`);
@@ -4107,6 +4110,32 @@ export default function HomePage() {
             <button onClick={() => setPaywallModal("pro")} style={{ width: "100%", padding: "10px 14px", marginBottom: 16, marginTop: 4, background: "#0f172a", border: "1px solid #1e2d45", borderRadius: 8, color: "#475569", cursor: "pointer", textAlign: "left", fontSize: 12 }}>
               🔒 Custom size — <span style={{ color: "#7c3aed" }}>Pro</span>
             </button>
+          )}
+
+          {/* Velocity slider — Pro only */}
+          {proTier !== "free" && (
+            <>
+              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, marginTop: 4, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Impact Velocity</div>
+              <input
+                type="range" min="11" max="72" step="1" value={impactVelocity}
+                onChange={(e) => { setImpactVelocity(Number(e.target.value)); impactVelocityRef.current = Number(e.target.value); }}
+                style={{ width: "100%", marginBottom: 6, height: 6, cursor: "pointer" }}
+              />
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 11, color: "#475569" }}>
+                <span>11 km/s (slow)</span>
+                <span>72 km/s (comet)</span>
+              </div>
+              <div style={{ fontSize: 13, marginBottom: 4, color: "#64748b" }}>
+                Velocity: <b>{impactVelocity} km/s</b>
+                {impactVelocity <= 15 && <span style={{ color: "#94a3b8", fontSize: 11, marginLeft: 6 }}>— slow asteroid</span>}
+                {impactVelocity > 15 && impactVelocity <= 25 && <span style={{ color: "#f97316", fontSize: 11, marginLeft: 6 }}>— typical Apollo</span>}
+                {impactVelocity > 25 && impactVelocity <= 45 && <span style={{ color: "#ef4444", fontSize: 11, marginLeft: 6 }}>— fast asteroid</span>}
+                {impactVelocity > 45 && <span style={{ color: "#a78bfa", fontSize: 11, marginLeft: 6 }}>— cometary</span>}
+              </div>
+              <div style={{ fontSize: 11, color: "#475569", marginBottom: 14, lineHeight: 1.5 }}>
+                KE scales as v² — doubling velocity quadruples energy, crater, blast &amp; tsunami.
+              </div>
+            </>
           )}
           {proTier !== "free" && (
             <div style={{ fontSize: 11, color: "#475569", marginBottom: 8 }}>
