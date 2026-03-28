@@ -4118,7 +4118,7 @@ export default function HomePage() {
           )}
 
           {/* Velocity slider — Pro only */}
-          {proTier !== "free" && (
+          {proTier !== "free" ? (
             <>
               <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, marginTop: 4, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Impact Velocity</div>
               <input
@@ -4141,10 +4141,18 @@ export default function HomePage() {
                 KE scales as v² — doubling velocity quadruples energy, crater, blast &amp; tsunami.
               </div>
             </>
+          ) : (
+            <div onClick={() => setPaywallModal("pro")} style={{ fontSize: 11, color: "#f97316", marginBottom: 12, cursor: "pointer", padding: "5px 8px", background: "#1a0d00", border: "1px solid #7c2d00", borderRadius: 6 }}>
+              🔒 Impact velocity (11–72 km/s) — <span style={{ color: "#fb923c", textDecoration: "underline" }}>Pro feature</span>
+            </div>
           )}
-          {proTier !== "free" && (
+          {proTier !== "free" ? (
             <div style={{ fontSize: 11, color: "#475569", marginBottom: 8 }}>
               {impactPoints.length > 0 ? `${impactPoints.length}/3 impact points placed` : "Click map to place up to 3 impact points"}
+            </div>
+          ) : (
+            <div onClick={() => setPaywallModal("pro")} style={{ fontSize: 11, color: "#f97316", marginBottom: 8, cursor: "pointer", padding: "5px 8px", background: "#1a0d00", border: "1px solid #7c2d00", borderRadius: 6 }}>
+              🔒 Multiple impacts (up to 3) — <span style={{ color: "#fb923c", textDecoration: "underline" }}>Pro feature</span>
             </div>
           )}
           <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
@@ -5699,7 +5707,10 @@ export default function HomePage() {
                   {[
                     { free: "30 simulations / day",         pro: "200 simulations / day" },
                     { free: "Asteroid up to 5,000 m",       pro: "Asteroid up to 20,000 m" },
+                    { free: "1 impact point",               pro: "Up to 3 simultaneous impacts" },
+                    { free: "Fixed velocity (20 km/s)",     pro: "Velocity slider (11–72 km/s)" },
                     { free: "Nuke up to 1 Mt",              pro: "Nuke up to 100 Mt" },
+                    { free: "1 nuke strike",                pro: "Up to 5 simultaneous strikes" },
                     { free: "Flood only in Cataclysm",      pro: "Wind + Both overlays" },
                     { free: "1 zone click popup",           pro: "Unlimited zone popups" },
                     { free: "Map view only",                pro: "Satellite + Globe view" },
@@ -5812,9 +5823,9 @@ export default function HomePage() {
                   : paywallModal === "pro" && scenarioMode === "tsunami"
                   ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the tsunami inundation zone. Founders price $18.99 lifetime — going up to $24.99 soon.</>
                   : paywallModal === "pro" && scenarioMode === "impact"
-                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to simulate asteroids up to <strong style={{ color: "#e2e8f0" }}>20,000 m</strong> diameter (free: 5,000 m) and click any zone for detailed survival data. Founders price $18.99 lifetime — going up to $24.99 soon.</>
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to simulate asteroids up to <strong style={{ color: "#e2e8f0" }}>20,000 m</strong> diameter, place up to <strong style={{ color: "#e2e8f0" }}>3 simultaneous impacts</strong>, adjust <strong style={{ color: "#e2e8f0" }}>impact velocity</strong> (11–72 km/s), and click any zone for detailed survival data. Founders price $18.99 lifetime — going up to $24.99 soon.</>
                   : paywallModal === "pro" && scenarioMode === "nuke"
-                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to detonate up to <strong style={{ color: "#e2e8f0" }}>100 Mt</strong> (free: 1 Mt) and click any blast zone for detailed analysis. Founders price $18.99 lifetime — going up to $24.99 soon.</>
+                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to detonate up to <strong style={{ color: "#e2e8f0" }}>100 Mt</strong> (free: 1 Mt), place up to <strong style={{ color: "#e2e8f0" }}>5 simultaneous strikes</strong>, and click any blast zone for detailed analysis. Founders price $18.99 lifetime — going up to $24.99 soon.</>
                   : "This feature requires Pro. Founders price $18.99 lifetime — going up to $24.99 soon."}
               </div>
             </>)}
@@ -5830,7 +5841,10 @@ export default function HomePage() {
               <div style={{ color: "#94a3b8", fontSize: 12, lineHeight: 1.7 }}>
                 ✓ {PRO_SIM_PER_HOUR} simulations/hour, {PRO_SIM_PER_DAY}/day<br/>
                 ✓ Impact diameter up to <strong style={{ color: "#e2e8f0" }}>20,000 m</strong> (free: 5,000 m)<br/>
+                ✓ Up to <strong style={{ color: "#e2e8f0" }}>3 simultaneous impact points</strong><br/>
+                ✓ <strong style={{ color: "#e2e8f0" }}>Impact velocity</strong> slider (11–72 km/s)<br/>
                 ✓ Nuke yield up to <strong style={{ color: "#e2e8f0" }}>100 Mt</strong> (free: 1 Mt)<br/>
+                ✓ Up to <strong style={{ color: "#e2e8f0" }}>5 simultaneous nuke strikes</strong><br/>
                 ✓ Wind &amp; Both cataclysm overlays<br/>
                 ✓ Unlimited zone click popups<br/>
                 ✓ Satellite + Globe view<br/>
