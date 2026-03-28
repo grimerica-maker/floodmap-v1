@@ -1820,7 +1820,7 @@ export default function HomePage() {
       // Fly to center of outermost ellipse, not the origin/collapse point
       const [oLngF, oLatF] = src.origin;
       const bearRad = (src.bearing * Math.PI) / 180;
-      const shiftKm = outerKm * 0.85 * 0.85;
+      const shiftKm = outerKm * 0.4; // center view on midpoint of wedge
       const R = 6371;
       const d = shiftKm / R;
       const lat1 = oLatF * Math.PI / 180;
@@ -1847,7 +1847,7 @@ export default function HomePage() {
       const outerRing = src.rings[src.rings.length - 1];
       const outerWave = outerRing.waveM;
       const [oLng, oLat] = src.origin;
-      const floodParams = `origin_lat=${oLat}&major_km=${outerRing.major_km}&minor_km=${outerRing.minor_km}&bearing_deg=${src.bearing}&shift=0.85`;
+      const floodParams = `origin_lat=${oLat}&major_km=${outerRing.major_km}&minor_km=${outerRing.minor_km}&bearing_deg=${src.bearing}&shift=0`;
       // Primary source — covers origin side of antimeridian
       const floodUrl = `${floodEngineUrlRef.current}/flood-bbox/${outerWave}/{z}/{x}/{y}.png?origin_lng=${oLng}&${floodParams}`;
       // Secondary source — shifted +360° to cover the other side of the antimeridian
