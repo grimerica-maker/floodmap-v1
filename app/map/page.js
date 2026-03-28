@@ -1930,24 +1930,26 @@ export default function HomePage() {
     const dNorth = Math.cos(bearingRad);
     const dEast  = Math.sin(bearingRad);
 
-    // Find innermost ring containing this point — wedge hit test
-    // Point must be: within majorKm of origin AND within spreadAngle of bearing
+    // Iterate outermost→innermost so distant clicks get far-travel low-height ring
     let ringInfo = null;
     const spreadAngle = src.spreadAngle || 65;
-    for (let i = 0; i < src.rings.length; i++) {
-      const ring = src.rings[i];
-      const dLatKm = (lat - oLat) * kpLat;
-      const dLngKm = (lng - oLng) * Math.max(kpLng, 0.0001);
-      const distKm = Math.sqrt(dLatKm * dLatKm + dLngKm * dLngKm);
-      if (distKm <= ring.major_km * 12) {
-        // Check angle from origin to click vs bearing
-        const clickAngleDeg = Math.atan2(dLngKm, dLatKm) * 180 / Math.PI;
-        let angleDiff = ((clickAngleDeg - src.bearing) + 360) % 360;
-        if (angleDiff > 180) angleDiff -= 360;
-        if (Math.abs(angleDiff) <= spreadAngle * 3.9) {
-          ringInfo = ring; break;
+    const dLatKmBase = (lat - oLat) * kpLat;
+    const dLngKmBase = (lng - oLng) * Math.max(kpLng, 0.0001);
+    const distKm = Math.sqrt(dLatKmBase * dLatKmBase + dLngKmBase * dLngKmBase);
+    const clickAngleDeg = Math.atan2(dLngKmBase, dLatKmBase) * 180 / Math.PI;
+    let angleDiff = ((clickAngleDeg - src.bearing) + 360) % 360;
+    if (angleDiff > 180) angleDiff -= 360;
+    const inCone = Math.abs(angleDiff) <= spreadAngle * 3.9;
+    if (inCone) {
+      // Find correct ring by distance — outermost first, use first ring that fits
+      for (let i = src.rings.length - 1; i >= 0; i--) {
+        if (distKm <= src.rings[i].major_km * 12) {
+          ringInfo = src.rings[i];
+          break;
         }
       }
+      // If within innermost ring, use innermost
+      if (!ringInfo && distKm <= src.rings[0].major_km * 12) ringInfo = src.rings[0];
     }
 
     const content = ringInfo
