@@ -3316,24 +3316,10 @@ export default function HomePage() {
 
       // Allow full globe navigation — remove lat restrictions
       safely(() => { map.setMaxBounds(null); });
-      // Interaction already handled below with currentTier check
-      // Post-flip: same left-to-right longitude spin as before
       if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-      // Free: full zoom + pan — paywall after 30s
-      if ((proTierRef.current ?? proTier ?? "free") === "free") {
-        safely(() => {
-          map.dragPan.enable();
-          map.scrollZoom.enable();
-          map.doubleClickZoom.enable();
-          map.touchZoomRotate.enable();
-        });
-      }
-      // Post-flip spin — bearing decrements (right to left) around centered new pole
-      // Small delay lets the easeTo finish landing before spin takes over
-      // Hard stop — no post-flip spin
       cataclysmSpinRef.current = null;
 
-      // Enable interaction for pro, lock for free
+      // Enable interaction for pro, cap zoom for free
       const isFree = (proTierRef.current ?? proTier ?? "free") === "free";
       if (!isFree) {
         safely(() => {
@@ -3347,25 +3333,19 @@ export default function HomePage() {
           map.setMaxBounds(null);
         });
       } else {
+        // Free: pan + limited zoom (can see hemisphere, can't drill into detail)
         safely(() => {
           map.dragPan.enable();
           map.scrollZoom.enable();
-          map.doubleClickZoom.enable();
+          map.doubleClickZoom.disable();
           map.touchZoomRotate.enable();
           map.dragRotate.enable();
+          map.setMinZoom(0);
+          map.setMaxZoom(3);
           map.setMaxBounds(null);
         });
-      }
-
-      // Free mobile: spin 10 more seconds then show paywall
-      const isFreeUser = (proTierRef.current ?? proTier ?? "free") === "free";
-      const isMobileUser = window.innerWidth <= 640;
-      if (isFreeUser) {
-        setTimeout(() => {
-          spinActive = false;
-          if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
-          setPaywallModal("pro");
-        }, 30000);
+        // Pop paywall if they hit the zoom cap
+        try { map.on("zoomend", () => { if (map.getZoom() >= 2.9) setPaywallModal("pro"); }); } catch(e){}
       }
 
       // Stop spin on first interaction (pro: keep map, free: show paywall)
@@ -3376,9 +3356,7 @@ export default function HomePage() {
           try { map.off("wheel", stopSpin); } catch(e){}
           try { map.off("zoomstart", stopSpin); } catch(e){}
           if ((proTierRef.current ?? proTier ?? "free") === "free") {
-            safely(() => { map.dragPan.enable(); });
-            try { map.on("wheel", () => setPaywallModal("pro")); } catch(e){}
-            try { map.on("zoomstart", () => setPaywallModal("pro")); } catch(e){}
+            // Keep zoom cap in place — no further changes needed
           } else {
             safely(() => {
               map.dragPan.enable();
