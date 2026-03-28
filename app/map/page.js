@@ -3081,12 +3081,12 @@ export default function HomePage() {
       // Free mobile: spin 10 more seconds then show paywall
       const isFreeUser = (proTierRef.current ?? proTier ?? "free") === "free";
       const isMobileUser = window.innerWidth <= 640;
-      if (isFreeUser && isMobileUser) {
+      if (isFreeUser) {
         setTimeout(() => {
           spinActive = false;
           if (cataclysmSpinRef.current) { cancelAnimationFrame(cataclysmSpinRef.current); cataclysmSpinRef.current = null; }
           setPaywallModal("pro");
-        }, 20000);
+        }, 30000);
       }
 
       // Stop spin on first interaction (pro: keep map, free: show paywall)
@@ -3163,6 +3163,8 @@ export default function HomePage() {
     const params = new URLSearchParams(window.location.search);
     const scenario = params.get("scenario");
     if (!scenario) return;
+    // Store full query string in sessionStorage as backup
+    try { sessionStorage.setItem("dm_permalink", window.location.search); } catch(e) {}
     // Clean URL immediately
     window.history.replaceState({}, "", window.location.pathname);
     // Store params for map-ready trigger
@@ -3402,7 +3404,19 @@ export default function HomePage() {
     map.on("load", handleLoad);
     map.on("load", () => {
       // Auto-trigger from permalink
-      const pp = window._permalinkParams;
+      // Check sessionStorage backup if _permalinkParams was cleared (e.g. SSR/hydration)
+      let pp = window._permalinkParams;
+      if (!pp) {
+        try {
+          const stored = sessionStorage.getItem("dm_permalink");
+          if (stored) {
+            const p2 = new URLSearchParams(stored);
+            const s2 = p2.get("scenario");
+            if (s2) pp = { scenario: s2, params: p2 };
+            sessionStorage.removeItem("dm_permalink");
+          }
+        } catch(e) {}
+      }
       if (!pp) return;
       window._permalinkParams = null;
       const { scenario, params } = pp;
@@ -3479,6 +3493,14 @@ export default function HomePage() {
             setTimeout(() => triggerCataclysm(), 500);
           }
         } catch(e) { console.warn("Permalink trigger failed", e); }
+
+        // Show pro CTA if free user arrives at paywalled scenario via share link
+        const isFreeUser = (proTierRef.current ?? "free") === "free";
+        if (isFreeUser && ["impact", "nuke", "cataclysm"].includes(scenario)) {
+          setTimeout(() => {
+            setStatus("🔓 Viewing shared scenario — upgrade to Pro to run your own simulations & unlock full detail");
+          }, 3000);
+        }
       }, 800);
     });
     map.on("style.load", handleStyleLoad);
