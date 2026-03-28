@@ -2895,7 +2895,7 @@ export default function HomePage() {
     const model = cataclysmModelRef.current;
     const info = model === "davidson"
       ? { name: "Davidson / Suspicious Observers", flipBearing: 90, newPoleLat: 22, newPoleLng: 90, newPoleLabel: "New N. Pole (Bay of Bengal)", finalBearing: 90, startBearing: 0, snapLat: 22, snapLng: 0 }
-      : { name: "The Ethical Skeptic ECDO", flipBearing: 65, newPoleLat: -13.5, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: 65, startBearing: 0, snapLat: 20, snapLng: -20 };
+      : { name: "The Ethical Skeptic ECDO", flipBearing: 110, newPoleLat: -13.5, newPoleLng: 31, newPoleLabel: "New N. Pole (S. Africa 31°E)", finalBearing: 110, startBearing: 0, snapLat: 20, snapLng: -20 };
 
     clearCataclysm();
     cataclysmRunRef.current += 1;
