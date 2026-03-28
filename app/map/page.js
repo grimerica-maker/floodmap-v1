@@ -4668,7 +4668,7 @@ export default function HomePage() {
             const activePresets = volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
             const p = activePresets[Math.min(yellowstonePreset, activePresets.length - 1)];
             // Only show if not already shown inside yellowstoneResult block
-            if (yellowstoneResult && Number(yellowstoneResult.blackout_pct ?? 0) > 0) return null;
+            if (yellowstoneResult) return null;
             if (!p?.blackout_pct) return null;
             return (
               <div style={{ marginTop: 8, padding: "8px 10px", background: "#0a0a1a", borderRadius: 8, border: "1px solid #1e2d45" }}>
