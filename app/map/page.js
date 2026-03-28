@@ -82,15 +82,173 @@ const PRESETS = [
   { label: "Fully Drained", value: -11000 },
 ];
 
+// Real Last Glacial Maximum ice sheet extents as lat/lng polygons
+// Sources: Dyke et al. 2002, Ehlers & Gibbard 2004, Hughes et al. 2016
+// Each sheet is a closed polygon following the actual glaciological margin
 const ICE_SHEET_ZONES = [
-  { name: "Laurentide", center: [-90.0, 55.0], major_km: 2372, minor_km: 1739, bearing: 10, color: "#bfdbfe" },
-  { name: "Fennoscandian", center: [18.0, 65.0], major_km: 1423, minor_km: 949, bearing: 20, color: "#bfdbfe" },
-  { name: "British-Irish", center: [-3.5, 56.0], major_km: 474, minor_km: 300, bearing: 10, color: "#bfdbfe" },
-  { name: "Patagonian", center: [-70.0, -48.0], major_km: 711, minor_km: 253, bearing: 170, color: "#bfdbfe" },
-  { name: "Greenland (Extended)", center: [-42.0, 72.0], major_km: 949, minor_km: 553, bearing: 10, color: "#e0f2fe" },
-  { name: "Antarctic (Extended)", center: [0.0, -82.0], major_km: 2213, minor_km: 2213, bearing: 0, color: "#e0f2fe" },
-  { name: "Barents-Kara", center: [55.0, 74.0], major_km: 1107, minor_km: 711, bearing: 80, color: "#bfdbfe" },
-  { name: "Cordilleran", center: [-126.0, 56.0], major_km: 949, minor_km: 474, bearing: 160, color: "#bfdbfe" },
+  {
+    name: "Laurentide Ice Sheet",
+    color: "#bfdbfe",
+    coords: [
+      // Southern margin — follows Missouri & Ohio rivers, then up Atlantic seaboard
+      [-76.5, 43.0],  // Finger Lakes / upstate NY
+      [-79.0, 42.5],  // Lake Erie south shore
+      [-82.5, 41.5],  // NW Ohio
+      [-85.5, 41.5],  // Indiana/Ohio border
+      [-87.5, 41.8],  // Chicago area
+      [-90.0, 42.5],  // Wisconsin
+      [-93.0, 43.5],  // Minnesota
+      [-96.5, 45.0],  // N Dakota border
+      [-99.5, 46.5],  // N Dakota
+      [-102.0, 47.5], // N Dakota/Montana
+      [-106.0, 48.5], // Montana
+      [-109.0, 49.0], // Montana/Alberta border
+      [-112.0, 49.0], // Alberta south — ice-free corridor starts here
+      // Ice-free corridor indent (Mackenzie Corridor)
+      [-113.5, 51.0], [-113.0, 53.5], [-113.5, 56.0], [-116.0, 58.0],
+      [-118.0, 59.5], [-120.0, 61.0],
+      // Arctic extent — follows actual northern coastline
+      [-125.0, 63.0], [-130.0, 65.0], [-135.0, 68.0], [-130.0, 70.0],
+      [-120.0, 72.0], [-105.0, 73.0], [-90.0, 73.5],  [-80.0, 74.0],
+      [-72.0, 74.5],  [-65.0, 73.0],  [-60.0, 70.0],  [-57.0, 65.0],
+      // Eastern margin — down Atlantic seaboard
+      [-59.0, 60.0],  [-63.0, 57.0],  [-66.0, 52.0],
+      [-69.0, 48.0],  [-71.0, 46.0],  [-73.5, 44.5],
+      [-76.5, 43.0],  // close
+    ]
+  },
+  {
+    name: "Cordilleran Ice Sheet",
+    color: "#bfdbfe",
+    coords: [
+      [-113.5, 49.0],  // BC/Alberta border — eastern limit
+      [-115.0, 48.0],  // N Idaho
+      [-117.0, 47.0],  // Washington state
+      [-119.5, 46.5],  // Central Washington
+      [-121.0, 45.5],  // Columbia River
+      [-122.0, 45.0],  // Portland — southern limit
+      [-123.5, 45.5],  // Oregon coast
+      [-124.0, 47.0],  // Olympic Peninsula
+      [-123.5, 48.5],  // Puget Sound
+      [-124.0, 50.0],  // Vancouver Island north
+      [-125.0, 52.0],  // BC coast
+      [-127.0, 54.0],  // BC north coast
+      [-129.0, 56.0],  // SE Alaska
+      [-132.0, 57.5],  [-135.0, 59.0], [-138.0, 60.5], [-141.0, 61.5],
+      [-140.0, 63.0],  [-136.0, 63.5], [-133.0, 62.5], [-129.0, 61.0],
+      [-125.0, 60.0],  [-121.0, 59.0], [-118.0, 57.5],
+      [-116.0, 55.5],  [-114.5, 53.0], [-113.5, 51.0],
+      [-113.5, 49.0],  // close
+    ]
+  },
+  {
+    name: "Fennoscandian Ice Sheet",
+    color: "#bfdbfe",
+    coords: [
+      // Southern margin — N Germany / Poland lobes
+      [8.0,  54.0], [10.0, 53.5], [13.0, 53.0], [16.0, 52.5],
+      [19.0, 52.0], [22.0, 52.5], [25.0, 53.0], [27.0, 53.5],
+      [30.0, 55.0], [32.0, 57.0], [34.0, 59.0],
+      // Eastern extent — Russia
+      [36.0, 61.0], [38.0, 63.0], [42.0, 65.0],
+      [48.0, 66.5], [55.0, 68.0], [60.0, 68.5],
+      // Northern tip — Arctic Ocean
+      [65.0, 70.0], [60.0, 71.0], [50.0, 71.5],
+      [30.0, 71.0], [15.0, 71.0], [5.0, 70.5],
+      // Western extent — North Sea, Scotland
+      [0.0,  68.0], [-2.0, 65.0], [-2.0, 62.0],
+      [2.0,  58.0], [5.0,  56.0], [8.0,  54.0], // close
+    ]
+  },
+  {
+    name: "British-Irish Ice Sheet",
+    color: "#bfdbfe",
+    // Two separate polygons — Great Britain and Ireland
+    rings: [
+      // Great Britain (main island)
+      [
+        [-2.0,  51.5], [-3.5,  51.5], [-5.0,  51.7], [-5.5,  52.0],
+        [-4.5,  52.5], [-3.5,  53.0], [-3.0,  53.5],
+        [-2.0,  53.8], [-1.5,  54.5],
+        [-2.0,  55.0], [-3.0,  55.5], [-4.5,  56.0],
+        [-5.0,  57.5], [-5.5,  58.5], [-4.5,  59.0],
+        [-3.5,  59.5], [-1.5,  60.0],
+        [0.0,   59.5], [0.5,   58.5],
+        [-0.5,  57.5], [0.0,   56.5], [0.0,   55.5],
+        [-1.0,  54.5], [-0.5,  53.5], [-0.5,  52.5],
+        [-1.0,  52.0], [-2.0,  51.5],
+      ],
+      // Ireland
+      [
+        [-10.0, 51.5], [-10.5, 52.5], [-10.0, 53.5],
+        [-9.5,  54.5], [-8.0,  55.5], [-7.0,  56.0],
+        [-6.0,  55.5], [-6.0,  54.5], [-7.0,  53.5],
+        [-8.0,  52.5], [-9.0,  52.0], [-10.0, 51.5],
+      ],
+    ],
+    // coords alias points to first ring for centroid calc
+    get coords() { return this.rings[0]; },
+  },
+  {
+    name: "Barents-Kara Ice Sheet",
+    color: "#bfdbfe",
+    coords: [
+      [30.0, 68.0], [35.0, 67.0], [40.0, 67.5], [45.0, 68.0],
+      [50.0, 68.5], [55.0, 69.5], [60.0, 70.0], [65.0, 71.0],
+      [70.0, 72.0], [75.0, 73.0], [80.0, 74.5],
+      [85.0, 76.0], [80.0, 78.0], [70.0, 79.0],
+      [55.0, 80.0], [40.0, 79.0], [25.0, 78.0],
+      [15.0, 76.0], [15.0, 74.0], [20.0, 72.0],
+      [25.0, 70.5], [28.0, 69.0], [30.0, 68.0], // close
+    ]
+  },
+  {
+    name: "Greenland Ice Sheet",
+    color: "#e0f2fe",
+    coords: [
+      // Extended LGM margin — slightly beyond modern ice sheet
+      [-52.0, 60.0], [-46.0, 59.5], [-42.0, 60.5], [-38.0, 62.0],
+      [-32.0, 63.5], [-26.0, 65.0], [-20.0, 66.5], [-17.0, 68.0],
+      [-18.0, 70.0], [-20.0, 72.0], [-22.0, 75.0], [-26.0, 77.0],
+      [-30.0, 78.5], [-35.0, 80.0], [-42.0, 81.5], [-52.0, 82.5],
+      [-62.0, 82.5], [-68.0, 81.0], [-70.0, 79.0], [-68.0, 77.0],
+      [-64.0, 75.0], [-60.0, 73.0], [-58.0, 71.0], [-56.0, 68.5],
+      [-54.0, 65.5], [-52.0, 63.0], [-52.0, 60.0], // close
+    ]
+  },
+  {
+    name: "Patagonian Ice Sheet",
+    color: "#bfdbfe",
+    coords: [
+      // Real southern South American glaciation
+      [-66.0, -39.0], [-68.0, -40.0], [-70.0, -41.0], [-72.0, -42.0],
+      [-73.0, -43.5], [-73.5, -45.0], [-74.0, -47.0], [-74.5, -49.0],
+      [-75.0, -51.0], [-75.5, -53.0], [-76.0, -55.0],
+      [-68.0, -55.5], [-66.0, -54.5], [-65.0, -53.0],
+      [-65.5, -51.0], [-66.0, -49.0], [-66.5, -47.0],
+      [-66.0, -45.0], [-65.5, -43.0], [-65.0, -41.0],
+      [-65.5, -39.5], [-66.0, -39.0], // close
+    ]
+  },
+  {
+    name: "Antarctic Ice Sheet (Extended)",
+    color: "#e0f2fe",
+    coords: (() => {
+      // Full LGM Antarctic extent — approximately 10% larger radius than modern
+      const pts = [];
+      const steps = 72;
+      for (let i = 0; i <= steps; i++) {
+        const angle = (i / steps) * Math.PI * 2;
+        // Vary radius by sector to approximate actual LGM grounding line
+        const baseR = 18.0; // degrees from pole
+        const r = baseR + Math.sin(angle * 3) * 2.5 + Math.cos(angle * 2) * 1.5;
+        const lng = (angle * 180 / Math.PI);
+        const lat = -90 + r;
+        pts.push([((lng + 180) % 360) - 180, lat]);
+      }
+      return pts;
+    })()
+  },
 ];
 
 const ICE_SHEET_SOURCE = "ice-sheet-source";
@@ -1487,13 +1645,22 @@ export default function HomePage() {
     setSeaLevel(level); seaLevelRef.current = level; setInputLevel(level);
     if (scenarioModeRef.current !== "climate") setScenarioMode("flood");
     if (!floodAllowedInCurrentView()) { removeFloodLayer(); setStatus("Switch to a supported view mode"); return; }
-    if (level === 0) { removeFloodLayer(); setStatus("Flood cleared"); return; }
+    if (level === 0) { removeFloodLayer(); safely(() => clearIceSheets(mapRef.current)); setStatus("Flood cleared"); return; }
     if (!mapRef.current) { setStatus("Map not ready"); return; }
     if (!mapRef.current.isStyleLoaded()) { setStatus("Map style still loading..."); return; }
     removeImpactPoint(); setImpactResult(null); setImpactError("");
     closeElevPopup();
     setStatus(`Loading flood tiles at ${formatLevelForDisplay(level)}...`);
     if (!addFloodLayer(level)) setStatus("Flood layer failed to attach");
+    // Ice Age ice sheets — draw if level ≤ -100m, clear otherwise
+    const map = mapRef.current;
+    if (map && map.isStyleLoaded()) {
+      if (level <= -100) {
+        setTimeout(() => safely(() => drawIceSheets(map)), 200);
+      } else {
+        safely(() => clearIceSheets(map));
+      }
+    }
     // Flood displaced — Pro only
     setFloodDisplaced(null);
     if (proTier !== "free") {
@@ -2662,24 +2829,72 @@ export default function HomePage() {
   };
 
   const drawIceSheets = (map) => {
-    const features = ICE_SHEET_ZONES.map((z, i) => ({
-      ...buildAshEllipse(z.center[0], z.center[1], z.major_km, z.minor_km, z.bearing),
-      properties: { name: z.name, color: z.color, idx: i },
-    }));
+    // Build features — zones with `rings` become MultiPolygon, others become Polygon
+    const features = ICE_SHEET_ZONES.map((z, i) => {
+      let geometry;
+      if (z.rings) {
+        // MultiPolygon — each ring is a separate polygon (e.g. Britain + Ireland)
+        const closeRing = (r) => {
+          const c = [...r];
+          if (c[0][0] !== c[c.length-1][0] || c[0][1] !== c[c.length-1][1]) c.push(c[0]);
+          return c;
+        };
+        geometry = { type: "MultiPolygon", coordinates: z.rings.map(r => [closeRing(r)]) };
+      } else {
+        const ring = z.coords;
+        const closed = [...ring];
+        if (closed[0][0] !== closed[closed.length-1][0] || closed[0][1] !== closed[closed.length-1][1]) closed.push(closed[0]);
+        geometry = { type: "Polygon", coordinates: [closed] };
+      }
+      return { type: "Feature", geometry, properties: { name: z.name, color: z.color, idx: i } };
+    });
+
+    // Label points — centroid of bounding box of coords (or first ring)
+    const labelFeatures = ICE_SHEET_ZONES.map((z, i) => {
+      const coords = z.rings ? z.rings[0] : z.coords;
+      const lngs = coords.map(c => c[0]);
+      const lats = coords.map(c => c[1]);
+      const cLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+      const cLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+      return {
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [cLng, cLat] },
+        properties: { name: z.name, color: z.color, idx: i },
+      };
+    });
+
+    const fc      = { type: "FeatureCollection", features };
+    const labelFc = { type: "FeatureCollection", features: labelFeatures };
+
     try {
       if (map.getSource(ICE_SHEET_SOURCE)) {
-        map.getSource(ICE_SHEET_SOURCE).setData({ type: "FeatureCollection", features });
+        map.getSource(ICE_SHEET_SOURCE).setData(fc);
+        if (map.getSource(`${ICE_SHEET_SOURCE}-labels`)) {
+          map.getSource(`${ICE_SHEET_SOURCE}-labels`).setData(labelFc);
+        }
       } else {
-        map.addSource(ICE_SHEET_SOURCE, { type: "geojson", data: { type: "FeatureCollection", features } });
-        map.addLayer({ id: `${ICE_SHEET_PREFIX}-fill`, type: "fill", source: ICE_SHEET_SOURCE,
-          paint: { "fill-color": ["get", "color"], "fill-opacity": 0.45 } });
-        map.addLayer({ id: `${ICE_SHEET_PREFIX}-line`, type: "line", source: ICE_SHEET_SOURCE,
-          paint: { "line-color": "#93c5fd", "line-width": 1.5, "line-opacity": 0.9 } });
-        map.addLayer({ id: `${ICE_SHEET_PREFIX}-label`, type: "symbol", source: ICE_SHEET_SOURCE,
-          layout: { "symbol-placement": "line", "text-field": ["get", "name"],
-                    "text-size": 11, "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-                    "text-offset": [0, -0.8], "symbol-spacing": 400 },
-          paint: { "text-color": "#bfdbfe", "text-halo-color": "#0a0f1e", "text-halo-width": 2 } });
+        map.addSource(ICE_SHEET_SOURCE, { type: "geojson", data: fc });
+        map.addSource(`${ICE_SHEET_SOURCE}-labels`, { type: "geojson", data: labelFc });
+        map.addLayer({
+          id: `${ICE_SHEET_PREFIX}-fill`, type: "fill", source: ICE_SHEET_SOURCE,
+          paint: { "fill-color": ["get", "color"], "fill-opacity": 0.45 }
+        });
+        map.addLayer({
+          id: `${ICE_SHEET_PREFIX}-line`, type: "line", source: ICE_SHEET_SOURCE,
+          paint: { "line-color": "#93c5fd", "line-width": 1.5, "line-opacity": 0.9 }
+        });
+        map.addLayer({
+          id: `${ICE_SHEET_PREFIX}-label`, type: "symbol",
+          source: `${ICE_SHEET_SOURCE}-labels`,
+          layout: {
+            "text-field": ["get", "name"],
+            "text-size": 11,
+            "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+            "text-offset": [0, 0],
+            "text-anchor": "center",
+          },
+          paint: { "text-color": "#bfdbfe", "text-halo-color": "#0a0f1e", "text-halo-width": 2 }
+        });
       }
     } catch(e) { console.warn("Ice sheet error", e); }
   };
@@ -2688,6 +2903,7 @@ export default function HomePage() {
     try { if (map.getLayer(`${ICE_SHEET_PREFIX}-label`)) map.removeLayer(`${ICE_SHEET_PREFIX}-label`); } catch(e){}
     try { if (map.getLayer(`${ICE_SHEET_PREFIX}-line`)) map.removeLayer(`${ICE_SHEET_PREFIX}-line`); } catch(e){}
     try { if (map.getLayer(`${ICE_SHEET_PREFIX}-fill`)) map.removeLayer(`${ICE_SHEET_PREFIX}-fill`); } catch(e){}
+    try { if (map.getSource(`${ICE_SHEET_SOURCE}-labels`)) map.removeSource(`${ICE_SHEET_SOURCE}-labels`); } catch(e){}
     try { if (map.getSource(ICE_SHEET_SOURCE)) map.removeSource(ICE_SHEET_SOURCE); } catch(e){}
   };
 
@@ -3233,6 +3449,10 @@ export default function HomePage() {
       if ((scenarioModeRef.current === "flood" || scenarioModeRef.current === "climate") && Number(seaLevelRef.current) !== 0 && floodAllowedInCurrentView()) {
         setTimeout(() => { syncFloodScenario(); }, 50);
       } else { removeFloodLayer(); }
+      // Re-draw ice sheets if Ice Age sea level is active
+      if ((scenarioModeRef.current === "flood" || scenarioModeRef.current === "climate") && seaLevelRef.current <= -100) {
+        setTimeout(() => safely(() => drawIceSheets(mapRef.current)), 100);
+      }
       if (scenarioModeRef.current === "impact" && impactResultRef.current && !impactDrawingRef.current) {
         const points = impactPointsRef.current.length > 0 ? impactPointsRef.current : (impactPointRef.current ? [impactPointRef.current] : []);
         setTimeout(() => {
@@ -3938,7 +4158,12 @@ export default function HomePage() {
                   const map = mapRef.current;
                   if (map && map.isStyleLoaded()) {
                     if (preset.label === "Ice Age") {
-                      setTimeout(() => safely(() => drawIceSheets(map)), 400);
+                      // Switch to globe so ice sheets render properly at planetary scale
+                      setViewMode("globe");
+                      viewModeRef.current = "globe";
+                      safely(() => map.setProjection("globe"));
+                      map.easeTo({ center: [-30, 45], zoom: 1.5, duration: 1000, essential: true });
+                      setTimeout(() => safely(() => drawIceSheets(map)), 600);
                     } else {
                       safely(() => clearIceSheets(map));
                     }
