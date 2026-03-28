@@ -697,7 +697,7 @@ const TSUNAMI_SOURCES = [
     label: "Cumbre Vieja",
     name: "Cumbre Vieja Eruption",
     desc: "Full volcanic flank collapse — 1,500km³ ejecta",
-    origin: [-17.84, 36.07],
+    origin: [-17.84, 28.57],
     bearing: 265,
     color: "#06b6d4",
     threat: "US East Coast, Brazil, Iberian Peninsula",
@@ -758,8 +758,8 @@ const buildTsunamiEllipse = (originLng, originLat, majorKm, minorKm, bearingDeg,
   const bearingRad = (bearingDeg * Math.PI) / 180;
   const dNorth = Math.cos(bearingRad);
   const dEast  = Math.sin(bearingRad);
-  const cLat = originLat + (dNorth * majorKm * 0.85) / kpLat;
-  const cLng = originLng + (dEast  * majorKm * 0.85) / Math.max(kpLng, 0.0001);
+  const cLat = originLat + (dNorth * majorKm * 0.45) / kpLat;
+  const cLng = originLng + (dEast  * majorKm * 0.45) / Math.max(kpLng, 0.0001);
   const coords = [];
   for (let i = 0; i <= steps; i++) {
     const t = (i / steps) * Math.PI * 2;
@@ -1930,8 +1930,8 @@ export default function HomePage() {
     let ringInfo = null;
     for (let i = 0; i < src.rings.length; i++) {
       const ring = src.rings[i];
-      const eCLat = oLat + (dNorth * ring.major_km * 0.85) / kpLat;
-      const eCLng = oLng + (dEast  * ring.major_km * 0.85) / Math.max(kpLng, 0.0001);
+      const eCLat = oLat + (dNorth * ring.major_km * 0.45) / kpLat;
+      const eCLng = oLng + (dEast  * ring.major_km * 0.45) / Math.max(kpLng, 0.0001);
       const dLatKm = (lat - eCLat) * kpLat;
       const dLngKm = (lng - eCLng) * Math.max(kpLng, 0.0001);
       const along = dNorth * dLatKm + dEast * dLngKm;
