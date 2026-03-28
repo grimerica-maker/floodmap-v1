@@ -686,10 +686,10 @@ const TSUNAMI_SOURCES = [
     maxWaveM: 100,
     bbox: { minLat: 5, maxLat: 65, minLng: -85, maxLng: 20 },
     rings: [
-      { hours: 1,  major_km: 600,  minor_km: 400,  waveM: 100, label: "1 hr" },
-      { hours: 2,  major_km: 1200, minor_km: 800,  waveM: 40, label: "2 hr" },
-      { hours: 4,  major_km: 2400, minor_km: 1600, waveM: 25,  label: "4 hr" },
-      { hours: 8,  major_km: 4320, minor_km: 2880, waveM: 10,  label: "8 hr" },
+      { hours: 1,  major_km: 500,  minor_km: 320,  waveM: 100, label: "1 hr" },
+      { hours: 2,  major_km: 1000, minor_km: 640,  waveM: 40, label: "2 hr" },
+      { hours: 4,  major_km: 2000, minor_km: 1280, waveM: 25,  label: "4 hr" },
+      { hours: 8,  major_km: 3500, minor_km: 2240, waveM: 10,  label: "8 hr" },
     ],
     inundation_km: 3,   // avg km inland at target coasts
   },
@@ -704,10 +704,10 @@ const TSUNAMI_SOURCES = [
     maxWaveM: 650,
     bbox: { minLat: -35, maxLat: 65, minLng: -80, maxLng: 15 },
     rings: [
-      { hours: 1,  major_km: 700,  minor_km: 450,  waveM: 650, label: "1 hr" },
-      { hours: 2,  major_km: 1400, minor_km: 900,  waveM: 80, label: "2 hr" },
-      { hours: 4,  major_km: 2800, minor_km: 1800, waveM: 40, label: "4 hr" },
-      { hours: 9,  major_km: 4348, minor_km: 2767, waveM: 15,  label: "9 hr" },
+      { hours: 1,  major_km: 600,  minor_km: 380,  waveM: 650, label: "1 hr" },
+      { hours: 2,  major_km: 1200, minor_km: 760,  waveM: 80, label: "2 hr" },
+      { hours: 4,  major_km: 2400, minor_km: 1520, waveM: 40, label: "4 hr" },
+      { hours: 9,  major_km: 3600, minor_km: 2280, waveM: 15,  label: "9 hr" },
     ],
     inundation_km: 8,
   },
@@ -758,8 +758,8 @@ const buildTsunamiEllipse = (originLng, originLat, majorKm, minorKm, bearingDeg,
   const bearingRad = (bearingDeg * Math.PI) / 180;
   const dNorth = Math.cos(bearingRad);
   const dEast  = Math.sin(bearingRad);
-  const cLat = originLat + (dNorth * majorKm * 0.45) / kpLat;
-  const cLng = originLng + (dEast  * majorKm * 0.45) / Math.max(kpLng, 0.0001);
+  const cLat = originLat + (dNorth * majorKm * 0.25) / kpLat;
+  const cLng = originLng + (dEast  * majorKm * 0.25) / Math.max(kpLng, 0.0001);
   const coords = [];
   for (let i = 0; i <= steps; i++) {
     const t = (i / steps) * Math.PI * 2;
@@ -1930,8 +1930,8 @@ export default function HomePage() {
     let ringInfo = null;
     for (let i = 0; i < src.rings.length; i++) {
       const ring = src.rings[i];
-      const eCLat = oLat + (dNorth * ring.major_km * 0.45) / kpLat;
-      const eCLng = oLng + (dEast  * ring.major_km * 0.45) / Math.max(kpLng, 0.0001);
+      const eCLat = oLat + (dNorth * ring.major_km * 0.25) / kpLat;
+      const eCLng = oLng + (dEast  * ring.major_km * 0.25) / Math.max(kpLng, 0.0001);
       const dLatKm = (lat - eCLat) * kpLat;
       const dLngKm = (lng - eCLng) * Math.max(kpLng, 0.0001);
       const along = dNorth * dLatKm + dEast * dLngKm;
