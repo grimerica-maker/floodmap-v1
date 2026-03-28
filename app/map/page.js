@@ -1939,12 +1939,12 @@ export default function HomePage() {
       const dLatKm = (lat - oLat) * kpLat;
       const dLngKm = (lng - oLng) * Math.max(kpLng, 0.0001);
       const distKm = Math.sqrt(dLatKm * dLatKm + dLngKm * dLngKm);
-      if (distKm <= ring.major_km * 1.3) {
+      if (distKm <= ring.major_km * 3.9) {
         // Check angle from origin to click vs bearing
         const clickAngleDeg = Math.atan2(dLngKm, dLatKm) * 180 / Math.PI;
         let angleDiff = ((clickAngleDeg - src.bearing) + 360) % 360;
         if (angleDiff > 180) angleDiff -= 360;
-        if (Math.abs(angleDiff) <= spreadAngle * 1.3) {
+        if (Math.abs(angleDiff) <= spreadAngle * 3.9) {
           ringInfo = ring; break;
         }
       }
