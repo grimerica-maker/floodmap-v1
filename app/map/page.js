@@ -4597,14 +4597,17 @@ export default function HomePage() {
               </button>
             ))}
           </div>
-          {/* Younger Dryas — Coming Soon */}
-          <div style={{ width: "100%", padding: "10px 14px", minHeight: 52, marginBottom: 14, border: "1px solid #1e2d45", background: "#0a0f1a", color: "#334155", borderRadius: 10, fontWeight: 700, fontSize: 12, textAlign: "left", cursor: "not-allowed", opacity: 0.6 }}>
+          {/* Younger Dryas Impact */}
+          <button
+            onClick={() => { cataclysmModelRef.current = "ydi"; setCataclysmModel("ydi"); clearCataclysm(); }}
+            style={{ width: "100%", padding: "10px 14px", minHeight: 52, marginBottom: 14, border: cataclysmModel === "ydi" ? "1px solid #0ea5e9" : "1px solid #1e2d45", background: cataclysmModel === "ydi" ? "#0c1a2e" : "#111827", color: cataclysmModel === "ydi" ? "#38bdf8" : "#94a3b8", borderRadius: 10, fontWeight: 700, fontSize: 12, textAlign: "left", cursor: "pointer" }}
+          >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span>☄️ Younger Dryas Impact</span>
-              <span style={{ fontSize: 10, color: "#0ea5e9", fontWeight: 700, background: "#0c1a2e", border: "1px solid #0ea5e9", borderRadius: 6, padding: "2px 7px" }}>COMING SOON</span>
+              {cataclysmModel === "ydi" && <span style={{ fontSize: 10, color: "#38bdf8", fontWeight: 700, background: "#0c1a2e", border: "1px solid #38bdf8", borderRadius: 6, padding: "2px 7px" }}>SELECTED</span>}
             </div>
-            <div style={{ fontSize: 10, opacity: 0.5, marginTop: 2 }}>~12,900 BP · Laurentide collapse · Columbia Scablands</div>
-          </div>
+            <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>~12,900 BP · Laurentide collapse · Columbia Scablands</div>
+          </button>
           {cataclysmModel !== "ydi" && (
             <div>
               <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12, fontStyle: "italic", lineHeight: 1.5 }}>
