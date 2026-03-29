@@ -5331,16 +5331,16 @@ export default function HomePage() {
                 }
                 if (nukeResult) {
                   const yld = nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt";
-                  const deaths = Math.round(Number(nukeResult.estimated_deaths ?? 0)).toLocaleString();
-                  const blast = Math.round(Number(nukeResult.blast_radius_moderate_m ?? 0) / 1000);
-                  const thermal = Math.round(Number(nukeResult.thermal_radius_m ?? 0) / 1000);
+                  const deaths = Math.round(Number(nukeResult.deaths ?? 0)).toLocaleString();
+                  const blast = Math.round(Number(nukeResult.blast_moderate_r_m ?? 0) / 1000);
+                  const thermal = Math.round(Number(nukeResult.thermal_r_m ?? 0) / 1000);
                   const burst = nukeResult.burst_type === "air" ? "airburst" : nukeResult.burst_type === "surface" ? "surface burst" : "subsurface";
                   return "☢️ " + yld + " " + burst + " · " + blast + "km blast · " + thermal + "km thermal · " + deaths + " est. deaths\n\nDisasterMap: " + (forCopy ? permalink : "https://www.disastermap.ca");
                 }
                 if (scenarioMode === "tsunami" && tsunamiActive) {
                   const src = TSUNAMI_SOURCES[tsunamiSource];
                   const deaths = tsunamiResult ? tsunamiResult.total_deaths.toLocaleString() : "";
-                  return "🌊 " + src.name + " mega-tsunami · " + src.wave_height_m + "m wave · " + Math.round(src.reach_km).toLocaleString() + "km reach" + (deaths ? " · " + deaths + " est. deaths" : "") + "\n\nDisasterMap: " + (forCopy ? permalink : "https://www.disastermap.ca");
+                  return "🌊 " + src.name + " mega-tsunami · " + src.maxWaveM + "m wave · " + Math.round(src.rings[src.rings.length-1].major_km).toLocaleString() + "km reach" + (deaths ? " · " + deaths + " est. deaths" : "") + "\n\nDisasterMap: " + (forCopy ? permalink : "https://www.disastermap.ca");
                 }
                 if (scenarioMode === "yellowstone" && yellowstoneActive) {
                   const presets = volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
@@ -5362,7 +5362,7 @@ export default function HomePage() {
                 const label = seaLevel < -50 ? Math.round(seaLevel) + "m — Ice Age · land bridges exposed" : (seaLevel > 0 ? "+" : "") + Math.round(seaLevel) + "m sea level";
                 return "🌊 " + label + (displaced ? " · " + displaced + " people displaced" : "") + "\n\nDisasterMap: " + (forCopy ? permalink : "https://www.disastermap.ca");
               };
-              window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(buildMsg(false) + " " + url), "_blank");
+              window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(buildMsg(true)), "_blank");
             }} style={{ background: "#000", color: "#fff" }}>
               𝕏 Tweet
             </button>
@@ -5392,16 +5392,16 @@ export default function HomePage() {
                 }
                 if (nukeResult) {
                   const yld = nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt";
-                  const deaths = Math.round(Number(nukeResult.estimated_deaths ?? 0)).toLocaleString();
-                  const blast = Math.round(Number(nukeResult.blast_radius_moderate_m ?? 0) / 1000);
-                  const thermal = Math.round(Number(nukeResult.thermal_radius_m ?? 0) / 1000);
+                  const deaths = Math.round(Number(nukeResult.deaths ?? 0)).toLocaleString();
+                  const blast = Math.round(Number(nukeResult.blast_moderate_r_m ?? 0) / 1000);
+                  const thermal = Math.round(Number(nukeResult.thermal_r_m ?? 0) / 1000);
                   const burst = nukeResult.burst_type === "air" ? "airburst" : nukeResult.burst_type === "surface" ? "surface burst" : "subsurface";
                   return "☢️ " + yld + " " + burst + " · " + blast + "km blast · " + thermal + "km thermal · " + deaths + " est. deaths\n\nDisasterMap: " + url;
                 }
                 if (scenarioMode === "tsunami" && tsunamiActive) {
                   const src = TSUNAMI_SOURCES[tsunamiSource];
                   const deaths = tsunamiResult ? tsunamiResult.total_deaths.toLocaleString() : "";
-                  return "🌊 " + src.name + " mega-tsunami · " + src.wave_height_m + "m wave · " + Math.round(src.reach_km).toLocaleString() + "km reach" + (deaths ? " · " + deaths + " est. deaths" : "") + "\n\nDisasterMap: " + url;
+                  return "🌊 " + src.name + " mega-tsunami · " + src.maxWaveM + "m wave · " + Math.round(src.rings[src.rings.length-1].major_km).toLocaleString() + "km reach" + (deaths ? " · " + deaths + " est. deaths" : "") + "\n\nDisasterMap: " + url;
                 }
                 if (scenarioMode === "yellowstone" && yellowstoneActive) {
                   const presets = volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
