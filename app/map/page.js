@@ -5427,6 +5427,7 @@ export default function HomePage() {
               navigator.clipboard.writeText(msg).then(() => { setStatus("Copied!"); setTimeout(() => setStatus(""), 2000); });
             }} style={{ background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45" }}>
               🔗 Copy Link
+            </button>
             <button className="share-btn" onClick={window.saveScreenshot}
               style={{ background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45" }}>
               📷 Save Image
