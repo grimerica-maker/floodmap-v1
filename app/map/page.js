@@ -5311,21 +5311,58 @@ export default function HomePage() {
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#f97316" }}>SHARE</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button className="share-btn" onClick={() => {
-              const msg = impactResult
-                ? `💥 I just simulated a ${Number(impactResult.diameter_m ?? 0).toLocaleString()}m asteroid impact on Disaster Map! ${Math.round(Number(impactResult.estimated_deaths ?? 0)).toLocaleString()} estimated deaths. Try it: https://www.disastermap.ca`
-                : nukeResult
-                ? `☢️ I just detonated a ${nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt"} nuke on Disaster Map! ${Math.round(Number(nukeResult.estimated_deaths ?? 0)).toLocaleString()} estimated deaths. Try it: https://www.disastermap.ca`
-                : (scenarioMode === "tsunami" && tsunamiActive)
-                ? `🌊 Just triggered the ${TSUNAMI_SOURCES[tsunamiSource].name} mega-tsunami on Disaster Map!${tsunamiResult ? " Est. " + tsunamiResult.total_deaths.toLocaleString() + " deaths." : ""} Try it: https://www.disastermap.ca`
-                : (scenarioMode === "yellowstone" && yellowstoneActive)
-                ? `🌋 Just simulated the Yellowstone ${(volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS)[Math.min(yellowstonePreset, (volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS).length - 1)].name} supervolcano on Disaster Map!${yellowstoneResult ? " Est. " + yellowstoneResult.total_deaths.toLocaleString() + " deaths." : ""} Ash covers most of North America. Try it: https://www.disastermap.ca`
-                : (scenarioMode === "cataclysm" && cataclysmActive)
-                ? `☄️ Just simulated a ${cataclysmModel === "davidson" ? "90° Ben Davidson / Suspicious Observers" : "104° TES ECDO Theory"} pole shift on Disaster Map! Global inundation ${cataclysmModel === "davidson" ? "500-800m Americas, 300-500m Europe" : "120-1200m global, new pole S. Africa 31°E"}. Try it: https://www.disastermap.ca`
-                : (scenarioMode === "climate" && seaLevel !== 0)
-                ? `🌍 Just modeled ${activeWarmingLevel ? activeWarmingLevel + "°C warming" : seaLevel + "m sea level rise"} on Disaster Map Climate Change mode!${floodDisplaced ? " " + floodDisplaced.toLocaleString() + " people displaced." : ""} Wildfire zones + sea level rise visualized. Try it: https://www.disastermap.ca`
-                : `🌊 I just flooded the world ${seaLevel > 0 ? "+" : ""}${Math.round(seaLevel)}m on Disaster Map!${floodDisplaced ? " " + floodDisplaced.toLocaleString() + " people displaced." : ""} Try it: https://www.disastermap.ca`;
               const url = window.buildPermalink();
-              window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(msg + " " + url), "_blank");
+              const impactPts = impactPointsRef.current;
+              const buildMsg = (forCopy) => {
+                const permalink = forCopy ? url : "";
+                if (impactResult) {
+                  const d = Number(impactResult.diameter_m ?? 0).toLocaleString();
+                  const e = Number(impactResult.energy_mt ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+                  const deaths = Number(impactResult.estimated_deaths ?? 0).toLocaleString();
+                  const crater = Math.round(Number(impactResult.crater_diameter_m ?? 0) / 1000);
+                  const isOcean = impactResult.is_ocean_impact;
+                  const wh = Math.round(Number(impactResult.wave_height_m ?? 0));
+                  const reach = Math.round(Number(impactResult.estimated_wave_reach_m ?? 0) / 1000);
+                  const vel = Math.round(Number(impactResult.velocity_m_s ?? 20000) / 1000);
+                  const multi = impactPts && impactPts.length > 1 ? impactPts.length + " simultaneous impacts · " : "";
+                  const oceanLine = isOcean && wh > 0 ? " · " + wh.toLocaleString() + "m wave · " + reach.toLocaleString() + "km reach" : "";
+                  const blackout = Number(impactResult.blackout_pct ?? 0) > 10 ? " · " + Math.round(impactResult.blackout_pct) + "% atmospheric dimming" : "";
+                  return "💥 " + multi + d + "m asteroid · " + vel + " km/s · " + e + " Mt · " + crater + "km crater" + oceanLine + blackout + " · " + deaths + " est. deaths\n\nSimulated on DisasterMap — try it: " + (forCopy ? permalink : "https://www.disastermap.ca");
+                }
+                if (nukeResult) {
+                  const yld = nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt";
+                  const deaths = Math.round(Number(nukeResult.estimated_deaths ?? 0)).toLocaleString();
+                  const blast = Math.round(Number(nukeResult.blast_radius_moderate_m ?? 0) / 1000);
+                  const thermal = Math.round(Number(nukeResult.thermal_radius_m ?? 0) / 1000);
+                  const burst = nukeResult.burst_type === "air" ? "airburst" : nukeResult.burst_type === "surface" ? "surface burst" : "subsurface";
+                  return "☢️ " + yld + " " + burst + " · " + blast + "km blast · " + thermal + "km thermal · " + deaths + " est. deaths\n\nDisasterMap: " + (forCopy ? permalink : "https://www.disastermap.ca");
+                }
+                if (scenarioMode === "tsunami" && tsunamiActive) {
+                  const src = TSUNAMI_SOURCES[tsunamiSource];
+                  const deaths = tsunamiResult ? tsunamiResult.total_deaths.toLocaleString() : "";
+                  return "🌊 " + src.name + " mega-tsunami · " + src.wave_height_m + "m wave · " + Math.round(src.reach_km).toLocaleString() + "km reach" + (deaths ? " · " + deaths + " est. deaths" : "") + "\n\nDisasterMap: " + (forCopy ? permalink : "https://www.disastermap.ca");
+                }
+                if (scenarioMode === "yellowstone" && yellowstoneActive) {
+                  const presets = volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
+                  const preset = presets[Math.min(yellowstonePreset, presets.length - 1)];
+                  const deaths = yellowstoneResult ? yellowstoneResult.total_deaths.toLocaleString() : "";
+                  return "🌋 " + preset.name + " supervolcano · " + (deaths ? deaths + " est. deaths" : "civilisation-ending") + "\n\nDisasterMap: " + (forCopy ? permalink : "https://www.disastermap.ca");
+                }
+                if (scenarioMode === "cataclysm" && cataclysmActive) {
+                  if (cataclysmModel === "ydi") return "☄️ Younger Dryas Impact · ~12,900 BP · Laurentide ice collapse · Columbia Scablands meltwater surge\n\nDisasterMap: " + (forCopy ? permalink : "https://www.disastermap.ca");
+                  if (cataclysmModel === "davidson") return "🌍 90° pole shift (Ben Davidson / Suspicious Observers) · New pole: Bay of Bengal · Americas flood 500-800m\n\nDisasterMap: " + (forCopy ? permalink : "https://www.disastermap.ca");
+                  return "🌍 104° TES ECDO pole shift · New pole: South Africa 31°E · Global inundation 120-1,200m\n\nDisasterMap: " + (forCopy ? permalink : "https://www.disastermap.ca");
+                }
+                if (scenarioMode === "climate" && seaLevel !== 0) {
+                  const displaced = floodDisplaced ? floodDisplaced.toLocaleString() : "";
+                  const label = activeWarmingLevel ? "+" + activeWarmingLevel + "°C warming" : (seaLevel > 0 ? "+" : "") + Math.round(seaLevel) + "m sea level";
+                  return "🌍 " + label + (displaced ? " · " + displaced + " people displaced" : "") + "\n\nDisasterMap: " + (forCopy ? permalink : "https://www.disastermap.ca");
+                }
+                const displaced = floodDisplaced ? floodDisplaced.toLocaleString() : "";
+                const label = seaLevel < -50 ? Math.round(seaLevel) + "m — Ice Age · land bridges exposed" : (seaLevel > 0 ? "+" : "") + Math.round(seaLevel) + "m sea level";
+                return "🌊 " + label + (displaced ? " · " + displaced + " people displaced" : "") + "\n\nDisasterMap: " + (forCopy ? permalink : "https://www.disastermap.ca");
+              };
+              window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(buildMsg(false) + " " + url), "_blank");
             }} style={{ background: "#000", color: "#fff" }}>
               𝕏 Tweet
             </button>
@@ -5336,10 +5373,60 @@ export default function HomePage() {
             </button>
             <button className="share-btn" onClick={() => {
               const url = window.buildPermalink();
-              navigator.clipboard.writeText(url).then(() => { setStatus("Link copied!"); setTimeout(() => setStatus(""), 2000); });
+              const impactPts = impactPointsRef.current;
+              const buildMsg = (forCopy) => {
+                const permalink = forCopy ? url : "";
+                if (impactResult) {
+                  const d = Number(impactResult.diameter_m ?? 0).toLocaleString();
+                  const e = Number(impactResult.energy_mt ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+                  const deaths = Number(impactResult.estimated_deaths ?? 0).toLocaleString();
+                  const crater = Math.round(Number(impactResult.crater_diameter_m ?? 0) / 1000);
+                  const isOcean = impactResult.is_ocean_impact;
+                  const wh = Math.round(Number(impactResult.wave_height_m ?? 0));
+                  const reach = Math.round(Number(impactResult.estimated_wave_reach_m ?? 0) / 1000);
+                  const vel = Math.round(Number(impactResult.velocity_m_s ?? 20000) / 1000);
+                  const multi = impactPts && impactPts.length > 1 ? impactPts.length + " simultaneous impacts · " : "";
+                  const oceanLine = isOcean && wh > 0 ? " · " + wh.toLocaleString() + "m wave · " + reach.toLocaleString() + "km reach" : "";
+                  const blackout = Number(impactResult.blackout_pct ?? 0) > 10 ? " · " + Math.round(impactResult.blackout_pct) + "% atmospheric dimming" : "";
+                  return "💥 " + multi + d + "m asteroid · " + vel + " km/s · " + e + " Mt · " + crater + "km crater" + oceanLine + blackout + " · " + deaths + " est. deaths\n\nSimulated on DisasterMap: " + url;
+                }
+                if (nukeResult) {
+                  const yld = nukeResult.yield_kt >= 1000 ? (nukeResult.yield_kt/1000).toFixed(1)+"Mt" : nukeResult.yield_kt+"kt";
+                  const deaths = Math.round(Number(nukeResult.estimated_deaths ?? 0)).toLocaleString();
+                  const blast = Math.round(Number(nukeResult.blast_radius_moderate_m ?? 0) / 1000);
+                  const thermal = Math.round(Number(nukeResult.thermal_radius_m ?? 0) / 1000);
+                  const burst = nukeResult.burst_type === "air" ? "airburst" : nukeResult.burst_type === "surface" ? "surface burst" : "subsurface";
+                  return "☢️ " + yld + " " + burst + " · " + blast + "km blast · " + thermal + "km thermal · " + deaths + " est. deaths\n\nDisasterMap: " + url;
+                }
+                if (scenarioMode === "tsunami" && tsunamiActive) {
+                  const src = TSUNAMI_SOURCES[tsunamiSource];
+                  const deaths = tsunamiResult ? tsunamiResult.total_deaths.toLocaleString() : "";
+                  return "🌊 " + src.name + " mega-tsunami · " + src.wave_height_m + "m wave · " + Math.round(src.reach_km).toLocaleString() + "km reach" + (deaths ? " · " + deaths + " est. deaths" : "") + "\n\nDisasterMap: " + url;
+                }
+                if (scenarioMode === "yellowstone" && yellowstoneActive) {
+                  const presets = volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
+                  const preset = presets[Math.min(yellowstonePreset, presets.length - 1)];
+                  const deaths = yellowstoneResult ? yellowstoneResult.total_deaths.toLocaleString() : "";
+                  return "🌋 " + preset.name + " · " + (deaths ? deaths + " est. deaths" : "civilisation-ending") + "\n\nDisasterMap: " + url;
+                }
+                if (scenarioMode === "cataclysm" && cataclysmActive) {
+                  if (cataclysmModel === "ydi") return "☄️ Younger Dryas Impact · ~12,900 BP · Laurentide collapse · Columbia Scablands\n\nDisasterMap: " + url;
+                  if (cataclysmModel === "davidson") return "🌍 90° pole shift (Ben Davidson) · New pole: Bay of Bengal · Americas flood 500-800m\n\nDisasterMap: " + url;
+                  return "🌍 104° TES ECDO · New pole: South Africa · Global inundation 120-1,200m\n\nDisasterMap: " + url;
+                }
+                if (scenarioMode === "climate" && seaLevel !== 0) {
+                  const displaced = floodDisplaced ? floodDisplaced.toLocaleString() : "";
+                  const label = activeWarmingLevel ? "+" + activeWarmingLevel + "°C warming" : (seaLevel > 0 ? "+" : "") + Math.round(seaLevel) + "m sea level";
+                  return "🌍 " + label + (displaced ? " · " + displaced + " people displaced" : "") + "\n\nDisasterMap: " + url;
+                }
+                const displaced = floodDisplaced ? floodDisplaced.toLocaleString() : "";
+                const label = seaLevel < -50 ? Math.round(seaLevel) + "m — Ice Age · land bridges exposed" : (seaLevel > 0 ? "+" : "") + Math.round(seaLevel) + "m sea level";
+                return "🌊 " + label + (displaced ? " · " + displaced + " people displaced" : "") + "\n\nDisasterMap: " + url;
+              };
+              const msg = buildMsg(true);
+              navigator.clipboard.writeText(msg).then(() => { setStatus("Copied!"); setTimeout(() => setStatus(""), 2000); });
             }} style={{ background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45" }}>
               🔗 Copy Link
-            </button>
             <button className="share-btn" onClick={window.saveScreenshot}
               style={{ background: "#1e293b", color: "#e2e8f0", border: "1px solid #1e2d45" }}>
               📷 Save Image
