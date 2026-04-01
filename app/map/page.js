@@ -1039,6 +1039,7 @@ export default function HomePage() {
   const [fireOn, setFireOn] = useState(false);
   const fireOnRef = useRef(false);
   const [overlayPanelOpen, setOverlayPanelOpen] = useState(false);
+  const overlayLoadingRef = useRef(new Set()); // tracks in-flight fetches
   const [wikiPanel, setWikiPanel] = useState(null);
   const megalithPopupRef = useRef(null);
   const overlayPopupRef = useRef(null);
@@ -1198,6 +1199,9 @@ export default function HomePage() {
     const map = mapRef.current;
     const c = OVL[type];
     if (!map || !c || !map.isStyleLoaded()) return;
+    // In-flight guard — prevent concurrent fetches for same type
+    if (overlayLoadingRef.current.has(type)) return;
+    overlayLoadingRef.current.add(type);
     // Bulletproof double-add guard — remove layer then source explicitly
     { const m = mapRef.current; if (m) {
       try { if (m.getLayer(c.layer)) m.removeLayer(c.layer); } catch(e){}
@@ -1248,6 +1252,7 @@ export default function HomePage() {
       map.on("mouseleave", c.layer, () => { map.getCanvas().style.cursor = "crosshair"; });
       safely(() => map.triggerRepaint());
     } catch(e) { console.warn(`[overlay:${type}]`, e); }
+    finally { overlayLoadingRef.current.delete(type); }
   };
 
   const reloadActiveOverlays = (level, includeFiresReload = false) => {
@@ -6452,6 +6457,7 @@ export default function HomePage() {
       {/* ── Overlays floating button ── */}
       <div
         onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => { e.stopPropagation(); setOverlayPanelOpen(v => !v); }}
         style={{
           position: "fixed",
@@ -6475,10 +6481,20 @@ export default function HomePage() {
         </span>
       </div>
 
+      {/* ── Overlays panel backdrop ── */}
+      {overlayPanelOpen && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 1199 }}
+          onClick={() => setOverlayPanelOpen(false)}
+          onPointerDown={() => setOverlayPanelOpen(false)}
+        />
+      )}
+
       {/* ── Overlays panel ── */}
       {overlayPanelOpen && (
         <div
           onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
           style={{
             position: "fixed",
