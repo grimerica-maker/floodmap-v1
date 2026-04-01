@@ -6292,7 +6292,6 @@ export default function HomePage() {
           {drawerOpen ? "⌄" : "⌃"}
         </button>
       </div>
-    </div>
 
       {/* ── Wikipedia slide-in panel ── */}
       {wikiPanel && (
