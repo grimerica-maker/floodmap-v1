@@ -24,10 +24,6 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
-// ── Megalith overlay ──────────────────────────────────────────────────────────
-const MEGALITH_SOURCE = "dm-megaliths-src";
-const MEGALITH_LAYER  = "dm-megaliths-layer";
-const MEGALITH_COLOR  = "#d97706";
 
 const FRONTEND_BUILD_LABEL = "v250";
 
@@ -1187,7 +1183,7 @@ export default function HomePage() {
     unesco:    { src: "dm-unesco-src",    layer: "dm-unesco-layer",    color: "#a855f7", subColor: "#6366f1", icon: "🌍", label: "UNESCO Sites",   proOnly: false },
     airports:  { src: "dm-airports-src",  layer: "dm-airports-layer",  color: "#22d3ee", subColor: "#0ea5e9", icon: "✈️", label: "Airports",       proOnly: true  },
     nuclear:   { src: "dm-nuclear-src",   layer: "dm-nuclear-layer",   color: "#4ade80", subColor: "#16a34a", icon: "☢️", label: "Nuclear Plants", proOnly: true  },
-    fires:     { src: "dm-fires-src",     layer: "dm-fires-layer",     color: "#ff4500", subColor: "#ff8c00", icon: "🔥", label: "Live Fires",      proOnly: false, noFloodColor: true },
+    fires:     { src: "dm-fires-src",     layer: "dm-fires-layer",     color: "#ff4500", subColor: "#ff8c00", icon: "🔥", label: "Live Fires",      proOnly: false },
   };
 
   const removeOverlayLayer = (type) => {
@@ -1203,6 +1199,9 @@ export default function HomePage() {
     const c = OVL[type];
     if (!map || !c || !map.isStyleLoaded()) return;
     removeOverlayLayer(type); // guard double-add
+    // Extra safety: verify source is gone before proceeding
+    const mapChk = mapRef.current;
+    if (mapChk) { try { if (mapChk.getSource(c.src)) mapChk.removeSource(c.src); } catch(e){} }
     try {
       // Fires use a dedicated endpoint; all others use /at-risk
       const url = type === "fires"
@@ -1263,8 +1262,8 @@ export default function HomePage() {
     const setter = { megaliths: setMegalithOn, unesco: setUnescoOn, airports: setAirportOn, nuclear: setNuclearOn, fires: setFireOn }[type];
     if (!onRef || !setter) return;
     const next = !onRef.current;
-    setter(next);
-    onRef.current = next;
+    onRef.current = next; // set ref immediately so re-renders read correct value
+    setter(next);         // trigger re-render (useEffect syncs ref again but idempotent)
     if (!next) {
       removeOverlayLayer(type);
       if (overlayPopupRef.current) { overlayPopupRef.current.remove(); overlayPopupRef.current = null; }
@@ -1272,11 +1271,6 @@ export default function HomePage() {
       addOverlayLayer(type, seaLevelRef.current);
     }
   };
-
-  // Keep megalithOn/megalithOnRef in sync for legacy patch 5/6/7 references
-  const removeMegalithLayer = () => removeOverlayLayer("megaliths");
-  const addMegalithLayer    = (level) => addOverlayLayer("megaliths", level);
-  const toggleMegalithOverlay = () => toggleOverlay("megaliths");
 
   const openWikiPanel = async (name, wikiUrl, wikidataId) => {
     if (proTierRef.current === "free") {
@@ -4111,6 +4105,13 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, seaLevel, unitMode, scenarioMode, impactLoading, impactResult, nukeLoading, nukeResult, nukePointSet]);
 
+  // Expose openWikiPanel globally for popup HTML buttons
+  useEffect(() => {
+    window.__dmWiki = openWikiPanel;
+    return () => { delete window.__dmWiki; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ─── Derived display values for the collapsed strip ───────────────────────
   const stripLabel = scenarioMode === "impact"
     ? `💥 ${impactDiameter.toLocaleString()}m`
@@ -6456,8 +6457,8 @@ export default function HomePage() {
           top: isMobile ? 60 : 14,
           right: isMobile ? 14 : 70,
           zIndex: 1200,
-          background: (megalithOn || unescoOn || airportOn || nuclearOn || fireOn) ? "rgba(217,119,6,0.18)" : "rgba(15,23,42,0.85)",
-          border: (megalithOn || unescoOn || airportOn || nuclearOn || fireOn) ? "1px solid #d97706" : "1px solid #1e2d45",
+          background: (megalithOnRef.current || unescoOnRef.current || airportOnRef.current || nuclearOnRef.current || fireOnRef.current) ? "rgba(217,119,6,0.18)" : "rgba(15,23,42,0.85)",
+          border: (megalithOnRef.current || unescoOnRef.current || airportOnRef.current || nuclearOnRef.current || fireOnRef.current) ? "1px solid #d97706" : "1px solid #1e2d45",
           borderRadius: 10,
           padding: "7px 13px",
           cursor: "pointer",
@@ -6468,8 +6469,8 @@ export default function HomePage() {
         }}
       >
         <span style={{ fontSize: 16 }}>🗺️</span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: (megalithOn || unescoOn || airportOn || nuclearOn || fireOn) ? "#d97706" : "#94a3b8", letterSpacing: "0.03em" }}>
-          Overlays{(megalithOn || unescoOn || airportOn || nuclearOn || fireOn) ? " ●" : ""}
+        <span style={{ fontSize: 12, fontWeight: 700, color: (megalithOnRef.current || unescoOnRef.current || airportOnRef.current || nuclearOnRef.current || fireOnRef.current) ? "#d97706" : "#94a3b8", letterSpacing: "0.03em" }}>
+          Overlays{(megalithOnRef.current || unescoOnRef.current || airportOnRef.current || nuclearOnRef.current || fireOnRef.current) ? " ●" : ""}
         </span>
       </div>
 
@@ -6496,7 +6497,8 @@ export default function HomePage() {
             Map Overlays
           </div>
           {Object.entries(OVL).map(([type, cfg]) => {
-            const isOn = { megaliths: megalithOn, unesco: unescoOn, airports: airportOn, nuclear: nuclearOn, fires: fireOn }[type];
+            // Read from ref for instant accuracy, state for re-render trigger
+            const isOn = { megaliths: megalithOnRef.current, unesco: unescoOnRef.current, airports: airportOnRef.current, nuclear: nuclearOnRef.current, fires: fireOnRef.current }[type];
             const isPro = cfg.proOnly;
             const locked = isPro && proTier === "free";
             return (
