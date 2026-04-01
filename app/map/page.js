@@ -1166,6 +1166,89 @@ export default function HomePage() {
   useEffect(() => { floodEngineUrlRef.current = floodEngineUrl; }, [floodEngineUrl]);
   useEffect(() => { megalithOnRef.current = megalithOn; }, [megalithOn]);
 
+  // ── Megalith overlay functions ──────────────────────────────────────────────
+  const removeMegalithLayer = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    try { if (map.getLayer(MEGALITH_LAYER)) map.removeLayer(MEGALITH_LAYER); } catch(e){}
+    try { if (map.getSource(MEGALITH_SOURCE)) map.removeSource(MEGALITH_SOURCE); } catch(e){}
+  };
+
+  const addMegalithLayer = async (level = 0) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    removeMegalithLayer();
+    try {
+      const res = await fetch(
+        `${floodEngineUrlRef.current}/at-risk?level=${level}&type=megaliths`,
+        { cache: "no-store" }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.features?.length) return;
+      map.addSource(MEGALITH_SOURCE, { type: "geojson", data });
+      map.addLayer({
+        id: MEGALITH_LAYER,
+        type: "circle",
+        source: MEGALITH_SOURCE,
+        paint: {
+          "circle-color": MEGALITH_COLOR,
+          "circle-stroke-width": level > 0
+            ? ["case", ["==", ["get", "flooded"], true], 2.5, 1.5]
+            : 1.5,
+          "circle-stroke-color": "#ffffff",
+          "circle-opacity": level > 0
+            ? ["case", ["==", ["get", "flooded"], true], 1.0, 0.5]
+            : 0.75,
+          "circle-radius": level > 0
+            ? ["case", ["==", ["get", "flooded"], true],
+                ["interpolate", ["linear"], ["zoom"], 2, 6, 6, 9, 10, 13],
+                ["interpolate", ["linear"], ["zoom"], 2, 4, 6, 7, 10, 10]]
+            : ["interpolate", ["linear"], ["zoom"], 2, 4, 6, 7, 10, 10],
+        },
+      });
+      map.on("mouseenter", MEGALITH_LAYER, () => { try { map.getCanvas().style.cursor = "pointer"; } catch {} });
+      map.on("mouseleave", MEGALITH_LAYER, () => { map.getCanvas().style.cursor = "crosshair"; });
+      safely(() => map.triggerRepaint());
+    } catch(e) { console.warn("[megaliths]", e); }
+  };
+
+  const toggleMegalithOverlay = () => {
+    const next = !megalithOnRef.current;
+    setMegalithOn(next);
+    megalithOnRef.current = next;
+    if (!next) {
+      removeMegalithLayer();
+      if (megalithPopupRef.current) { megalithPopupRef.current.remove(); megalithPopupRef.current = null; }
+    } else {
+      addMegalithLayer(seaLevelRef.current);
+    }
+  };
+
+  const openWikiPanel = async (name, wikiUrl, wikidataId) => {
+    setWikiPanel({ title: name, extract: null, thumbnail: null, url: wikiUrl, loading: true });
+    try {
+      const slug = encodeURIComponent(name.replace(/ /g, "_"));
+      const res  = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${slug}`);
+      if (res.ok) {
+        const d = await res.json();
+        setWikiPanel({
+          title:     d.title || name,
+          extract:   d.extract || null,
+          thumbnail: d.thumbnail?.source || null,
+          url:       d.content_urls?.desktop?.page || wikiUrl,
+          wikidataId,
+          loading:   false,
+        });
+      } else {
+        setWikiPanel({ title: name, extract: null, thumbnail: null, url: wikiUrl, wikidataId, loading: false });
+      }
+    } catch {
+      setWikiPanel({ title: name, extract: null, thumbnail: null, url: wikiUrl, wikidataId, loading: false });
+    }
+  };
+
+
   // Star field animation
   useEffect(() => {
     const canvas = document.getElementById("star-canvas");
