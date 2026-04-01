@@ -3793,7 +3793,7 @@ export default function HomePage() {
             popup.setLngLat([lng, lat]).setHTML(isFire ? `
               <div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
                 <div style="color:#ff4500;font-weight:700;font-size:14px;margin-bottom:6px">🔥 Active Fire Detection</div>
-                ${p.frp ? `<div style="color:#e2e8f0;margin-bottom:3px">Intensity: <strong>${p.frp} MW</strong></div>` : "<div style="color:#94a3b8;margin-bottom:3px">High confidence detection</div>"}
+                ${p.frp ? `<div style="color:#e2e8f0;margin-bottom:3px">Intensity: <strong>${p.frp} MW</strong></div>` : '<div style="color:#94a3b8;margin-bottom:3px">High confidence detection</div>'}
                 ${p.date ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:3px">Detected: <strong>${p.date}</strong></div>` : ""}
                 <div style="color:#64748b;font-size:11px;margin-top:4px">Source: NASA FIRMS VIIRS 24h</div>
               </div>
