@@ -1810,11 +1810,17 @@ export default function HomePage() {
     if (!map) return;
     if (mode === "satellite") {
       map.setStyle(SATELLITE_STYLE_URL);
-      map.easeTo({ center: [-80.19, 25.76], zoom: 6.2, duration: 250, essential: true });
+      map.once("style.load", () => {
+        applyProjectionForMode("map");
+        map.easeTo({ center: [-80.19, 25.76], zoom: 6.2, duration: 250, essential: true });
+      });
       return;
     }
     map.setStyle(MAP_STYLE_URL);
-    map.easeTo({ center: mode === "globe" ? [0, 20] : [-80.19, 25.76], zoom: mode === "globe" ? 1.6 : 6.2, duration: 250, essential: true });
+    map.once("style.load", () => {
+      applyProjectionForMode(mode);
+      map.easeTo({ center: mode === "globe" ? [0, 20] : [-80.19, 25.76], zoom: mode === "globe" ? 1.6 : 6.2, duration: 250, essential: true });
+    });
   };
 
   const executeFlood = () => {
@@ -3591,7 +3597,7 @@ export default function HomePage() {
       attributionControl: true,
       collectResourceTiming: false,
       preserveDrawingBuffer: true,
-      renderWorldCopies: false,
+      renderWorldCopies: true,
       transformRequest: (url) => ({ url }),
     });
 
