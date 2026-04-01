@@ -1038,7 +1038,6 @@ export default function HomePage() {
   const nuclearOnRef = useRef(false);
   const [fireOn, setFireOn] = useState(false);
   const fireOnRef = useRef(false);
-  const [overlayPanelOpen, setOverlayPanelOpen] = useState(false);
   const overlayLoadingRef = useRef(new Set()); // tracks in-flight fetches
   const [wikiPanel, setWikiPanel] = useState(null);
   const megalithPopupRef = useRef(null);
@@ -5048,6 +5047,50 @@ export default function HomePage() {
         )}
       </div>
 
+      {/* ── MAP OVERLAYS ── */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#d97706", textTransform: "uppercase" }}>Map Overlays</div>
+        {Object.entries(OVL).map(([type, cfg]) => {
+          const isOn = { megaliths: megalithOn, unesco: unescoOn, airports: airportOn, nuclear: nuclearOn, fires: fireOn }[type];
+          const locked = cfg.proOnly && proTier === "free";
+          return (
+            <div key={type}
+              onClick={() => {
+                if (locked) { window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank"); return; }
+                toggleOverlay(type);
+              }}
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "9px 10px", marginBottom: 4, borderRadius: 9,
+                cursor: "pointer",
+                background: isOn ? `rgba(${type==="megaliths"?"217,119,6":type==="unesco"?"168,85,247":type==="airports"?"34,211,238":type==="nuclear"?"74,222,128":"255,69,0"},0.12)` : "rgba(255,255,255,0.03)",
+                border: isOn ? `1px solid ${cfg.color}55` : "1px solid transparent",
+              }}
+            >
+              <span style={{ fontSize: 18, lineHeight: 1 }}>{cfg.icon}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: isOn ? cfg.color : locked ? "#4b5563" : "#cbd5e1" }}>
+                  {cfg.label}{locked && <span style={{ marginLeft: 6, fontSize: 10, color: "#f97316" }}>PRO</span>}
+                </div>
+                <div style={{ fontSize: 10, color: locked ? "#374151" : "#475569", marginTop: 1 }}>
+                  {type === "megaliths" && "28,000+ sites · incl. underwater"}
+                  {type === "unesco"    && "World Heritage Sites"}
+                  {type === "airports"  && (locked ? "Upgrade to Pro" : "Major & regional airports")}
+                  {type === "nuclear"   && (locked ? "Upgrade to Pro" : "Active nuclear plants")}
+                  {type === "fires"     && "NASA FIRMS VIIRS · updated 24h"}
+                </div>
+              </div>
+              <div style={{ width: 28, height: 16, borderRadius: 8, background: isOn ? cfg.color : "#1e2d45", position: "relative", flexShrink: 0, transition: "background 0.2s" }}>
+                <div style={{ position: "absolute", top: 2, left: isOn ? 14 : 2, width: 12, height: 12, borderRadius: "50%", background: "white", transition: "left 0.2s" }} />
+              </div>
+            </div>
+          );
+        })}
+        <div style={{ marginTop: 6, fontSize: 10, color: "#374151", textAlign: "center" }}>
+          🔵 currently underwater &nbsp;·&nbsp; 🔴 flooded at current level
+        </div>
+      </div>
+
       {/* ── VIEW MODE ── */}
       <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>View Mode</div>
       <div style={{ display: "grid", gap: 10, marginBottom: 24 }}>
@@ -6453,119 +6496,6 @@ export default function HomePage() {
           {drawerOpen ? "⌄" : "⌃"}
         </button>
       </div>
-
-      {/* ── Overlays floating button ── */}
-      <div
-        onPointerDown={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => { e.stopPropagation(); setOverlayPanelOpen(v => !v); }}
-        style={{
-          position: "fixed",
-          top: isMobile ? 60 : 14,
-          right: isMobile ? 14 : 70,
-          zIndex: 1200,
-          background: (megalithOnRef.current || unescoOnRef.current || airportOnRef.current || nuclearOnRef.current || fireOnRef.current) ? "rgba(217,119,6,0.18)" : "rgba(15,23,42,0.85)",
-          border: (megalithOnRef.current || unescoOnRef.current || airportOnRef.current || nuclearOnRef.current || fireOnRef.current) ? "1px solid #d97706" : "1px solid #1e2d45",
-          borderRadius: 10,
-          padding: "7px 13px",
-          cursor: "pointer",
-          display: "flex", alignItems: "center", gap: 7,
-          backdropFilter: "blur(8px)",
-          boxShadow: "0 2px 12px rgba(0,0,0,0.4)",
-          userSelect: "none",
-        }}
-      >
-        <span style={{ fontSize: 16 }}>🗺️</span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: (megalithOnRef.current || unescoOnRef.current || airportOnRef.current || nuclearOnRef.current || fireOnRef.current) ? "#d97706" : "#94a3b8", letterSpacing: "0.03em" }}>
-          Overlays{(megalithOnRef.current || unescoOnRef.current || airportOnRef.current || nuclearOnRef.current || fireOnRef.current) ? " ●" : ""}
-        </span>
-      </div>
-
-      {/* ── Overlays panel backdrop ── */}
-      {overlayPanelOpen && (
-        <div
-          style={{ position: "fixed", inset: 0, zIndex: 1199 }}
-          onClick={() => setOverlayPanelOpen(false)}
-          onPointerDown={() => setOverlayPanelOpen(false)}
-        />
-      )}
-
-      {/* ── Overlays panel ── */}
-      {overlayPanelOpen && (
-        <div
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: "fixed",
-            top: isMobile ? 108 : 56,
-            right: isMobile ? 14 : 70,
-            zIndex: 1200,
-            background: "rgba(10,15,30,0.97)",
-            border: "1px solid #1e2d45",
-            borderRadius: 14,
-            padding: "14px 14px 10px",
-            width: 240,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
-            backdropFilter: "blur(12px)",
-          }}
-        >
-          <div style={{ fontSize: 11, color: "#475569", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
-            Map Overlays
-          </div>
-          {Object.entries(OVL).map(([type, cfg]) => {
-            // Read from ref for instant accuracy, state for re-render trigger
-            const isOn = { megaliths: megalithOnRef.current, unesco: unescoOnRef.current, airports: airportOnRef.current, nuclear: nuclearOnRef.current, fires: fireOnRef.current }[type];
-            const isPro = cfg.proOnly;
-            const locked = isPro && proTier === "free";
-            return (
-              <div key={type}
-                onClick={() => {
-                  if (locked) { window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank"); return; }
-                  toggleOverlay(type);
-                }}
-                style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "9px 10px",
-                  marginBottom: 4,
-                  borderRadius: 9,
-                  cursor: "pointer",
-                  background: isOn ? `rgba(${type === "megaliths" ? "217,119,6" : type === "unesco" ? "168,85,247" : type === "airports" ? "34,211,238" : "74,222,128"},0.12)` : "rgba(255,255,255,0.03)",
-                  border: isOn ? `1px solid ${cfg.color}44` : "1px solid transparent",
-                  transition: "all 0.15s",
-                }}
-              >
-                <span style={{ fontSize: 18, lineHeight: 1 }}>{cfg.icon}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: isOn ? cfg.color : locked ? "#4b5563" : "#cbd5e1" }}>
-                    {cfg.label}
-                    {locked && <span style={{ marginLeft: 6, fontSize: 10, color: "#f97316" }}>PRO</span>}
-                  </div>
-                  {type === "megaliths" && <div style={{ fontSize: 10, color: "#475569", marginTop: 1 }}>28,000+ sites · incl. underwater</div>}
-                  {type === "unesco"    && <div style={{ fontSize: 10, color: "#475569", marginTop: 1 }}>World Heritage Sites</div>}
-                  {type === "airports"  && <div style={{ fontSize: 10, color: locked ? "#374151" : "#475569", marginTop: 1 }}>{locked ? "Upgrade to Pro" : "Major & regional airports"}</div>}
-                  {type === "nuclear"   && <div style={{ fontSize: 10, color: locked ? "#374151" : "#475569", marginTop: 1 }}>{locked ? "Upgrade to Pro" : "Active nuclear plants"}</div>}
-                  {type === "fires"     && <div style={{ fontSize: 10, color: "#475569", marginTop: 1 }}>NASA FIRMS VIIRS · updated every 3h</div>}
-                </div>
-                <div style={{
-                  width: 28, height: 16, borderRadius: 8,
-                  background: isOn ? cfg.color : "#1e2d45",
-                  position: "relative", flexShrink: 0, transition: "background 0.2s",
-                }}>
-                  <div style={{
-                    position: "absolute", top: 2, left: isOn ? 14 : 2,
-                    width: 12, height: 12, borderRadius: "50%",
-                    background: "white", transition: "left 0.2s",
-                  }} />
-                </div>
-              </div>
-            );
-          })}
-          <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #1e2d45", fontSize: 10, color: "#374151", textAlign: "center" }}>
-            🔵 currently underwater &nbsp;·&nbsp; 🔴 flooded at current level
-          </div>
-        </div>
-      )}
 
       {/* ── Wikipedia slide-in panel ── */}
       {wikiPanel && (
