@@ -1198,10 +1198,11 @@ export default function HomePage() {
     const map = mapRef.current;
     const c = OVL[type];
     if (!map || !c || !map.isStyleLoaded()) return;
-    removeOverlayLayer(type); // guard double-add
-    // Extra safety: verify source is gone before proceeding
-    const mapChk = mapRef.current;
-    if (mapChk) { try { if (mapChk.getSource(c.src)) mapChk.removeSource(c.src); } catch(e){} }
+    // Bulletproof double-add guard — remove layer then source explicitly
+    { const m = mapRef.current; if (m) {
+      try { if (m.getLayer(c.layer)) m.removeLayer(c.layer); } catch(e){}
+      try { if (m.getSource(c.src))  m.removeSource(c.src);  } catch(e){}
+    }}
     try {
       // Fires use a dedicated endpoint; all others use /at-risk
       const url = type === "fires"
@@ -3806,7 +3807,7 @@ export default function HomePage() {
                     : seaLevelRef.current > 0
                       ? `<div style="color:#4ade80;margin-bottom:4px">✓ Safe at +${Math.round(seaLevelRef.current)} m</div>`
                       : ""}
-                ${wikiUrl ? `<button onclick="window.__dmWiki && window.__dmWiki(${JSON.stringify(p.name || "")}, ${JSON.stringify(wikiUrl)}, ${JSON.stringify(p.wikidata || "")})" style="margin-top:6px;font-size:11px;color:${dotColor};background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:Arial,sans-serif;">📖 Wikipedia</button>` : ""}
+                ${wikiUrl ? `<button onclick="if(window.__dmWiki){window.__dmWiki(this.dataset.n,this.dataset.u,this.dataset.w)}" data-n="${(p.name||'').replace(/"/g,'&quot;')}" data-u="${(wikiUrl||'').replace(/"/g,'&quot;')}" data-w="${(p.wikidata||'').replace(/"/g,'&quot;')}" style="margin-top:6px;font-size:11px;color:${dotColor};background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:Arial,sans-serif;">📖 Wikipedia</button>` : ""}
               </div>
             `).addTo(map);
             overlayPopupRef.current = popup;
