@@ -4111,7 +4111,7 @@ export default function HomePage() {
       }
       return;
     }
-    if (viewMode === "globe" && seaLevel === 0) { setStatus("Globe mode"); return; }
+
     if (seaLevel === 0) { setStatus("Flood cleared"); return; }
     setStatus(`Flood tiles loaded at ${formatLevelForDisplay(seaLevel)}`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -5104,7 +5104,6 @@ export default function HomePage() {
         {[
           { key: "map", label: "Standard Map", sub: "Flood tiles active", pro: false },
           { key: "satellite", label: "Satellite View", sub: "Pro feature 🔒", pro: true },
-          { key: "globe", label: "Globe View", sub: "Pro feature 🔒", pro: true },
         ].map(({ key, label, sub, pro }) => (
           <button
             key={key}
@@ -6241,7 +6240,7 @@ export default function HomePage() {
         </div>
       )}
 
-      <canvas id="star-canvas" className={viewMode === "globe" ? "visible" : ""} />
+      <canvas id="star-canvas" className="" />
       <div ref={mapContainerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0, touchAction: "none" }} />
       <style>{`html, body { overflow: hidden !important; height: 100% !important; overscroll-behavior: none; touch-action: none; }`}</style>
       {/* Disaster Map wordmark — top center, unobtrusive */}
