@@ -1478,15 +1478,17 @@ export default function HomePage() {
   const applyProjectionForMode = (mode) => {
     const map = mapRef.current;
     if (!map) return;
-    if (mode === "globe") {
-      safely(() => map.setProjection("globe"));
-      safely(() => map.setPitch(0)); safely(() => map.setBearing(0));
-      safely(() => map.dragRotate.enable()); safely(() => map.touchZoomRotate.enableRotation());
-      return;
-    }
-    safely(() => map.setProjection("mercator"));
+    // Always globe projection — never mercator
+    safely(() => map.setProjection("globe"));
     safely(() => map.setPitch(0)); safely(() => map.setBearing(0));
-    safely(() => map.dragRotate.disable()); safely(() => map.touchZoomRotate.disableRotation());
+    // Globe view (Pro) enables free rotate; standard/satellite locks it
+    if (mode === "globe") {
+      safely(() => map.dragRotate.enable());
+      safely(() => map.touchZoomRotate.enableRotation());
+    } else {
+      safely(() => map.dragRotate.disable());
+      safely(() => map.touchZoomRotate.disableRotation());
+    }
   };
 
   const removeImpactFloodLayers = () => {
@@ -1808,18 +1810,17 @@ export default function HomePage() {
   const applyStyleMode = (mode) => {
     const map = mapRef.current;
     if (!map) return;
-    if (mode === "satellite") {
-      map.setStyle(SATELLITE_STYLE_URL);
-      map.once("style.load", () => {
-        applyProjectionForMode("map");
-        map.easeTo({ center: [-80.19, 25.76], zoom: 6.2, duration: 250, essential: true });
-      });
-      return;
-    }
-    map.setStyle(MAP_STYLE_URL);
+    const isSat  = mode === "satellite";
+    const isGlobe = mode === "globe";
+    map.setStyle(isSat ? SATELLITE_STYLE_URL : MAP_STYLE_URL);
     map.once("style.load", () => {
-      applyProjectionForMode(mode);
-      map.easeTo({ center: mode === "globe" ? [0, 20] : [-80.19, 25.76], zoom: mode === "globe" ? 1.6 : 6.2, duration: 250, essential: true });
+      try { map.setProjection("globe"); } catch(e) {}
+      map.easeTo({
+        center: isGlobe ? [0, 20] : [-80.19, 25.76],
+        zoom:   isGlobe ? 1.6 : 6.2,
+        duration: 250, essential: true,
+      });
+      setTimeout(() => reloadActiveOverlays(seaLevelRef.current, true), 150);
     });
   };
 
@@ -2740,7 +2741,7 @@ export default function HomePage() {
       // Reset bearing and pitch first, then switch projection and style after
       safely(() => map.jumpTo({ bearing: 0, pitch: 0 }));
       safely(() => {
-        map.setProjection("mercator");
+        map.setProjection("globe");
         map.setStyle("mapbox://styles/mapbox/streets-v12");
       });
       // Fly to default view after style loads
@@ -3598,11 +3599,11 @@ export default function HomePage() {
       collectResourceTiming: false,
       preserveDrawingBuffer: true,
       renderWorldCopies: true,
+      projection: "globe",
       transformRequest: (url) => ({ url }),
     });
 
     mapRef.current = map;
-    applyProjectionForMode("map");
     // Zoom controls only on desktop — mobile uses pinch-to-zoom
     if (typeof window !== "undefined" && window.innerWidth > 640) {
       map.addControl(new mapboxgl.NavigationControl(), "top-right");
