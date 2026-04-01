@@ -24,6 +24,11 @@ const IMPACT_CRATER_LAYER_ID = "impact-crater-layer";
 const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
+// ── Megalith overlay ──────────────────────────────────────────────────────────
+const MEGALITH_SOURCE = "dm-megaliths-src";
+const MEGALITH_LAYER  = "dm-megaliths-layer";
+const MEGALITH_COLOR  = "#d97706";
+
 const FRONTEND_BUILD_LABEL = "v250";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
@@ -1027,6 +1032,10 @@ export default function HomePage() {
   const [empAltitudeKm, setEmpAltitudeKm] = useState(400);
   const [empResult, setEmpResult] = useState(null);
   const [empLoading, setEmpLoading] = useState(false);
+  const [megalithOn, setMegalithOn] = useState(false);
+  const megalithOnRef = useRef(false);
+  const [wikiPanel, setWikiPanel] = useState(null);
+  const megalithPopupRef = useRef(null);
   const [nukeResult, setNukeResult] = useState(null);
   const nukeResultRef = useRef(null);
   const [nukeLoading, setNukeLoading] = useState(false);
@@ -1155,6 +1164,7 @@ export default function HomePage() {
   useEffect(() => { impactResultRef.current = impactResult; }, [impactResult]);
   useEffect(() => { nukeResultRef.current = nukeResult; }, [nukeResult]);
   useEffect(() => { floodEngineUrlRef.current = floodEngineUrl; }, [floodEngineUrl]);
+  useEffect(() => { megalithOnRef.current = megalithOn; }, [megalithOn]);
 
   // Star field animation
   useEffect(() => {
@@ -3467,6 +3477,10 @@ export default function HomePage() {
       if ((scenarioModeRef.current === "flood" || scenarioModeRef.current === "climate") && seaLevelRef.current <= -100) {
         setTimeout(() => safely(() => drawIceSheets(mapRef.current)), 100);
       }
+      // Re-add megalith layer on style reload
+      if (megalithOnRef.current) {
+        setTimeout(() => addMegalithLayer(seaLevelRef.current), 100);
+      }
       if (scenarioModeRef.current === "impact" && impactResultRef.current && !impactDrawingRef.current) {
         const points = impactPointsRef.current.length > 0 ? impactPointsRef.current : (impactPointRef.current ? [impactPointRef.current] : []);
         setTimeout(() => {
@@ -3609,6 +3623,40 @@ export default function HomePage() {
         setNukeResult(null); setNukeError("");
         setStatus(`Strike ${idx + 1} placed — add more or detonate`);
         return;
+      }
+
+      // ── Megalith overlay click ──
+      if (megalithOnRef.current) {
+        const mFeats = map.queryRenderedFeatures(e.point, {
+          layers: [MEGALITH_LAYER].filter(l => { try { return !!map.getLayer(l); } catch { return false; } })
+        });
+        if (mFeats.length > 0) {
+          const p = mFeats[0].properties;
+          if (megalithPopupRef.current) { megalithPopupRef.current.remove(); megalithPopupRef.current = null; }
+          const wikiUrl = p.wikipedia
+            ? (p.wikipedia.startsWith("http") ? p.wikipedia : `https://en.wikipedia.org/wiki/${encodeURIComponent(p.wikipedia)}`)
+            : p.name ? `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(p.name)}&ns0=1` : null;
+          const popup = new mapboxgl.Popup({
+            closeButton: true, closeOnClick: false,
+            className: "elev-popup", maxWidth: "280px"
+          });
+          popup.setLngLat([lng, lat]).setHTML(`
+            <div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+              <div style="color:${MEGALITH_COLOR};font-weight:700;margin-bottom:4px">🗿 ${p.name || "Unnamed site"}</div>
+              ${p.type ? `<div style="color:#e2e8f0;margin-bottom:3px">Type: <b>${p.type}</b></div>` : ""}
+              ${p.country ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:3px">📍 ${p.country}</div>` : ""}
+              ${p.flooded === true
+                ? `<div style="color:#f87171;margin-bottom:4px">🌊 Flooded at this sea level</div>`
+                : seaLevelRef.current > 0
+                  ? `<div style="color:#4ade80;margin-bottom:4px">✓ Safe at +${Math.round(seaLevelRef.current)} m</div>`
+                  : ""}
+              ${p.access ? `<div style="color:#64748b;font-size:11px;margin-bottom:3px">Access: ${p.access}</div>` : ""}
+              ${wikiUrl ? `<button onclick="window.__dmWiki && window.__dmWiki(${JSON.stringify(p.name || "")}, ${JSON.stringify(wikiUrl)}, ${JSON.stringify(p.wikidata || "")})" style="margin-top:6px;font-size:11px;color:#d97706;background:rgba(217,119,6,0.1);border:1px solid rgba(217,119,6,0.3);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:Arial,sans-serif;">📖 Wikipedia</button>` : ""}
+            </div>
+          `).addTo(map);
+          megalithPopupRef.current = popup;
+          return;
+        }
       }
 
       if (scenarioModeRef.current === "yellowstone") {
@@ -3849,6 +3897,11 @@ export default function HomePage() {
   }, [seaLevel, viewMode, scenarioMode]);
 
   useEffect(() => {
+    if (megalithOn) addMegalithLayer(seaLevel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seaLevel]);
+
+  useEffect(() => {
     if (!mapRef.current) return;
     if (scenarioMode === "impact") {
       const wh = Math.round(Number(impactResult?.wave_height_m ?? 0));
@@ -4032,6 +4085,15 @@ export default function HomePage() {
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "cataclysm" ? "#1a0505" : "#111827", color: scenarioMode === "cataclysm" ? "#ef4444" : "#94a3b8", border: scenarioMode === "cataclysm" ? "1px solid #dc2626" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>☄️ Cataclysm</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Pole shift inundation models</div>
+        </button>
+        {/* ── Megalith overlay toggle ── */}
+        <button
+          onClick={toggleMegalithOverlay}
+          style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: megalithOn ? "#451a03" : "#111827", color: megalithOn ? "#d97706" : "#94a3b8", border: megalithOn ? "1px solid #d97706" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
+          <div style={{ fontSize: 15 }}>🗿 Megaliths</div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>
+            {megalithOn ? "Overlay active — click site for details" : "28,000+ megalithic sites worldwide"}
+          </div>
         </button>
       </div>
 
@@ -6230,6 +6292,83 @@ export default function HomePage() {
           {drawerOpen ? "⌄" : "⌃"}
         </button>
       </div>
+    </div>
+
+      {/* ── Wikipedia slide-in panel ── */}
+      {wikiPanel && (
+        <div style={{
+          position: "fixed", top: 0, right: 0, bottom: 0,
+          width: "min(420px, 100vw)",
+          background: "#0a0f1e",
+          borderLeft: "1px solid rgba(217,119,6,0.25)",
+          zIndex: 2000,
+          display: "flex", flexDirection: "column",
+          boxShadow: "-8px 0 40px rgba(0,0,0,0.6)",
+          fontFamily: "Arial,sans-serif",
+          animation: "dmWikiSlideIn .25s ease",
+        }}>
+          <style>{`@keyframes dmWikiSlideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}`}</style>
+          {/* Header */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "16px 20px",
+            borderBottom: "1px solid rgba(217,119,6,0.15)",
+            flexShrink: 0,
+          }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#e2e8f0", lineHeight: 1.3, flex: 1, marginRight: 12 }}>
+              🗿 {wikiPanel.title}
+            </div>
+            <button
+              onClick={() => setWikiPanel(null)}
+              style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: 20, lineHeight: 1, padding: 4 }}
+            >✕</button>
+          </div>
+          {/* Content */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
+            {wikiPanel.loading ? (
+              <div style={{ color: "#64748b", fontSize: 13, fontStyle: "italic", paddingTop: 20 }}>Loading…</div>
+            ) : (
+              <>
+                {wikiPanel.thumbnail && (
+                  <img src={wikiPanel.thumbnail} alt={wikiPanel.title}
+                    style={{ width: "100%", borderRadius: 8, marginBottom: 16, maxHeight: 220, objectFit: "cover" }} />
+                )}
+                {wikiPanel.extract ? (
+                  <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.7, fontWeight: 300 }}>{wikiPanel.extract}</p>
+                ) : (
+                  <p style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>
+                    No Wikipedia summary found for "{wikiPanel.title}". Try the full article below.
+                  </p>
+                )}
+                {wikiPanel.wikidataId && (
+                  <div style={{ marginTop: 14, padding: "8px 12px", background: "rgba(217,119,6,0.06)", border: "1px solid rgba(217,119,6,0.2)", borderRadius: 8 }}>
+                    <div style={{ fontSize: 11, color: "#92400e", marginBottom: 2 }}>Wikidata</div>
+                    <a href={`https://www.wikidata.org/wiki/${wikiPanel.wikidataId}`}
+                      target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: 12, color: "#d97706", textDecoration: "none" }}>
+                      {wikiPanel.wikidataId} ↗
+                    </a>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          {/* Footer */}
+          {wikiPanel.url && (
+            <div style={{ padding: "14px 20px", borderTop: "1px solid rgba(217,119,6,0.15)", flexShrink: 0 }}>
+              <a href={wikiPanel.url} target="_blank" rel="noopener noreferrer"
+                style={{
+                  display: "block", padding: "10px", textAlign: "center",
+                  background: "rgba(217,119,6,0.1)", border: "1px solid rgba(217,119,6,0.3)",
+                  borderRadius: 8, color: "#d97706", fontSize: 13, fontWeight: 600,
+                  textDecoration: "none",
+                }}>
+                Open full article on Wikipedia →
+              </a>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
