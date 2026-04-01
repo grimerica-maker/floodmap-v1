@@ -1034,8 +1034,18 @@ export default function HomePage() {
   const [empLoading, setEmpLoading] = useState(false);
   const [megalithOn, setMegalithOn] = useState(false);
   const megalithOnRef = useRef(false);
+  const [airportOn, setAirportOn] = useState(false);
+  const airportOnRef = useRef(false);
+  const [unescoOn, setUnescoOn] = useState(false);
+  const unescoOnRef = useRef(false);
+  const [nuclearOn, setNuclearOn] = useState(false);
+  const nuclearOnRef = useRef(false);
+  const [fireOn, setFireOn] = useState(false);
+  const fireOnRef = useRef(false);
+  const [overlayPanelOpen, setOverlayPanelOpen] = useState(false);
   const [wikiPanel, setWikiPanel] = useState(null);
   const megalithPopupRef = useRef(null);
+  const overlayPopupRef = useRef(null);
   const [nukeResult, setNukeResult] = useState(null);
   const nukeResultRef = useRef(null);
   const [nukeLoading, setNukeLoading] = useState(false);
@@ -1165,67 +1175,115 @@ export default function HomePage() {
   useEffect(() => { nukeResultRef.current = nukeResult; }, [nukeResult]);
   useEffect(() => { floodEngineUrlRef.current = floodEngineUrl; }, [floodEngineUrl]);
   useEffect(() => { megalithOnRef.current = megalithOn; }, [megalithOn]);
+  useEffect(() => { airportOnRef.current = airportOn; }, [airportOn]);
+  useEffect(() => { unescoOnRef.current = unescoOn; }, [unescoOn]);
+  useEffect(() => { nuclearOnRef.current = nuclearOn; }, [nuclearOn]);
+  useEffect(() => { fireOnRef.current = fireOn; }, [fireOn]);
 
-  // ── Megalith overlay functions ──────────────────────────────────────────────
-  const removeMegalithLayer = () => {
-    const map = mapRef.current;
-    if (!map) return;
-    try { if (map.getLayer(MEGALITH_LAYER)) map.removeLayer(MEGALITH_LAYER); } catch(e){}
-    try { if (map.getSource(MEGALITH_SOURCE)) map.removeSource(MEGALITH_SOURCE); } catch(e){}
+  // ── Generic at-risk overlay system ───────────────────────────────────────────
+  // Config: type → { src, layer, color, subColor, icon, label, proOnly }
+  const OVL = {
+    megaliths: { src: "dm-megaliths-src", layer: "dm-megaliths-layer", color: "#d97706", subColor: "#3b82f6", icon: "🗿", label: "Megaliths",      proOnly: false },
+    unesco:    { src: "dm-unesco-src",    layer: "dm-unesco-layer",    color: "#a855f7", subColor: "#6366f1", icon: "🌍", label: "UNESCO Sites",   proOnly: false },
+    airports:  { src: "dm-airports-src",  layer: "dm-airports-layer",  color: "#22d3ee", subColor: "#0ea5e9", icon: "✈️", label: "Airports",       proOnly: true  },
+    nuclear:   { src: "dm-nuclear-src",   layer: "dm-nuclear-layer",   color: "#4ade80", subColor: "#16a34a", icon: "☢️", label: "Nuclear Plants", proOnly: true  },
+    fires:     { src: "dm-fires-src",     layer: "dm-fires-layer",     color: "#ff4500", subColor: "#ff8c00", icon: "🔥", label: "Live Fires",      proOnly: false, noFloodColor: true },
   };
 
-  const addMegalithLayer = async (level = 0) => {
+  const removeOverlayLayer = (type) => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    removeMegalithLayer();
+    const c = OVL[type];
+    if (!map || !c) return;
+    try { if (map.getLayer(c.layer)) map.removeLayer(c.layer); } catch(e){}
+    try { if (map.getSource(c.src))  map.removeSource(c.src);  } catch(e){}
+  };
+
+  const addOverlayLayer = async (type, level = 0) => {
+    const map = mapRef.current;
+    const c = OVL[type];
+    if (!map || !c || !map.isStyleLoaded()) return;
+    removeOverlayLayer(type); // guard double-add
     try {
-      const res = await fetch(
-        `${floodEngineUrlRef.current}/at-risk?level=${level}&type=megaliths`,
-        { cache: "no-store" }
-      );
+      // Fires use a dedicated endpoint; all others use /at-risk
+      const url = type === "fires"
+        ? `${floodEngineUrlRef.current}/active-fires?pro=${proTierRef.current !== "free"}`
+        : `${floodEngineUrlRef.current}/at-risk?level=${level}&type=${type}`;
+      const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
       if (!data.features?.length) return;
-      map.addSource(MEGALITH_SOURCE, { type: "geojson", data });
+      map.addSource(c.src, { type: "geojson", data });
+
+      const isFire = type === "fires";
       map.addLayer({
-        id: MEGALITH_LAYER,
-        type: "circle",
-        source: MEGALITH_SOURCE,
+        id: c.layer, type: "circle", source: c.src,
         paint: {
-          "circle-color": MEGALITH_COLOR,
-          "circle-stroke-width": level > 0
-            ? ["case", ["==", ["get", "flooded"], true], 2.5, 1.5]
-            : 1.5,
-          "circle-stroke-color": "#ffffff",
-          "circle-opacity": level > 0
-            ? ["case", ["==", ["get", "flooded"], true], 1.0, 0.5]
-            : 0.75,
-          "circle-radius": level > 0
-            ? ["case", ["==", ["get", "flooded"], true],
-                ["interpolate", ["linear"], ["zoom"], 2, 6, 6, 9, 10, 13],
-                ["interpolate", ["linear"], ["zoom"], 2, 4, 6, 7, 10, 10]]
-            : ["interpolate", ["linear"], ["zoom"], 2, 4, 6, 7, 10, 10],
+          "circle-color": isFire ? "#ff4500" : [
+            "case",
+            ["==", ["get", "already_submerged"], true], c.subColor,
+            ["==", ["get", "flooded"], true],            c.subColor,
+            c.color,
+          ],
+          "circle-stroke-width": isFire ? 0.5 : [
+            "case", ["any",
+              ["==", ["get", "flooded"], true],
+              ["==", ["get", "already_submerged"], true]
+            ], 2.5, 1.5
+          ],
+          "circle-stroke-color": isFire ? "#ff8c00" : "#ffffff",
+          "circle-opacity": isFire ? 0.85 : [
+            "case", ["any",
+              ["==", ["get", "flooded"], true],
+              ["==", ["get", "already_submerged"], true]
+            ], 1.0, 0.75
+          ],
+          "circle-radius": isFire
+            ? (proTierRef.current !== "free"
+                ? ["interpolate", ["linear"], ["coalesce", ["get", "frp"], 5], 5, 3, 50, 6, 200, 10, 500, 16]
+                : ["interpolate", ["linear"], ["zoom"], 2, 3, 6, 5, 10, 7])
+            : ["interpolate", ["linear"], ["zoom"], 2, 4, 6, 7, 10, 11],
         },
       });
-      map.on("mouseenter", MEGALITH_LAYER, () => { try { map.getCanvas().style.cursor = "pointer"; } catch {} });
-      map.on("mouseleave", MEGALITH_LAYER, () => { map.getCanvas().style.cursor = "crosshair"; });
+      map.on("mouseenter", c.layer, () => { try { map.getCanvas().style.cursor = "pointer"; } catch {} });
+      map.on("mouseleave", c.layer, () => { map.getCanvas().style.cursor = "crosshair"; });
       safely(() => map.triggerRepaint());
-    } catch(e) { console.warn("[megaliths]", e); }
+    } catch(e) { console.warn(`[overlay:${type}]`, e); }
   };
 
-  const toggleMegalithOverlay = () => {
-    const next = !megalithOnRef.current;
-    setMegalithOn(next);
-    megalithOnRef.current = next;
+  const reloadActiveOverlays = (level, includeFiresReload = false) => {
+    if (megalithOnRef.current) addOverlayLayer("megaliths", level);
+    if (unescoOnRef.current)   addOverlayLayer("unesco",    level);
+    if (airportOnRef.current)  addOverlayLayer("airports",  level);
+    if (nuclearOnRef.current)  addOverlayLayer("nuclear",   level);
+    if (fireOnRef.current && includeFiresReload) addOverlayLayer("fires", 0);
+  };
+
+  const toggleOverlay = (type) => {
+    const onRef = { megaliths: megalithOnRef, unesco: unescoOnRef, airports: airportOnRef, nuclear: nuclearOnRef, fires: fireOnRef }[type];
+    const setter = { megaliths: setMegalithOn, unesco: setUnescoOn, airports: setAirportOn, nuclear: setNuclearOn, fires: setFireOn }[type];
+    if (!onRef || !setter) return;
+    const next = !onRef.current;
+    setter(next);
+    onRef.current = next;
     if (!next) {
-      removeMegalithLayer();
-      if (megalithPopupRef.current) { megalithPopupRef.current.remove(); megalithPopupRef.current = null; }
+      removeOverlayLayer(type);
+      if (overlayPopupRef.current) { overlayPopupRef.current.remove(); overlayPopupRef.current = null; }
     } else {
-      addMegalithLayer(seaLevelRef.current);
+      addOverlayLayer(type, seaLevelRef.current);
     }
   };
 
+  // Keep megalithOn/megalithOnRef in sync for legacy patch 5/6/7 references
+  const removeMegalithLayer = () => removeOverlayLayer("megaliths");
+  const addMegalithLayer    = (level) => addOverlayLayer("megaliths", level);
+  const toggleMegalithOverlay = () => toggleOverlay("megaliths");
+
   const openWikiPanel = async (name, wikiUrl, wikidataId) => {
+    if (proTierRef.current === "free") {
+      // Free users: show upgrade CTA instead of wiki panel
+      setWikiPanel({ proGate: true, title: name });
+      return;
+    }
     setWikiPanel({ title: name, extract: null, thumbnail: null, url: wikiUrl, loading: true });
     try {
       const slug = encodeURIComponent(name.replace(/ /g, "_"));
@@ -1247,6 +1305,7 @@ export default function HomePage() {
       setWikiPanel({ title: name, extract: null, thumbnail: null, url: wikiUrl, wikidataId, loading: false });
     }
   };
+
 
 
   // Star field animation
@@ -3560,10 +3619,8 @@ export default function HomePage() {
       if ((scenarioModeRef.current === "flood" || scenarioModeRef.current === "climate") && seaLevelRef.current <= -100) {
         setTimeout(() => safely(() => drawIceSheets(mapRef.current)), 100);
       }
-      // Re-add megalith layer on style reload
-      if (megalithOnRef.current) {
-        setTimeout(() => addMegalithLayer(seaLevelRef.current), 100);
-      }
+      // Re-add all active overlays on style reload
+      setTimeout(() => reloadActiveOverlays(seaLevelRef.current, true), 100);
       if (scenarioModeRef.current === "impact" && impactResultRef.current && !impactDrawingRef.current) {
         const points = impactPointsRef.current.length > 0 ? impactPointsRef.current : (impactPointRef.current ? [impactPointRef.current] : []);
         setTimeout(() => {
@@ -3708,37 +3765,59 @@ export default function HomePage() {
         return;
       }
 
-      // ── Megalith overlay click ──
-      if (megalithOnRef.current) {
-        const mFeats = map.queryRenderedFeatures(e.point, {
-          layers: [MEGALITH_LAYER].filter(l => { try { return !!map.getLayer(l); } catch { return false; } })
-        });
-        if (mFeats.length > 0) {
-          const p = mFeats[0].properties;
-          if (megalithPopupRef.current) { megalithPopupRef.current.remove(); megalithPopupRef.current = null; }
-          const wikiUrl = p.wikipedia
-            ? (p.wikipedia.startsWith("http") ? p.wikipedia : `https://en.wikipedia.org/wiki/${encodeURIComponent(p.wikipedia)}`)
-            : p.name ? `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(p.name)}&ns0=1` : null;
-          const popup = new mapboxgl.Popup({
-            closeButton: true, closeOnClick: false,
-            className: "elev-popup", maxWidth: "280px"
-          });
-          popup.setLngLat([lng, lat]).setHTML(`
-            <div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
-              <div style="color:${MEGALITH_COLOR};font-weight:700;margin-bottom:4px">🗿 ${p.name || "Unnamed site"}</div>
-              ${p.type ? `<div style="color:#e2e8f0;margin-bottom:3px">Type: <b>${p.type}</b></div>` : ""}
-              ${p.country ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:3px">📍 ${p.country}</div>` : ""}
-              ${p.flooded === true
-                ? `<div style="color:#f87171;margin-bottom:4px">🌊 Flooded at this sea level</div>`
-                : seaLevelRef.current > 0
-                  ? `<div style="color:#4ade80;margin-bottom:4px">✓ Safe at +${Math.round(seaLevelRef.current)} m</div>`
-                  : ""}
-              ${p.access ? `<div style="color:#64748b;font-size:11px;margin-bottom:3px">Access: ${p.access}</div>` : ""}
-              ${wikiUrl ? `<button onclick="window.__dmWiki && window.__dmWiki(${JSON.stringify(p.name || "")}, ${JSON.stringify(wikiUrl)}, ${JSON.stringify(p.wikidata || "")})" style="margin-top:6px;font-size:11px;color:#d97706;background:rgba(217,119,6,0.1);border:1px solid rgba(217,119,6,0.3);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:Arial,sans-serif;">📖 Wikipedia</button>` : ""}
-            </div>
-          `).addTo(map);
-          megalithPopupRef.current = popup;
-          return;
+      // ── Overlay click handler (megaliths, unesco, airports, nuclear) ──
+      {
+        const activeLayers = Object.entries(OVL)
+          .filter(([type]) => {
+            const refs = { megaliths: megalithOnRef, unesco: unescoOnRef, airports: airportOnRef, nuclear: nuclearOnRef, fires: fireOnRef };
+            return refs[type]?.current;
+          })
+          .map(([, c]) => c.layer)
+          .filter(l => { try { return !!map.getLayer(l); } catch { return false; } });
+
+        if (activeLayers.length > 0) {
+          const feats = map.queryRenderedFeatures(e.point, { layers: activeLayers });
+          if (feats.length > 0) {
+            const p   = feats[0].properties;
+            const kind = p.kind || "megalith";
+            const cfg = Object.values(OVL).find(c => c.layer === feats[0].layer.id) || OVL.megaliths;
+            if (overlayPopupRef.current) { overlayPopupRef.current.remove(); overlayPopupRef.current = null; }
+            const wikiUrl = p.wikipedia
+              ? (p.wikipedia.startsWith("http") ? p.wikipedia : `https://en.wikipedia.org/wiki/${encodeURIComponent(p.wikipedia)}`)
+              : p.name ? `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(p.name)}&ns0=1` : null;
+            const isSubmerged = p.already_submerged === true || p.already_submerged === "true";
+            const isFlooded   = p.flooded === true || p.flooded === "true";
+            const dotColor    = (isSubmerged || isFlooded) ? cfg.subColor : cfg.color;
+            const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: false, className: "elev-popup", maxWidth: "300px" });
+            const isFire = kind === "fire";
+            popup.setLngLat([lng, lat]).setHTML(isFire ? `
+              <div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+                <div style="color:#ff4500;font-weight:700;font-size:14px;margin-bottom:6px">🔥 Active Fire Detection</div>
+                ${p.frp ? `<div style="color:#e2e8f0;margin-bottom:3px">Intensity: <strong>${p.frp} MW</strong></div>` : "<div style="color:#94a3b8;margin-bottom:3px">High confidence detection</div>"}
+                ${p.date ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:3px">Detected: <strong>${p.date}</strong></div>` : ""}
+                <div style="color:#64748b;font-size:11px;margin-top:4px">Source: NASA FIRMS VIIRS 24h</div>
+              </div>
+            ` : `
+              <div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+                <div style="color:${dotColor};font-weight:700;margin-bottom:4px">${cfg.icon} ${p.name || "Unnamed site"}</div>
+                ${p.type || p.category ? `<div style="color:#e2e8f0;margin-bottom:3px"><b>${p.type || p.category}</b></div>` : ""}
+                ${p.country ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:3px">📍 ${p.country}</div>` : ""}
+                ${p.iata ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:3px">IATA: <b>${p.iata}</b></div>` : ""}
+                ${p.capacity ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:3px">Capacity: ${p.capacity} MW</div>` : ""}
+                ${p.elevation !== undefined ? `<div style="color:#64748b;font-size:11px;margin-bottom:3px">Elevation: ${Number(p.elevation).toFixed(0)} m</div>` : ""}
+                ${isSubmerged
+                  ? `<div style="color:#60a5fa;margin-bottom:4px">🌊 Currently underwater</div>`
+                  : isFlooded
+                    ? `<div style="color:#f87171;margin-bottom:4px">🌊 Flooded at this sea level</div>`
+                    : seaLevelRef.current > 0
+                      ? `<div style="color:#4ade80;margin-bottom:4px">✓ Safe at +${Math.round(seaLevelRef.current)} m</div>`
+                      : ""}
+                ${wikiUrl ? `<button onclick="window.__dmWiki && window.__dmWiki(${JSON.stringify(p.name || "")}, ${JSON.stringify(wikiUrl)}, ${JSON.stringify(p.wikidata || "")})" style="margin-top:6px;font-size:11px;color:${dotColor};background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:Arial,sans-serif;">📖 Wikipedia</button>` : ""}
+              </div>
+            `).addTo(map);
+            overlayPopupRef.current = popup;
+            return;
+          }
         }
       }
 
@@ -3980,7 +4059,7 @@ export default function HomePage() {
   }, [seaLevel, viewMode, scenarioMode]);
 
   useEffect(() => {
-    if (megalithOn) addMegalithLayer(seaLevel);
+    reloadActiveOverlays(seaLevel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seaLevel]);
 
@@ -4169,15 +4248,7 @@ export default function HomePage() {
           <div style={{ fontSize: 15 }}>☄️ Cataclysm</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Pole shift inundation models</div>
         </button>
-        {/* ── Megalith overlay toggle ── */}
-        <button
-          onClick={toggleMegalithOverlay}
-          style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: megalithOn ? "#451a03" : "#111827", color: megalithOn ? "#d97706" : "#94a3b8", border: megalithOn ? "1px solid #d97706" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
-          <div style={{ fontSize: 15 }}>🗿 Megaliths</div>
-          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>
-            {megalithOn ? "Overlay active — click site for details" : "28,000+ megalithic sites worldwide"}
-          </div>
-        </button>
+
       </div>
 
       {/* ── IMPACT CONTROLS ── */}
@@ -6376,6 +6447,107 @@ export default function HomePage() {
         </button>
       </div>
 
+      {/* ── Overlays floating button ── */}
+      <div
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); setOverlayPanelOpen(v => !v); }}
+        style={{
+          position: "fixed",
+          top: isMobile ? 60 : 14,
+          right: isMobile ? 14 : 70,
+          zIndex: 1200,
+          background: (megalithOn || unescoOn || airportOn || nuclearOn || fireOn) ? "rgba(217,119,6,0.18)" : "rgba(15,23,42,0.85)",
+          border: (megalithOn || unescoOn || airportOn || nuclearOn || fireOn) ? "1px solid #d97706" : "1px solid #1e2d45",
+          borderRadius: 10,
+          padding: "7px 13px",
+          cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 7,
+          backdropFilter: "blur(8px)",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.4)",
+          userSelect: "none",
+        }}
+      >
+        <span style={{ fontSize: 16 }}>🗺️</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: (megalithOn || unescoOn || airportOn || nuclearOn || fireOn) ? "#d97706" : "#94a3b8", letterSpacing: "0.03em" }}>
+          Overlays{(megalithOn || unescoOn || airportOn || nuclearOn || fireOn) ? " ●" : ""}
+        </span>
+      </div>
+
+      {/* ── Overlays panel ── */}
+      {overlayPanelOpen && (
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "fixed",
+            top: isMobile ? 108 : 56,
+            right: isMobile ? 14 : 70,
+            zIndex: 1200,
+            background: "rgba(10,15,30,0.97)",
+            border: "1px solid #1e2d45",
+            borderRadius: 14,
+            padding: "14px 14px 10px",
+            width: 240,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+            backdropFilter: "blur(12px)",
+          }}
+        >
+          <div style={{ fontSize: 11, color: "#475569", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
+            Map Overlays
+          </div>
+          {Object.entries(OVL).map(([type, cfg]) => {
+            const isOn = { megaliths: megalithOn, unesco: unescoOn, airports: airportOn, nuclear: nuclearOn, fires: fireOn }[type];
+            const isPro = cfg.proOnly;
+            const locked = isPro && proTier === "free";
+            return (
+              <div key={type}
+                onClick={() => {
+                  if (locked) { window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank"); return; }
+                  toggleOverlay(type);
+                }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "9px 10px",
+                  marginBottom: 4,
+                  borderRadius: 9,
+                  cursor: "pointer",
+                  background: isOn ? `rgba(${type === "megaliths" ? "217,119,6" : type === "unesco" ? "168,85,247" : type === "airports" ? "34,211,238" : "74,222,128"},0.12)` : "rgba(255,255,255,0.03)",
+                  border: isOn ? `1px solid ${cfg.color}44` : "1px solid transparent",
+                  transition: "all 0.15s",
+                }}
+              >
+                <span style={{ fontSize: 18, lineHeight: 1 }}>{cfg.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: isOn ? cfg.color : locked ? "#4b5563" : "#cbd5e1" }}>
+                    {cfg.label}
+                    {locked && <span style={{ marginLeft: 6, fontSize: 10, color: "#f97316" }}>PRO</span>}
+                  </div>
+                  {type === "megaliths" && <div style={{ fontSize: 10, color: "#475569", marginTop: 1 }}>28,000+ sites · incl. underwater</div>}
+                  {type === "unesco"    && <div style={{ fontSize: 10, color: "#475569", marginTop: 1 }}>World Heritage Sites</div>}
+                  {type === "airports"  && <div style={{ fontSize: 10, color: locked ? "#374151" : "#475569", marginTop: 1 }}>{locked ? "Upgrade to Pro" : "Major & regional airports"}</div>}
+                  {type === "nuclear"   && <div style={{ fontSize: 10, color: locked ? "#374151" : "#475569", marginTop: 1 }}>{locked ? "Upgrade to Pro" : "Active nuclear plants"}</div>}
+                  {type === "fires"     && <div style={{ fontSize: 10, color: "#475569", marginTop: 1 }}>NASA FIRMS VIIRS · updated every 3h</div>}
+                </div>
+                <div style={{
+                  width: 28, height: 16, borderRadius: 8,
+                  background: isOn ? cfg.color : "#1e2d45",
+                  position: "relative", flexShrink: 0, transition: "background 0.2s",
+                }}>
+                  <div style={{
+                    position: "absolute", top: 2, left: isOn ? 14 : 2,
+                    width: 12, height: 12, borderRadius: "50%",
+                    background: "white", transition: "left 0.2s",
+                  }} />
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #1e2d45", fontSize: 10, color: "#374151", textAlign: "center" }}>
+            🔵 currently underwater &nbsp;·&nbsp; 🔴 flooded at current level
+          </div>
+        </div>
+      )}
+
       {/* ── Wikipedia slide-in panel ── */}
       {wikiPanel && (
         <div style={{
@@ -6407,7 +6579,24 @@ export default function HomePage() {
           </div>
           {/* Content */}
           <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
-            {wikiPanel.loading ? (
+            {wikiPanel.proGate ? (
+              <div style={{ paddingTop: 24, textAlign: "center" }}>
+                <div style={{ fontSize: 36, marginBottom: 12 }}>📖</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#e2e8f0", marginBottom: 8 }}>Wikipedia Panel</div>
+                <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6, marginBottom: 20 }}>
+                  Read full site summaries, see photos, and explore history — included with Pro.
+                </div>
+                <button
+                  onClick={() => window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank")}
+                  style={{ width: "100%", padding: "11px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 9, color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}
+                >
+                  🔓 Upgrade to Pro
+                </button>
+                <button onClick={() => setWikiPanel(null)} style={{ width: "100%", padding: "8px", background: "transparent", border: "1px solid #1e2d45", borderRadius: 9, color: "#64748b", fontSize: 13, cursor: "pointer" }}>
+                  Close
+                </button>
+              </div>
+            ) : wikiPanel.loading ? (
               <div style={{ color: "#64748b", fontSize: 13, fontStyle: "italic", paddingTop: 20 }}>Loading…</div>
             ) : (
               <>
@@ -6436,7 +6625,7 @@ export default function HomePage() {
             )}
           </div>
           {/* Footer */}
-          {wikiPanel.url && (
+          {!wikiPanel.proGate && wikiPanel.url && (
             <div style={{ padding: "14px 20px", borderTop: "1px solid rgba(217,119,6,0.15)", flexShrink: 0 }}>
               <a href={wikiPanel.url} target="_blank" rel="noopener noreferrer"
                 style={{
