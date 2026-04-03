@@ -14,6 +14,46 @@ const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-streets-v12";
 
 const FLOOD_TILE_VERSION = "204";
+
+// ── Scenario wiki content ────────────────────────────────────────────────────
+const SCENARIO_WIKI = {
+  impact: {
+    title: "Meteor Impact", icon: "🌑",
+    body: `<h3>Meteor Impact Physics</h3><p>When a meteorite strikes Earth, it releases energy orders of magnitude greater than nuclear weapons. A 1km asteroid delivers ~10,000 megatons — equivalent to all nuclear arsenals combined.</p><h4>Key Events</h4><ul><li><strong>Chicxulub (66 Ma)</strong> — ~10km impactor, triggered mass extinction, 180km crater beneath Yucatán</li><li><strong>Tunguska (1908)</strong> — ~50m asteroid airburst, flattened 2,000 km² of Siberian forest</li><li><strong>Younger Dryas (12,900 BP)</strong> — Proposed ~100m cometary cluster impact over Laurentide ice sheet</li><li><strong>Barringer Crater (50,000 BP)</strong> — ~50m iron meteorite, 1.2km crater, Arizona</li></ul><h4>Impact Zones</h4><p>Fireball → overpressure → thermal radiation → seismic → tsunami. Each zone grows with yield. A 1km impactor creates a fireball visible from 500km.</p>`,
+  },
+  nuke: {
+    title: "Nuclear Detonation", icon: "☢️",
+    body: `<h3>Nuclear Weapons Effects</h3><p>Nuclear weapons release energy through fission and fusion. Effects scale with yield and burst height.</p><h4>Yield Comparison</h4><ul><li><strong>Little Boy (Hiroshima)</strong> — 15 kt, 140,000 deaths, 1.6km fireball radius</li><li><strong>Castle Bravo (1954)</strong> — 15 Mt, largest US test, 7km fireball radius</li><li><strong>Tsar Bomba (1961)</strong> — 50 Mt, largest ever detonated, 3.5km fireball</li><li><strong>Modern W87</strong> — 300 kt standard US ICBM warhead</li></ul><h4>Effect Zones</h4><p>Fireball → prompt radiation → overpressure → thermal → fallout. Airburst maximizes blast radius. Nuclear winter possible above ~100 warheads targeting cities.</p>`,
+  },
+  yellowstone: {
+    title: "Super Volcano", icon: "🌋",
+    body: `<h3>Supervolcano Eruptions</h3><p>Supervolcanoes (VEI 8+) eject over 1,000 km³ of material, causing global cooling, crop failure, and mass casualties.</p><h4>Major Caldera Systems</h4><ul><li><strong>Yellowstone</strong> — Last eruption 640,000 BP (VEI 8). Ash would blanket North America.</li><li><strong>Toba (74,000 BP)</strong> — VEI 8, possibly caused human population bottleneck. ~6 years of volcanic winter.</li><li><strong>Campi Flegrei</strong> — Active Italian caldera near Naples. Last major eruption 39,000 BP.</li></ul><h4>Global Effects</h4><p>SO₂ injection into stratosphere → volcanic winter → 1-3°C global cooling lasting years. Agriculture collapse within months.</p>`,
+  },
+  tsunami: {
+    title: "Mega-Tsunami", icon: "🌊",
+    body: `<h3>Mega-Tsunami Formation</h3><p>Mega-tsunamis are caused by massive landslides, volcanic flank collapses, or asteroid ocean impacts — generating waves 10-100x larger than tectonic tsunamis.</p><h4>Historical Events</h4><ul><li><strong>Lituya Bay 1958</strong> — Largest recorded: 524m runup wave from rockslide. Alaska.</li><li><strong>Storegga Slide (8,150 BP)</strong> — Norwegian shelf collapse, 20m waves hit Britain, may have severed Doggerland.</li><li><strong>La Palma risk</strong> — Cumbre Vieja flank collapse could generate 25m Atlantic waves reaching Americas in 8 hours.</li></ul><h4>Ocean Impact Tsunamis</h4><p>A 1km asteroid striking ocean generates 300m+ wave at impact, 10m+ across ocean basins. Amplifies in coastal shallows.</p>`,
+  },
+  cataclysm: {
+    title: "Pole Shift / Cataclysm", icon: "☄️",
+    body: `<h3>Crustal Displacement & Pole Shift</h3><p>Catastrophist theories propose periodic rapid displacement of Earth's lithosphere, shifting geographic poles and triggering global flooding and mass extinctions.</p><h4>Key Models</h4><ul><li><strong>Ben Davidson / Suspicious Observers</strong> — Micronova hypothesis: solar plasma event triggers geomagnetic excursion and crustal shift. New pole: Bay of Bengal.</li><li><strong>ECDO Theory (Ethical Skeptic)</strong> — Earth's crust decouples from mantle along asthenosphere. Rotational momentum imbalance.</li><li><strong>Charles Hapgood (1958)</strong> — Original crustal displacement theory, supported by Einstein.</li></ul><h4>Evidence Cited</h4><p>Megafauna flash-freezing, tropical species in Arctic sediments, Younger Dryas impact evidence, ancient maps showing ice-free Antarctica.</p>`,
+  },
+  ydi: {
+    title: "Younger Dryas Impact", icon: "☄️",
+    body: `<h3>Younger Dryas Impact Hypothesis</h3><p>At ~12,900 BP, a cometary or asteroidal cluster impact/airburst over the Laurentide Ice Sheet triggered rapid climate change, megafaunal extinction, and Clovis culture collapse.</p><h4>Key Evidence</h4><ul><li><strong>Platinum/Iridium spike</strong> — Impact markers found across 4 continents at YDB</li><li><strong>Nanodiamond layer</strong> — Shock-formed nanodiamonds in YDB sediments</li><li><strong>Columbia Scablands</strong> — Catastrophic flooding carved Washington State's channeled scablands</li><li><strong>Carolina Bays</strong> — Elliptical depressions across eastern US, possibly secondary ejecta craters</li><li><strong>Mammoth extinction</strong> — Population collapses align with YDB</li></ul><h4>Flood Corridors</h4><p>Lake Agassiz drainage triggered massive freshwater pulses into Atlantic, disrupting thermohaline circulation and causing rapid cooling within decades.</p>`,
+  },
+};
+
+// ── Storm surge presets (NOAA SLOSH parameterization) ────────────────────────
+const SURGE_PRESETS = [
+  { id: "ts",   label: "T.Storm", height: 1.0, reach: 25000,  color: "#16a34a" },
+  { id: "cat1", label: "Cat 1",   height: 2.0, reach: 45000,  color: "#ca8a04" },
+  { id: "cat2", label: "Cat 2",   height: 3.0, reach: 65000,  color: "#ea580c" },
+  { id: "cat3", label: "Cat 3",   height: 4.5, reach: 90000,  color: "#dc2626" },
+  { id: "cat4", label: "Cat 4",   height: 6.0, reach: 120000, color: "#b91c1c" },
+  { id: "cat5", label: "Cat 5",   height: 9.0, reach: 180000, color: "#7f1d1d" },
+];
+const SURGE_SOURCE = "dm-surge-source";
+const SURGE_LAYER  = "dm-surge-layer";
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
 
@@ -1068,7 +1108,18 @@ export default function HomePage() {
     return getProTier(); // localStorage fallback
   };
 
-  const [proTier, setProTier] = useState("free"); // set after mount in useEffect
+  const [proTier, setProTier] = useState("free");
+  const [scenarioWiki, setScenarioWiki] = useState(null);
+  const [surgeOn,     setSurgeOn]     = useState(false);
+  const [surgeM,      setSurgeM]      = useState(3.0);
+  const [surgePreset, setSurgePreset] = useState(null);
+  const [surgeMode,   setSurgeMode]   = useState("place");
+  const [surgePoint,  setSurgePoint]  = useState(null);
+  const surgeOnRef    = useRef(false);
+  const surgeRef      = useRef(3.0);
+  const surgeModeRef  = useRef("place");
+  const surgePointRef = useRef(null);
+  const surgeMarker   = useRef(null); // set after mount in useEffect
   // keep ref in sync
   useEffect(() => { proTierRef.current = proTier; }, [proTier]);
   useEffect(() => { cataclysmOverlayRef.current = cataclysmOverlay; }, [cataclysmOverlay]);
@@ -1164,6 +1215,10 @@ export default function HomePage() {
 
   useEffect(() => { seaLevelRef.current = seaLevel; }, [seaLevel]);
   useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
+  useEffect(() => { surgeOnRef.current   = surgeOn;    }, [surgeOn]);
+  useEffect(() => { surgeRef.current     = surgeM;     }, [surgeM]);
+  useEffect(() => { surgeModeRef.current = surgeMode;  }, [surgeMode]);
+  useEffect(() => { surgePointRef.current= surgePoint; }, [surgePoint]);
   useEffect(() => { scenarioModeRef.current = scenarioMode; }, [scenarioMode]);
   useEffect(() => { impactDiameterRef.current = impactDiameter; }, [impactDiameter]);
   useEffect(() => { impactVelocityRef.current = impactVelocity; }, [impactVelocity]);
@@ -1473,6 +1528,78 @@ export default function HomePage() {
         </div>
       `);
     }
+  };
+
+  // ── Storm Surge ──────────────────────────────────────────────────────────────
+  const applySurge = (point, surgeHeight, baseLevel, reachM) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    try { if (map.getLayer(SURGE_LAYER))  map.removeLayer(SURGE_LAYER);  } catch(e) {}
+    try { if (map.getSource(SURGE_SOURCE)) map.removeSource(SURGE_SOURCE); } catch(e) {}
+    if (!point || surgeHeight <= 0) return;
+    const totalLevel = baseLevel + surgeHeight;
+    const url = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(totalLevel)}/${encodeURIComponent(point.lat)}/${encodeURIComponent(point.lng)}/${encodeURIComponent(reachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
+    map.addSource(SURGE_SOURCE, { type: "raster", tiles: [url], tileSize: 256, minzoom: 0, maxzoom: 12 });
+    map.addLayer({ id: SURGE_LAYER, type: "raster", source: SURGE_SOURCE,
+      paint: { "raster-opacity": 0.72, "raster-opacity-transition": { duration: 400 } } });
+    map.triggerRepaint();
+  };
+
+  const clearSurge = () => {
+    const map = mapRef.current;
+    if (map && map.isStyleLoaded()) {
+      try { if (map.getLayer(SURGE_LAYER))  map.removeLayer(SURGE_LAYER);  } catch(e) {}
+      try { if (map.getSource(SURGE_SOURCE)) map.removeSource(SURGE_SOURCE); } catch(e) {}
+    }
+    if (surgeMarker.current) { surgeMarker.current.remove(); surgeMarker.current = null; }
+    setSurgeOn(false); surgeOnRef.current = false;
+    setSurgePoint(null); surgePointRef.current = null;
+    setSurgeMode("place"); surgeModeRef.current = "place";
+  };
+
+  const getSurgeReach = () => {
+    if (surgePreset) {
+      const p = SURGE_PRESETS.find(p => p.id === surgePreset);
+      return p ? p.reach : surgeRef.current * 20000;
+    }
+    return surgeRef.current * 20000;
+  };
+
+  const selectSurgePreset = (preset) => {
+    setSurgePreset(preset.id);
+    setSurgeM(preset.height); surgeRef.current = preset.height;
+    if (surgePointRef.current) {
+      applySurge(surgePointRef.current, preset.height, seaLevelRef.current, preset.reach);
+    }
+  };
+
+  const toggleSurge = () => {
+    const isPro = proTierRef.current !== "free";
+    if (!isPro) { setPaywallModal("pro"); return; }
+    const next = !surgeOnRef.current;
+    setSurgeOn(next); surgeOnRef.current = next;
+    if (!next) clearSurge();
+    else setSurgeMode("place");
+  };
+
+  const placeSurgePoint = (lat, lng) => {
+    if (surgeMarker.current) { surgeMarker.current.remove(); surgeMarker.current = null; }
+    const map = mapRef.current;
+    if (!map) return;
+    const el = document.createElement("div");
+    el.style.cssText = "width:22px;height:22px;border-radius:50%;background:#38bdf8;border:2.5px solid #fff;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.5);";
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (surgeMarker.current) { surgeMarker.current.remove(); surgeMarker.current = null; }
+      setSurgePoint(null); surgePointRef.current = null;
+      setSurgeMode("place"); surgeModeRef.current = "place";
+      clearSurge();
+    });
+    const marker = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([lng, lat]).addTo(map);
+    surgeMarker.current = marker;
+    setSurgePoint({ lat, lng }); surgePointRef.current = { lat, lng };
+    setSurgeMode("active"); surgeModeRef.current = "active";
+    applySurge({ lat, lng }, surgeRef.current, seaLevelRef.current, getSurgeReach());
   };
 
   const applyProjectionForMode = (mode) => {
@@ -3669,6 +3796,12 @@ export default function HomePage() {
 
       const { lng, lat } = e.lngLat;
 
+      // Storm surge placement
+      if (surgeModeRef.current === "place" && surgeOnRef.current) {
+        placeSurgePoint(lat, lng);
+        return;
+      }
+
       if (scenarioModeRef.current === "impact") {
         // If results exist, show zone popup; otherwise place a new impact point
         if (impactResultRef.current) {
@@ -4221,7 +4354,7 @@ export default function HomePage() {
         <button
           onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("impact"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "impact" ? "#1e3a5f" : "#111827", color: scenarioMode === "impact" ? "#60a5fa" : "#94a3b8", border: scenarioMode === "impact" ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
-          <div style={{ fontSize: 15 }}>Impact</div>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>Impact</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["impact"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Click map to place impact point</div>
         </button>
         <button
@@ -4240,25 +4373,25 @@ export default function HomePage() {
         <button
           onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("nuke"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "nuke" ? "#4c1d95" : "#111827", color: scenarioMode === "nuke" ? "#c4b5fd" : "#94a3b8", border: scenarioMode === "nuke" ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
-          <div style={{ fontSize: 15 }}>☢️ Nuke</div>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>☢️ Nuke</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["nuke"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Click map to place detonation point</div>
         </button>
         <button
           onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("yellowstone"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "yellowstone" ? "#431407" : "#111827", color: scenarioMode === "yellowstone" ? "#fb923c" : "#94a3b8", border: scenarioMode === "yellowstone" ? "1px solid #ea580c" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
-          <div style={{ fontSize: 15 }}>🌋 Super Volcano</div>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>🌋 Super Volcano</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["yellowstone"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Supervolcano eruption scenarios</div>
         </button>
         <button
           onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "tsunami" ? "#0c2a4a" : "#111827", color: scenarioMode === "tsunami" ? "#38bdf8" : "#94a3b8", border: scenarioMode === "tsunami" ? "1px solid #0ea5e9" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
-          <div style={{ fontSize: 15 }}>🌊 Mega-Tsunami</div>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>🌊 Mega-Tsunami</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["tsunami"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Ocean collapse wave propagation</div>
         </button>
         <button
           onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); scenarioModeRef.current = "cataclysm"; setScenarioMode("cataclysm"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "cataclysm" ? "#1a0505" : "#111827", color: scenarioMode === "cataclysm" ? "#ef4444" : "#94a3b8", border: scenarioMode === "cataclysm" ? "1px solid #dc2626" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
-          <div style={{ fontSize: 15 }}>☄️ Cataclysm</div>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>☄️ Cataclysm</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["cataclysm"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Pole shift inundation models</div>
         </button>
 
@@ -4267,7 +4400,63 @@ export default function HomePage() {
       {/* ── IMPACT CONTROLS ── */}
       {scenarioMode === "impact" && (
         <>
-          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Presets</div>
+          {/* ── STORM SURGE ── */}
+        <div style={{ marginBottom: 16 }}>
+          <button
+            onClick={toggleSurge}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              width: "100%", padding: "9px 12px",
+              background: surgeOn ? "rgba(56,189,248,0.1)" : "rgba(255,255,255,0.03)",
+              border: surgeOn ? "1px solid #38bdf8" : "1px solid #1e2d45",
+              borderRadius: 9, cursor: "pointer", color: surgeOn ? "#38bdf8" : "#64748b",
+              fontSize: 13, fontWeight: 600,
+            }}>
+            <span>🌀</span>
+            <span style={{ flex: 1, textAlign: "left" }}>
+              {proTier === "free" ? "🔒 Storm Surge — Pro" :
+               surgeOn ? (surgePoint ? `Surge active: +${surgeM} m` : "Click map to place surge") : "Add localised storm surge"}
+            </span>
+            {surgeOn && <span style={{ fontSize: 10 }}>✕ clear</span>}
+          </button>
+          {surgeOn && proTier !== "free" && (
+            <div style={{ marginTop: 8, padding: "10px 12px", background: "rgba(56,189,248,0.05)", borderRadius: 8, border: "1px solid #1e2d45" }}>
+              <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
+                {SURGE_PRESETS.map(p => (
+                  <button key={p.id}
+                    onClick={() => selectSurgePreset(p)}
+                    style={{
+                      padding: "4px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+                      cursor: "pointer", border: "1px solid",
+                      background: surgePreset === p.id ? p.color : "transparent",
+                      borderColor: p.color,
+                      color: surgePreset === p.id ? "white" : p.color,
+                    }}>{p.label}</button>
+                ))}
+              </div>
+              <input type="range" min={0.5} max={10} step={0.5} value={surgeM}
+                onChange={e => { setSurgeM(parseFloat(e.target.value)); setSurgePreset(null); }}
+                style={{ width: "100%", marginBottom: 4 }} />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#475569", marginBottom: 6 }}>
+                <span>0.5 m</span><span>10 m</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#94a3b8", textAlign: "center" }}>
+                {surgePoint ? `📍 ${surgeM} m surge placed · click marker to remove` : "👆 Click map to place surge origin"}
+              </div>
+              {surgePoint && (
+                <button onClick={() => {
+                  if (surgeMarker.current) { surgeMarker.current.remove(); surgeMarker.current = null; }
+                  setSurgePoint(null); surgePointRef.current = null;
+                  setSurgeMode("place"); surgeModeRef.current = "place";
+                }} style={{ marginTop: 6, width: "100%", padding: "5px", background: "transparent", color: "#475569", border: "1px solid #1e2d45", borderRadius: 6, cursor: "pointer", fontSize: 11 }}>
+                  Replace surge point
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Presets</div>
           {["historical", "threat", "scale"].map(cat => (
             <div key={cat}>
               <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "#475569", textTransform: "uppercase", marginBottom: 6 }}>
@@ -4833,7 +5022,10 @@ export default function HomePage() {
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span>☄️ Younger Dryas Impact</span>
-              {cataclysmModel === "ydi" && <span style={{ fontSize: 10, color: "#38bdf8", fontWeight: 700, background: "#0c1a2e", border: "1px solid #38bdf8", borderRadius: 6, padding: "2px 7px" }}>SELECTED</span>}
+              <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                {cataclysmModel === "ydi" && <span style={{ fontSize: 10, color: "#38bdf8", fontWeight: 700, background: "#0c1a2e", border: "1px solid #38bdf8", borderRadius: 6, padding: "2px 7px" }}>SELECTED</span>}
+                <button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["ydi"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button>
+              </div>
             </div>
             <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>~12,900 BP · Laurentide collapse · Columbia Scablands</div>
           </button>
@@ -6593,6 +6785,34 @@ export default function HomePage() {
               </a>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── SCENARIO WIKI PANEL ── */}
+      {scenarioWiki && (
+        <div style={{
+          position: "fixed", top: 0, right: 0, bottom: 0,
+          width: "min(420px, 100vw)",
+          background: "#0a0f1e",
+          borderLeft: "1px solid rgba(248,113,113,0.25)",
+          zIndex: 2001,
+          display: "flex", flexDirection: "column",
+          boxShadow: "-8px 0 40px rgba(0,0,0,0.6)",
+          fontFamily: "Arial,sans-serif",
+          animation: "dmWikiSlideIn .25s ease",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #1e2d45" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 24 }}>{scenarioWiki.icon}</span>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#f1f5f9" }}>{scenarioWiki.title}</div>
+            </div>
+            <button onClick={() => setScenarioWiki(null)} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: 20, padding: 4 }}>✕</button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px", color: "#cbd5e1", fontSize: 13, lineHeight: 1.6 }}
+            dangerouslySetInnerHTML={{ __html: scenarioWiki.body }} />
+          <div style={{ padding: "12px 20px", borderTop: "1px solid #1e2d45", fontSize: 11, color: "#374151", textAlign: "center" }}>
+            DisasterMap — Educational content
+          </div>
         </div>
       )}
     </div>
