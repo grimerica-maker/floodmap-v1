@@ -4409,69 +4409,57 @@ export default function HomePage() {
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>☄️ Cataclysm</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["cataclysm"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Pole shift inundation models</div>
         </button>
+        <button
+          onClick={toggleSurge}
+          style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: surgeOn ? "rgba(56,189,248,0.1)" : "#111827", color: surgeOn ? "#38bdf8" : "#94a3b8", border: surgeOn ? "1px solid #38bdf8" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <span style={{ fontSize: 15 }}>🌀 Storm Surge</span>
+            {proTier === "free" && <span style={{ fontSize: 10, color: "#f97316" }}>PRO</span>}
+          </div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>
+            {surgeOn ? (surgePoint ? `Surge active: +${surgeM} m · click map to place` : "Click map to place surge point") : "Localised coastal storm surge"}
+          </div>
+        </button>
 
       </div>
+
+      {/* ── SURGE CONTROLS ── */}
+      {surgeOn && proTier !== "free" && (
+        <div style={{ marginBottom: 16, padding: "12px", background: "rgba(56,189,248,0.05)", borderRadius: 10, border: "1px solid #1e2d45" }}>
+          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#38bdf8", textTransform: "uppercase" }}>Storm Surge Settings</div>
+          <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
+            {SURGE_PRESETS.map(p => (
+              <button key={p.id} onClick={() => selectSurgePreset(p)}
+                style={{ padding: "5px 9px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1px solid", background: surgePreset === p.id ? p.color : "transparent", borderColor: p.color, color: surgePreset === p.id ? "white" : p.color }}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <input type="range" min={0.5} max={10} step={0.5} value={surgeM}
+            onChange={e => { setSurgeM(parseFloat(e.target.value)); setSurgePreset(null); }}
+            style={{ width: "100%", marginBottom: 4 }} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#475569", marginBottom: 8 }}>
+            <span>0.5 m</span><span style={{ fontWeight: 700, color: "#38bdf8" }}>{surgeM} m</span><span>10 m</span>
+          </div>
+          <div style={{ fontSize: 11, color: "#94a3b8", textAlign: "center" }}>
+            {surgePoint ? `📍 +${surgeM} m surge placed · click marker to remove` : "👆 Click map to place surge origin"}
+          </div>
+          {surgePoint && (
+            <button onClick={() => {
+              if (surgeMarker.current) { surgeMarker.current.remove(); surgeMarker.current = null; }
+              setSurgePoint(null); surgePointRef.current = null;
+              setSurgeMode("place"); surgeModeRef.current = "place";
+            }} style={{ marginTop: 8, width: "100%", padding: "6px", background: "transparent", color: "#475569", border: "1px solid #1e2d45", borderRadius: 6, cursor: "pointer", fontSize: 11 }}>
+              Replace surge point
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── IMPACT CONTROLS ── */}
       {scenarioMode === "impact" && (
         <>
-          {/* ── STORM SURGE ── */}
-        <div style={{ marginBottom: 16 }}>
-          <button
-            onClick={toggleSurge}
-            style={{
-              display: "flex", alignItems: "center", gap: 8,
-              width: "100%", padding: "9px 12px",
-              background: surgeOn ? "rgba(56,189,248,0.1)" : "rgba(255,255,255,0.03)",
-              border: surgeOn ? "1px solid #38bdf8" : "1px solid #1e2d45",
-              borderRadius: 9, cursor: "pointer", color: surgeOn ? "#38bdf8" : "#64748b",
-              fontSize: 13, fontWeight: 600,
-            }}>
-            <span>🌀</span>
-            <span style={{ flex: 1, textAlign: "left" }}>
-              {proTier === "free" ? "🔒 Storm Surge — Pro" :
-               surgeOn ? (surgePoint ? `Surge active: +${surgeM} m` : "Click map to place surge") : "Add localised storm surge"}
-            </span>
-            {surgeOn && <span style={{ fontSize: 10 }}>✕ clear</span>}
-          </button>
-          {surgeOn && proTier !== "free" && (
-            <div style={{ marginTop: 8, padding: "10px 12px", background: "rgba(56,189,248,0.05)", borderRadius: 8, border: "1px solid #1e2d45" }}>
-              <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
-                {SURGE_PRESETS.map(p => (
-                  <button key={p.id}
-                    onClick={() => selectSurgePreset(p)}
-                    style={{
-                      padding: "4px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
-                      cursor: "pointer", border: "1px solid",
-                      background: surgePreset === p.id ? p.color : "transparent",
-                      borderColor: p.color,
-                      color: surgePreset === p.id ? "white" : p.color,
-                    }}>{p.label}</button>
-                ))}
-              </div>
-              <input type="range" min={0.5} max={10} step={0.5} value={surgeM}
-                onChange={e => { setSurgeM(parseFloat(e.target.value)); setSurgePreset(null); }}
-                style={{ width: "100%", marginBottom: 4 }} />
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#475569", marginBottom: 6 }}>
-                <span>0.5 m</span><span>10 m</span>
-              </div>
-              <div style={{ fontSize: 11, color: "#94a3b8", textAlign: "center" }}>
-                {surgePoint ? `📍 ${surgeM} m surge placed · click marker to remove` : "👆 Click map to place surge origin"}
-              </div>
-              {surgePoint && (
-                <button onClick={() => {
-                  if (surgeMarker.current) { surgeMarker.current.remove(); surgeMarker.current = null; }
-                  setSurgePoint(null); surgePointRef.current = null;
-                  setSurgeMode("place"); surgeModeRef.current = "place";
-                }} style={{ marginTop: 6, width: "100%", padding: "5px", background: "transparent", color: "#475569", border: "1px solid #1e2d45", borderRadius: 6, cursor: "pointer", fontSize: 11 }}>
-                  Replace surge point
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Presets</div>
+          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Presets</div>
           {["historical", "threat", "scale"].map(cat => (
             <div key={cat}>
               <div style={{ fontSize: 10, letterSpacing: "0.12em", color: "#475569", textTransform: "uppercase", marginBottom: 6 }}>
