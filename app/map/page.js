@@ -722,26 +722,41 @@ const CLIMATE_PRESETS = [
 
 const IMPACT_PRESETS = [
   // Historical events
-  { label: "Chelyabinsk", sub: "2013 · Russia", diameter: 20, category: "historical" },
-  { label: "Tunguska", sub: "1908 · Siberia", diameter: 60, category: "historical" },
-  { label: "Barringer", sub: "50,000 BP · Arizona", diameter: 50, category: "historical" },
-  { label: "Chicxulub", sub: "66M BP · K-Pg", diameter: 12000, category: "historical" },
+  { label: "Chelyabinsk", sub: "2013 · Russia", diameter: 20, category: "historical",
+    wiki: "<h4>Chelyabinsk 2013</h4><p>A ~20m asteroid airburst over Russia on Feb 15, 2013. Energy: ~500 kt. Shockwave injured 1,500 people, shattered windows across 6 cities. Largest recorded atmospheric impact since Tunguska. Arrived undetected — came from sun's direction.</p><p><strong>Probability:</strong> Events this size occur every 10-50 years globally.</p>" },
+  { label: "Tunguska", sub: "1908 · Siberia", diameter: 60, category: "historical",
+    wiki: "<h4>Tunguska 1908</h4><p>~60m comet/asteroid airburst over remote Siberia, June 30, 1908. Energy: ~10-15 Mt. Flattened ~2,000 km² of forest — 80 million trees. No crater formed. If over a city, millions would have died. Largest impact in recorded history.</p><p><strong>Probability:</strong> Events this size occur every 500-1,000 years.</p>" },
+  { label: "Barringer", sub: "50,000 BP · Arizona", diameter: 50, category: "historical",
+    wiki: "<h4>Barringer Crater (Meteor Crater)</h4><p>~50m iron meteorite struck Arizona ~50,000 BP. Energy: ~10 Mt. Created 1.2km wide, 170m deep crater. Iron meteorites survive atmosphere better than stony ones — rarer but more destructive per size.</p><p><strong>Location:</strong> Winslow, Arizona. Best-preserved impact crater on Earth.</p>" },
+  { label: "Chicxulub", sub: "66M BP · K-Pg", diameter: 12000, category: "historical",
+    wiki: "<h4>Chicxulub Impact — K-Pg Extinction</h4><p>~10-12km asteroid struck Yucatán, Mexico, 66 million years ago. Energy: ~100 trillion Mt. Created 180km crater now buried under Gulf of Mexico. Triggered mass extinction — killed 75% of all species including non-avian dinosaurs.</p><p>Global firestorms, decade-long impact winter, ocean acidification. Evidence: global iridium layer, shocked quartz, spherules.</p>" },
   // Near-Earth threats
-  { label: "2024 YR4", sub: "2032 threat · 1:83", diameter: 65, category: "threat" },
-  { label: "Apophis", sub: "2029 flyby", diameter: 370, category: "threat" },
-  { label: "Bennu", sub: "2182 threat", diameter: 490, category: "threat" },
+  { label: "2024 YR4", sub: "2032 threat · 1:83", diameter: 65, category: "threat",
+    wiki: "<h4>2024 YR4 — Active Threat</h4><p>Discovered December 2024. ~65m diameter asteroid with 1-in-83 chance of Earth impact on December 22, 2032 — highest impact probability ever recorded for a known asteroid of this size.</p><p>Energy if impact: ~500 Mt. City-scale destruction. Impact probability being refined as observations continue. NASA/ESA tracking closely.</p>" },
+  { label: "Apophis", sub: "2029 flyby", diameter: 370, category: "threat",
+    wiki: "<h4>Apophis — 2029 Close Flyby</h4><p>~370m asteroid will pass within 31,000km of Earth on April 13, 2029 — closer than geostationary satellites. Visible to naked eye. Initial 2004 calculations suggested 2.7% impact probability; now ruled out for 2029 and 2036.</p><p>Energy if impact: ~1,200 Mt. Regional devastation. A key test of planetary defense capabilities.</p>" },
+  { label: "Bennu", sub: "2182 threat", diameter: 490, category: "threat",
+    wiki: "<h4>Bennu — 2182 Threat</h4><p>~490m carbonaceous asteroid. NASA OSIRIS-REx returned samples in 2023. Cumulative 1-in-2,700 impact probability through 2300, with peak risk September 24, 2182.</p><p>Energy if impact: ~1,200 Mt. Would cause continental-scale devastation and global effects. Carbonaceous composition suggests ancient solar system material.</p>" },
   // Scale references
-  { label: "City Killer", sub: "~150m", diameter: 150, category: "scale" },
-  { label: "Regional", sub: "~1km", diameter: 1000, category: "scale" },
-  { label: "Global", sub: "~10km", diameter: 10000, category: "scale" },
+  { label: "City Killer", sub: "~150m", diameter: 150, category: "scale",
+    wiki: "<h4>City Killer — ~150m</h4><p>150m asteroids occur every 10,000-20,000 years. Energy: ~1,000 Mt — enough to destroy a major city or cause large tsunamis if ocean impact.</p><p><strong>Annual probability:</strong> ~0.005%. Currently ~25,000 known near-Earth asteroids over 140m, with ~40% still undetected.</p>" },
+  { label: "Regional", sub: "~1km", diameter: 1000, category: "scale",
+    wiki: "<h4>Regional Devastation — ~1km</h4><p>1km asteroids occur every 500,000 years. Energy: ~100,000 Mt. Would devastate a continent, trigger global dust veil lasting years, cause regional extinction-level effects.</p><p>~900 known near-Earth objects over 1km. Considered threshold for civilization-threatening impact. ~95% of these have been catalogued.</p>" },
+  { label: "Global", sub: "~10km", diameter: 10000, category: "scale",
+    wiki: "<h4>Global Extinction — ~10km</h4><p>10km+ asteroids occur every 100 million years. Energy: Chicxulub-scale — >100 trillion Mt. Mass extinction certain. Global firestorms, decade of impact winter, ocean acidification.</p><p>No known near-Earth objects of this size pose a threat for the foreseeable future. Next major extinction-level impact expected in ~500 million years statistically.</p>" },
 ];
 
 const NUKE_PRESETS = [
-  { label: "Tactical", yield_kt: 1 },
-  { label: "Hiroshima", yield_kt: 15 },
-  { label: "B61", yield_kt: 340 },
-  { label: "B83 (1.2Mt)", yield_kt: 1200 },
-  { label: "Tsar Bomba", yield_kt: 50000 },
+  { label: "Tactical", yield_kt: 1,
+    wiki: "<h4>Tactical Nuclear Weapon — ~1 kt</h4><p>Sub-kiloton to low-kiloton yields designed for battlefield use. Examples: B61-12 (variable 0.3-50kt), Russian 9M729 cruise missile warhead.</p><p><strong>Effects at 1kt:</strong> Fireball 150m, lethal overpressure 500m, thermal burns 1km. Comparable to ~67 Hiroshima bombs at scale.</p><p><strong>Doctrine:</strong> NATO and Russia maintain thousands of tactical warheads. Low yield lowers the threshold for use — major proliferation concern.</p>" },
+  { label: "Hiroshima", yield_kt: 15,
+    wiki: "<h4>Little Boy — Hiroshima, 1945 (15kt)</h4><p>Gun-type uranium fission bomb. Detonated 580m above Hiroshima, August 6, 1945. 140,000 deaths by year's end. Destroyed 13 km².</p><p><strong>Effects:</strong> Fireball 300m, overpressure kills to 1.7km, thermal burns to 11km. Modern equivalent warheads are 20-100x more powerful.</p><p><strong>Legacy:</strong> One of only two nuclear weapons ever used in war. Led to Japanese surrender and the nuclear age.</p>" },
+  { label: "B61", yield_kt: 340,
+    wiki: "<h4>B61 Nuclear Gravity Bomb — 340kt</h4><p>Primary US tactical/strategic nuclear bomb. Variable yield 0.3-340kt. Deployed on B-2, F-35, and NATO dual-capable aircraft. ~480 in US stockpile.</p><p><strong>Effects at 340kt:</strong> Fireball 1km, severe overpressure to 5km, moderate damage to 12km, thermal burns to 30km.</p><p><strong>B61-12 upgrade:</strong> Added precision guidance, making it more usable — critics argue this lowers threshold for nuclear use.</p>" },
+  { label: "B83 (1.2Mt)", yield_kt: 1200,
+    wiki: "<h4>B83 — 1.2 Megaton</h4><p>Largest nuclear weapon in US active stockpile. Gravity bomb for hardened target destruction. ~50 believed in active stockpile.</p><p><strong>Effects at 1.2Mt:</strong> Fireball 2km, lethal overpressure to 8km, moderate damage to 20km, third-degree burns to 50km.</p><p><strong>Targets:</strong> Underground command bunkers, missile silos, hardened military facilities requiring deep earth-penetrating blast.</p>" },
+  { label: "Tsar Bomba", yield_kt: 50000,
+    wiki: "<h4>Tsar Bomba — 50 Megatons</h4><p>Largest nuclear weapon ever detonated. Soviet hydrogen bomb tested October 30, 1961 over Novaya Zemlya, Arctic. Originally designed for 100Mt but tamper reduced to limit fallout.</p><p><strong>Effects:</strong> Fireball 8km visible 1,000km away. Complete destruction to 35km. Windows broken in Finland and Norway. Seismic wave circled Earth three times.</p><p><strong>No modern equivalent:</strong> Too large for missile delivery. Modern strategy uses MIRVed warheads — multiple smaller warheads more effective than one giant bomb.</p>" },
 ];
 
 // ── Yellowstone eruption data ─────────────────────────────────────────────────
@@ -753,7 +768,7 @@ const YELLOWSTONE_CENTER = [-110.6, 44.4];
 
 const YELLOWSTONE_PRESETS = [
   {
-    label: "640k BP",
+    label: "640k BP", wiki: "<h4>Lava Creek Eruption — 640,000 BP</h4><p>Largest of Yellowstone's three caldera-forming eruptions. Ejected ~1,000 km³ of material (VEI 8). Created the current 85km × 45km Yellowstone caldera.</p><p><strong>Global effects:</strong> Nuclear winter for 3+ years. North American agriculture destroyed. Ash blanketed entire continent. The cycle interval suggests the next eruption is 'overdue' — though USGS notes eruptions are not clockwork.</p><p><strong>Current status:</strong> Magma chamber partially molten at 5-15km depth. Ground uplift of ~20cm since 2000s, likely hydrothermal not magmatic.</p>",
     name: "Lava Creek (640,000 BP)",
     desc: "Largest known — 1,000 km³ ejecta",
     vei: 8,
@@ -767,7 +782,7 @@ const YELLOWSTONE_PRESETS = [
     ],
   },
   {
-    label: "1.3M BP",
+    label: "1.3M BP", wiki: "<h4>Mesa Falls Eruption — 1.3 Million BP</h4><p>Second caldera-forming eruption. Ejected ~280 km³ (VEI 8). Created the Henry's Fork caldera in Idaho, now largely obscured by subsequent lava flows.</p><p><strong>Scale:</strong> Smaller than Lava Creek but still ~280× the volume of the 1980 Mt. St. Helens eruption. Global dimming and crop failures would last 1-2 years.</p>",
     name: "Mesa Falls (1.3M BP)",
     desc: "Mid-size — 280 km³ ejecta",
     vei: 8,
@@ -781,7 +796,7 @@ const YELLOWSTONE_PRESETS = [
     ],
   },
   {
-    label: "2.1M BP",
+    label: "2.1M BP", wiki: "<h4>Huckleberry Ridge Eruption — 2.1 Million BP</h4><p>Largest of the three Yellowstone supereruptions. Ejected ~2,450 km³ — 2.5× Lava Creek. Created original Island Park caldera, much of which is now buried.</p><p><strong>Context:</strong> This eruption deposited ash as far as Louisiana and California. At this scale, North American civilization would effectively end. Nuclear winter lasting 3-5 years minimum.</p>",
     name: "Huckleberry Ridge (2.1M BP)",
     desc: "First eruption — 2,450 km³ ejecta",
     vei: 8,
@@ -4465,11 +4480,12 @@ export default function HomePage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
                 {IMPACT_PRESETS.filter(p => p.category === cat).map(p => (
                   <button key={p.label}
-                    onClick={() => {
-                      setImpactDiameter(p.diameter);
-                    }}
-                    style={{ padding: "8px 10px", background: impactDiameter === p.diameter ? "#7f1d1d" : "#111827", color: impactDiameter === p.diameter ? "#fca5a5" : "#94a3b8", border: impactDiameter === p.diameter ? "1px solid #ef4444" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, textAlign: "left" }}>
-                    <div style={{ fontSize: 12 }}>{p.label}</div>
+                    onClick={() => { setImpactDiameter(p.diameter); }}
+                    style={{ padding: "8px 10px", background: impactDiameter === p.diameter ? "#7f1d1d" : "#111827", color: impactDiameter === p.diameter ? "#fca5a5" : "#94a3b8", border: impactDiameter === p.diameter ? "1px solid #ef4444" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 10, fontWeight: 700, textAlign: "left", position: "relative" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                      <div style={{ fontSize: 12 }}>{p.label}</div>
+                      {p.wiki && <span onClick={(e) => { e.stopPropagation(); setScenarioWiki({ title: p.label, icon: "🌑", body: p.wiki }); }} style={{ fontSize: 11, color: "#475569", cursor: "pointer", lineHeight: 1 }}>ℹ️</span>}
+                    </div>
                     <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{p.sub}</div>
                   </button>
                 ))}
@@ -4776,11 +4792,12 @@ export default function HomePage() {
             <>
               <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"} style={{ marginBottom: 12 }}>
                 {NUKE_PRESETS.map((p) => (
-                  <button key={p.label} onClick={() => {
-                    setNukeYield(p.yield_kt);
-                  }}
-                    style={{ padding: "10px 8px", minHeight: 48, border: "1px solid #d1d5db", background: nukeYield === p.yield_kt ? "#7c3aed" : "white", color: nukeYield === p.yield_kt ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700, whiteSpace: "nowrap", fontSize: 13 }}>
-                    {p.label}
+                  <button key={p.label} onClick={() => { setNukeYield(p.yield_kt); }}
+                    style={{ padding: "10px 8px", minHeight: 48, border: "1px solid #d1d5db", background: nukeYield === p.yield_kt ? "#7c3aed" : "white", color: nukeYield === p.yield_kt ? "white" : "#111827", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 13, position: "relative" }}>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:4 }}>
+                      <span style={{ whiteSpace:"nowrap" }}>{p.label}</span>
+                      {p.wiki && <span onClick={(e) => { e.stopPropagation(); setScenarioWiki({ title: p.label, icon: "☢️", body: p.wiki }); }} style={{ fontSize: 11, cursor: "pointer", opacity: 0.7 }}>ℹ️</span>}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -5131,8 +5148,11 @@ export default function HomePage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
             {(volcanoType === "yellowstone" ? YELLOWSTONE_PRESETS : volcanoType === "toba" ? TOBA_PRESETS : CAMPI_PRESETS).map((p, i) => (
               <button key={p.label} onClick={() => { setYellowstonePreset(i); clearYellowstone(); }}
-                style={{ padding: "10px 6px", minHeight: 52, border: yellowstonePreset === i ? "1px solid #ea580c" : "1px solid #1e2d45", background: yellowstonePreset === i ? "#431407" : "#111827", color: yellowstonePreset === i ? "#fb923c" : "#94a3b8", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 12, textAlign: "center" }}>
-                <div>{p.label}</div>
+                style={{ padding: "10px 6px", minHeight: 52, border: yellowstonePreset === i ? "1px solid #ea580c" : "1px solid #1e2d45", background: yellowstonePreset === i ? "#431407" : "#111827", color: yellowstonePreset === i ? "#fb923c" : "#94a3b8", cursor: "pointer", borderRadius: 10, fontWeight: 700, fontSize: 12, textAlign: "center", position: "relative" }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:4 }}>
+                  <span>{p.label}</span>
+                  {p.wiki && <span onClick={(e) => { e.stopPropagation(); setScenarioWiki({ title: p.label + " — " + (p.name||""), icon: "🌋", body: p.wiki }); }} style={{ fontSize: 11, cursor: "pointer", opacity: 0.7 }}>ℹ️</span>}
+                </div>
                 <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>VEI {p.vei}</div>
               </button>
             ))}
