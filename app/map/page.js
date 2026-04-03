@@ -1653,18 +1653,20 @@ export default function HomePage() {
     const windMph = preset ? preset.wind_mph : "—";
     const example = preset ? preset.example : "";
     const color = preset ? preset.color : "#38bdf8";
-    const html = `
-      <div style="font-family:Arial,sans-serif;min-width:220px;max-width:280px;background:#0f172a;color:#e2e8f0;border-radius:8px">
-        <div style="font-size:14px;font-weight:700;color:${color};margin-bottom:8px">🌀 ${cat} Storm Surge</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px;font-size:12px">
-          <div style="color:#94a3b8">Surge Height</div><div style="color:#f1f5f9;font-weight:700">+${surgeRef.current} m</div>
-          <div style="color:#94a3b8">Wind Speed</div><div style="color:#f1f5f9;font-weight:700">${windKmh} km/h</div>
-          <div style="color:#94a3b8">Wind (mph)</div><div style="color:#f1f5f9;font-weight:700">${windMph} mph</div>
-          <div style="color:#94a3b8">Reach Radius</div><div style="color:#f1f5f9;font-weight:700">${preset ? (preset.reach/1000).toFixed(0) : "—"} km</div>
-        </div>
-        ${example ? `<div style="font-size:11px;color:#94a3b8;border-top:1px solid #1e2d45;padding-top:6px;line-height:1.4;margin-bottom:8px">${example}</div>` : ""}
-        <button onclick="window.__dmClearSurge && window.__dmClearSurge()" style="width:100%;padding:6px;background:transparent;border:1px solid #334155;border-radius:6px;color:#94a3b8;cursor:pointer;font-size:11px;margin-top:4px">✕ Clear Surge</button>
-      </div>`;
+    const rows = [
+      ["Surge Height", `+${surgeRef.current} m`],
+      ["Wind Speed",   `${windKmh} km/h`],
+      ["Wind (mph)",   `${windMph} mph`],
+      ["Reach Radius", `${preset ? (preset.reach/1000).toFixed(0) : "—"} km`],
+    ];
+    const html = `<div style="font-family:Arial,sans-serif;min-width:220px;max-width:280px">
+      <div style="font-size:14px;font-weight:700;color:${color};margin-bottom:8px">🌀 ${cat} Storm Surge</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
+        ${rows.map(([k,v]) => `<tr><td style="padding:2px 8px 2px 0;color:#94a3b8">${k}</td><td style="font-weight:700">${v}</td></tr>`).join("")}
+      </table>
+      ${example ? `<div style="font-size:11px;color:#64748b;border-top:1px solid #334155;padding-top:6px;line-height:1.4;margin-bottom:8px">${example}</div>` : ""}
+      <button onclick="window.__dmClearSurge&&window.__dmClearSurge()" style="width:100%;padding:6px;background:transparent;border:1px solid #334155;border-radius:6px;cursor:pointer;font-size:11px">✕ Clear Surge</button>
+    </div>`;
     const popup = new mapboxgl.Popup({ closeButton: true, maxWidth: "300px",
       className: "dm-dark-popup" })
       .setLngLat([lng, lat])
