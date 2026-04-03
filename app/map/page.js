@@ -1131,6 +1131,7 @@ export default function HomePage() {
   const [surgeMode,   setSurgeMode]   = useState("place");
   const [surgePoint,  setSurgePoint]  = useState(null);
   const surgeOnRef    = useRef(false);
+  const surgePresetRef = useRef(null);
   const surgeRef      = useRef(3.0);
   const surgeModeRef  = useRef("place");
   const surgePointRef = useRef(null);
@@ -1231,7 +1232,8 @@ export default function HomePage() {
 
   useEffect(() => { seaLevelRef.current = seaLevel; }, [seaLevel]);
   useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
-  useEffect(() => { surgeOnRef.current   = surgeOn;    }, [surgeOn]);
+  useEffect(() => { surgeOnRef.current    = surgeOn;     }, [surgeOn]);
+  useEffect(() => { surgePresetRef.current = surgePreset; }, [surgePreset]);
   useEffect(() => { surgeRef.current     = surgeM;     }, [surgeM]);
   useEffect(() => { surgeModeRef.current = surgeMode;  }, [surgeMode]);
   useEffect(() => { surgePointRef.current= surgePoint; }, [surgePoint]);
@@ -1582,7 +1584,7 @@ export default function HomePage() {
   };
 
   const selectSurgePreset = (preset) => {
-    setSurgePreset(preset.id);
+    setSurgePreset(preset.id); surgePresetRef.current = preset.id;
     setSurgeM(preset.height); surgeRef.current = preset.height;
     if (surgePointRef.current) {
       applySurge(surgePointRef.current, preset.height, seaLevelRef.current, preset.reach);
@@ -1622,7 +1624,7 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map) return;
     if (surgePopupRef.current) { surgePopupRef.current.remove(); surgePopupRef.current = null; }
-    const preset = SURGE_PRESETS.find(p => p.id === surgePreset) || null;
+    const preset = SURGE_PRESETS.find(p => p.id === surgePresetRef.current) || null;
     const cat = preset ? preset.label : "Custom";
     const windKmh = preset ? preset.wind_kmh : "—";
     const windMph = preset ? preset.wind_mph : "—";
@@ -4397,19 +4399,20 @@ export default function HomePage() {
       <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Scenario Mode</div>
       <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
         <button
-          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("flood"); }}
+          onClick={() => { clearSurge(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("flood"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "flood" ? "#1e3a5f" : "#111827", color: scenarioMode === "flood" ? "#60a5fa" : "#94a3b8", border: scenarioMode === "flood" ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>Flood</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Sea level up / down</div>
         </button>
         <button
-          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("impact"); }}
+          onClick={() => { clearSurge(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("impact"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "impact" ? "#1e3a5f" : "#111827", color: scenarioMode === "impact" ? "#60a5fa" : "#94a3b8", border: scenarioMode === "impact" ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>Impact</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["impact"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Click map to place impact point</div>
         </button>
         <button
           onClick={() => {
+            clearSurge();
             if (scenarioModeRef.current === "nuke") clearNuke();
             if (scenarioModeRef.current === "yellowstone") clearYellowstone();
             if (scenarioModeRef.current === "tsunami") clearTsunami();
@@ -4422,25 +4425,25 @@ export default function HomePage() {
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Sea level rise projections</div>
         </button>
         <button
-          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("nuke"); }}
+          onClick={() => { clearSurge(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("nuke"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "nuke" ? "#4c1d95" : "#111827", color: scenarioMode === "nuke" ? "#c4b5fd" : "#94a3b8", border: scenarioMode === "nuke" ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>☢️ Nuke</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["nuke"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Click map to place detonation point</div>
         </button>
         <button
-          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("yellowstone"); }}
+          onClick={() => { clearSurge(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("yellowstone"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "yellowstone" ? "#431407" : "#111827", color: scenarioMode === "yellowstone" ? "#fb923c" : "#94a3b8", border: scenarioMode === "yellowstone" ? "1px solid #ea580c" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>🌋 Super Volcano</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["yellowstone"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Supervolcano eruption scenarios</div>
         </button>
         <button
-          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); }}
+          onClick={() => { clearSurge(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "tsunami" ? "#0c2a4a" : "#111827", color: scenarioMode === "tsunami" ? "#38bdf8" : "#94a3b8", border: scenarioMode === "tsunami" ? "1px solid #0ea5e9" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>🌊 Mega-Tsunami</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["tsunami"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Ocean collapse wave propagation</div>
         </button>
         <button
-          onClick={() => { clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); scenarioModeRef.current = "cataclysm"; setScenarioMode("cataclysm"); }}
+          onClick={() => { clearSurge(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); scenarioModeRef.current = "cataclysm"; setScenarioMode("cataclysm"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "cataclysm" ? "#1a0505" : "#111827", color: scenarioMode === "cataclysm" ? "#ef4444" : "#94a3b8", border: scenarioMode === "cataclysm" ? "1px solid #dc2626" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>☄️ Cataclysm</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["cataclysm"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Pole shift inundation models</div>
