@@ -1631,7 +1631,7 @@ export default function HomePage() {
     const example = preset ? preset.example : "";
     const color = preset ? preset.color : "#38bdf8";
     const html = `
-      <div style="font-family:Arial,sans-serif;min-width:220px;max-width:280px">
+      <div style="font-family:Arial,sans-serif;min-width:220px;max-width:280px;background:#0f172a;color:#e2e8f0;border-radius:8px">
         <div style="font-size:14px;font-weight:700;color:${color};margin-bottom:8px">🌀 ${cat} Storm Surge</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px;font-size:12px">
           <div style="color:#94a3b8">Surge Height</div><div style="color:#f1f5f9;font-weight:700">+${surgeRef.current} m</div>
@@ -1639,7 +1639,7 @@ export default function HomePage() {
           <div style="color:#94a3b8">Wind (mph)</div><div style="color:#f1f5f9;font-weight:700">${windMph} mph</div>
           <div style="color:#94a3b8">Reach Radius</div><div style="color:#f1f5f9;font-weight:700">${preset ? (preset.reach/1000).toFixed(0) : "—"} km</div>
         </div>
-        ${example ? `<div style="font-size:11px;color:#64748b;border-top:1px solid #1e2d45;padding-top:6px;line-height:1.4">${example}</div>` : ""}
+        ${example ? `<div style="font-size:11px;color:#94a3b8;border-top:1px solid #1e2d45;padding-top:6px;line-height:1.4">${example}</div>` : ""}
       </div>`;
     const popup = new mapboxgl.Popup({ closeButton: true, maxWidth: "300px",
       className: "dm-dark-popup" })
@@ -6109,15 +6109,16 @@ export default function HomePage() {
           }
           /* Bottom drawer: use dvh so it doesn't overlap browser chrome */
           .dm-dark-popup .mapboxgl-popup-content {
-            background: #0f172a;
-            border: 1px solid #1e2d45;
+            background: #0f172a !important;
+            border: 1px solid #334155;
             border-radius: 10px;
             padding: 14px;
-            color: #e2e8f0;
+            color: #e2e8f0 !important;
             box-shadow: 0 8px 32px rgba(0,0,0,0.6);
           }
-          .dm-dark-popup .mapboxgl-popup-tip { border-top-color: #1e2d45; border-bottom-color: #1e2d45; }
-          .dm-dark-popup .mapboxgl-popup-close-button { color: #64748b; font-size: 16px; }
+          .dm-dark-popup .mapboxgl-popup-content * { color: inherit; }
+          .dm-dark-popup .mapboxgl-popup-tip { border-top-color: #334155; border-bottom-color: #334155; }
+          .dm-dark-popup .mapboxgl-popup-close-button { color: #64748b !important; font-size: 16px; background: none; }
           .fm-mobile-drawer {
             max-height: 80dvh !important;
           }
