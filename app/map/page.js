@@ -45,12 +45,12 @@ const SCENARIO_WIKI = {
 
 // ── Storm surge presets (NOAA SLOSH parameterization) ────────────────────────
 const SURGE_PRESETS = [
-  { id: "ts",   label: "T.Storm", height: 1.0, reach: 25000,  color: "#16a34a" },
-  { id: "cat1", label: "Cat 1",   height: 2.0, reach: 45000,  color: "#ca8a04" },
-  { id: "cat2", label: "Cat 2",   height: 3.0, reach: 65000,  color: "#ea580c" },
-  { id: "cat3", label: "Cat 3",   height: 4.5, reach: 90000,  color: "#dc2626" },
-  { id: "cat4", label: "Cat 4",   height: 6.0, reach: 120000, color: "#b91c1c" },
-  { id: "cat5", label: "Cat 5",   height: 9.0, reach: 180000, color: "#7f1d1d" },
+  { id: "ts",   label: "T.Storm", height: 1.0, reach: 25000,  color: "#16a34a", wind_kmh: "63–118",  wind_mph: "39–73",  example: "Tropical Storm Allison (2001) — $9B damage, 41 deaths, Houston flooding" },
+  { id: "cat1", label: "Cat 1",   height: 2.0, reach: 45000,  color: "#ca8a04", wind_kmh: "119–153", wind_mph: "74–95",  example: "Hurricane Sandy (2012) — Cat 1 at landfall, $65B damage, 13ft NYC surge" },
+  { id: "cat2", label: "Cat 2",   height: 3.0, reach: 65000,  color: "#ea580c", wind_kmh: "154–177", wind_mph: "96–110", example: "Hurricane Ike (2008) — Cat 2, 20ft surge, Galveston devastated, $38B damage" },
+  { id: "cat3", label: "Cat 3",   height: 4.5, reach: 90000,  color: "#dc2626", wind_kmh: "178–208", wind_mph: "111–129",example: "Hurricane Katrina (2005) — Cat 3 at landfall, 28ft surge, 1,833 deaths, $186B" },
+  { id: "cat4", label: "Cat 4",   height: 6.0, reach: 120000, color: "#b91c1c", wind_kmh: "209–251", wind_mph: "130–156",example: "Hurricane Harvey (2017) — Cat 4, 60 inches rain, $125B, Houston inundated" },
+  { id: "cat5", label: "Cat 5",   height: 9.0, reach: 180000, color: "#7f1d1d", wind_kmh: "252+",    wind_mph: "157+",   example: "Hurricane Dorian (2019) — Cat 5, 185mph winds, 23ft surge, Bahamas destroyed" },
 ];
 const SURGE_SOURCE = "dm-surge-source";
 const SURGE_LAYER  = "dm-surge-layer";
@@ -1134,7 +1134,8 @@ export default function HomePage() {
   const surgeRef      = useRef(3.0);
   const surgeModeRef  = useRef("place");
   const surgePointRef = useRef(null);
-  const surgeMarker   = useRef(null); // set after mount in useEffect
+  const surgeMarker   = useRef(null);
+  const surgePopupRef = useRef(null); // set after mount in useEffect
   // keep ref in sync
   useEffect(() => { proTierRef.current = proTier; }, [proTier]);
   useEffect(() => { cataclysmOverlayRef.current = cataclysmOverlay; }, [cataclysmOverlay]);
@@ -1615,6 +1616,35 @@ export default function HomePage() {
     setSurgePoint({ lat, lng }); surgePointRef.current = { lat, lng };
     setSurgeMode("active"); surgeModeRef.current = "active";
     applySurge({ lat, lng }, surgeRef.current, seaLevelRef.current, getSurgeReach());
+  };
+
+  const showSurgePopup = (lng, lat) => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (surgePopupRef.current) { surgePopupRef.current.remove(); surgePopupRef.current = null; }
+    const preset = SURGE_PRESETS.find(p => p.id === surgePreset) || null;
+    const cat = preset ? preset.label : "Custom";
+    const windKmh = preset ? preset.wind_kmh : "—";
+    const windMph = preset ? preset.wind_mph : "—";
+    const example = preset ? preset.example : "";
+    const color = preset ? preset.color : "#38bdf8";
+    const html = `
+      <div style="font-family:Arial,sans-serif;min-width:220px;max-width:280px">
+        <div style="font-size:14px;font-weight:700;color:${color};margin-bottom:8px">🌀 ${cat} Storm Surge</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px;font-size:12px">
+          <div style="color:#94a3b8">Surge Height</div><div style="color:#f1f5f9;font-weight:700">+${surgeRef.current} m</div>
+          <div style="color:#94a3b8">Wind Speed</div><div style="color:#f1f5f9;font-weight:700">${windKmh} km/h</div>
+          <div style="color:#94a3b8">Wind (mph)</div><div style="color:#f1f5f9;font-weight:700">${windMph} mph</div>
+          <div style="color:#94a3b8">Reach Radius</div><div style="color:#f1f5f9;font-weight:700">${preset ? (preset.reach/1000).toFixed(0) : "—"} km</div>
+        </div>
+        ${example ? `<div style="font-size:11px;color:#64748b;border-top:1px solid #1e2d45;padding-top:6px;line-height:1.4">${example}</div>` : ""}
+      </div>`;
+    const popup = new mapboxgl.Popup({ closeButton: true, maxWidth: "300px",
+      className: "dm-dark-popup" })
+      .setLngLat([lng, lat])
+      .setHTML(html)
+      .addTo(map);
+    surgePopupRef.current = popup;
   };
 
   const applyProjectionForMode = (mode) => {
@@ -3811,10 +3841,16 @@ export default function HomePage() {
 
       const { lng, lat } = e.lngLat;
 
-      // Storm surge placement
-      if (surgeModeRef.current === "place" && surgeOnRef.current) {
-        placeSurgePoint(lat, lng);
-        return;
+      // Storm surge
+      if (surgeOnRef.current) {
+        if (surgeModeRef.current === "place") {
+          placeSurgePoint(lat, lng);
+          return;
+        } else if (surgeModeRef.current === "active") {
+          // Click anywhere on map shows surge info popup
+          showSurgePopup(lng, lat);
+          return;
+        }
       }
 
       if (scenarioModeRef.current === "impact") {
@@ -4430,8 +4466,10 @@ export default function HomePage() {
           <div style={{ display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap" }}>
             {SURGE_PRESETS.map(p => (
               <button key={p.id} onClick={() => selectSurgePreset(p)}
+                title={`${p.wind_kmh} km/h · ${p.example}`}
                 style={{ padding: "5px 9px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1px solid", background: surgePreset === p.id ? p.color : "transparent", borderColor: p.color, color: surgePreset === p.id ? "white" : p.color }}>
-                {p.label}
+                <div>{p.label}</div>
+                <div style={{ fontSize: 9, opacity: 0.8, fontWeight: 400 }}>{p.wind_kmh} km/h</div>
               </button>
             ))}
           </div>
@@ -4441,8 +4479,13 @@ export default function HomePage() {
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#475569", marginBottom: 8 }}>
             <span>0.5 m</span><span style={{ fontWeight: 700, color: "#38bdf8" }}>{surgeM} m</span><span>10 m</span>
           </div>
+          {surgePreset && SURGE_PRESETS.find(p => p.id === surgePreset) && (
+            <div style={{ fontSize: 11, color: "#38bdf8", marginBottom: 6, textAlign: "center" }}>
+              💨 {SURGE_PRESETS.find(p => p.id === surgePreset).wind_kmh} km/h · {SURGE_PRESETS.find(p => p.id === surgePreset).wind_mph} mph
+            </div>
+          )}
           <div style={{ fontSize: 11, color: "#94a3b8", textAlign: "center" }}>
-            {surgePoint ? `📍 +${surgeM} m surge placed · click marker to remove` : "👆 Click map to place surge origin"}
+            {surgePoint ? `📍 +${surgeM} m surge placed · click map for info` : "👆 Click map to place surge origin"}
           </div>
           {surgePoint && (
             <button onClick={() => {
@@ -6062,6 +6105,16 @@ export default function HomePage() {
             min-height: 44px;
           }
           /* Bottom drawer: use dvh so it doesn't overlap browser chrome */
+          .dm-dark-popup .mapboxgl-popup-content {
+            background: #0f172a;
+            border: 1px solid #1e2d45;
+            border-radius: 10px;
+            padding: 14px;
+            color: #e2e8f0;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+          }
+          .dm-dark-popup .mapboxgl-popup-tip { border-top-color: #1e2d45; border-bottom-color: #1e2d45; }
+          .dm-dark-popup .mapboxgl-popup-close-button { color: #64748b; font-size: 16px; }
           .fm-mobile-drawer {
             max-height: 80dvh !important;
           }
