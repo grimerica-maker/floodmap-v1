@@ -1597,8 +1597,10 @@ export default function HomePage() {
     const next = !surgeOnRef.current;
     setSurgeOn(next); surgeOnRef.current = next;
     if (!next) clearSurge();
-    else setSurgeMode("place");
+    else { setSurgeMode("place"); window.__dmClearSurge = clearSurge; }
   };
+  // Expose clearSurge for popup button
+  if (typeof window !== "undefined") window.__dmClearSurge = surgeOnRef.current ? clearSurge : null;
 
   const placeSurgePoint = (lat, lng) => {
     if (surgeMarker.current) { surgeMarker.current.remove(); surgeMarker.current = null; }
@@ -1617,6 +1619,7 @@ export default function HomePage() {
     surgeMarker.current = marker;
     setSurgePoint({ lat, lng }); surgePointRef.current = { lat, lng };
     setSurgeMode("active"); surgeModeRef.current = "active";
+    window.__dmClearSurge = clearSurge;
     applySurge({ lat, lng }, surgeRef.current, seaLevelRef.current, getSurgeReach());
   };
 
@@ -1625,6 +1628,26 @@ export default function HomePage() {
     if (!map) return;
     if (surgePopupRef.current) { surgePopupRef.current.remove(); surgePopupRef.current = null; }
     const preset = SURGE_PRESETS.find(p => p.id === surgePresetRef.current) || null;
+
+    // Check if click is within surge reach radius
+    const sp = surgePointRef.current;
+    if (sp) {
+      const R = 6371000; // Earth radius m
+      const dLat = (lat - sp.lat) * Math.PI / 180;
+      const dLng = (lng - sp.lng) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(sp.lat*Math.PI/180) * Math.cos(lat*Math.PI/180) * Math.sin(dLng/2)**2;
+      const distM = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      const reachM = preset ? preset.reach : surgeRef.current * 20000;
+      if (distM > reachM) {
+        const popup = new mapboxgl.Popup({ closeButton: true, maxWidth: "220px", className: "dm-dark-popup" })
+          .setLngLat([lng, lat])
+          .setHTML(`<div style="font-family:Arial,sans-serif;background:#0f172a;color:#94a3b8;padding:4px;font-size:12px">📍 Outside surge zone<br/><span style="font-size:11px;color:#475569">${Math.round(distM/1000)}km from origin · reach ${Math.round(reachM/1000)}km</span></div>`)
+          .addTo(map);
+        surgePopupRef.current = popup;
+        return;
+      }
+    }
+
     const cat = preset ? preset.label : "Custom";
     const windKmh = preset ? preset.wind_kmh : "—";
     const windMph = preset ? preset.wind_mph : "—";
@@ -1639,7 +1662,8 @@ export default function HomePage() {
           <div style="color:#94a3b8">Wind (mph)</div><div style="color:#f1f5f9;font-weight:700">${windMph} mph</div>
           <div style="color:#94a3b8">Reach Radius</div><div style="color:#f1f5f9;font-weight:700">${preset ? (preset.reach/1000).toFixed(0) : "—"} km</div>
         </div>
-        ${example ? `<div style="font-size:11px;color:#94a3b8;border-top:1px solid #1e2d45;padding-top:6px;line-height:1.4">${example}</div>` : ""}
+        ${example ? `<div style="font-size:11px;color:#94a3b8;border-top:1px solid #1e2d45;padding-top:6px;line-height:1.4;margin-bottom:8px">${example}</div>` : ""}
+        <button onclick="window.__dmClearSurge && window.__dmClearSurge()" style="width:100%;padding:6px;background:transparent;border:1px solid #334155;border-radius:6px;color:#94a3b8;cursor:pointer;font-size:11px;margin-top:4px">✕ Clear Surge</button>
       </div>`;
     const popup = new mapboxgl.Popup({ closeButton: true, maxWidth: "300px",
       className: "dm-dark-popup" })
@@ -3848,10 +3872,18 @@ export default function HomePage() {
         if (surgeModeRef.current === "place") {
           placeSurgePoint(lat, lng);
           return;
-        } else if (surgeModeRef.current === "active") {
-          // Click anywhere on map shows surge info popup
-          showSurgePopup(lng, lat);
-          return;
+        } else if (surgeModeRef.current === "active" && surgePointRef.current) {
+          // Only show popup if clicking within surge reach radius
+          const sp = surgePointRef.current;
+          const preset = SURGE_PRESETS.find(p => p.id === surgePresetRef.current);
+          const reachM = preset ? preset.reach : surgeRef.current * 20000;
+          const dLat = (lat - sp.lat) * 111000;
+          const dLng = (lng - sp.lng) * 111000 * Math.cos(sp.lat * Math.PI / 180);
+          const distM = Math.sqrt(dLat*dLat + dLng*dLng);
+          if (distM <= reachM * 1.2) {
+            showSurgePopup(lng, lat);
+            return;
+          }
         }
       }
 
@@ -4448,17 +4480,25 @@ export default function HomePage() {
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>☄️ Cataclysm</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["cataclysm"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Pole shift inundation models</div>
         </button>
-        <button
-          onClick={toggleSurge}
-          style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: surgeOn ? "rgba(56,189,248,0.1)" : "#111827", color: surgeOn ? "#38bdf8" : "#94a3b8", border: surgeOn ? "1px solid #38bdf8" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-            <span style={{ fontSize: 15 }}>🌀 Storm Surge</span>
-            {proTier === "free" && <span style={{ fontSize: 10, color: "#f97316" }}>PRO</span>}
-          </div>
-          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>
-            {surgeOn ? (surgePoint ? `Surge active: +${surgeM} m · click map to place` : "Click map to place surge point") : "Localised coastal storm surge"}
-          </div>
-        </button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            onClick={toggleSurge}
+            style={{ flex: 1, padding: "13px 14px", minHeight: 56, background: surgeOn ? "rgba(56,189,248,0.1)" : "#111827", color: surgeOn ? "#38bdf8" : "#94a3b8", border: surgeOn ? "1px solid #38bdf8" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <span style={{ fontSize: 15 }}>🌀 Storm Surge</span>
+              {proTier === "free" && <span style={{ fontSize: 10, color: "#f97316" }}>PRO</span>}
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>
+              {surgeOn ? (surgePoint ? `Surge active: +${surgeM} m` : "Click map to place surge point") : "Localised coastal storm surge"}
+            </div>
+          </button>
+          {surgeOn && (
+            <button onClick={clearSurge}
+              style={{ padding: "13px 12px", minHeight: 56, background: "#111827", color: "#475569", border: "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, fontSize: 13 }}>
+              Clear
+            </button>
+          )}
+        </div>
 
       </div>
 
