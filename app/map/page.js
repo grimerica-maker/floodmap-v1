@@ -3598,7 +3598,7 @@ export default function HomePage() {
       attributionControl: true,
       collectResourceTiming: false,
       preserveDrawingBuffer: true,
-      renderWorldCopies: true,
+      renderWorldCopies: false,
       projection: "globe",
       transformRequest: (url) => ({ url }),
     });
