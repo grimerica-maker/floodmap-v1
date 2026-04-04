@@ -1955,8 +1955,8 @@ export default function HomePage() {
         try { if (map.getLayer(layerId)) map.removeLayer(layerId); } catch(e){}
         try { if (map.getSource(sourceId)) map.removeSource(sourceId); } catch(e){}
       }
-      map.addSource(sourceId, { type: "raster", tiles: [tileUrl], tileSize: 256, minzoom: 0, maxzoom: 22 });
-      map.addLayer({ id: layerId, type: "raster", source: sourceId, paint: { "raster-opacity": 1, "raster-fade-duration": 0, "raster-resampling": "linear" } });
+      map.addSource(sourceId, { type: "raster", tiles: [tileUrl], tileSize: 256, minzoom: 0, maxzoom: 12 });
+      map.addLayer({ id: layerId, type: "raster", source: sourceId, paint: { "raster-opacity": 0.82, "raster-opacity-transition": { duration: 400 } } });
       if (!isIndexed) {
         activeFloodLevelRef.current = normalizedLevel;
       } else {
