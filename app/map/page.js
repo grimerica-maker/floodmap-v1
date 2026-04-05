@@ -1405,8 +1405,10 @@ export default function HomePage() {
     const map = mapRef.current;
     const c = OVL[type];
     if (!map || !c) return;
-    try { if (map.getLayer(c.layer)) map.removeLayer(c.layer); } catch(e){}
-    try { if (map.getSource(c.src))  map.removeSource(c.src);  } catch(e){}
+    try { if (map.getLayer(c.layer + "-count"))    map.removeLayer(c.layer + "-count");    } catch(e){}
+    try { if (map.getLayer(c.layer + "-clusters")) map.removeLayer(c.layer + "-clusters"); } catch(e){}
+    try { if (map.getLayer(c.layer))               map.removeLayer(c.layer);               } catch(e){}
+    try { if (map.getSource(c.src))                map.removeSource(c.src);                } catch(e){}
   };
 
   const addOverlayLayer = async (type, level = 0) => {
