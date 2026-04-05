@@ -1640,11 +1640,12 @@ export default function HomePage() {
       if (marker) marker.remove();
     });
     surgeTrackLayers.current = [];
-    // Remove track line
-    if (surgeTrackLine.current && map) {
+    // Remove track line and arrows
+    if (map) {
       try { if (map.getLayer("surge-track-line"))   map.removeLayer("surge-track-line");   } catch(e) {}
       try { if (map.getLayer("surge-track-arrows")) map.removeLayer("surge-track-arrows"); } catch(e) {}
       try { if (map.getSource("surge-track-src"))   map.removeSource("surge-track-src");   } catch(e) {}
+      try { if (map.getSource("surge-arrow-src"))   map.removeSource("surge-arrow-src");   } catch(e) {}
       surgeTrackLine.current = null;
     }
     setSurgeTrackPts([]); surgeTrackPtsRef.current = [];
@@ -1652,16 +1653,50 @@ export default function HomePage() {
 
   const updateTrackLine = (pts) => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || pts.length < 2) return;
+    if (!map || !map.isStyleLoaded() || pts.length < 1) return;
     const coords = pts.map(p => [p.lng, p.lat]);
-    const geojson = { type: "Feature", geometry: { type: "LineString", coordinates: coords } };
+
+    // Build wind arrow features along track
+    const arrowFeatures = [];
+    if (pts.length >= 2) {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p1 = pts[i], p2 = pts[i+1];
+        const midLng = (p1.lng + p2.lng) / 2;
+        const midLat = (p1.lat + p2.lat) / 2;
+        const bearing = Math.atan2(p2.lng - p1.lng, p2.lat - p1.lat) * 180 / Math.PI;
+        arrowFeatures.push({
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [midLng, midLat] },
+          properties: { bearing }
+        });
+      }
+    }
+
+    const lineGeo = { type: "FeatureCollection", features: pts.length >= 2 ? [
+      { type: "Feature", geometry: { type: "LineString", coordinates: coords } }
+    ] : [] };
+    const arrowGeo = { type: "FeatureCollection", features: arrowFeatures };
+
     try {
       if (map.getSource("surge-track-src")) {
-        map.getSource("surge-track-src").setData(geojson);
+        map.getSource("surge-track-src").setData(lineGeo);
+        if (map.getSource("surge-arrow-src")) map.getSource("surge-arrow-src").setData(arrowGeo);
       } else {
-        map.addSource("surge-track-src", { type: "geojson", data: geojson });
+        map.addSource("surge-track-src", { type: "geojson", data: lineGeo });
+        map.addSource("surge-arrow-src", { type: "geojson", data: arrowGeo });
         map.addLayer({ id: "surge-track-line", type: "line", source: "surge-track-src",
-          paint: { "line-color": "#38bdf8", "line-width": 3, "line-dasharray": [4, 2], "line-opacity": 0.8 } });
+          paint: { "line-color": "#38bdf8", "line-width": 3, "line-dasharray": [4, 2], "line-opacity": 0.9 } });
+        // Wind direction arrows using symbol layer
+        map.addLayer({ id: "surge-track-arrows", type: "symbol", source: "surge-arrow-src",
+          layout: {
+            "text-field": "▶",
+            "text-size": 18,
+            "text-rotate": ["get", "bearing"],
+            "text-rotation-alignment": "map",
+            "text-allow-overlap": true,
+          },
+          paint: { "text-color": "#38bdf8", "text-opacity": 0.9 }
+        });
         surgeTrackLine.current = true;
       }
     } catch(e) {}
@@ -3971,8 +4006,22 @@ export default function HomePage() {
         }
         return;
       }
+      // Surge popup — show when clicking near any surge point after trigger
+      if (scenarioModeRef.current === "surge" && surgeTrackPtsRef.current.length > 0 && surgeTrackLayers.current.some(l => l.layerId)) {
+        const preset = SURGE_PRESETS.find(p => p.id === surgePresetRef.current);
+        const reachM = preset ? preset.reach : surgeRef.current * 20000;
+        const nearPt = surgeTrackPtsRef.current.find(sp => {
+          const dLat = (lat - sp.lat) * 111000;
+          const dLng = (lng - sp.lng) * 111000 * Math.cos(sp.lat * Math.PI / 180);
+          return Math.sqrt(dLat*dLat + dLng*dLng) <= reachM * 1.2;
+        });
+        if (nearPt) {
+          showSurgePopup(lng, lat);
+          return;
+        }
+      }
+      // Single point surge popup
       if (surgeOnRef.current && surgeModeRef.current === "active" && surgePointRef.current) {
-        // Only show popup if clicking within surge reach radius
         const sp = surgePointRef.current;
         const preset = SURGE_PRESETS.find(p => p.id === surgePresetRef.current);
         const reachM = preset ? preset.reach : surgeRef.current * 20000;
