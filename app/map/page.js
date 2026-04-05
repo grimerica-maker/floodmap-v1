@@ -1184,6 +1184,7 @@ export default function HomePage() {
   const [empLoading, setEmpLoading] = useState(false);
   const [megalithOn, setMegalithOn] = useState(false);
   const megalithOnRef = useRef(false);
+  const [megalithLoading, setMegalithLoading] = useState(false);
   const [airportOn, setAirportOn] = useState(false);
   const airportOnRef = useRef(false);
   const [unescoOn, setUnescoOn] = useState(false);
@@ -1409,6 +1410,7 @@ export default function HomePage() {
   };
 
   const addOverlayLayer = async (type, level = 0) => {
+    if (type === "megaliths") setMegalithLoading(true);
     const map = mapRef.current;
     const c = OVL[type];
     if (!map || !c || !map.isStyleLoaded()) return;
@@ -1417,6 +1419,8 @@ export default function HomePage() {
     overlayLoadingRef.current.add(type);
     // Bulletproof double-add guard — remove layer then source explicitly
     { const m = mapRef.current; if (m) {
+      try { if (m.getLayer(c.layer + "-count")) m.removeLayer(c.layer + "-count"); } catch(e){}
+      try { if (m.getLayer(c.layer + "-clusters")) m.removeLayer(c.layer + "-clusters"); } catch(e){}
       try { if (m.getLayer(c.layer)) m.removeLayer(c.layer); } catch(e){}
       try { if (m.getSource(c.src))  m.removeSource(c.src);  } catch(e){}
     }}
@@ -1425,11 +1429,56 @@ export default function HomePage() {
       const url = type === "fires"
         ? `${floodEngineUrlRef.current}/active-fires?pro=${proTierRef.current !== "free"}`
         : `${floodEngineUrlRef.current}/at-risk?level=${level}&type=${type}`;
-      const res = await fetch(url, { cache: "no-store" });
-      if (!res.ok) return;
-      const data = await res.json();
+      // Cache megaliths in sessionStorage (129k features, slow to re-fetch)
+      let data;
+      const cacheKey = `overlay_${type}_${level}`;
+      if (type === "megaliths") {
+        try {
+          const cached = sessionStorage.getItem(cacheKey);
+          if (cached) { data = JSON.parse(cached); }
+        } catch {}
+      }
+      if (!data) {
+        const res = await fetch(url, { cache: type === "megaliths" ? "force-cache" : "no-store" });
+        if (!res.ok) { if (type === "megaliths") setMegalithLoading(false); return; }
+        data = await res.json();
+        if (type === "megaliths") {
+          try { sessionStorage.setItem(cacheKey, JSON.stringify(data)); } catch {}
+        }
+      }
+      if (type === "megaliths") setMegalithLoading(false);
       if (!data.features?.length) return;
-      map.addSource(c.src, { type: "geojson", data });
+      const isMegalith = type === "megaliths";
+      map.addSource(c.src, {
+        type: "geojson", data,
+        ...(isMegalith ? { cluster: true, clusterMaxZoom: 8, clusterRadius: 40 } : {}),
+      });
+
+      // Cluster layers for megaliths
+      if (isMegalith) {
+        map.addLayer({ id: c.layer + "-clusters", type: "circle", source: c.src,
+          filter: ["has", "point_count"],
+          paint: {
+            "circle-color": ["step", ["get", "point_count"], "#f97316", 10, "#ea580c", 100, "#c2410c"],
+            "circle-radius": ["step", ["get", "point_count"], 14, 10, 20, 100, 28],
+            "circle-stroke-width": 1.5, "circle-stroke-color": "#fff",
+          }
+        });
+        map.addLayer({ id: c.layer + "-count", type: "symbol", source: c.src,
+          filter: ["has", "point_count"],
+          layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 11, "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"] },
+          paint: { "text-color": "#fff" }
+        });
+        // Click cluster to zoom in
+        map.on("click", c.layer + "-clusters", (e) => {
+          const f = map.queryRenderedFeatures(e.point, { layers: [c.layer + "-clusters"] })[0];
+          map.getSource(c.src).getClusterExpansionZoom(f.properties.cluster_id, (err, zoom) => {
+            if (!err) map.easeTo({ center: f.geometry.coordinates, zoom });
+          });
+        });
+        map.on("mouseenter", c.layer + "-clusters", () => { map.getCanvas().style.cursor = "pointer"; });
+        map.on("mouseleave", c.layer + "-clusters", () => { map.getCanvas().style.cursor = ""; });
+      }
 
       const isFire = type === "fires";
       map.addLayer({
@@ -4515,7 +4564,12 @@ export default function HomePage() {
                 ${p.type || p.category ? `<div style="color:#e2e8f0;margin-bottom:3px"><b>${p.type || p.category}</b></div>` : ""}
                 ${p.country ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:3px">📍 ${p.country}</div>` : ""}
                 ${p.iata ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:3px">IATA: <b>${p.iata}</b></div>` : ""}
-                ${p.capacity ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:3px">Capacity: ${p.capacity} MW</div>` : ""}
+                ${p.status ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:3px">Status: <b>${p.status}</b></div>` : ""}
+                ${p.capacity ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:3px">Capacity: <b>${p.capacity} MW</b></div>` : ""}
+                ${p.reactor_type ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:3px">Reactor: ${p.reactor_type}${p.model ? ' · ' + p.model : ''}</div>` : ""}
+                ${p.operator ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:3px">Operator: ${p.operator}</div>` : ""}
+                ${p.start_year ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:3px">Online: ${p.start_year}${p.retirement_year ? ' → retired ' + p.retirement_year : p.planned_retirement ? ' · retires ' + p.planned_retirement : ''}</div>` : ""}
+                ${p.region ? `<div style="color:#64748b;font-size:10px;margin-bottom:3px">${p.region}</div>` : ""}
                 ${p.elevation !== undefined ? `<div style="color:#64748b;font-size:11px;margin-bottom:3px">Elevation: ${Number(p.elevation).toFixed(0)} m</div>` : ""}
                 ${isSubmerged
                   ? `<div style="color:#60a5fa;margin-bottom:4px">🌊 Currently underwater</div>`
@@ -5967,7 +6021,7 @@ export default function HomePage() {
                   {cfg.label}{locked && <span style={{ marginLeft: 6, fontSize: 10, color: "#f97316" }}>PRO</span>}
                 </div>
                 <div style={{ fontSize: 10, color: locked ? "#374151" : "#475569", marginTop: 1 }}>
-                  {type === "megaliths" && "100,000+ sites · worldwide"}
+                  {type === "megaliths" && (megalithOn ? (megalithLoading ? "Loading 100k+ sites..." : "100,000+ sites · worldwide") : "100,000+ sites · worldwide")}
                   {type === "unesco"    && "World Heritage Sites"}
                   {type === "airports"  && (locked ? "Upgrade to Pro" : "Major & regional airports")}
                   {type === "nuclear"   && (locked ? "Upgrade to Pro" : "Active nuclear plants")}
