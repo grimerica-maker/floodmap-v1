@@ -32,10 +32,9 @@ const EQ_FAULT_TYPES = [
 // Hardcoded tsunami impacts for historical presets — real data, bypasses engine
 const PRESET_TSUNAMI_IMPACTS = {
   "Tohoku 2011": {
-    // 15,897 dead. Max wave 40m. Rupture ran NNE along Japan trench.
-    // flood-bbox ellipse: origin=epicenter, propagates W toward Japan coast
-    floodLevel: 15, major_km: 220, minor_km: 80, bearing: 270,
-    // bearing 270 = westward toward coast; major along coast N-S, minor inland
+    // 15,897 dead. Rupture 500km NNE along Japan trench. Waves hit E Japan coast.
+    // Ellipse along fault strike (NNE), wide enough to cover Sendai plain ~100km inland
+    floodLevel: 15, major_km: 500, minor_km: 150, bearing: 203,
     impacts: [
       { lat:38.32, lng:141.55, arrival_min:10, wave_height_m:40, band_color:"#ef4444", band_label:"Extreme — 40m",  warning:"Danger", distance_km:55  },
       { lat:38.50, lng:141.48, arrival_min:12, wave_height_m:20, band_color:"#ef4444", band_label:"Extreme — 20m",  warning:"Danger", distance_km:80  },
@@ -52,8 +51,9 @@ const PRESET_TSUNAMI_IMPACTS = {
   },
   "Indian Ocean 2004": {
     // 227,898 dead. Rupture ran NNW along Sunda trench for 1300km.
-    // Ellipse: wide N-S along fault, narrow E-W. Floods Indian Ocean coasts.
-    floodLevel: 15, major_km: 1800, minor_km: 400, bearing: 340,
+    // Two-sided flood: India/Sri Lanka to W, Thailand to E
+    // Use wide minor axis to capture both coastlines
+    floodLevel: 12, major_km: 1400, minor_km: 1200, bearing: 340,
     impacts: [
       // Banda Aceh — worst hit, 30m, 15min
       { lat:5.55,  lng:95.32,  arrival_min:15,  wave_height_m:30, band_color:"#ef4444", band_label:"Extreme — 30m", warning:"Danger",   distance_km:250 },
@@ -83,9 +83,9 @@ const PRESET_TSUNAMI_IMPACTS = {
     ]
   },
   "Valdivia 1960": {
-    // 5,700 dead. Rupture ran N-S along Chilean trench 1000km.
-    // Ellipse: long N-S along coast, propagates W into Pacific.
-    floodLevel: 12, major_km: 900, minor_km: 350, bearing: 270,
+    // 5,700 dead. Rupture 1000km N-S along Chilean trench.
+    // Ellipse along fault (N-S=5°), wide to capture Chilean coast E and Pacific W
+    floodLevel: 12, major_km: 900, minor_km: 800, bearing: 5,
     impacts: [
       { lat:-38.50,lng:-73.00, arrival_min:10,  wave_height_m:25, band_color:"#ef4444", band_label:"Extreme — 25m", warning:"Danger",   distance_km:60  },
       { lat:-39.80,lng:-73.40, arrival_min:18,  wave_height_m:20, band_color:"#ef4444", band_label:"Extreme — 20m", warning:"Danger",   distance_km:200 },
@@ -104,9 +104,9 @@ const PRESET_TSUNAMI_IMPACTS = {
     ]
   },
   "Cascadia (Scenario)": {
-    // FEMA: 13,000 dead. Rupture runs N-S along Cascadia subduction zone.
-    // Ellipse: long N-S along coast, propagates W to E hitting coast.
-    floodLevel: 15, major_km: 800, minor_km: 200, bearing: 90,
+    // FEMA: 13,000 dead. Rupture 1000km N-S along Cascadia subduction zone.
+    // Ellipse along fault (N-S=350°), wide E to hit coast, narrow W into Pacific
+    floodLevel: 15, major_km: 900, minor_km: 300, bearing: 350,
     impacts: [
       // Oregon/Washington coast — 15-30min, no warning
       { lat:47.00, lng:-124.15,arrival_min:12,  wave_height_m:28, band_color:"#ef4444", band_label:"Extreme — 28m", warning:"Danger",   distance_km:65  },
@@ -2213,8 +2213,37 @@ export default function HomePage() {
             mapNow.on("mouseleave", tLayerId, () => { mapNow.getCanvas().style.cursor=""; });
           } catch(e) { console.warn("Tsunami dots error:", e); }
 
-          // Note: flood-region tiles not used for tsunami — they show sea-level-rise, not wave inundation
-          // Dots show impact locations with arrival time and wave height
+          // flood-bbox ellipse derived from fault geometry
+          try {
+            const impacts = tsResult.tsunami_impacts || [];
+            if (impacts.length > 0) {
+              // Fault length from magnitude (Wells & Coppersmith)
+              const faultLenKm = Math.pow(10, 0.59 * mag - 2.44);
+              // Propagation bearing = perpendicular to fault strike, toward coast
+              // Strike runs along fault; waves propagate ~90° from strike
+              const propBearing = (strike + 90) % 360;
+              const major_km = Math.min(faultLenKm * 1.2, 2000);
+              const minor_km = Math.min(major_km * 0.25, 500);
+              // Max wave from impacts
+              const maxWave = Math.max(...impacts.map(i => i.wave_height_m));
+              const floodLevel = Math.max(5, Math.min(maxWave * 0.6, 30));
+              const fParams = `origin_lat=${lat}&major_km=${major_km}&minor_km=${minor_km}&bearing_deg=${propBearing}&shift=0.5`;
+              const fUrl  = `${floodEngineUrlRef.current}/flood-bbox/${floodLevel}/{z}/{x}/{y}.png?origin_lng=${lng}&${fParams}`;
+              const fUrl2 = `${floodEngineUrlRef.current}/flood-bbox/${floodLevel}/{z}/{x}/{y}.png?origin_lng=${lng + 360}&${fParams}`;
+              const fSrc = "eq-ts-flood-src-0", fLay = "eq-ts-flood-layer-0";
+              const fSrc2 = "eq-ts-flood-src-1", fLay2 = "eq-ts-flood-layer-1";
+              if (mapNow.getLayer(fLay))  mapNow.removeLayer(fLay);
+              if (mapNow.getSource(fSrc)) mapNow.removeSource(fSrc);
+              if (mapNow.getLayer(fLay2))  mapNow.removeLayer(fLay2);
+              if (mapNow.getSource(fSrc2)) mapNow.removeSource(fSrc2);
+              mapNow.addSource(fSrc,  { type:"raster", tiles:[fUrl],  tileSize:256 });
+              mapNow.addLayer({ id:fLay,  type:"raster", source:fSrc,  paint:{"raster-opacity":0.7} });
+              mapNow.addSource(fSrc2, { type:"raster", tiles:[fUrl2], tileSize:256 });
+              mapNow.addLayer({ id:fLay2, type:"raster", source:fSrc2, paint:{"raster-opacity":0.7} });
+              eqLayers.current.push({ sourceId:fSrc,  layerId:fLay  });
+              eqLayers.current.push({ sourceId:fSrc2, layerId:fLay2 });
+            }
+          } catch(e) { console.warn("EQ flood-bbox error:", e); }
 
           mapNow.triggerRepaint();
       };  // end processResult
@@ -2230,7 +2259,7 @@ export default function HomePage() {
           const mapNow = mapRef.current;
           if (!mapNow || !mapNow.isStyleLoaded()) return;
           const { floodLevel, major_km, minor_km, bearing } = hardcoded;
-          const floodParams = `origin_lat=${lat}&major_km=${major_km}&minor_km=${minor_km}&bearing_deg=${bearing}&shift=0.9`;
+          const floodParams = `origin_lat=${lat}&major_km=${major_km}&minor_km=${minor_km}&bearing_deg=${bearing}&shift=0.5`;
           const fUrl  = `${floodEngineUrlRef.current}/flood-bbox/${floodLevel}/{z}/{x}/{y}.png?origin_lng=${lng}&${floodParams}`;
           const fUrl2 = `${floodEngineUrlRef.current}/flood-bbox/${floodLevel}/{z}/{x}/{y}.png?origin_lng=${lng + 360}&${floodParams}`;
           const fSrc = "eq-ts-flood-src-0", fLay = "eq-ts-flood-layer-0";
