@@ -1575,9 +1575,12 @@ export default function HomePage() {
       try { if (map.getSource(SURGE_SOURCE)) map.removeSource(SURGE_SOURCE); } catch(e) {}
     }
     if (surgeMarker.current) { surgeMarker.current.remove(); surgeMarker.current = null; }
+    if (surgePopupRef.current) { surgePopupRef.current.remove(); surgePopupRef.current = null; }
+    clearSurgeTrack();
     setSurgeOn(false); surgeOnRef.current = false;
     setSurgePoint(null); surgePointRef.current = null;
     setSurgeMode("place"); surgeModeRef.current = "place";
+    setSurgePreset(null); surgePresetRef.current = null;
   };
 
   const getSurgeReach = () => {
@@ -1667,35 +1670,49 @@ export default function HomePage() {
   const addTrackPoint = (lat, lng) => {
     const map = mapRef.current;
     const pts = surgeTrackPtsRef.current;
-    if (pts.length >= 3) return; // max 3
+    if (pts.length >= 3) return;
 
-    // Add marker
+    // Add numbered marker only — no flood tiles yet
     const el = document.createElement("div");
     const idx = pts.length;
     el.style.cssText = `width:28px;height:28px;border-radius:50%;background:#38bdf8;border:2.5px solid #fff;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#0f172a;`;
     el.textContent = idx + 1;
     const marker = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([lng, lat]).addTo(map);
 
-    // Add surge flood layer for this point
-    const preset = SURGE_PRESETS.find(p => p.id === surgePresetRef.current);
-    const reachM = preset ? preset.reach : surgeRef.current * 20000;
-    const totalLevel = seaLevelRef.current + surgeRef.current;
-    const sourceId = `surge-track-src-${idx}`;
-    const layerId  = `surge-track-layer-${idx}`;
-    const url = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(totalLevel)}/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}/${encodeURIComponent(reachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
-    try {
-      if (map.getLayer(layerId))  map.removeLayer(layerId);
-      if (map.getSource(sourceId)) map.removeSource(sourceId);
-      map.addSource(sourceId, { type: "raster", tiles: [url], tileSize: 256, minzoom: 0, maxzoom: 12 });
-      map.addLayer({ id: layerId, type: "raster", source: sourceId,
-        paint: { "raster-opacity": 0.72, "raster-opacity-transition": { duration: 400 } } });
-    } catch(e) {}
-
     const newPts = [...pts, { lat, lng }];
-    surgeTrackLayers.current.push({ sourceId, layerId, marker });
+    surgeTrackLayers.current.push({ sourceId: null, layerId: null, marker });
     surgeTrackPtsRef.current = newPts;
     setSurgeTrackPts([...newPts]);
     updateTrackLine(newPts);
+  };
+
+  const triggerSurgeTrack = () => {
+    // Render flood layers for all placed track points
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const pts = surgeTrackPtsRef.current;
+    if (pts.length === 0) return;
+    const preset = SURGE_PRESETS.find(p => p.id === surgePresetRef.current);
+    const reachM = preset ? preset.reach : surgeRef.current * 20000;
+    const totalLevel = seaLevelRef.current + surgeRef.current;
+    // Remove old flood layers but keep markers
+    surgeTrackLayers.current.forEach(({ sourceId, layerId }) => {
+      if (layerId) try { map.removeLayer(layerId); } catch(e) {}
+      if (sourceId) try { map.removeSource(sourceId); } catch(e) {}
+    });
+    // Add fresh flood layers for each point
+    surgeTrackLayers.current = surgeTrackLayers.current.map((entry, idx) => {
+      const pt = pts[idx];
+      const sourceId = `surge-track-src-${idx}`;
+      const layerId  = `surge-track-layer-${idx}`;
+      const url = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(totalLevel)}/${encodeURIComponent(pt.lat)}/${encodeURIComponent(pt.lng)}/${encodeURIComponent(reachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
+      try {
+        map.addSource(sourceId, { type: "raster", tiles: [url], tileSize: 256, minzoom: 0, maxzoom: 12 });
+        map.addLayer({ id: layerId, type: "raster", source: sourceId,
+          paint: { "raster-opacity": 0.72, "raster-opacity-transition": { duration: 400 } } });
+      } catch(e) {}
+      return { ...entry, sourceId, layerId };
+    });
     map.triggerRepaint();
   };
 
@@ -3946,18 +3963,11 @@ export default function HomePage() {
       const { lng, lat } = e.lngLat;
 
       // Storm surge
-      if (surgeOnRef.current && surgeModeRef.current === "place") {
+      if (scenarioModeRef.current === "surge" && surgeOnRef.current) {
         const maxPts = proTierRef.current !== "free" ? 3 : 1;
         const currentPts = surgeTrackPtsRef.current.length;
-        // Free: single point via placeSurgePoint, Pro: track points
-        if (proTierRef.current === "free") {
-          placeSurgePoint(lat, lng);
-        } else if (currentPts < maxPts) {
+        if (currentPts < maxPts) {
           addTrackPoint(lat, lng);
-          if (currentPts + 1 >= maxPts) {
-            // Max reached — switch to active
-            setSurgeMode("active"); surgeModeRef.current = "active";
-          }
         }
         return;
       }
@@ -4570,7 +4580,7 @@ export default function HomePage() {
         </button>
         <div style={{ display: "flex", gap: 6 }}>
           <button
-            onClick={() => { clearSurge(); setScenarioMode("surge"); scenarioModeRef.current = "surge"; }}
+            onClick={() => { clearSurge(); setScenarioMode("surge"); scenarioModeRef.current = "surge"; setSurgeOn(true); surgeOnRef.current = true; window.__dmClearSurge = clearSurge; }}
             style={{ flex: 1, padding: "13px 14px", minHeight: 56, background: scenarioMode === "surge" ? "rgba(56,189,248,0.1)" : "#111827", color: scenarioMode === "surge" ? "#38bdf8" : "#94a3b8", border: scenarioMode === "surge" ? "1px solid #38bdf8" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <span style={{ fontSize: 15 }}>🌀 Storm Surge</span>
@@ -4617,16 +4627,17 @@ export default function HomePage() {
             </div>
           )}
           <div style={{ fontSize: 11, color: "#94a3b8", textAlign: "center", marginBottom: 8 }}>
-            {surgeOn && surgeTrackPts.length > 0
-              ? `📍 ${surgeTrackPts.length}/3 points · ${surgeTrackPts.length < 3 ? "click map for next point" : "max reached"}`
-              : surgeOn && surgePoint
-              ? `📍 +${surgeM} m placed · click within zone for info`
-              : "👆 Click Trigger then click map to place"}
+            {surgeTrackPts.length > 0
+              ? `📍 ${surgeTrackPts.length}/3 points placed${surgeTrackPts.length < 3 ? " · click map to add more" : " · hit Trigger"}`
+              : proTier !== "free" ? "👆 Click map to place up to 3 surge points" : "👆 Click map to place surge point"}
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-            <button onClick={activateSurge}
-              style={{ flex: 1, padding: "10px", background: "#38bdf8", color: "#0f172a", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-              {surgeOn && (surgePoint || surgeTrackPts.length > 0) ? `🌀 Active (${surgeTrackPts.length > 0 ? surgeTrackPts.length + "/3 pts" : "+"+surgeM+"m"})` : "🌀 Trigger"}
+            <button onClick={() => {
+                if (surgeTrackPts.length > 0) triggerSurgeTrack();
+              }}
+              disabled={surgeTrackPts.length === 0}
+              style={{ flex: 1, padding: "10px", background: surgeTrackPts.length > 0 ? "#38bdf8" : "#1e2d45", color: surgeTrackPts.length > 0 ? "#0f172a" : "#475569", border: "none", borderRadius: 8, fontWeight: 700, cursor: surgeTrackPts.length > 0 ? "pointer" : "not-allowed", fontSize: 13 }}>
+              {surgeTrackPts.length > 0 ? `🌀 Trigger (${surgeTrackPts.length} pt${surgeTrackPts.length>1?"s":""})` : "🌀 Click map to place"}
             </button>
             {surgeOn && <button onClick={clearSurge}
               style={{ flex: 1, padding: "10px", background: "transparent", color: "#475569", border: "1px solid #1e2d45", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
