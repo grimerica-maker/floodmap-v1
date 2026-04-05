@@ -4553,6 +4553,7 @@ export default function HomePage() {
               ? p.wiki_url
               : p.wikipedia
                 ? (p.wikipedia.startsWith("http") ? p.wikipedia : `https://en.wikipedia.org/wiki/${encodeURIComponent(p.wikipedia)}`)
+                : (p.kind === "nuclear" || p.kind === "megalith") ? null
                 : p.name ? `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(p.name)}&ns0=1` : null;
             const isSubmerged = p.already_submerged === true || p.already_submerged === "true";
             const isFlooded   = p.flooded === true || p.flooded === "true";
@@ -7164,18 +7165,11 @@ export default function HomePage() {
               </div>
               <div style={{ fontSize: 11, color: "#f97316", marginBottom: 8 }}>Price going up to $24.99 soon — lock in now</div>
               <div style={{ color: "#94a3b8", fontSize: 12, lineHeight: 1.7 }}>
-                ✓ {PRO_SIM_PER_HOUR} simulations/hour, {PRO_SIM_PER_DAY}/day<br/>
-                ✓ Impact diameter up to <strong style={{ color: "#e2e8f0" }}>20,000 m</strong> (free: 5,000 m)<br/>
-                ✓ Up to <strong style={{ color: "#e2e8f0" }}>3 simultaneous impact points</strong><br/>
-                ✓ <strong style={{ color: "#e2e8f0" }}>Impact velocity</strong> slider (11–72 km/s)<br/>
-                ✓ Nuke yield up to <strong style={{ color: "#e2e8f0" }}>100 Mt</strong> (free: 1 Mt)<br/>
-                ✓ Up to <strong style={{ color: "#e2e8f0" }}>5 simultaneous nuke strikes</strong><br/>
-                ✓ Wind &amp; Both cataclysm overlays<br/>
-                ✓ Unlimited zone click popups<br/>
-                ✓ Satellite + Globe view<br/>
-                ✓ Flood displaced counts<br/>
-                ✓ 🌊 Mega-Tsunami scenarios<br/>
-                ✓ No ads · No subscription ever
+                ✓ More simulations · bigger impacts · higher yields<br/>
+                ✓ Satellite + Globe view · Mega-Tsunami<br/>
+                ✓ Flood displaced population counts<br/>
+                ✓ Wind &amp; cataclysm overlays · Wikipedia panel<br/>
+                ✓ No ads · No subscription · Yours forever
               </div>
               <button onClick={() => { window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank"); }}
                 style={{ width: "100%", marginTop: 12, padding: "10px", background: "#f97316", color: "white", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
@@ -7185,12 +7179,7 @@ export default function HomePage() {
 
 
 
-            {/* Developer Kit teaser */}
-            <div style={{ background: "#0a0f1e", border: "1px solid #1e2d45", borderRadius: 12, padding: "12px 16px", marginBottom: 10 }}>
-              <div style={{ color: "#334155", fontSize: 12, textAlign: "center" }}>
-                🛠️ Developer Kit — coming soon
-              </div>
-            </div>
+
 
             {/* Already have Pro? Sign in */}
             {!isSignedIn && (
