@@ -1192,6 +1192,17 @@ export default function HomePage() {
 
   const [proTier, setProTier] = useState("free");
   const [scenarioWiki, setScenarioWiki] = useState(null);
+  const [eqMag,     setEqMag]     = useState(7.5);
+  const [eqDepthId, setEqDepthId] = useState("shallow");
+  const [eqFaultId, setEqFaultId] = useState("thrust");
+  const [eqResult,  setEqResult]  = useState(null);
+  const [eqPoint,   setEqPoint]   = useState(null);
+  const eqMagRef   = useRef(7.5);
+  const eqDepthRef = useRef("shallow");
+  const eqFaultRef = useRef("thrust");
+  const eqPointRef = useRef(null);
+  const eqMarker   = useRef(null);
+  const eqLayers   = useRef([]);
   const [surgeOn,        setSurgeOn]        = useState(false);
   const [surgeTrackMode, setSurgeTrackMode]  = useState(false); // Pro: multi-point track
   const [surgeTrackPts,  setSurgeTrackPts]   = useState([]);    // [{lat,lng}] max 3
