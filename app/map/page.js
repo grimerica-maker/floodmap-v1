@@ -1466,8 +1466,8 @@ export default function HomePage() {
         });
         map.addLayer({ id: c.layer + "-count", type: "symbol", source: c.src,
           filter: ["has", "point_count"],
-          layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 11, "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"] },
-          paint: { "text-color": "#fff" }
+          layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 13, "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"] },
+          paint: { "text-color": "#fff", "text-halo-color": "rgba(0,0,0,0.4)", "text-halo-width": 1 }
         });
         // Click cluster to zoom in
         map.on("click", c.layer + "-clusters", (e) => {
@@ -1546,6 +1546,10 @@ export default function HomePage() {
       return;
     }
     setWikiPanel({ title: name, extract: null, thumbnail: null, url: wikiUrl, loading: true });
+    if (!mpId && wikiUrl && wikiUrl.includes("gem.wiki")) {
+      setWikiPanel({ title: name, extract: null, thumbnail: null, url: wikiUrl, loading: false, gemWiki: true });
+      return;
+    }
     if (mpId) {
       try {
         const cacheKey = `mp_${mpId}`;
@@ -7114,7 +7118,8 @@ export default function HomePage() {
         <div onPointerDown={(e) => e.stopPropagation()} onClick={() => setPaywallModal(null)} style={{
           position: "fixed", inset: 0, zIndex: 2000,
           background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)",
-          display: "flex", alignItems: "center", justifyContent: "center",
+          display: "flex", alignItems: "flex-start", justifyContent: "center",
+          overflowY: "auto", padding: "20px 0",
           fontFamily: "Arial,sans-serif",
         }}>
           <div onClick={(e) => e.stopPropagation()} style={{
@@ -7543,7 +7548,7 @@ export default function HomePage() {
                   <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.7, fontWeight: 300 }}>{wikiPanel.extract}</p>
                 ) : (
                   <p style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>
-                    No description available.
+                    {wikiPanel.gemWiki ? "Click below to view full plant data on GEM Wiki." : "No description available."}
                   </p>
                 )}
                 {wikiPanel.wikidataId && (
@@ -7569,7 +7574,7 @@ export default function HomePage() {
                   borderRadius: 8, color: "#d97706", fontSize: 13, fontWeight: 600,
                   textDecoration: "none",
                 }}>
-                {wikiPanel.mpUrl ? "View on Megalithic Portal" : "Open full article on Wikipedia →"}
+                {wikiPanel.mpUrl ? "View on Megalithic Portal" : wikiPanel.gemWiki ? "View on GEM Wiki" : "Open full article on Wikipedia →"}
               </a>
             </div>
           )}
