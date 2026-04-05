@@ -2040,17 +2040,18 @@ export default function HomePage() {
             mapNow.on("mouseleave", tLayerId, () => { mapNow.getCanvas().style.cursor=""; });
           } catch(e) { console.warn("Tsunami dots error:", e); }
 
-          // Flood tiles — separate try block so dot errors don't block this
-          const sorted = [...tsResult.tsunami_impacts].sort((a,b) => b.wave_height_m - a.wave_height_m);
-          const toFlood = sorted.slice(0, 12);
-          console.log("🌊 Adding flood tiles for", toFlood.length, "impact points");
-          toFlood.forEach((imp, i) => {
-            const fSrcId = `eq-ts-flood-src-${i}`;
-            const fLayId = `eq-ts-flood-layer-${i}`;
-            const reachM = Math.max(imp.wave_height_m * 10000, 30000);
-            const tUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(imp.wave_height_m)}/${encodeURIComponent(imp.lat)}/${encodeURIComponent(imp.lng)}/${encodeURIComponent(reachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
-            console.log(`  [${i}] lat=${imp.lat} lng=${imp.lng} h=${imp.wave_height_m}m reach=${Math.round(reachM/1000)}km`);
-            try {
+          // Flood tiles — single unified call centered on epicenter
+          try {
+            const impacts = tsResult.tsunami_impacts || [];
+            if (impacts.length > 0) {
+              const maxImpact = impacts.reduce((a, b) => b.wave_height_m > a.wave_height_m ? b : a);
+              const maxReachM = Math.max(...impacts.map(i => i.distance_km * 1000), 50000);
+              // Amplify for visibility: min 10m flood level, 3x actual wave height
+              const floodLevel = Math.max(10, maxImpact.wave_height_m * 3);
+              const fSrcId = `eq-ts-flood-src-0`;
+              const fLayId = `eq-ts-flood-layer-0`;
+              const tUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(floodLevel)}/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}/${encodeURIComponent(maxReachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
+              console.log(`🌊 Unified flood tile: epicenter=${lat},${lng} level=${floodLevel}m reach=${Math.round(maxReachM/1000)}km (max wave=${maxImpact.wave_height_m}m)`);
               if (mapNow.getLayer(fLayId)) mapNow.removeLayer(fLayId);
               if (mapNow.getSource(fSrcId)) mapNow.removeSource(fSrcId);
               mapNow.addSource(fSrcId, { type:"raster", tiles:[tUrl], tileSize:256, minzoom:0, maxzoom:12 });
@@ -2059,8 +2060,8 @@ export default function HomePage() {
                 paint:{ "raster-opacity":0.75, "raster-opacity-transition":{ duration:500 } } });
               eqLayers.current.push({ sourceId:fSrcId, layerId:fLayId });
               console.log(`  ✓ ${fLayId} added`);
-            } catch(e) { console.error(`  ✗ ${fLayId} error:`, e.message); }
-          });
+            }
+          } catch(e) { console.error("Tsunami flood tile error:", e.message); }
 
           mapNow.triggerRepaint();
         })
