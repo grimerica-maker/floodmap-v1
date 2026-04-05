@@ -30,12 +30,24 @@ const EQ_FAULT_TYPES = [
 ];
 
 const EQ_PRESETS = [
-  { label: "Tohoku 2011",      lat: 38.297, lng: 142.373, mag: 9.1, depthId: "subduction", faultId: "thrust",     desc: "M9.1 — 15,897 dead, Fukushima meltdown, 40m tsunami" },
-  { label: "Haiti 2010",       lat: 18.457, lng: -72.533, mag: 7.0, depthId: "shallow",    faultId: "strikeslip", desc: "M7.0 — 316,000 dead, Port-au-Prince destroyed" },
-  { label: "Indian Ocean 2004",lat: 3.295,  lng: 95.982,  mag: 9.1, depthId: "subduction", faultId: "thrust",     desc: "M9.1 — 227,898 dead, Thailand/Indonesia/Sri Lanka" },
-  { label: "Valdivia 1960",    lat: -38.14, lng: -73.41,  mag: 9.5, depthId: "subduction", faultId: "thrust",     desc: "M9.5 — Largest ever recorded, 5,700 dead, Chile" },
-  { label: "San Andreas (Scenario)", lat: 34.05, lng: -118.25, mag: 7.8, depthId: "shallow", faultId: "strikeslip", desc: "M7.8 scenario — ShakeOut: 1,800 dead, $200B damage, LA" },
-  { label: "Cascadia (Scenario)",    lat: 47.60, lng: -124.0,  mag: 9.0, depthId: "subduction", faultId: "thrust",  desc: "M9.0 scenario — Pacific Northwest megathrust overdue" },
+  { label: "Tohoku 2011", lat: 38.297, lng: 142.373, mag: 9.1, depthId: "subduction", faultId: "thrust",
+    desc: "M9.1 — 15,897 dead, Fukushima meltdown, 40m tsunami",
+    wiki: "<h4>Tōhoku 2011 — M9.1</h4><p>March 11, 2011. Japan's most powerful earthquake, triggering a 40m tsunami that destroyed coastal towns and caused three Fukushima Daiichi reactor meltdowns. 15,897 confirmed dead, 2,533 missing. $235B in damages. Shifted Earth's axis by 10-25cm and moved Japan's main island 2.4m east.</p>" },
+  { label: "Haiti 2010", lat: 18.457, lng: -72.533, mag: 7.0, depthId: "shallow", faultId: "strikeslip",
+    desc: "M7.0 — 316,000 dead, Port-au-Prince destroyed",
+    wiki: "<h4>Haiti 2010 — M7.0</h4><p>January 12, 2010. Shallow strike-slip quake 25km from Port-au-Prince. 316,000 dead, 300,000 injured, 1.5M displaced. 250,000 residences destroyed. Haiti's catastrophic losses attributed to shallow depth, proximity to capital, poor construction standards, and dense population.</p>" },
+  { label: "Indian Ocean 2004", lat: 3.295, lng: 95.982, mag: 9.1, depthId: "subduction", faultId: "thrust",
+    desc: "M9.1 — 227,898 dead, Thailand/Indonesia/Sri Lanka",
+    wiki: "<h4>Indian Ocean 2004 — M9.1</h4><p>December 26, 2004. Third largest earthquake ever recorded. Subduction quake off Sumatra ruptured 1,300km of fault in 10 minutes. Triggered tsunamis reaching 30m hitting 14 countries. 227,898 dead across Indonesia, Sri Lanka, India, Thailand. Waves reached Africa 7 hours later.</p>" },
+  { label: "Valdivia 1960", lat: -38.14, lng: -73.41, mag: 9.5, depthId: "subduction", faultId: "thrust",
+    desc: "M9.5 — Largest ever recorded, 5,700 dead, Chile",
+    wiki: "<h4>Valdivia 1960 — M9.5</h4><p>May 22, 1960. Largest earthquake ever recorded in human history. Ruptured 1,000km of Nazca-South American plate boundary. 5,700 dead in Chile, tsunami killed 61 in Hawaii, 122 in Japan, 32 in Philippines. Released more energy than all earthquakes combined from 1906-1960.</p>" },
+  { label: "San Andreas (Scenario)", lat: 34.05, lng: -118.25, mag: 7.8, depthId: "shallow", faultId: "strikeslip",
+    desc: "M7.8 scenario — ShakeOut: 1,800 dead, $200B damage, LA",
+    wiki: "<h4>San Andreas Scenario — M7.8</h4><p>USGS ShakeOut scenario: a M7.8 rupture of the southern San Andreas fault near Los Angeles. Estimated 1,800 deaths, 53,000 injuries, $200B in damage. 300,000 displaced. Fire following earthquake could double casualties. Last major rupture in this segment was 1857 (M7.9).</p>" },
+  { label: "Cascadia (Scenario)", lat: 47.60, lng: -124.0, mag: 9.0, depthId: "subduction", faultId: "thrust",
+    desc: "M9.0 scenario — Pacific Northwest megathrust overdue",
+    wiki: "<h4>Cascadia Scenario — M9.0</h4><p>The Cascadia Subduction Zone last ruptured January 26, 1700 (confirmed by Japanese tsunami records). A full M9.0 rupture would devastate Seattle, Portland, and coastal Oregon/Washington. FEMA estimates 13,000 dead, 27,000 injured, $82B damage — with coastal areas having 15-50 minutes before tsunami arrival.</p>" },
 ];
 
 // Mercalli intensity ring radii (km) by magnitude and depth factor
@@ -1854,8 +1866,8 @@ export default function HomePage() {
   const clearEarthquake = () => {
     const map = mapRef.current;
     eqLayers.current.forEach(({ sourceId, layerId }) => {
-      try { if (map && map.getLayer(layerId))  map.removeLayer(layerId);  } catch(e) {}
-      try { if (map && map.getSource(sourceId)) map.removeSource(sourceId); } catch(e) {}
+      if (layerId) try { if (map && map.getLayer(layerId))  map.removeLayer(layerId);  } catch(e) {}
+      if (sourceId) try { if (map && map.getSource(sourceId)) map.removeSource(sourceId); } catch(e) {}
     });
     eqLayers.current = [];
     if (eqMarker.current) { eqMarker.current.remove(); eqMarker.current = null; }
@@ -1873,11 +1885,6 @@ export default function HomePage() {
     const rings = eqIntensityRings(mag, depthType.depth, faultId);
     const liqRadiusKm = eqLiquefactionRadius(mag, depthType.depth);
     const casualties = eqCasualtyEstimate(mag, depthType.depth);
-
-    // Place epicenter marker
-    const el = document.createElement("div");
-    el.style.cssText = "width:24px;height:24px;background:#fbbf24;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 3px #f59e0b,0 2px 8px rgba(0,0,0,0.5);cursor:pointer;";
-    eqMarker.current = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([lng, lat]).addTo(map);
 
     const newLayers = [];
 
@@ -1917,27 +1924,22 @@ export default function HomePage() {
     const isPro = proTierRef.current !== "free";
     const tsunamiRisk = faultType.tsunami && mag >= 7.5;
     if (tsunamiRisk && isPro) {
-      // Find nearest tsunami source to epicenter
-      const sources = [
-        { name: "La Palma",    lat: 28.5, lng: -17.9 },
-        { name: "Cascadia",    lat: 47.0, lng: -124.0 },
-        { name: "Alaska",      lat: 58.3, lng: -153.0 },
-        { name: "Sumatra",     lat: 3.3,  lng: 96.0 },
-        { name: "Japan",       lat: 38.3, lng: 142.4 },
-        { name: "Chile",       lat: -38.1,lng: -73.4 },
+      const TSRC = [
+        { lat: 28.5,  lng: -17.9  }, // La Palma/Canaries
+        { lat: 27.8,  lng: -15.6  }, // Cumbre Vieja
+        { lat: 47.0,  lng: -124.0 }, // Cascadia
+        { lat: 58.3,  lng: -153.0 }, // Alaska
       ];
-      let nearest = sources[0], minDist = Infinity;
-      sources.forEach(s => {
+      let nearestIdx = 0, minDist = Infinity;
+      TSRC.forEach((s, i) => {
         const d = Math.sqrt((s.lat-lat)**2 + (s.lng-lng)**2);
-        if (d < minDist) { minDist = d; nearest = s; }
+        if (d < minDist) { minDist = d; nearestIdx = i; }
       });
       setTimeout(() => {
-        tsunamiSourceRef.current = 0;
-        setTsunamiSource(0);
-        scenarioModeRef.current = "tsunami";
-        setScenarioMode("tsunami");
-        setTimeout(() => drawTsunami(0), 300);
-      }, 1500);
+        tsunamiSourceRef.current = nearestIdx;
+        setTsunamiSource(nearestIdx);
+        drawTsunami(nearestIdx);
+      }, 1200);
     }
 
     setEqResult({ mag, depthType, faultType, rings, casualties, tsunamiRisk, isPro, liqRadiusKm });
@@ -1956,8 +1958,17 @@ export default function HomePage() {
     setEqFaultId(preset.faultId); eqFaultRef.current = preset.faultId;
     setScenarioMode("earthquake"); scenarioModeRef.current = "earthquake";
     const map = mapRef.current;
-    if (map) map.flyTo({ center: [preset.lng, preset.lat], zoom: 7, duration: 1200 });
-    setTimeout(() => runEarthquake(preset.lat, preset.lng, preset.mag, preset.depthId, preset.faultId), 1400);
+    if (!map) return;
+    // Clear old state
+    clearEarthquake();
+    // Place marker immediately
+    const el = document.createElement("div");
+    el.style.cssText = "width:24px;height:24px;background:#fbbf24;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 3px #f59e0b,0 2px 8px rgba(0,0,0,0.5);cursor:pointer;";
+    eqMarker.current = new mapboxgl.Marker({ element: el, anchor:"center" }).setLngLat([preset.lng, preset.lat]).addTo(map);
+    setEqPoint({ lat: preset.lat, lng: preset.lng }); eqPointRef.current = { lat: preset.lat, lng: preset.lng };
+    map.flyTo({ center: [preset.lng, preset.lat], zoom: 7, duration: 1200 });
+    // Run after fly completes
+    setTimeout(() => runEarthquake(preset.lat, preset.lng, preset.mag, preset.depthId, preset.faultId), 1500);
   };
 
   const applyProjectionForMode = (mode) => {
@@ -4190,8 +4201,35 @@ export default function HomePage() {
         }
       }
 
+      if (scenarioModeRef.current === "earthquake" && eqPointRef.current && eqLayers.current.some(l => l.layerId)) {
+        const ep = eqPointRef.current;
+        const depthType = EQ_DEPTH_TYPES.find(d => d.id === eqDepthRef.current) || EQ_DEPTH_TYPES[0];
+        const rings = eqIntensityRings(eqMagRef.current, depthType.depth, eqFaultRef.current);
+        const dLat = (lat - ep.lat) * 111000;
+        const dLng = (lng - ep.lng) * 111000 * Math.cos(ep.lat * Math.PI / 180);
+        const distKm = Math.sqrt(dLat*dLat + dLng*dLng) / 1000;
+        const ring = [...rings].reverse().find(r => distKm <= r.radiusKm) || rings[rings.length-1];
+        new mapboxgl.Popup({ closeButton:true, maxWidth:"260px", className:"dm-dark-popup" })
+          .setLngLat([lng, lat])
+          .setHTML(`<div style="font-family:Arial,sans-serif"><div style="font-size:13px;font-weight:700;color:${ring.color};margin-bottom:6px">MMI ${ring.intensity} — ${ring.label}</div><table style="font-size:11px;width:100%;border-collapse:collapse"><tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Distance</td><td style="font-weight:700">${distKm.toFixed(0)} km</td></tr><tr><td style="color:#94a3b8;padding:2px 8px 2px 0">PGA</td><td style="font-weight:700">${ring.pga}</td></tr><tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Magnitude</td><td style="font-weight:700">M${eqMagRef.current.toFixed(1)}</td></tr></table></div>`)
+          .addTo(mapRef.current);
+        return;
+      }
+
       if (scenarioModeRef.current === "earthquake") {
-        runEarthquake(lat, lng, eqMagRef.current, eqDepthRef.current, eqFaultRef.current);
+        // Just place marker — wait for Trigger
+        if (eqMarker.current) { eqMarker.current.remove(); eqMarker.current = null; }
+        const el = document.createElement("div");
+        el.style.cssText = "width:24px;height:24px;background:#fbbf24;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 3px #f59e0b,0 2px 8px rgba(0,0,0,0.5);cursor:pointer;";
+        eqMarker.current = new mapboxgl.Marker({ element: el, anchor:"center" }).setLngLat([lng, lat]).addTo(mapRef.current);
+        setEqPoint({ lat, lng }); eqPointRef.current = { lat, lng };
+        // Clear old rings
+        eqLayers.current.forEach(({ sourceId, layerId }) => {
+          try { if (mapRef.current.getLayer(layerId)) mapRef.current.removeLayer(layerId); } catch(e) {}
+          try { if (sourceId && mapRef.current.getSource(sourceId)) mapRef.current.removeSource(sourceId); } catch(e) {}
+        });
+        eqLayers.current = [];
+        setEqResult(null);
         return;
       }
 
@@ -4912,9 +4950,12 @@ export default function HomePage() {
               <button key={p.label} onClick={() => loadEqPreset(p)}
                 style={{ padding:"8px 10px", borderRadius:8, fontSize:11, fontWeight:600, cursor:"pointer", textAlign:"left",
                   background:"#111827", color:"#94a3b8", border:"1px solid #1e2d45" }}>
-                <div style={{ display:"flex", justifyContent:"space-between" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                   <span style={{ color:"#fbbf24" }}>{p.label}</span>
-                  <span style={{ color:"#f59e0b" }}>M{p.mag}</span>
+                  <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                    <span style={{ color:"#f59e0b" }}>M{p.mag}</span>
+                    {p.wiki && <span onClick={(e) => { e.stopPropagation(); setScenarioWiki({ title: p.label, icon:"🌍", body: p.wiki }); }} style={{ fontSize:11, cursor:"pointer", opacity:0.7 }}>ℹ️</span>}
+                  </div>
                 </div>
                 <div style={{ fontSize:10, opacity:0.6, marginTop:2 }}>{p.desc}</div>
               </button>
@@ -4922,42 +4963,20 @@ export default function HomePage() {
           </div>
 
           <div style={{ fontSize:11, color:"#94a3b8", textAlign:"center", marginBottom:10 }}>
-            👆 Click map to place epicenter
+            {eqPoint ? "👆 Hit Trigger to run simulation" : "👆 Click map to place epicenter"}
           </div>
 
-          {eqPoint && (
-            <button onClick={clearEarthquake}
-              style={{ width:"100%", padding:"8px", background:"transparent", border:"1px solid #1e2d45", borderRadius:8, color:"#475569", cursor:"pointer", fontSize:12 }}>
-              Clear
+          <div style={{ display:"flex", gap:6 }}>
+            <button onClick={() => { if (eqPointRef.current) runEarthquake(eqPointRef.current.lat, eqPointRef.current.lng, eqMagRef.current, eqDepthRef.current, eqFaultRef.current); }}
+              disabled={!eqPoint}
+              style={{ flex:1, padding:"10px", background: eqPoint ? "#f59e0b" : "#1e2d45", color: eqPoint ? "#0f172a" : "#475569", border:"none", borderRadius:8, fontWeight:700, cursor: eqPoint ? "pointer" : "not-allowed", fontSize:13 }}>
+              🌍 Trigger
             </button>
-          )}
-
-          {/* Results */}
-          {eqResult && (
-            <div style={{ marginTop:12, padding:"12px", background:"rgba(245,158,11,0.07)", borderRadius:10, border:"1px solid #1e2d45" }}>
-              <div style={{ fontWeight:700, fontSize:12, color:"#fbbf24", marginBottom:8 }}>M{eqResult.mag.toFixed(1)} · {eqResult.depthType.label}</div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:4, fontSize:11, marginBottom:8 }}>
-                {eqResult.rings.slice(0,4).map(r => (
-                  <div key={r.intensity} style={{ padding:"4px 6px", borderRadius:6, background:"rgba(0,0,0,0.3)", border:`1px solid ${r.color}` }}>
-                    <span style={{ color:r.color, fontWeight:700 }}>MMI {r.intensity}</span>
-                    <span style={{ color:"#94a3b8" }}> {r.label}</span>
-                    <div style={{ fontSize:10, color:"#64748b" }}>r~{Math.round(r.radiusKm)}km</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ fontSize:11, color:"#94a3b8", marginBottom:4 }}>
-                💀 Estimated casualties: <span style={{ color:"#fbbf24", fontWeight:700 }}>{eqResult.casualties}</span>
-              </div>
-              <div style={{ fontSize:11, color:"#0d9488" }}>
-                💧 Liquefaction risk zone: ~{Math.round(eqResult.liqRadiusKm)}km radius
-              </div>
-              {eqResult.tsunamiRisk && (
-                <div style={{ marginTop:8, padding:"6px 8px", background:"rgba(56,189,248,0.1)", borderRadius:6, border:"1px solid #38bdf8", fontSize:11, color:"#38bdf8" }}>
-                  🌊 {eqResult.isPro ? "Tsunami triggered automatically" : "🔒 Tsunami simulation — Pro"}
-                </div>
-              )}
-            </div>
-          )}
+            {eqPoint && <button onClick={clearEarthquake}
+              style={{ flex:1, padding:"10px", background:"transparent", border:"1px solid #1e2d45", borderRadius:8, color:"#475569", cursor:"pointer", fontSize:13, fontWeight:700 }}>
+              Clear
+            </button>}
+          </div>
         </div>
       )}
 
