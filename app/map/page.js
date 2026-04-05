@@ -1982,7 +1982,7 @@ export default function HomePage() {
       const depthKm = depthType.depth;
       const tSrcId = "eq-tsunami-src";
       const tLayerId = "eq-tsunami-layer";
-      const tsUrl = `${floodEngineUrlRef.current}/tsunami-simulate?lat=${lat}&lng=${lng}&mag=${mag}&strike=${strike}&dip=${dip}&rake=${rake}&depth_km=${depthKm}&n_rays=72`;
+      const tsUrl = `${floodEngineUrlRef.current}/tsunami-simulate?lat=${lat}&lng=${lng}&mag=${mag}&strike=${strike}&dip=${dip}&rake=${rake}&depth_km=${depthKm}&n_rays=120`;
       console.log("🌊 Tsunami fetch:", tsUrl);
       fetch(tsUrl)
         .then(r => r.json())
@@ -2043,20 +2043,23 @@ export default function HomePage() {
             // Limit to max 12 flood layers to avoid overload — pick highest wave heights
             const sorted = [...tsResult.tsunami_impacts].sort((a,b) => b.wave_height_m - a.wave_height_m);
             const toFlood = sorted.slice(0, 12);
+            console.log("🌊 Adding flood tiles for", toFlood.length, "impact points");
             toFlood.forEach((imp, i) => {
               const fSrcId = `eq-ts-flood-src-${i}`;
               const fLayId = `eq-ts-flood-layer-${i}`;
-              const reachM = Math.max(imp.wave_height_m * 8000, 25000); // reach scales with height
+              const reachM = Math.max(imp.wave_height_m * 10000, 30000);
               const tUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(imp.wave_height_m)}/${encodeURIComponent(imp.lat)}/${encodeURIComponent(imp.lng)}/${encodeURIComponent(reachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
+              console.log(`  [${i}] lat=${imp.lat} lng=${imp.lng} h=${imp.wave_height_m}m reach=${Math.round(reachM/1000)}km url=${tUrl.substring(0,80)}`);
               try {
                 if (mapNow.getLayer(fLayId)) mapNow.removeLayer(fLayId);
                 if (mapNow.getSource(fSrcId)) mapNow.removeSource(fSrcId);
                 mapNow.addSource(fSrcId, { type:"raster", tiles:[tUrl], tileSize:256, minzoom:0, maxzoom:12 });
                 mapNow.addLayer({ id:fLayId, type:"raster", source:fSrcId,
                   layout:{ "visibility": "visible" },
-                  paint:{ "raster-opacity":0.65, "raster-opacity-transition":{ duration:500 } } });
+                  paint:{ "raster-opacity":0.75, "raster-opacity-transition":{ duration:500 } } });
                 eqLayers.current.push({ sourceId:fSrcId, layerId:fLayId });
-              } catch(e) {}
+                console.log(`  ✓ layer ${fLayId} added`);
+              } catch(e) { console.error(`  ✗ layer ${fLayId} error:`, e); }
             });
 
             mapNow.triggerRepaint();
