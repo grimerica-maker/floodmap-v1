@@ -2208,23 +2208,8 @@ export default function HomePage() {
             mapNow.on("mouseleave", tLayerId, () => { mapNow.getCanvas().style.cursor=""; });
           } catch(e) { console.warn("Tsunami dots error:", e); }
 
-          // Flood tiles — single unified call centered on epicenter
-          try {
-            const impacts = tsResult.tsunami_impacts || [];
-            if (impacts.length > 0) {
-              const maxImpact = impacts.reduce((a, b) => b.wave_height_m > a.wave_height_m ? b : a);
-              const maxReachM = Math.max(...impacts.map(i => i.distance_km * 1000), 50000);
-              const floodLevel = Math.max(10, maxImpact.wave_height_m * 3);
-              const fSrcId = `eq-ts-flood-src-0`;
-              const fLayId = `eq-ts-flood-layer-0`;
-              const tUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(floodLevel)}/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}/${encodeURIComponent(maxReachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
-              if (mapNow.getLayer(fLayId)) mapNow.removeLayer(fLayId);
-              if (mapNow.getSource(fSrcId)) mapNow.removeSource(fSrcId);
-              mapNow.addSource(fSrcId, { type:"raster", tiles:[tUrl], tileSize:256, minzoom:0, maxzoom:12 });
-              mapNow.addLayer({ id:fLayId, type:"raster", source:fSrcId, layout:{ "visibility": "visible" }, paint:{ "raster-opacity":0.75, "raster-opacity-transition":{ duration:500 } } });
-              eqLayers.current.push({ sourceId:fSrcId, layerId:fLayId });
-            }
-          } catch(e) { console.error("Tsunami flood tile error:", e.message); }
+          // Note: flood-region tiles not used for tsunami — they show sea-level-rise, not wave inundation
+          // Dots show impact locations with arrival time and wave height
 
           mapNow.triggerRepaint();
       };  // end processResult
@@ -2232,20 +2217,9 @@ export default function HomePage() {
       // Dispatch: use hardcoded preset data or hit the engine
       if (hardcoded) {
         console.log("🌊 Using hardcoded data for:", presetKey);
+        // Use dots only — flood-region tiles flood wrong areas for tsunami (sea-level-rise engine, not inundation)
         const synth = { tsunami_impacts: hardcoded.impacts };
         processResult(synth);
-        // Also draw flood tile from epicenter using hardcoded maxWave
-        setTimeout(() => {
-          const mapNow = mapRef.current;
-          if (!mapNow || !mapNow.isStyleLoaded()) return;
-          const l = "eq-ts-flood-src-0", s = "eq-ts-flood-layer-0";
-          if (mapNow.getLayer(s)) mapNow.removeLayer(s);
-          if (mapNow.getSource(l)) mapNow.removeSource(l);
-          const floodUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(hardcoded.floodLevel)}/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}/${encodeURIComponent(hardcoded.reachM)}/{z}/{x}/{y}.png?v=204`;
-          mapNow.addSource(l, { type:"raster", tiles:[floodUrl], tileSize:256, minzoom:0, maxzoom:12 });
-          mapNow.addLayer({ id:s, type:"raster", source:l, layout:{visibility:"visible"}, paint:{"raster-opacity":0.75,"raster-opacity-transition":{duration:500}} });
-          eqLayers.current.push({ sourceId:l, layerId:s });
-        }, 200);
       } else {
         const tsUrl = `${floodEngineUrlRef.current}/tsunami-simulate?lat=${lat}&lng=${lng}&mag=${mag}&strike=${strike}&dip=${dip}&rake=${rake}&depth_km=${depthKm}&n_rays=120`;
         console.log("🌊 Tsunami fetch:", tsUrl);
@@ -7252,11 +7226,10 @@ export default function HomePage() {
         }}>
           <div onClick={(e) => e.stopPropagation()} style={{
             background: "#0a0f1e", border: "1px solid #1e2d45", borderRadius: "16px 16px 0 0",
-            maxWidth: 480, width: "100%", maxHeight: "85dvh",
+            maxWidth: 480, width: "100%",
             boxShadow: "0 -8px 40px rgba(0,0,0,0.6)",
-            display: "flex", flexDirection: "column",
+            padding: "20px 20px 24px",
           }}>
-          <div style={{ overflowY: "scroll", WebkitOverflowScrolling: "touch", flex: 1, padding: "20px 20px 32px" }}>
             
             {paywallModal === "ratelimit" ? (<>
               <div style={{ textAlign: "center", color: "#e2e8f0", fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Simulation Limit Reached</div>
@@ -7307,34 +7280,20 @@ export default function HomePage() {
 
 
             {/* Already have Pro? Sign in */}
-            {!isSignedIn && (
-              <div style={{ borderTop: "1px solid #1e2d45", paddingTop: 14, marginBottom: 10, textAlign: "center" }}>
-                <div style={{ color: "#475569", fontSize: 12, marginBottom: 8 }}>Already purchased? Sign in to restore access.</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <button onClick={() => setPaywallModal(null)}
+                style={{ flex: 1, padding: "10px", background: "transparent", color: "#475569", border: "1px solid #1e2d45", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
+                Continue Free
+              </button>
+              {!isSignedIn && (
                 <SignInButton mode="modal">
-                  <button style={{ padding: "8px 20px", background: "transparent", color: "#f97316",
-                    border: "1px solid #f97316", borderRadius: 8, fontWeight: 700,
-                    fontSize: 13, cursor: "pointer", width: "100%" }}>
+                  <button style={{ flex: 1, padding: "10px", background: "transparent", color: "#f97316",
+                    border: "1px solid #f97316", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
                     Sign In
                   </button>
                 </SignInButton>
-              </div>
-            )}
-
-            <button onClick={() => setPaywallModal(null)}
-              style={{ width: "100%", padding: "8px", background: "transparent", color: "#475569", border: "1px solid #1e2d45", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
-              Continue Free
-            </button>
-            <div style={{ textAlign: "center", marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
-              <a href="https://x.com/grimerica" target="_blank"
-                style={{ fontSize: 12, color: "#475569", textDecoration: "none" }}>
-                𝕏 @grimerica
-              </a>
-              <button onClick={() => { setPaywallModal(null); setSupportFormOpen(true); }}
-                style={{ background: "transparent", border: "none", fontSize: 12, color: "#60a5fa", cursor: "pointer", padding: 0 }}>
-                ✉️ Contact support
-              </button>
+              )}
             </div>
-          </div>
           </div>
         </div>
       )}
