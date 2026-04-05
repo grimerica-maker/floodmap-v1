@@ -29,6 +29,70 @@ const EQ_FAULT_TYPES = [
   { id: "normal",      label: "Normal",      tsunami: false, desc: "Extension — moderate risk" },
 ];
 
+// Hardcoded tsunami impacts for historical presets — bypasses engine for known events
+const PRESET_TSUNAMI_IMPACTS = {
+  "Tohoku 2011": {
+    maxWave: 40, epicenterFloodM: 40, reachM: 1800000,
+    impacts: [
+      { lat:38.5,  lng:141.5,  arrival_min:15,  wave_height_m:15, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:90  },
+      { lat:37.8,  lng:141.0,  arrival_min:20,  wave_height_m:12, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:140 },
+      { lat:39.2,  lng:141.8,  arrival_min:18,  wave_height_m:10, band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:110 },
+      { lat:40.0,  lng:141.9,  arrival_min:25,  wave_height_m:7,  band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:180 },
+      { lat:36.5,  lng:140.8,  arrival_min:30,  wave_height_m:5,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:230 },
+      { lat:35.5,  lng:140.8,  arrival_min:40,  wave_height_m:3,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:330 },
+      { lat:34.5,  lng:138.5,  arrival_min:75,  wave_height_m:2,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:600 },
+      { lat:42.0,  lng:140.0,  arrival_min:45,  wave_height_m:4,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:350 },
+      { lat:51.0,  lng:179.0,  arrival_min:240, wave_height_m:2,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:3200 },
+      { lat:21.3,  lng:-157.8, arrival_min:480, wave_height_m:1,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:6200 },
+    ]
+  },
+  "Indian Ocean 2004": {
+    maxWave: 30, epicenterFloodM: 30, reachM: 2500000,
+    impacts: [
+      { lat:5.5,   lng:95.3,   arrival_min:20,  wave_height_m:25, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:280 },
+      { lat:3.0,   lng:95.8,   arrival_min:15,  wave_height_m:30, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:80  },
+      { lat:8.0,   lng:98.4,   arrival_min:90,  wave_height_m:10, band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:650 },
+      { lat:13.1,  lng:80.3,   arrival_min:120, wave_height_m:5,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:1600 },
+      { lat:7.8,   lng:80.7,   arrival_min:100, wave_height_m:8,  band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:1400 },
+      { lat:6.9,   lng:79.8,   arrival_min:110, wave_height_m:9,  band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:1550 },
+      { lat:12.5,  lng:47.5,   arrival_min:480, wave_height_m:2,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:4200 },
+      { lat:-3.5,  lng:39.7,   arrival_min:600, wave_height_m:2,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:5200 },
+      { lat:16.5,  lng:96.2,   arrival_min:60,  wave_height_m:4,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:1500 },
+      { lat:1.3,   lng:103.8,  arrival_min:150, wave_height_m:1,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:900 },
+    ]
+  },
+  "Valdivia 1960": {
+    maxWave: 25, epicenterFloodM: 25, reachM: 3000000,
+    impacts: [
+      { lat:-38.5, lng:-73.0,  arrival_min:10,  wave_height_m:25, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:60  },
+      { lat:-36.5, lng:-72.8,  arrival_min:20,  wave_height_m:15, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:200 },
+      { lat:-40.5, lng:-73.3,  arrival_min:25,  wave_height_m:12, band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:260 },
+      { lat:-42.5, lng:-73.5,  arrival_min:35,  wave_height_m:8,  band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:450 },
+      { lat:21.3,  lng:-157.8, arrival_min:900, wave_height_m:10, band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:10700 },
+      { lat:35.7,  lng:139.7,  arrival_min:1320,wave_height_m:6,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:17400 },
+      { lat:35.4,  lng:136.8,  arrival_min:1310,wave_height_m:4,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:17300 },
+      { lat:-33.5, lng:-71.5,  arrival_min:60,  wave_height_m:4,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:800 },
+      { lat:14.1,  lng:-87.2,  arrival_min:540, wave_height_m:2,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:6800 },
+      { lat:-9.4,  lng:-140.1, arrival_min:600, wave_height_m:3,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:7000 },
+    ]
+  },
+  "Cascadia (Scenario)": {
+    maxWave: 30, epicenterFloodM: 30, reachM: 2000000,
+    impacts: [
+      { lat:47.0,  lng:-124.1, arrival_min:12,  wave_height_m:20, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:70  },
+      { lat:46.2,  lng:-124.0, arrival_min:15,  wave_height_m:18, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:150 },
+      { lat:48.5,  lng:-124.4, arrival_min:18,  wave_height_m:15, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:110 },
+      { lat:44.6,  lng:-124.1, arrival_min:20,  wave_height_m:12, band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:310 },
+      { lat:42.5,  lng:-124.4, arrival_min:25,  wave_height_m:10, band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:510 },
+      { lat:37.8,  lng:-122.5, arrival_min:45,  wave_height_m:4,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:900 },
+      { lat:34.0,  lng:-120.0, arrival_min:60,  wave_height_m:3,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:1200 },
+      { lat:21.3,  lng:-157.8, arrival_min:330, wave_height_m:3,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:4200 },
+      { lat:35.7,  lng:139.7,  arrival_min:600, wave_height_m:2,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:8200 },
+      { lat:49.0,  lng:-126.5, arrival_min:20,  wave_height_m:12, band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:180 },
+    ]
+  }
+};
+
 const EQ_PRESETS = [
   { label: "Tohoku 2011", lat: 38.297, lng: 142.373, mag: 9.1, depthId: "subduction", faultId: "thrust",
     strike: 203, dip: 10, rake: 88, depth_km: 25,
@@ -2054,11 +2118,12 @@ export default function HomePage() {
       const depthKm = depthType.depth;
       const tSrcId = "eq-tsunami-src";
       const tLayerId = "eq-tsunami-layer";
-      const tsUrl = `${floodEngineUrlRef.current}/tsunami-simulate?lat=${lat}&lng=${lng}&mag=${mag}&strike=${strike}&dip=${dip}&rake=${rake}&depth_km=${depthKm}&n_rays=120`;
-      console.log("🌊 Tsunami fetch:", tsUrl);
-      fetch(tsUrl)
-        .then(r => r.json())
-        .then(tsResult => {
+
+      // Use hardcoded historical data for known presets, fall back to engine otherwise
+      const presetKey = EQ_PRESETS.find(p => Math.abs(p.lat - lat) < 0.1 && Math.abs(p.lng - lng) < 0.1)?.label;
+      const hardcoded = presetKey && PRESET_TSUNAMI_IMPACTS[presetKey];
+
+      const processResult = (tsResult) => {
           console.log("🌊 Tsunami result:", tsResult?.tsunami_impacts?.length, "impacts, error:", tsResult?.error);
           if (!tsResult || tsResult.error) { console.warn("Tsunami sim error:", tsResult?.error, tsResult?.trace); return; }
           const mapNow = mapRef.current;
@@ -2133,6 +2198,33 @@ export default function HomePage() {
           mapNow.triggerRepaint();
         })
         .catch(e => console.warn("Tsunami fetch error:", e));
+      };
+
+      // Dispatch: use hardcoded preset data or hit the engine
+      if (hardcoded) {
+        console.log("🌊 Using hardcoded data for:", presetKey);
+        const synth = { tsunami_impacts: hardcoded.impacts };
+        processResult(synth);
+        // Also draw flood tile from epicenter using hardcoded maxWave
+        setTimeout(() => {
+          const mapNow = mapRef.current;
+          if (!mapNow || !mapNow.isStyleLoaded()) return;
+          const l = "eq-ts-flood-src-0", s = "eq-ts-flood-layer-0";
+          if (mapNow.getLayer(s)) mapNow.removeLayer(s);
+          if (mapNow.getSource(l)) mapNow.removeSource(l);
+          const floodUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(hardcoded.epicenterFloodM)}/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}/${encodeURIComponent(hardcoded.reachM)}/{z}/{x}/{y}.png?v=204`;
+          mapNow.addSource(l, { type:"raster", tiles:[floodUrl], tileSize:256, minzoom:0, maxzoom:12 });
+          mapNow.addLayer({ id:s, type:"raster", source:l, layout:{visibility:"visible"}, paint:{"raster-opacity":0.75,"raster-opacity-transition":{duration:500}} });
+          eqLayers.current.push({ sourceId:l, layerId:s });
+        }, 200);
+      } else {
+        const tsUrl = `${floodEngineUrlRef.current}/tsunami-simulate?lat=${lat}&lng=${lng}&mag=${mag}&strike=${strike}&dip=${dip}&rake=${rake}&depth_km=${depthKm}&n_rays=120`;
+        console.log("🌊 Tsunami fetch:", tsUrl);
+        fetch(tsUrl)
+          .then(r => r.json())
+          .then(processResult)
+          .catch(e => console.warn("Tsunami fetch error:", e));
+      }
     }
 
     setEqResult({ mag, depthType, faultType, rings, casualties, tsunamiRisk, isPro, liqRadiusKm });
