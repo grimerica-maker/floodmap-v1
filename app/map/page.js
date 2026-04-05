@@ -29,66 +29,97 @@ const EQ_FAULT_TYPES = [
   { id: "normal",      label: "Normal",      tsunami: false, desc: "Extension — moderate risk" },
 ];
 
-// Hardcoded tsunami impacts for historical presets — bypasses engine for known events
+// Hardcoded tsunami impacts for historical presets — real data, bypasses engine
 const PRESET_TSUNAMI_IMPACTS = {
   "Tohoku 2011": {
-    maxWave: 40, epicenterFloodM: 40, reachM: 1800000,
+    // 15,897 dead. Max wave 40m. Flood inland up to 10km on Sendai plain.
+    floodLevel: 40, reachM: 1800000,
     impacts: [
-      { lat:38.5,  lng:141.5,  arrival_min:15,  wave_height_m:15, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:90  },
-      { lat:37.8,  lng:141.0,  arrival_min:20,  wave_height_m:12, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:140 },
-      { lat:39.2,  lng:141.8,  arrival_min:18,  wave_height_m:10, band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:110 },
-      { lat:40.0,  lng:141.9,  arrival_min:25,  wave_height_m:7,  band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:180 },
-      { lat:36.5,  lng:140.8,  arrival_min:30,  wave_height_m:5,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:230 },
-      { lat:35.5,  lng:140.8,  arrival_min:40,  wave_height_m:3,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:330 },
-      { lat:34.5,  lng:138.5,  arrival_min:75,  wave_height_m:2,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:600 },
-      { lat:42.0,  lng:140.0,  arrival_min:45,  wave_height_m:4,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:350 },
-      { lat:51.0,  lng:179.0,  arrival_min:240, wave_height_m:2,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:3200 },
-      { lat:21.3,  lng:-157.8, arrival_min:480, wave_height_m:1,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:6200 },
+      { lat:38.32, lng:141.55, arrival_min:10, wave_height_m:40, band_color:"#ef4444", band_label:"Extreme — 40m",  warning:"Danger", distance_km:55  },
+      { lat:38.50, lng:141.48, arrival_min:12, wave_height_m:20, band_color:"#ef4444", band_label:"Extreme — 20m",  warning:"Danger", distance_km:80  },
+      { lat:37.95, lng:141.10, arrival_min:18, wave_height_m:14, band_color:"#ef4444", band_label:"Extreme — 14m",  warning:"Danger", distance_km:140 },
+      { lat:39.20, lng:141.90, arrival_min:15, wave_height_m:12, band_color:"#ef4444", band_label:"Extreme — 12m",  warning:"Danger", distance_km:100 },
+      { lat:40.50, lng:141.95, arrival_min:22, wave_height_m:8,  band_color:"#f97316", band_label:"Severe — 8m",    warning:"Danger", distance_km:200 },
+      { lat:36.50, lng:140.80, arrival_min:28, wave_height_m:6,  band_color:"#f97316", band_label:"Severe — 6m",    warning:"Danger", distance_km:250 },
+      { lat:35.50, lng:140.90, arrival_min:38, wave_height_m:3,  band_color:"#fbbf24", band_label:"High — 3m",      warning:"Advisory", distance_km:370 },
+      { lat:42.00, lng:140.50, arrival_min:40, wave_height_m:4,  band_color:"#fbbf24", band_label:"High — 4m",      warning:"Advisory", distance_km:350 },
+      { lat:34.40, lng:136.90, arrival_min:80, wave_height_m:2,  band_color:"#4ade80", band_label:"Moderate — 2m",  warning:"Watch",  distance_km:680 },
+      { lat:51.00, lng:179.00, arrival_min:220,wave_height_m:2,  band_color:"#4ade80", band_label:"Moderate — 2m",  warning:"Watch",  distance_km:3200},
+      { lat:21.30, lng:-157.8, arrival_min:480,wave_height_m:1,  band_color:"#4ade80", band_label:"Moderate — 1m",  warning:"Watch",  distance_km:6200},
     ]
   },
   "Indian Ocean 2004": {
-    maxWave: 30, epicenterFloodM: 30, reachM: 2500000,
+    // 227,898 dead. Banda Aceh 30m, Thailand 10m, Sri Lanka 9m, India 5m, Somalia 3m.
+    floodLevel: 30, reachM: 3500000,
     impacts: [
-      { lat:5.5,   lng:95.3,   arrival_min:20,  wave_height_m:25, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:280 },
-      { lat:3.0,   lng:95.8,   arrival_min:15,  wave_height_m:30, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:80  },
-      { lat:8.0,   lng:98.4,   arrival_min:90,  wave_height_m:10, band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:650 },
-      { lat:13.1,  lng:80.3,   arrival_min:120, wave_height_m:5,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:1600 },
-      { lat:7.8,   lng:80.7,   arrival_min:100, wave_height_m:8,  band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:1400 },
-      { lat:6.9,   lng:79.8,   arrival_min:110, wave_height_m:9,  band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:1550 },
-      { lat:12.5,  lng:47.5,   arrival_min:480, wave_height_m:2,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:4200 },
-      { lat:-3.5,  lng:39.7,   arrival_min:600, wave_height_m:2,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:5200 },
-      { lat:16.5,  lng:96.2,   arrival_min:60,  wave_height_m:4,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:1500 },
-      { lat:1.3,   lng:103.8,  arrival_min:150, wave_height_m:1,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:900 },
+      // Banda Aceh — worst hit, 30m, 15min
+      { lat:5.55,  lng:95.32,  arrival_min:15,  wave_height_m:30, band_color:"#ef4444", band_label:"Extreme — 30m", warning:"Danger",   distance_km:250 },
+      // North Sumatra coast
+      { lat:4.20,  lng:96.10,  arrival_min:25,  wave_height_m:20, band_color:"#ef4444", band_label:"Extreme — 20m", warning:"Danger",   distance_km:180 },
+      { lat:3.00,  lng:96.80,  arrival_min:35,  wave_height_m:15, band_color:"#ef4444", band_label:"Extreme — 15m", warning:"Danger",   distance_km:130 },
+      // Khao Lak Thailand — 10m, 90min
+      { lat:8.85,  lng:98.28,  arrival_min:90,  wave_height_m:10, band_color:"#f97316", band_label:"Severe — 10m",  warning:"Danger",   distance_km:500 },
+      // Phuket Thailand — 6m, 100min
+      { lat:7.88,  lng:98.30,  arrival_min:100, wave_height_m:6,  band_color:"#f97316", band_label:"Severe — 6m",   warning:"Danger",   distance_km:600 },
+      // Ko Phi Phi Thailand
+      { lat:7.73,  lng:98.76,  arrival_min:105, wave_height_m:8,  band_color:"#f97316", band_label:"Severe — 8m",   warning:"Danger",   distance_km:620 },
+      // Sri Lanka west coast — 9m, 2hr
+      { lat:6.93,  lng:79.85,  arrival_min:120, wave_height_m:9,  band_color:"#f97316", band_label:"Severe — 9m",   warning:"Danger",   distance_km:1600},
+      { lat:8.57,  lng:81.22,  arrival_min:110, wave_height_m:7,  band_color:"#f97316", band_label:"Severe — 7m",   warning:"Danger",   distance_km:1500},
+      // Tamil Nadu India — 5m, 2hr
+      { lat:11.00, lng:79.85,  arrival_min:130, wave_height_m:5,  band_color:"#fbbf24", band_label:"High — 5m",     warning:"Advisory", distance_km:1700},
+      { lat:13.10, lng:80.28,  arrival_min:140, wave_height_m:4,  band_color:"#fbbf24", band_label:"High — 4m",     warning:"Advisory", distance_km:1900},
+      // Andaman Islands — 3m, 30min
+      { lat:11.70, lng:92.75,  arrival_min:30,  wave_height_m:3,  band_color:"#fbbf24", band_label:"High — 3m",     warning:"Advisory", distance_km:350 },
+      // Myanmar
+      { lat:16.50, lng:94.50,  arrival_min:75,  wave_height_m:3,  band_color:"#fbbf24", band_label:"High — 3m",     warning:"Advisory", distance_km:600 },
+      // Somalia — 3m, 7hr
+      { lat:2.00,  lng:45.50,  arrival_min:420, wave_height_m:3,  band_color:"#fbbf24", band_label:"High — 3m",     warning:"Advisory", distance_km:4800},
+      // Maldives
+      { lat:4.17,  lng:73.51,  arrival_min:180, wave_height_m:3,  band_color:"#fbbf24", band_label:"High — 3m",     warning:"Advisory", distance_km:1900},
     ]
   },
   "Valdivia 1960": {
-    maxWave: 25, epicenterFloodM: 25, reachM: 3000000,
+    // 5,700 dead. Max wave 25m Chile, 10m Hawaii, 6m Japan.
+    floodLevel: 25, reachM: 8000000,
     impacts: [
-      { lat:-38.5, lng:-73.0,  arrival_min:10,  wave_height_m:25, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:60  },
-      { lat:-36.5, lng:-72.8,  arrival_min:20,  wave_height_m:15, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:200 },
-      { lat:-40.5, lng:-73.3,  arrival_min:25,  wave_height_m:12, band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:260 },
-      { lat:-42.5, lng:-73.5,  arrival_min:35,  wave_height_m:8,  band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:450 },
-      { lat:21.3,  lng:-157.8, arrival_min:900, wave_height_m:10, band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:10700 },
-      { lat:35.7,  lng:139.7,  arrival_min:1320,wave_height_m:6,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:17400 },
-      { lat:35.4,  lng:136.8,  arrival_min:1310,wave_height_m:4,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:17300 },
-      { lat:-33.5, lng:-71.5,  arrival_min:60,  wave_height_m:4,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:800 },
-      { lat:14.1,  lng:-87.2,  arrival_min:540, wave_height_m:2,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:6800 },
-      { lat:-9.4,  lng:-140.1, arrival_min:600, wave_height_m:3,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:7000 },
+      { lat:-38.50,lng:-73.00, arrival_min:10,  wave_height_m:25, band_color:"#ef4444", band_label:"Extreme — 25m", warning:"Danger",   distance_km:60  },
+      { lat:-39.80,lng:-73.40, arrival_min:18,  wave_height_m:20, band_color:"#ef4444", band_label:"Extreme — 20m", warning:"Danger",   distance_km:200 },
+      { lat:-36.60,lng:-72.90, arrival_min:20,  wave_height_m:15, band_color:"#ef4444", band_label:"Extreme — 15m", warning:"Danger",   distance_km:200 },
+      { lat:-41.50,lng:-73.60, arrival_min:28,  wave_height_m:10, band_color:"#f97316", band_label:"Severe — 10m",  warning:"Danger",   distance_km:370 },
+      { lat:-43.50,lng:-73.80, arrival_min:38,  wave_height_m:8,  band_color:"#f97316", band_label:"Severe — 8m",   warning:"Danger",   distance_km:560 },
+      { lat:-33.50,lng:-71.60, arrival_min:55,  wave_height_m:4,  band_color:"#fbbf24", band_label:"High — 4m",     warning:"Advisory", distance_km:830 },
+      // Hawaii — 10m, 15hr
+      { lat:19.70, lng:-155.1, arrival_min:915, wave_height_m:10, band_color:"#f97316", band_label:"Severe — 10m",  warning:"Danger",   distance_km:10700},
+      { lat:21.30, lng:-157.8, arrival_min:920, wave_height_m:9,  band_color:"#f97316", band_label:"Severe — 9m",   warning:"Danger",   distance_km:10900},
+      // Japan — 6m, 22hr
+      { lat:39.40, lng:141.90, arrival_min:1320,wave_height_m:6,  band_color:"#f97316", band_label:"Severe — 6m",   warning:"Danger",   distance_km:17400},
+      { lat:35.10, lng:136.80, arrival_min:1310,wave_height_m:4,  band_color:"#fbbf24", band_label:"High — 4m",     warning:"Advisory", distance_km:17200},
+      // Philippines — 3m
+      { lat:10.30, lng:123.90, arrival_min:1200,wave_height_m:3,  band_color:"#fbbf24", band_label:"High — 3m",     warning:"Advisory", distance_km:13000},
     ]
   },
   "Cascadia (Scenario)": {
-    maxWave: 30, epicenterFloodM: 30, reachM: 2000000,
+    // FEMA: 13,000 dead. Max wave 30m. 15-50min warning window.
+    floodLevel: 30, reachM: 2500000,
     impacts: [
-      { lat:47.0,  lng:-124.1, arrival_min:12,  wave_height_m:20, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:70  },
-      { lat:46.2,  lng:-124.0, arrival_min:15,  wave_height_m:18, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:150 },
-      { lat:48.5,  lng:-124.4, arrival_min:18,  wave_height_m:15, band_color:"#ef4444", band_label:"Extreme",  warning:"Danger",      distance_km:110 },
-      { lat:44.6,  lng:-124.1, arrival_min:20,  wave_height_m:12, band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:310 },
-      { lat:42.5,  lng:-124.4, arrival_min:25,  wave_height_m:10, band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:510 },
-      { lat:37.8,  lng:-122.5, arrival_min:45,  wave_height_m:4,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:900 },
-      { lat:34.0,  lng:-120.0, arrival_min:60,  wave_height_m:3,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:1200 },
-      { lat:21.3,  lng:-157.8, arrival_min:330, wave_height_m:3,  band_color:"#fbbf24", band_label:"High",     warning:"Advisory",    distance_km:4200 },
-      { lat:35.7,  lng:139.7,  arrival_min:600, wave_height_m:2,  band_color:"#4ade80", band_label:"Moderate", warning:"Watch",       distance_km:8200 },
-      { lat:49.0,  lng:-126.5, arrival_min:20,  wave_height_m:12, band_color:"#f97316", band_label:"Severe",   warning:"Danger",      distance_km:180 },
+      // Oregon/Washington coast — 15-30min, no warning
+      { lat:47.00, lng:-124.15,arrival_min:12,  wave_height_m:28, band_color:"#ef4444", band_label:"Extreme — 28m", warning:"Danger",   distance_km:65  },
+      { lat:46.18, lng:-124.00,arrival_min:15,  wave_height_m:20, band_color:"#ef4444", band_label:"Extreme — 20m", warning:"Danger",   distance_km:140 },
+      { lat:48.50, lng:-124.40,arrival_min:16,  wave_height_m:18, band_color:"#ef4444", band_label:"Extreme — 18m", warning:"Danger",   distance_km:100 },
+      { lat:44.60, lng:-124.10,arrival_min:18,  wave_height_m:15, band_color:"#ef4444", band_label:"Extreme — 15m", warning:"Danger",   distance_km:290 },
+      { lat:43.40, lng:-124.30,arrival_min:20,  wave_height_m:12, band_color:"#f97316", band_label:"Severe — 12m",  warning:"Danger",   distance_km:420 },
+      { lat:42.00, lng:-124.40,arrival_min:22,  wave_height_m:10, band_color:"#f97316", band_label:"Severe — 10m",  warning:"Danger",   distance_km:570 },
+      // Northern CA
+      { lat:40.80, lng:-124.20,arrival_min:28,  wave_height_m:8,  band_color:"#f97316", band_label:"Severe — 8m",   warning:"Danger",   distance_km:750 },
+      { lat:38.30, lng:-123.00,arrival_min:45,  wave_height_m:4,  band_color:"#fbbf24", band_label:"High — 4m",     warning:"Advisory", distance_km:1100},
+      { lat:37.80, lng:-122.50,arrival_min:50,  wave_height_m:3,  band_color:"#fbbf24", band_label:"High — 3m",     warning:"Advisory", distance_km:1250},
+      // Canada
+      { lat:49.00, lng:-126.50,arrival_min:18,  wave_height_m:15, band_color:"#ef4444", band_label:"Extreme — 15m", warning:"Danger",   distance_km:170 },
+      // Hawaii
+      { lat:21.30, lng:-157.80,arrival_min:330, wave_height_m:3,  band_color:"#fbbf24", band_label:"High — 3m",     warning:"Advisory", distance_km:4200},
+      // Japan
+      { lat:35.70, lng:139.70, arrival_min:590, wave_height_m:2,  band_color:"#4ade80", band_label:"Moderate — 2m", warning:"Watch",    distance_km:8100},
     ]
   }
 };
@@ -2210,7 +2241,7 @@ export default function HomePage() {
           const l = "eq-ts-flood-src-0", s = "eq-ts-flood-layer-0";
           if (mapNow.getLayer(s)) mapNow.removeLayer(s);
           if (mapNow.getSource(l)) mapNow.removeSource(l);
-          const floodUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(hardcoded.epicenterFloodM)}/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}/${encodeURIComponent(hardcoded.reachM)}/{z}/{x}/{y}.png?v=204`;
+          const floodUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(hardcoded.floodLevel)}/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}/${encodeURIComponent(hardcoded.reachM)}/{z}/{x}/{y}.png?v=204`;
           mapNow.addSource(l, { type:"raster", tiles:[floodUrl], tileSize:256, minzoom:0, maxzoom:12 });
           mapNow.addLayer({ id:s, type:"raster", source:l, layout:{visibility:"visible"}, paint:{"raster-opacity":0.75,"raster-opacity-transition":{duration:500}} });
           eqLayers.current.push({ sourceId:l, layerId:s });
@@ -6195,7 +6226,12 @@ export default function HomePage() {
           <span style={{ fontSize:11, color:"#0d9488" }}>Liquefaction zone</span>
           <span style={{ fontSize:10, color:"#475569", marginLeft:"auto" }}>~{Math.round(eqResult.liqRadiusKm)}km</span>
         </div>
-        <div style={{ fontSize:12, color:"#94a3b8" }}>💀 Est. casualties: <b style={{ color:"#fbbf24" }}>{eqResult.casualties}</b></div>
+        <div style={{ fontSize:12, color:"#94a3b8" }}>💀 {(() => {
+          const preset = EQ_PRESETS.find(p => Math.abs(p.lat - (eqPointRef.current?.lat||0)) < 0.1 && Math.abs(p.lng - (eqPointRef.current?.lng||0)) < 0.1);
+          const historical = { "Tohoku 2011":"15,897 confirmed dead", "Indian Ocean 2004":"227,898 dead across 14 countries", "Valdivia 1960":"5,700 dead — Chile, Hawaii, Japan", "Cascadia (Scenario)":"FEMA est. 13,000+ dead" };
+          const real = preset && historical[preset.label];
+          return real ? <><b style={{ color:"#fbbf24" }}>{real}</b> <span style={{fontSize:10,color:"#475569"}}>(historical)</span></> : <>Est. casualties: <b style={{ color:"#fbbf24" }}>{eqResult.casualties}</b></>;
+        })()}</div>
         {eqResult.tsunamiRisk && (
           <div style={{ marginTop:6, fontSize:11, color:"#38bdf8" }}>
             🌊 {eqResult.isPro ? "Tsunami inundation active" : "🔒 Tsunami — Pro only"}
@@ -7216,10 +7252,11 @@ export default function HomePage() {
         }}>
           <div onClick={(e) => e.stopPropagation()} style={{
             background: "#0a0f1e", border: "1px solid #1e2d45", borderRadius: "16px 16px 0 0",
-            padding: "20px 20px 32px", maxWidth: 480, width: "100%",
+            maxWidth: 480, width: "100%", maxHeight: "85dvh",
             boxShadow: "0 -8px 40px rgba(0,0,0,0.6)",
-            overflowY: "auto", maxHeight: "85dvh", WebkitOverflowScrolling: "touch",
+            display: "flex", flexDirection: "column",
           }}>
+          <div style={{ overflowY: "scroll", WebkitOverflowScrolling: "touch", flex: 1, padding: "20px 20px 32px" }}>
             
             {paywallModal === "ratelimit" ? (<>
               <div style={{ textAlign: "center", color: "#e2e8f0", fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Simulation Limit Reached</div>
@@ -7297,6 +7334,7 @@ export default function HomePage() {
                 ✉️ Contact support
               </button>
             </div>
+          </div>
           </div>
         </div>
       )}
