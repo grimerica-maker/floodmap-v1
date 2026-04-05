@@ -2004,6 +2004,7 @@ export default function HomePage() {
             }
           }));
           if (features.length === 0) return;
+          // Dots layer
           try {
             if (mapNow.getLayer(tLayerId)) mapNow.removeLayer(tLayerId);
             if (mapNow.getSource(tSrcId)) mapNow.removeSource(tSrcId);
@@ -2017,7 +2018,6 @@ export default function HomePage() {
               "circle-stroke-opacity":0.6,
             }});
             eqLayers.current.push({ sourceId:tSrcId, layerId:tLayerId });
-            // Click popup
             mapNow.on("click", tLayerId, (e) => {
               const p = e.features[0].properties;
               const arrFmt = p.arrival_min < 60
@@ -2038,32 +2038,31 @@ export default function HomePage() {
             });
             mapNow.on("mouseenter", tLayerId, () => { mapNow.getCanvas().style.cursor="pointer"; });
             mapNow.on("mouseleave", tLayerId, () => { mapNow.getCanvas().style.cursor=""; });
+          } catch(e) { console.warn("Tsunami dots error:", e); }
 
-            // Add flood tiles for each impact point based on wave height
-            // Limit to max 12 flood layers to avoid overload — pick highest wave heights
-            const sorted = [...tsResult.tsunami_impacts].sort((a,b) => b.wave_height_m - a.wave_height_m);
-            const toFlood = sorted.slice(0, 12);
-            console.log("🌊 Adding flood tiles for", toFlood.length, "impact points");
-            toFlood.forEach((imp, i) => {
-              const fSrcId = `eq-ts-flood-src-${i}`;
-              const fLayId = `eq-ts-flood-layer-${i}`;
-              const reachM = Math.max(imp.wave_height_m * 10000, 30000);
-              const tUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(imp.wave_height_m)}/${encodeURIComponent(imp.lat)}/${encodeURIComponent(imp.lng)}/${encodeURIComponent(reachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
-              console.log(`  [${i}] lat=${imp.lat} lng=${imp.lng} h=${imp.wave_height_m}m reach=${Math.round(reachM/1000)}km url=${tUrl.substring(0,80)}`);
-              try {
-                if (mapNow.getLayer(fLayId)) mapNow.removeLayer(fLayId);
-                if (mapNow.getSource(fSrcId)) mapNow.removeSource(fSrcId);
-                mapNow.addSource(fSrcId, { type:"raster", tiles:[tUrl], tileSize:256, minzoom:0, maxzoom:12 });
-                mapNow.addLayer({ id:fLayId, type:"raster", source:fSrcId,
-                  layout:{ "visibility": "visible" },
-                  paint:{ "raster-opacity":0.75, "raster-opacity-transition":{ duration:500 } } });
-                eqLayers.current.push({ sourceId:fSrcId, layerId:fLayId });
-                console.log(`  ✓ layer ${fLayId} added`);
-              } catch(e) { console.error(`  ✗ layer ${fLayId} error:`, e); }
-            });
+          // Flood tiles — separate try block so dot errors don't block this
+          const sorted = [...tsResult.tsunami_impacts].sort((a,b) => b.wave_height_m - a.wave_height_m);
+          const toFlood = sorted.slice(0, 12);
+          console.log("🌊 Adding flood tiles for", toFlood.length, "impact points");
+          toFlood.forEach((imp, i) => {
+            const fSrcId = `eq-ts-flood-src-${i}`;
+            const fLayId = `eq-ts-flood-layer-${i}`;
+            const reachM = Math.max(imp.wave_height_m * 10000, 30000);
+            const tUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(imp.wave_height_m)}/${encodeURIComponent(imp.lat)}/${encodeURIComponent(imp.lng)}/${encodeURIComponent(reachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
+            console.log(`  [${i}] lat=${imp.lat} lng=${imp.lng} h=${imp.wave_height_m}m reach=${Math.round(reachM/1000)}km`);
+            try {
+              if (mapNow.getLayer(fLayId)) mapNow.removeLayer(fLayId);
+              if (mapNow.getSource(fSrcId)) mapNow.removeSource(fSrcId);
+              mapNow.addSource(fSrcId, { type:"raster", tiles:[tUrl], tileSize:256, minzoom:0, maxzoom:12 });
+              mapNow.addLayer({ id:fLayId, type:"raster", source:fSrcId,
+                layout:{ "visibility": "visible" },
+                paint:{ "raster-opacity":0.75, "raster-opacity-transition":{ duration:500 } } });
+              eqLayers.current.push({ sourceId:fSrcId, layerId:fLayId });
+              console.log(`  ✓ ${fLayId} added`);
+            } catch(e) { console.error(`  ✗ ${fLayId} error:`, e.message); }
+          });
 
-            mapNow.triggerRepaint();
-          } catch(e) { console.warn("Tsunami render error:", e); }
+          mapNow.triggerRepaint();
         })
         .catch(e => console.warn("Tsunami fetch error:", e));
     }
