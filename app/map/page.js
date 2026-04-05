@@ -1125,7 +1125,12 @@ export default function HomePage() {
 
   const [proTier, setProTier] = useState("free");
   const [scenarioWiki, setScenarioWiki] = useState(null);
-  const [surgeOn,     setSurgeOn]     = useState(false);
+  const [surgeOn,        setSurgeOn]        = useState(false);
+  const [surgeTrackMode, setSurgeTrackMode]  = useState(false); // Pro: multi-point track
+  const [surgeTrackPts,  setSurgeTrackPts]   = useState([]);    // [{lat,lng}] max 3
+  const surgeTrackPtsRef  = useRef([]);
+  const surgeTrackLayers  = useRef([]);  // [{sourceId,layerId,markerEl}]
+  const surgeTrackLine    = useRef(null); // GeoJSON line source/layer ids
   const [surgeM,      setSurgeM]      = useState(3.0);
   const [surgePreset, setSurgePreset] = useState(null);
   const [surgeMode,   setSurgeMode]   = useState("place");
@@ -1620,6 +1625,78 @@ export default function HomePage() {
     setSurgeMode("active"); surgeModeRef.current = "active";
     window.__dmClearSurge = clearSurge;
     applySurge({ lat, lng }, surgeRef.current, seaLevelRef.current, getSurgeReach());
+  };
+
+  // ── Storm Track (Pro) ────────────────────────────────────────────────────────
+  const clearSurgeTrack = () => {
+    const map = mapRef.current;
+    // Remove flood layers
+    surgeTrackLayers.current.forEach(({ sourceId, layerId, marker }) => {
+      try { if (map && map.getLayer(layerId))  map.removeLayer(layerId);  } catch(e) {}
+      try { if (map && map.getSource(sourceId)) map.removeSource(sourceId); } catch(e) {}
+      if (marker) marker.remove();
+    });
+    surgeTrackLayers.current = [];
+    // Remove track line
+    if (surgeTrackLine.current && map) {
+      try { if (map.getLayer("surge-track-line"))   map.removeLayer("surge-track-line");   } catch(e) {}
+      try { if (map.getLayer("surge-track-arrows")) map.removeLayer("surge-track-arrows"); } catch(e) {}
+      try { if (map.getSource("surge-track-src"))   map.removeSource("surge-track-src");   } catch(e) {}
+      surgeTrackLine.current = null;
+    }
+    setSurgeTrackPts([]); surgeTrackPtsRef.current = [];
+  };
+
+  const updateTrackLine = (pts) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || pts.length < 2) return;
+    const coords = pts.map(p => [p.lng, p.lat]);
+    const geojson = { type: "Feature", geometry: { type: "LineString", coordinates: coords } };
+    try {
+      if (map.getSource("surge-track-src")) {
+        map.getSource("surge-track-src").setData(geojson);
+      } else {
+        map.addSource("surge-track-src", { type: "geojson", data: geojson });
+        map.addLayer({ id: "surge-track-line", type: "line", source: "surge-track-src",
+          paint: { "line-color": "#38bdf8", "line-width": 3, "line-dasharray": [4, 2], "line-opacity": 0.8 } });
+        surgeTrackLine.current = true;
+      }
+    } catch(e) {}
+  };
+
+  const addTrackPoint = (lat, lng) => {
+    const map = mapRef.current;
+    const pts = surgeTrackPtsRef.current;
+    if (pts.length >= 3) return; // max 3
+
+    // Add marker
+    const el = document.createElement("div");
+    const idx = pts.length;
+    el.style.cssText = `width:28px;height:28px;border-radius:50%;background:#38bdf8;border:2.5px solid #fff;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#0f172a;`;
+    el.textContent = idx + 1;
+    const marker = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([lng, lat]).addTo(map);
+
+    // Add surge flood layer for this point
+    const preset = SURGE_PRESETS.find(p => p.id === surgePresetRef.current);
+    const reachM = preset ? preset.reach : surgeRef.current * 20000;
+    const totalLevel = seaLevelRef.current + surgeRef.current;
+    const sourceId = `surge-track-src-${idx}`;
+    const layerId  = `surge-track-layer-${idx}`;
+    const url = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(totalLevel)}/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}/${encodeURIComponent(reachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
+    try {
+      if (map.getLayer(layerId))  map.removeLayer(layerId);
+      if (map.getSource(sourceId)) map.removeSource(sourceId);
+      map.addSource(sourceId, { type: "raster", tiles: [url], tileSize: 256, minzoom: 0, maxzoom: 12 });
+      map.addLayer({ id: layerId, type: "raster", source: sourceId,
+        paint: { "raster-opacity": 0.72, "raster-opacity-transition": { duration: 400 } } });
+    } catch(e) {}
+
+    const newPts = [...pts, { lat, lng }];
+    surgeTrackLayers.current.push({ sourceId, layerId, marker });
+    surgeTrackPtsRef.current = newPts;
+    setSurgeTrackPts([...newPts]);
+    updateTrackLine(newPts);
+    map.triggerRepaint();
   };
 
   const showSurgePopup = (lng, lat) => {
@@ -3870,6 +3947,13 @@ export default function HomePage() {
 
       // Storm surge
       if (surgeOnRef.current) {
+        // Track mode (Pro) — add up to 3 points
+        if (surgeTrackMode && proTierRef.current !== "free") {
+          if (surgeTrackPtsRef.current.length < 3) {
+            addTrackPoint(lat, lng);
+          }
+          return;
+        }
         if (surgeModeRef.current === "place") {
           placeSurgePoint(lat, lng);
           return;
@@ -4517,6 +4601,31 @@ export default function HomePage() {
               </button>
             ))}
           </div>
+          {/* Track mode toggle — Pro only */}
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: 8, padding:"6px 8px", background:"rgba(56,189,248,0.05)", borderRadius:6, border:"1px solid #1e2d45" }}>
+            <div>
+              <div style={{ fontSize:12, fontWeight:700, color: surgeTrackMode ? "#38bdf8" : "#64748b" }}>🌀 Storm Track Mode</div>
+              <div style={{ fontSize:10, color:"#475569" }}>
+                {proTier === "free" ? "Pro — multi-point track" : surgeTrackMode ? `${surgeTrackPts.length}/3 points placed · click map to add` : "Click up to 3 points along coast"}
+              </div>
+            </div>
+            <div onClick={() => {
+              if (proTier === "free") { setPaywallModal("pro"); return; }
+              const next = !surgeTrackMode;
+              setSurgeTrackMode(next);
+              if (!next) clearSurgeTrack();
+            }} style={{ width:36, height:20, borderRadius:10, background: surgeTrackMode ? "#38bdf8" : "#1e2d45", position:"relative", cursor:"pointer", flexShrink:0, transition:"background 0.2s" }}>
+              <div style={{ position:"absolute", top:3, left: surgeTrackMode ? 18 : 3, width:14, height:14, borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
+            </div>
+          </div>
+          {surgeTrackMode && proTier !== "free" && surgeTrackPts.length > 0 && (
+            <div style={{ display:"flex", gap:6, marginBottom:8 }}>
+              <div style={{ flex:1, fontSize:11, color:"#38bdf8", padding:"4px 8px", background:"rgba(56,189,248,0.08)", borderRadius:6, border:"1px solid #1e2d45" }}>
+                📍 {surgeTrackPts.length} point{surgeTrackPts.length>1?"s":""} · {surgeTrackPts.length < 3 ? "click map to add more" : "max reached"}
+              </div>
+              <button onClick={clearSurgeTrack} style={{ padding:"4px 10px", background:"transparent", border:"1px solid #1e2d45", borderRadius:6, color:"#475569", cursor:"pointer", fontSize:11 }}>Clear Track</button>
+            </div>
+          )}
           <input type="range" min={0.5} max={10} step={0.5} value={surgeM}
             onChange={e => { setSurgeM(parseFloat(e.target.value)); setSurgePreset(null); }}
             style={{ width: "100%", marginBottom: 4 }} />
@@ -4534,9 +4643,17 @@ export default function HomePage() {
             </div>
           )}
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-            <button onClick={activateSurge}
+            <button onClick={() => {
+              if (surgeTrackMode && proTier !== "free") {
+                // Track mode — just arm it, user clicks map
+                setSurgeOn(true); surgeOnRef.current = true;
+                window.__dmClearSurge = clearSurge;
+              } else {
+                activateSurge();
+              }
+            }}
               style={{ flex: 1, padding: "10px", background: "#38bdf8", color: "#0f172a", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-              {surgeOn && surgePoint ? "🌀 Re-place" : "🌀 Trigger"}
+              {surgeTrackMode ? (surgeOn ? `🌀 Track (${surgeTrackPts.length}/3)` : "🌀 Start Track") : surgeOn && surgePoint ? "🌀 Re-place" : "🌀 Trigger"}
             </button>
             {surgeOn && <button onClick={clearSurge}
               style={{ flex: 1, padding: "10px", background: "transparent", color: "#475569", border: "1px solid #1e2d45", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
