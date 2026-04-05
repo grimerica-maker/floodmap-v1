@@ -1870,6 +1870,9 @@ export default function HomePage() {
       if (sourceId) try { if (map && map.getSource(sourceId)) map.removeSource(sourceId); } catch(e) {}
     });
     eqLayers.current = [];
+    // Also explicitly clear tsunami layer in case it was added async
+    try { if (map && map.getLayer("eq-tsunami-layer")) map.removeLayer("eq-tsunami-layer"); } catch(e) {}
+    try { if (map && map.getSource("eq-tsunami-src")) map.removeSource("eq-tsunami-src"); } catch(e) {}
     if (eqMarker.current) { eqMarker.current.remove(); eqMarker.current = null; }
     setEqResult(null);
     setEqPoint(null); eqPointRef.current = null;
@@ -1917,28 +1920,29 @@ export default function HomePage() {
     } catch(e) {}
 
     eqLayers.current = newLayers;
-    setEqPoint({ lat, lng });
-    eqPointRef.current = { lat, lng };
+    // eqPoint already set by click handler — just update result
+    setEqPoint({ lat, lng }); eqPointRef.current = { lat, lng };
 
     // Auto-trigger tsunami if M7.5+ thrust and coastal
     const isPro = proTierRef.current !== "free";
     const tsunamiRisk = faultType.tsunami && mag >= 7.5;
     if (tsunamiRisk && isPro) {
-      const TSRC = [
-        { lat: 28.5,  lng: -17.9  }, // La Palma/Canaries
-        { lat: 27.8,  lng: -15.6  }, // Cumbre Vieja
-        { lat: 47.0,  lng: -124.0 }, // Cascadia
-        { lat: 58.3,  lng: -153.0 }, // Alaska
-      ];
-      let nearestIdx = 0, minDist = Infinity;
-      TSRC.forEach((s, i) => {
-        const d = Math.sqrt((s.lat-lat)**2 + (s.lng-lng)**2);
-        if (d < minDist) { minDist = d; nearestIdx = i; }
-      });
+      // Use flood-region tiles from epicenter — tsunami inundation based on epicenter location
+      const tsunamiLevel = Math.min(mag * 3, 30); // rough surge height from magnitude
+      const tsunamiReach = Math.pow(10, 0.5 * mag - 1.5) * 50000; // reach scales with mag
+      const tSourceId = "eq-tsunami-src";
+      const tLayerId  = "eq-tsunami-layer";
       setTimeout(() => {
-        tsunamiSourceRef.current = nearestIdx;
-        setTsunamiSource(nearestIdx);
-        drawTsunami(nearestIdx);
+        try {
+          if (map.getLayer(tLayerId))  map.removeLayer(tLayerId);
+          if (map.getSource(tSourceId)) map.removeSource(tSourceId);
+          const tUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(tsunamiLevel)}/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}/${encodeURIComponent(tsunamiReach)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
+          map.addSource(tSourceId, { type:"raster", tiles:[tUrl], tileSize:256, minzoom:0, maxzoom:12 });
+          map.addLayer({ id:tLayerId, type:"raster", source:tSourceId,
+            paint:{ "raster-opacity":0.65, "raster-color":"rgb(56,189,248)", "raster-opacity-transition":{ duration:600 } } });
+          eqLayers.current.push({ sourceId:tSourceId, layerId:tLayerId });
+          map.triggerRepaint();
+        } catch(e) { console.warn("tsunami layer error:", e); }
       }, 1200);
     }
 
@@ -4205,10 +4209,11 @@ export default function HomePage() {
         const ep = eqPointRef.current;
         const depthType = EQ_DEPTH_TYPES.find(d => d.id === eqDepthRef.current) || EQ_DEPTH_TYPES[0];
         const rings = eqIntensityRings(eqMagRef.current, depthType.depth, eqFaultRef.current);
-        const dLat = (lat - ep.lat) * 111000;
-        const dLng = (lng - ep.lng) * 111000 * Math.cos(ep.lat * Math.PI / 180);
-        const distKm = Math.sqrt(dLat*dLat + dLng*dLng) / 1000;
-        const ring = [...rings].reverse().find(r => distKm <= r.radiusKm) || rings[rings.length-1];
+        const dLat = (lat - ep.lat) * 111.32;
+        const dLng = (lng - ep.lng) * 111.32 * Math.cos(ep.lat * Math.PI / 180);
+        const distKm = Math.sqrt(dLat*dLat + dLng*dLng);
+        // Find innermost ring that contains the click point
+        const ring = rings.find(r => distKm <= r.radiusKm) || rings[rings.length-1];
         new mapboxgl.Popup({ closeButton:true, maxWidth:"260px", className:"dm-dark-popup" })
           .setLngLat([lng, lat])
           .setHTML(`<div style="font-family:Arial,sans-serif"><div style="font-size:13px;font-weight:700;color:${ring.color};margin-bottom:6px">MMI ${ring.intensity} — ${ring.label}</div><table style="font-size:11px;width:100%;border-collapse:collapse"><tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Distance</td><td style="font-weight:700">${distKm.toFixed(0)} km</td></tr><tr><td style="color:#94a3b8;padding:2px 8px 2px 0">PGA</td><td style="font-weight:700">${ring.pga}</td></tr><tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Magnitude</td><td style="font-weight:700">M${eqMagRef.current.toFixed(1)}</td></tr></table></div>`)
@@ -5864,6 +5869,31 @@ export default function HomePage() {
       <div>Scenario Mode: {scenarioMode}</div>
       {scenarioMode === "impact" && <div>Impact Point: {impactPointRef.current ? `${impactPointRef.current.lng.toFixed(3)}, ${impactPointRef.current.lat.toFixed(3)}` : "--"}</div>}
       {scenarioMode === "impact" && <div>Asteroid Diameter: {impactDiameter.toLocaleString()} m</div>}
+
+      {/* Earthquake results in right panel */}
+      {scenarioMode === "earthquake" && eqResult && (<>
+        <hr style={{ margin:"10px 0", opacity:0.25 }} />
+        <div style={{ fontWeight:700, marginBottom:4, color:"#fbbf24" }}>🌍 M{eqResult.mag.toFixed(1)} — {eqResult.depthType.label}</div>
+        <div style={{ fontSize:11, color:"#64748b", marginBottom:8 }}>{eqResult.faultType.label} fault</div>
+        {eqResult.rings.map(r => (
+          <div key={r.intensity} style={{ display:"flex", alignItems:"center", gap:6, marginBottom:3 }}>
+            <div style={{ width:10, height:10, borderRadius:2, background:r.color, flexShrink:0 }} />
+            <span style={{ fontSize:11 }}><b style={{ color:r.color }}>MMI {r.intensity}</b> {r.label}</span>
+            <span style={{ fontSize:10, color:"#475569", marginLeft:"auto" }}>~{Math.round(r.radiusKm)}km</span>
+          </div>
+        ))}
+        <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:2, marginBottom:8 }}>
+          <div style={{ width:10, height:10, borderRadius:2, background:"#0d9488", flexShrink:0 }} />
+          <span style={{ fontSize:11, color:"#0d9488" }}>Liquefaction zone</span>
+          <span style={{ fontSize:10, color:"#475569", marginLeft:"auto" }}>~{Math.round(eqResult.liqRadiusKm)}km</span>
+        </div>
+        <div style={{ fontSize:12, color:"#94a3b8" }}>💀 Est. casualties: <b style={{ color:"#fbbf24" }}>{eqResult.casualties}</b></div>
+        {eqResult.tsunamiRisk && (
+          <div style={{ marginTop:6, fontSize:11, color:"#38bdf8" }}>
+            🌊 {eqResult.isPro ? "Tsunami inundation active" : "🔒 Tsunami — Pro only"}
+          </div>
+        )}
+      </>)}
 
       {/* Wildfire legend in right panel — climate mode only */}
       {scenarioMode === "climate" && activeWarmingLevel && (
