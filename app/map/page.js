@@ -1362,7 +1362,7 @@ export default function HomePage() {
     const showRings = eqView === "rings";
     eqLayers.current.forEach(({ layerId }) => {
       if (!layerId) return;
-      const isTsunami = layerId === "eq-tsunami-layer";
+      const isTsunami = layerId === "eq-tsunami-layer" || layerId.startsWith("eq-ts-flood");
       const isLiq = layerId.startsWith("eq-liq");
       const isRing = layerId.startsWith("eq-ring");
       try {
@@ -1914,9 +1914,14 @@ export default function HomePage() {
       if (sourceId) try { if (map && map.getSource(sourceId)) map.removeSource(sourceId); } catch(e) {}
     });
     eqLayers.current = [];
-    // Also explicitly clear tsunami layer in case it was added async
+    // Also explicitly clear tsunami layers in case added async
     try { if (map && map.getLayer("eq-tsunami-layer")) map.removeLayer("eq-tsunami-layer"); } catch(e) {}
     try { if (map && map.getSource("eq-tsunami-src")) map.removeSource("eq-tsunami-src"); } catch(e) {}
+    // Clear flood tiles per impact point
+    for (let i = 0; i < 12; i++) {
+      try { if (map && map.getLayer(`eq-ts-flood-layer-${i}`)) map.removeLayer(`eq-ts-flood-layer-${i}`); } catch(e) {}
+      try { if (map && map.getSource(`eq-ts-flood-src-${i}`)) map.removeSource(`eq-ts-flood-src-${i}`); } catch(e) {}
+    }
     if (eqMarker.current) { eqMarker.current.remove(); eqMarker.current = null; }
     setEqResult(null);
     setEqPoint(null); eqPointRef.current = null;
@@ -2030,6 +2035,26 @@ export default function HomePage() {
             });
             mapNow.on("mouseenter", tLayerId, () => { mapNow.getCanvas().style.cursor="pointer"; });
             mapNow.on("mouseleave", tLayerId, () => { mapNow.getCanvas().style.cursor=""; });
+
+            // Add flood tiles for each impact point based on wave height
+            // Limit to max 12 flood layers to avoid overload — pick highest wave heights
+            const sorted = [...tsResult.tsunami_impacts].sort((a,b) => b.wave_height_m - a.wave_height_m);
+            const toFlood = sorted.slice(0, 12);
+            toFlood.forEach((imp, i) => {
+              const fSrcId = `eq-ts-flood-src-${i}`;
+              const fLayId = `eq-ts-flood-layer-${i}`;
+              const reachM = Math.max(imp.wave_height_m * 8000, 25000); // reach scales with height
+              const tUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(imp.wave_height_m)}/${encodeURIComponent(imp.lat)}/${encodeURIComponent(imp.lng)}/${encodeURIComponent(reachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
+              try {
+                if (mapNow.getLayer(fLayId)) mapNow.removeLayer(fLayId);
+                if (mapNow.getSource(fSrcId)) mapNow.removeSource(fSrcId);
+                mapNow.addSource(fSrcId, { type:"raster", tiles:[tUrl], tileSize:256, minzoom:0, maxzoom:12 });
+                mapNow.addLayer({ id:fLayId, type:"raster", source:fSrcId,
+                  paint:{ "raster-opacity":0.65, "raster-opacity-transition":{ duration:500 } } });
+                eqLayers.current.push({ sourceId:fSrcId, layerId:fLayId });
+              } catch(e) {}
+            });
+
             mapNow.triggerRepaint();
           } catch(e) { console.warn("Tsunami render error:", e); }
         })
