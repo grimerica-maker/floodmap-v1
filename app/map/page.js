@@ -7122,7 +7122,7 @@ export default function HomePage() {
           position: "fixed", inset: 0, zIndex: 2000,
           background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)",
           display: "flex", alignItems: "flex-start", justifyContent: "center",
-          overflowY: "auto", padding: "20px 0",
+          overflowY: "scroll", WebkitOverflowScrolling: "touch", padding: "20px 0",
           fontFamily: "Arial,sans-serif",
         }}>
           <div onClick={(e) => e.stopPropagation()} style={{
