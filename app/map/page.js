@@ -15,6 +15,73 @@ const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-streets-v12";
 
 const FLOOD_TILE_VERSION = "204";
 
+// ── Earthquake presets ───────────────────────────────────────────────────────
+const EQ_DEPTH_TYPES = [
+  { id: "shallow",      label: "Shallow Crustal",   depth: 10,  desc: "0-70km · Max surface damage" },
+  { id: "subduction",   label: "Subduction Zone",   depth: 25,  desc: "15-50km · High tsunami risk" },
+  { id: "intermediate", label: "Intermediate",       depth: 150, desc: "70-300km · Wide area shaking" },
+  { id: "deep",         label: "Deep Slab",          depth: 450, desc: "300-700km · Felt widely, less damage" },
+];
+
+const EQ_FAULT_TYPES = [
+  { id: "thrust",      label: "Thrust",      tsunami: true,  desc: "Subduction — highest tsunami risk" },
+  { id: "strikeslip",  label: "Strike-slip", tsunami: false, desc: "Lateral — low tsunami risk" },
+  { id: "normal",      label: "Normal",      tsunami: false, desc: "Extension — moderate risk" },
+];
+
+const EQ_PRESETS = [
+  { label: "Tohoku 2011",      lat: 38.297, lng: 142.373, mag: 9.1, depthId: "subduction", faultId: "thrust",     desc: "M9.1 — 15,897 dead, Fukushima meltdown, 40m tsunami" },
+  { label: "Haiti 2010",       lat: 18.457, lng: -72.533, mag: 7.0, depthId: "shallow",    faultId: "strikeslip", desc: "M7.0 — 316,000 dead, Port-au-Prince destroyed" },
+  { label: "Indian Ocean 2004",lat: 3.295,  lng: 95.982,  mag: 9.1, depthId: "subduction", faultId: "thrust",     desc: "M9.1 — 227,898 dead, Thailand/Indonesia/Sri Lanka" },
+  { label: "Valdivia 1960",    lat: -38.14, lng: -73.41,  mag: 9.5, depthId: "subduction", faultId: "thrust",     desc: "M9.5 — Largest ever recorded, 5,700 dead, Chile" },
+  { label: "San Andreas (Scenario)", lat: 34.05, lng: -118.25, mag: 7.8, depthId: "shallow", faultId: "strikeslip", desc: "M7.8 scenario — ShakeOut: 1,800 dead, $200B damage, LA" },
+  { label: "Cascadia (Scenario)",    lat: 47.60, lng: -124.0,  mag: 9.0, depthId: "subduction", faultId: "thrust",  desc: "M9.0 scenario — Pacific Northwest megathrust overdue" },
+];
+
+// Mercalli intensity ring radii (km) by magnitude and depth factor
+// Returns array of {intensity, radiusKm, color, label, pga}
+function eqIntensityRings(mag, depthKm, faultId) {
+  const depthFactor = Math.max(0.3, 1 - (depthKm - 10) / 500);
+  const baseR = Math.pow(10, 0.5 * mag - 1.0) * depthFactor;
+  return [
+    { intensity: "X+",  label: "Extreme",     pga: ">124%g",  color: "#7f1d1d", opacity: 0.85, radiusKm: baseR * 0.15 },
+    { intensity: "IX",  label: "Violent",     pga: "62-124%g", color: "#b91c1c", opacity: 0.70, radiusKm: baseR * 0.30 },
+    { intensity: "VIII",label: "Severe",      pga: "31-62%g",  color: "#dc2626", opacity: 0.55, radiusKm: baseR * 0.55 },
+    { intensity: "VII", label: "Very Strong", pga: "15-31%g",  color: "#ea580c", opacity: 0.40, radiusKm: baseR * 1.0  },
+    { intensity: "VI",  label: "Strong",      pga: "8-15%g",   color: "#f97316", opacity: 0.28, radiusKm: baseR * 1.8  },
+    { intensity: "V",   label: "Moderate",    pga: "4-8%g",    color: "#ca8a04", opacity: 0.18, radiusKm: baseR * 3.2  },
+  ];
+}
+
+// Rough casualties ROM based on intensity + population density approximation
+function eqCasualtyEstimate(mag, depthKm) {
+  const e = Math.pow(10, 0.67 * mag - 3.5) * Math.max(0.2, 1 - depthKm / 300);
+  if (e < 1) return "< 1";
+  if (e < 10) return "~" + Math.round(e);
+  if (e < 1000) return "~" + Math.round(e / 10) * 10;
+  if (e < 10000) return "~" + (e / 1000).toFixed(1) + "K";
+  if (e < 1000000) return "~" + Math.round(e / 1000) + "K";
+  return "~" + (e / 1000000).toFixed(1) + "M";
+}
+
+// Build circle GeoJSON for intensity ring
+function eqRingGeoJSON(lat, lng, radiusKm, steps = 64) {
+  const coords = [];
+  for (let i = 0; i <= steps; i++) {
+    const angle = (i / steps) * Math.PI * 2;
+    const dLat = (radiusKm * Math.cos(angle)) / 111.32;
+    const dLng = (radiusKm * Math.sin(angle)) / (111.32 * Math.cos(lat * Math.PI / 180));
+    coords.push([lng + dLng, lat + dLat]);
+  }
+  return { type: "Feature", geometry: { type: "Polygon", coordinates: [coords] }, properties: {} };
+}
+
+// Liquefaction risk — high in coastal/river deltas at VI+ shaking
+// Approximated by elevation proxy: < 10m elevation = high liquefaction risk
+function eqLiquefactionRadius(mag, depthKm) {
+  return Math.pow(10, 0.45 * mag - 1.2) * Math.max(0.3, 1 - depthKm / 400) * 15;
+}
+
 // ── Scenario wiki content ────────────────────────────────────────────────────
 const SCENARIO_WIKI = {
   impact: {
@@ -1238,6 +1305,10 @@ export default function HomePage() {
   useEffect(() => { seaLevelRef.current = seaLevel; }, [seaLevel]);
   useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
   useEffect(() => { surgeOnRef.current    = surgeOn;     }, [surgeOn]);
+  useEffect(() => { eqMagRef.current   = eqMag;     }, [eqMag]);
+  useEffect(() => { eqDepthRef.current = eqDepthId; }, [eqDepthId]);
+  useEffect(() => { eqFaultRef.current = eqFaultId; }, [eqFaultId]);
+  useEffect(() => { eqPointRef.current = eqPoint;   }, [eqPoint]);
   useEffect(() => { surgePresetRef.current = surgePreset; }, [surgePreset]);
   useEffect(() => { surgeRef.current     = surgeM;     }, [surgeM]);
   useEffect(() => { surgeModeRef.current = surgeMode;  }, [surgeMode]);
@@ -1645,7 +1716,7 @@ export default function HomePage() {
       try { if (map.getLayer("surge-track-line"))   map.removeLayer("surge-track-line");   } catch(e) {}
       try { if (map.getLayer("surge-track-arrows")) map.removeLayer("surge-track-arrows"); } catch(e) {}
       try { if (map.getSource("surge-track-src"))   map.removeSource("surge-track-src");   } catch(e) {}
-      try { if (map.getSource("surge-arrow-src"))   map.removeSource("surge-arrow-src");   } catch(e) {}
+
       surgeTrackLine.current = null;
     }
     setSurgeTrackPts([]); surgeTrackPtsRef.current = [];
@@ -1653,44 +1724,18 @@ export default function HomePage() {
 
   const updateTrackLine = (pts) => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !map.isStyleLoaded() || pts.length < 2) return;
     const coords = pts.map(p => [p.lng, p.lat]);
-
-    // Build arrow features between consecutive points
-    const arrowFeatures = [];
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p1 = pts[i], p2 = pts[i+1];
-      const bearing = Math.atan2(p2.lng - p1.lng, p2.lat - p1.lat) * 180 / Math.PI;
-      arrowFeatures.push({ type:"Feature",
-        geometry:{ type:"Point", coordinates:[(p1.lng+p2.lng)/2, (p1.lat+p2.lat)/2] },
-        properties:{ bearing } });
-    }
-
-    const lineGeo = { type:"FeatureCollection", features: coords.length >= 2 ? [
-      { type:"Feature", geometry:{ type:"LineString", coordinates:coords } }] : [] };
-    const arrowGeo = { type:"FeatureCollection", features: arrowFeatures };
-
+    const lineGeo = { type:"FeatureCollection", features:[
+      { type:"Feature", geometry:{ type:"LineString", coordinates:coords } }] };
     try {
-      // Always remove and re-add so layers are fresh
-      try { map.removeLayer("surge-track-arrows"); } catch(e) {}
       try { map.removeLayer("surge-track-line"); } catch(e) {}
-      try { map.removeSource("surge-arrow-src"); } catch(e) {}
       try { map.removeSource("surge-track-src"); } catch(e) {}
-
-      if (coords.length >= 2) {
-        map.addSource("surge-track-src", { type:"geojson", data:lineGeo });
-        map.addLayer({ id:"surge-track-line", type:"line", source:"surge-track-src",
-          paint:{ "line-color":"#38bdf8", "line-width":3, "line-dasharray":[4,2], "line-opacity":0.9 } });
-        if (arrowFeatures.length > 0) {
-          map.addSource("surge-arrow-src", { type:"geojson", data:arrowGeo });
-          map.addLayer({ id:"surge-track-arrows", type:"symbol", source:"surge-arrow-src",
-            layout:{ "text-field":"➤", "text-size":22, "text-rotate":["get","bearing"],
-              "text-rotation-alignment":"map", "text-allow-overlap":true, "text-ignore-placement":true },
-            paint:{ "text-color":"#38bdf8", "text-halo-color":"#0f172a", "text-halo-width":2 } });
-        }
-      }
+      map.addSource("surge-track-src", { type:"geojson", data:lineGeo });
+      map.addLayer({ id:"surge-track-line", type:"line", source:"surge-track-src",
+        paint:{ "line-color":"#38bdf8", "line-width":3, "line-dasharray":[4,2], "line-opacity":0.9 } });
       surgeTrackLine.current = true;
-    } catch(e) { console.warn("updateTrackLine error:", e); }
+    } catch(e) {}
   };
 
   const addTrackPoint = (lat, lng) => {
@@ -1792,6 +1837,116 @@ export default function HomePage() {
       .setHTML(html)
       .addTo(map);
     surgePopupRef.current = popup;
+  };
+
+  // ── Earthquake simulation ────────────────────────────────────────────────────
+  const clearEarthquake = () => {
+    const map = mapRef.current;
+    eqLayers.current.forEach(({ sourceId, layerId }) => {
+      try { if (map && map.getLayer(layerId))  map.removeLayer(layerId);  } catch(e) {}
+      try { if (map && map.getSource(sourceId)) map.removeSource(sourceId); } catch(e) {}
+    });
+    eqLayers.current = [];
+    if (eqMarker.current) { eqMarker.current.remove(); eqMarker.current = null; }
+    setEqResult(null);
+    setEqPoint(null); eqPointRef.current = null;
+  };
+
+  const runEarthquake = (lat, lng, mag, depthId, faultId) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    clearEarthquake();
+
+    const depthType = EQ_DEPTH_TYPES.find(d => d.id === depthId) || EQ_DEPTH_TYPES[0];
+    const faultType = EQ_FAULT_TYPES.find(f => f.id === faultId) || EQ_FAULT_TYPES[0];
+    const rings = eqIntensityRings(mag, depthType.depth, faultId);
+    const liqRadiusKm = eqLiquefactionRadius(mag, depthType.depth);
+    const casualties = eqCasualtyEstimate(mag, depthType.depth);
+
+    // Place epicenter marker
+    const el = document.createElement("div");
+    el.style.cssText = "width:24px;height:24px;background:#fbbf24;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 3px #f59e0b,0 2px 8px rgba(0,0,0,0.5);cursor:pointer;";
+    eqMarker.current = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([lng, lat]).addTo(map);
+
+    const newLayers = [];
+
+    // Draw rings largest → smallest so smaller ones render on top
+    [...rings].reverse().forEach((ring, ri) => {
+      const sourceId = `eq-ring-src-${ri}`;
+      const layerId  = `eq-ring-layer-${ri}`;
+      const geo = eqRingGeoJSON(lat, lng, ring.radiusKm);
+      try {
+        map.addSource(sourceId, { type: "geojson", data: geo });
+        map.addLayer({ id: layerId, type: "fill", source: sourceId,
+          paint: { "fill-color": ring.color, "fill-opacity": ring.opacity } });
+        newLayers.push({ sourceId, layerId });
+      } catch(e) {}
+    });
+
+    // Liquefaction overlay — teal hatch approximation
+    const liqSourceId = "eq-liq-src";
+    const liqLayerId  = "eq-liq-layer";
+    const liqGeo = eqRingGeoJSON(lat, lng, liqRadiusKm);
+    try {
+      map.addSource(liqSourceId, { type: "geojson", data: liqGeo });
+      map.addLayer({ id: liqLayerId, type: "fill", source: liqSourceId,
+        paint: { "fill-color": "#0d9488", "fill-opacity": 0.22, "fill-outline-color": "#0d9488" } });
+      // Add outline ring
+      map.addLayer({ id: liqLayerId + "-line", type: "line", source: liqSourceId,
+        paint: { "line-color": "#0d9488", "line-width": 2, "line-dasharray": [3, 3], "line-opacity": 0.7 } });
+      newLayers.push({ sourceId: liqSourceId, layerId: liqLayerId });
+      newLayers.push({ sourceId: null, layerId: liqLayerId + "-line" });
+    } catch(e) {}
+
+    eqLayers.current = newLayers;
+    setEqPoint({ lat, lng });
+    eqPointRef.current = { lat, lng };
+
+    // Auto-trigger tsunami if M7.5+ thrust and coastal
+    const isPro = proTierRef.current !== "free";
+    const tsunamiRisk = faultType.tsunami && mag >= 7.5;
+    if (tsunamiRisk && isPro) {
+      // Find nearest tsunami source to epicenter
+      const sources = [
+        { name: "La Palma",    lat: 28.5, lng: -17.9 },
+        { name: "Cascadia",    lat: 47.0, lng: -124.0 },
+        { name: "Alaska",      lat: 58.3, lng: -153.0 },
+        { name: "Sumatra",     lat: 3.3,  lng: 96.0 },
+        { name: "Japan",       lat: 38.3, lng: 142.4 },
+        { name: "Chile",       lat: -38.1,lng: -73.4 },
+      ];
+      let nearest = sources[0], minDist = Infinity;
+      sources.forEach(s => {
+        const d = Math.sqrt((s.lat-lat)**2 + (s.lng-lng)**2);
+        if (d < minDist) { minDist = d; nearest = s; }
+      });
+      setTimeout(() => {
+        tsunamiSourceRef.current = 0;
+        setTsunamiSource(0);
+        scenarioModeRef.current = "tsunami";
+        setScenarioMode("tsunami");
+        setTimeout(() => drawTsunami(0), 300);
+      }, 1500);
+    }
+
+    setEqResult({ mag, depthType, faultType, rings, casualties, tsunamiRisk, isPro, liqRadiusKm });
+    map.triggerRepaint();
+  };
+
+  const triggerEarthquake = () => {
+    if (!eqPointRef.current) return;
+    const { lat, lng } = eqPointRef.current;
+    runEarthquake(lat, lng, eqMagRef.current, eqDepthRef.current, eqFaultRef.current);
+  };
+
+  const loadEqPreset = (preset) => {
+    setEqMag(preset.mag); eqMagRef.current = preset.mag;
+    setEqDepthId(preset.depthId); eqDepthRef.current = preset.depthId;
+    setEqFaultId(preset.faultId); eqFaultRef.current = preset.faultId;
+    setScenarioMode("earthquake"); scenarioModeRef.current = "earthquake";
+    const map = mapRef.current;
+    if (map) map.flyTo({ center: [preset.lng, preset.lat], zoom: 7, duration: 1200 });
+    setTimeout(() => runEarthquake(preset.lat, preset.lng, preset.mag, preset.depthId, preset.faultId), 1400);
   };
 
   const applyProjectionForMode = (mode) => {
@@ -4024,6 +4179,11 @@ export default function HomePage() {
         }
       }
 
+      if (scenarioModeRef.current === "earthquake") {
+        runEarthquake(lat, lng, eqMagRef.current, eqDepthRef.current, eqFaultRef.current);
+        return;
+      }
+
       if (scenarioModeRef.current === "impact") {
         // If results exist, show zone popup; otherwise place a new impact point
         if (impactResultRef.current) {
@@ -4568,13 +4728,13 @@ export default function HomePage() {
       <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Scenario Mode</div>
       <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
         <button
-          onClick={() => { clearSurge(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("flood"); }}
+          onClick={() => { clearSurge(); clearEarthquake(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("flood"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "flood" ? "#1e3a5f" : "#111827", color: scenarioMode === "flood" ? "#60a5fa" : "#94a3b8", border: scenarioMode === "flood" ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ fontSize: 15 }}>Flood</div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Sea level up / down</div>
         </button>
         <button
-          onClick={() => { clearSurge(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("impact"); }}
+          onClick={() => { clearSurge(); clearEarthquake(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("impact"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "impact" ? "#1e3a5f" : "#111827", color: scenarioMode === "impact" ? "#60a5fa" : "#94a3b8", border: scenarioMode === "impact" ? "1px solid #3b82f6" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>Impact</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["impact"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Click map to place impact point</div>
@@ -4594,25 +4754,25 @@ export default function HomePage() {
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Sea level rise projections</div>
         </button>
         <button
-          onClick={() => { clearSurge(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("nuke"); }}
+          onClick={() => { clearSurge(); clearEarthquake(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("nuke"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, border: "1px solid #d1d5db", background: scenarioMode === "nuke" ? "#4c1d95" : "#111827", color: scenarioMode === "nuke" ? "#c4b5fd" : "#94a3b8", border: scenarioMode === "nuke" ? "1px solid #7c3aed" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>☢️ Nuke</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["nuke"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Click map to place detonation point</div>
         </button>
         <button
-          onClick={() => { clearSurge(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("yellowstone"); }}
+          onClick={() => { clearSurge(); clearEarthquake(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("yellowstone"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "yellowstone" ? "#431407" : "#111827", color: scenarioMode === "yellowstone" ? "#fb923c" : "#94a3b8", border: scenarioMode === "yellowstone" ? "1px solid #ea580c" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>🌋 Super Volcano</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["yellowstone"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Supervolcano eruption scenarios</div>
         </button>
         <button
-          onClick={() => { clearSurge(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); }}
+          onClick={() => { clearSurge(); clearEarthquake(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "tsunami" ? "#0c2a4a" : "#111827", color: scenarioMode === "tsunami" ? "#38bdf8" : "#94a3b8", border: scenarioMode === "tsunami" ? "1px solid #0ea5e9" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>🌊 Mega-Tsunami</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["tsunami"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Ocean collapse wave propagation</div>
         </button>
         <button
-          onClick={() => { clearSurge(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); scenarioModeRef.current = "cataclysm"; setScenarioMode("cataclysm"); }}
+          onClick={() => { clearSurge(); clearEarthquake(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); scenarioModeRef.current = "cataclysm"; setScenarioMode("cataclysm"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "cataclysm" ? "#1a0505" : "#111827", color: scenarioMode === "cataclysm" ? "#ef4444" : "#94a3b8", border: scenarioMode === "cataclysm" ? "1px solid #dc2626" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>☄️ Cataclysm</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["cataclysm"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Pole shift inundation models</div>
@@ -4636,6 +4796,13 @@ export default function HomePage() {
             </button>
           )}
         </div>
+
+        <button
+          onClick={() => { clearSurge(); clearEarthquake(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); unlockMapControls(); setScenarioMode("earthquake"); scenarioModeRef.current = "earthquake"; }}
+          style={{ width:"100%", padding:"13px 14px", minHeight:56, background: scenarioMode==="earthquake" ? "#1c1208" : "#111827", color: scenarioMode==="earthquake" ? "#fbbf24" : "#94a3b8", border: scenarioMode==="earthquake" ? "1px solid #f59e0b" : "1px solid #1e2d45", cursor:"pointer", borderRadius:12, fontWeight:700, textAlign:"left" }}>
+          <div style={{ fontSize:15 }}>🌍 Earthquake</div>
+          <div style={{ fontSize:12, opacity:0.7, marginTop:3 }}>Seismic intensity + tsunami trigger</div>
+        </button>
 
       </div>
 
@@ -4683,6 +4850,103 @@ export default function HomePage() {
               Clear
             </button>}
           </div>
+        </div>
+      )}
+
+      {/* ── EARTHQUAKE CONTROLS ── */}
+      {scenarioMode === "earthquake" && (
+        <div style={{ marginBottom:16 }}>
+          {/* Magnitude */}
+          <div style={{ fontWeight:700, fontSize:12, marginBottom:8, letterSpacing:"0.1em", color:"#f59e0b", textTransform:"uppercase" }}>Magnitude</div>
+          <input type="range" min={4} max={9.5} step={0.1} value={eqMag}
+            onChange={e => { setEqMag(parseFloat(e.target.value)); eqMagRef.current = parseFloat(e.target.value); }}
+            style={{ width:"100%", marginBottom:4 }} />
+          <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"#64748b", marginBottom:12 }}>
+            <span>M4.0</span><span style={{ color:"#fbbf24", fontWeight:700 }}>M{eqMag.toFixed(1)}</span><span>M9.5</span>
+          </div>
+
+          {/* Depth type */}
+          <div style={{ fontWeight:700, fontSize:12, marginBottom:6, letterSpacing:"0.1em", color:"#f59e0b", textTransform:"uppercase" }}>Depth</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:4, marginBottom:12 }}>
+            {EQ_DEPTH_TYPES.map(d => (
+              <button key={d.id} onClick={() => { setEqDepthId(d.id); eqDepthRef.current = d.id; }}
+                style={{ padding:"6px 8px", borderRadius:8, fontSize:11, fontWeight:600, cursor:"pointer", textAlign:"left",
+                  background: eqDepthId===d.id ? "#451a03" : "#111827",
+                  color: eqDepthId===d.id ? "#fbbf24" : "#64748b",
+                  border: eqDepthId===d.id ? "1px solid #f59e0b" : "1px solid #1e2d45" }}>
+                <div>{d.label}</div>
+                <div style={{ fontSize:10, opacity:0.7 }}>{d.desc}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* Fault type */}
+          <div style={{ fontWeight:700, fontSize:12, marginBottom:6, letterSpacing:"0.1em", color:"#f59e0b", textTransform:"uppercase" }}>Fault Type</div>
+          <div style={{ display:"flex", gap:4, marginBottom:12 }}>
+            {EQ_FAULT_TYPES.map(f => (
+              <button key={f.id} onClick={() => { setEqFaultId(f.id); eqFaultRef.current = f.id; }}
+                style={{ flex:1, padding:"6px 4px", borderRadius:8, fontSize:11, fontWeight:600, cursor:"pointer",
+                  background: eqFaultId===f.id ? "#451a03" : "#111827",
+                  color: eqFaultId===f.id ? "#fbbf24" : "#64748b",
+                  border: eqFaultId===f.id ? "1px solid #f59e0b" : "1px solid #1e2d45" }}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Presets */}
+          <div style={{ fontWeight:700, fontSize:12, marginBottom:6, letterSpacing:"0.1em", color:"#f59e0b", textTransform:"uppercase" }}>Historic Events</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:4, marginBottom:12 }}>
+            {EQ_PRESETS.map(p => (
+              <button key={p.label} onClick={() => loadEqPreset(p)}
+                style={{ padding:"8px 10px", borderRadius:8, fontSize:11, fontWeight:600, cursor:"pointer", textAlign:"left",
+                  background:"#111827", color:"#94a3b8", border:"1px solid #1e2d45" }}>
+                <div style={{ display:"flex", justifyContent:"space-between" }}>
+                  <span style={{ color:"#fbbf24" }}>{p.label}</span>
+                  <span style={{ color:"#f59e0b" }}>M{p.mag}</span>
+                </div>
+                <div style={{ fontSize:10, opacity:0.6, marginTop:2 }}>{p.desc}</div>
+              </button>
+            ))}
+          </div>
+
+          <div style={{ fontSize:11, color:"#94a3b8", textAlign:"center", marginBottom:10 }}>
+            👆 Click map to place epicenter
+          </div>
+
+          {eqPoint && (
+            <button onClick={clearEarthquake}
+              style={{ width:"100%", padding:"8px", background:"transparent", border:"1px solid #1e2d45", borderRadius:8, color:"#475569", cursor:"pointer", fontSize:12 }}>
+              Clear
+            </button>
+          )}
+
+          {/* Results */}
+          {eqResult && (
+            <div style={{ marginTop:12, padding:"12px", background:"rgba(245,158,11,0.07)", borderRadius:10, border:"1px solid #1e2d45" }}>
+              <div style={{ fontWeight:700, fontSize:12, color:"#fbbf24", marginBottom:8 }}>M{eqResult.mag.toFixed(1)} · {eqResult.depthType.label}</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:4, fontSize:11, marginBottom:8 }}>
+                {eqResult.rings.slice(0,4).map(r => (
+                  <div key={r.intensity} style={{ padding:"4px 6px", borderRadius:6, background:"rgba(0,0,0,0.3)", border:`1px solid ${r.color}` }}>
+                    <span style={{ color:r.color, fontWeight:700 }}>MMI {r.intensity}</span>
+                    <span style={{ color:"#94a3b8" }}> {r.label}</span>
+                    <div style={{ fontSize:10, color:"#64748b" }}>r~{Math.round(r.radiusKm)}km</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize:11, color:"#94a3b8", marginBottom:4 }}>
+                💀 Estimated casualties: <span style={{ color:"#fbbf24", fontWeight:700 }}>{eqResult.casualties}</span>
+              </div>
+              <div style={{ fontSize:11, color:"#0d9488" }}>
+                💧 Liquefaction risk zone: ~{Math.round(eqResult.liqRadiusKm)}km radius
+              </div>
+              {eqResult.tsunamiRisk && (
+                <div style={{ marginTop:8, padding:"6px 8px", background:"rgba(56,189,248,0.1)", borderRadius:6, border:"1px solid #38bdf8", fontSize:11, color:"#38bdf8" }}>
+                  🌊 {eqResult.isPro ? "Tsunami triggered automatically" : "🔒 Tsunami simulation — Pro"}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
