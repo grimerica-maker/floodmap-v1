@@ -32,8 +32,10 @@ const EQ_FAULT_TYPES = [
 // Hardcoded tsunami impacts for historical presets — real data, bypasses engine
 const PRESET_TSUNAMI_IMPACTS = {
   "Tohoku 2011": {
-    // 15,897 dead. Max wave 40m. Flood inland up to 10km on Sendai plain.
-    floodLevel: 40, reachM: 1800000,
+    // 15,897 dead. Max wave 40m. Rupture ran NNE along Japan trench.
+    // flood-bbox ellipse: origin=epicenter, propagates W toward Japan coast
+    floodLevel: 15, major_km: 220, minor_km: 80, bearing: 270,
+    // bearing 270 = westward toward coast; major along coast N-S, minor inland
     impacts: [
       { lat:38.32, lng:141.55, arrival_min:10, wave_height_m:40, band_color:"#ef4444", band_label:"Extreme — 40m",  warning:"Danger", distance_km:55  },
       { lat:38.50, lng:141.48, arrival_min:12, wave_height_m:20, band_color:"#ef4444", band_label:"Extreme — 20m",  warning:"Danger", distance_km:80  },
@@ -49,8 +51,9 @@ const PRESET_TSUNAMI_IMPACTS = {
     ]
   },
   "Indian Ocean 2004": {
-    // 227,898 dead. Banda Aceh 30m, Thailand 10m, Sri Lanka 9m, India 5m, Somalia 3m.
-    floodLevel: 30, reachM: 3500000,
+    // 227,898 dead. Rupture ran NNW along Sunda trench for 1300km.
+    // Ellipse: wide N-S along fault, narrow E-W. Floods Indian Ocean coasts.
+    floodLevel: 15, major_km: 1800, minor_km: 400, bearing: 340,
     impacts: [
       // Banda Aceh — worst hit, 30m, 15min
       { lat:5.55,  lng:95.32,  arrival_min:15,  wave_height_m:30, band_color:"#ef4444", band_label:"Extreme — 30m", warning:"Danger",   distance_km:250 },
@@ -80,8 +83,9 @@ const PRESET_TSUNAMI_IMPACTS = {
     ]
   },
   "Valdivia 1960": {
-    // 5,700 dead. Max wave 25m Chile, 10m Hawaii, 6m Japan.
-    floodLevel: 25, reachM: 8000000,
+    // 5,700 dead. Rupture ran N-S along Chilean trench 1000km.
+    // Ellipse: long N-S along coast, propagates W into Pacific.
+    floodLevel: 12, major_km: 900, minor_km: 350, bearing: 270,
     impacts: [
       { lat:-38.50,lng:-73.00, arrival_min:10,  wave_height_m:25, band_color:"#ef4444", band_label:"Extreme — 25m", warning:"Danger",   distance_km:60  },
       { lat:-39.80,lng:-73.40, arrival_min:18,  wave_height_m:20, band_color:"#ef4444", band_label:"Extreme — 20m", warning:"Danger",   distance_km:200 },
@@ -100,8 +104,9 @@ const PRESET_TSUNAMI_IMPACTS = {
     ]
   },
   "Cascadia (Scenario)": {
-    // FEMA: 13,000 dead. Max wave 30m. 15-50min warning window.
-    floodLevel: 30, reachM: 2500000,
+    // FEMA: 13,000 dead. Rupture runs N-S along Cascadia subduction zone.
+    // Ellipse: long N-S along coast, propagates W to E hitting coast.
+    floodLevel: 15, major_km: 800, minor_km: 200, bearing: 90,
     impacts: [
       // Oregon/Washington coast — 15-30min, no warning
       { lat:47.00, lng:-124.15,arrival_min:12,  wave_height_m:28, band_color:"#ef4444", band_label:"Extreme — 28m", warning:"Danger",   distance_km:65  },
@@ -2217,9 +2222,32 @@ export default function HomePage() {
       // Dispatch: use hardcoded preset data or hit the engine
       if (hardcoded) {
         console.log("🌊 Using hardcoded data for:", presetKey);
-        // Use dots only — flood-region tiles flood wrong areas for tsunami (sea-level-rise engine, not inundation)
+        // Dots first
         const synth = { tsunami_impacts: hardcoded.impacts };
         processResult(synth);
+        // Then flood-bbox tiles — ellipse-masked like mega-tsunami, correct shape
+        setTimeout(() => {
+          const mapNow = mapRef.current;
+          if (!mapNow || !mapNow.isStyleLoaded()) return;
+          const { floodLevel, major_km, minor_km, bearing } = hardcoded;
+          const floodParams = `origin_lat=${lat}&major_km=${major_km}&minor_km=${minor_km}&bearing_deg=${bearing}&shift=0.9`;
+          const fUrl  = `${floodEngineUrlRef.current}/flood-bbox/${floodLevel}/{z}/{x}/{y}.png?origin_lng=${lng}&${floodParams}`;
+          const fUrl2 = `${floodEngineUrlRef.current}/flood-bbox/${floodLevel}/{z}/{x}/{y}.png?origin_lng=${lng + 360}&${floodParams}`;
+          const fSrc = "eq-ts-flood-src-0", fLay = "eq-ts-flood-layer-0";
+          const fSrc2 = "eq-ts-flood-src-1", fLay2 = "eq-ts-flood-layer-1";
+          try {
+            if (mapNow.getLayer(fLay))  mapNow.removeLayer(fLay);
+            if (mapNow.getSource(fSrc)) mapNow.removeSource(fSrc);
+            if (mapNow.getLayer(fLay2))  mapNow.removeLayer(fLay2);
+            if (mapNow.getSource(fSrc2)) mapNow.removeSource(fSrc2);
+            mapNow.addSource(fSrc, { type:"raster", tiles:[fUrl], tileSize:256 });
+            mapNow.addLayer({ id:fLay, type:"raster", source:fSrc, paint:{"raster-opacity":0.7} });
+            mapNow.addSource(fSrc2, { type:"raster", tiles:[fUrl2], tileSize:256 });
+            mapNow.addLayer({ id:fLay2, type:"raster", source:fSrc2, paint:{"raster-opacity":0.7} });
+            eqLayers.current.push({ sourceId:fSrc, layerId:fLay });
+            eqLayers.current.push({ sourceId:fSrc2, layerId:fLay2 });
+          } catch(e) { console.warn("EQ flood-bbox error:", e); }
+        }, 200);
       } else {
         const tsUrl = `${floodEngineUrlRef.current}/tsunami-simulate?lat=${lat}&lng=${lng}&mag=${mag}&strike=${strike}&dip=${dip}&rake=${rake}&depth_km=${depthKm}&n_rays=120`;
         console.log("🌊 Tsunami fetch:", tsUrl);
