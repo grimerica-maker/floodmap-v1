@@ -5257,14 +5257,30 @@ export default function HomePage() {
             Feet
           </button>
         </div>
-        <input type="text" inputMode="decimal"
-          placeholder={unitMode === "ft" ? "Enter sea level in feet" : "Enter sea level in meters"}
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onBlur={() => { const c = commitInputText(inputText, unitMode); if (c !== null) setInputLevel(c); }}
-          onKeyDown={(e) => { if (e.key === "Enter") executeFlood(); }}
-          style={{ width: "100%", padding: "12px 14px", fontSize: 17, border: "1px solid #1e2d45", marginBottom: 10, boxSizing: "border-box", borderRadius: 8, minHeight: 48, background: "#111827", color: "#e2e8f0" }}
-        />
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <button
+            onClick={() => {
+              const cur = inputText.trim();
+              let next;
+              if (cur.startsWith("-")) { next = cur.slice(1); }
+              else if (cur === "" || cur === "0") { next = "-"; }
+              else { next = "-" + cur; }
+              setInputText(next);
+              const c = commitInputText(next, unitMode);
+              if (c !== null) { setInputLevel(c); setSeaLevel(c); seaLevelRef.current = c; }
+            }}
+            style={{ padding: "12px 16px", minHeight: 48, background: inputText.trim().startsWith("-") ? "#f97316" : "#1e293b", color: "white", border: inputText.trim().startsWith("-") ? "1px solid #f97316" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 8, fontWeight: 700, fontSize: 22, lineHeight: 1 }}>
+            −
+          </button>
+          <input type="text" inputMode="decimal"
+            placeholder={unitMode === "ft" ? "feet" : "meters"}
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onBlur={() => { const c = commitInputText(inputText, unitMode); if (c !== null) setInputLevel(c); }}
+            onKeyDown={(e) => { if (e.key === "Enter") executeFlood(); }}
+            style={{ flex: 1, padding: "12px 14px", fontSize: 17, border: "1px solid #1e2d45", boxSizing: "border-box", borderRadius: 8, minHeight: 48, background: "#111827", color: "#e2e8f0" }}
+          />
+        </div>
         <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
           <button onClick={(e) => { e.stopPropagation(); executeFlood(); }}
             style={{ flex: 1, padding: "13px 10px", minHeight: 48, background: "#f97316", color: "white", border: "none", fontWeight: 700, cursor: "pointer", borderRadius: 8, fontSize: 15 }}>
@@ -7051,6 +7067,7 @@ export default function HomePage() {
             background: "#0a0f1e", border: "1px solid #1e2d45", borderRadius: 16,
             padding: 28, maxWidth: 380, width: "90%",
             boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+            maxHeight: "90vh", overflowY: "auto",
           }}>
             <img src={LOGO_DATA} alt="Disaster Map" style={{ width: 64, height: 64, display: "block", margin: "0 auto 12px" }} />
             
