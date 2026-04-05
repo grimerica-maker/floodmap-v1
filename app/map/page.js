@@ -5965,9 +5965,7 @@ export default function HomePage() {
             </div>
           );
         })}
-        <div style={{ marginTop: 6, fontSize: 10, color: "#374151", textAlign: "center" }}>
-          🔵 currently underwater &nbsp;·&nbsp; 🔴 flooded at current level
-        </div>
+
       </div>
 
       {/* ── VIEW MODE ── */}
