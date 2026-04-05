@@ -1497,41 +1497,31 @@ export default function HomePage() {
       return;
     }
     setWikiPanel({ title: name, extract: null, thumbnail: null, url: wikiUrl, loading: true });
-    // If mpId exists, use Megalithic Portal as primary source (skip Wikipedia)
     if (mpId) {
       try {
         const res = await fetch(`${floodEngineUrlRef.current}/megalith-info?id=${mpId}`);
         const mpData = res.ok ? await res.json() : null;
+        const imgUrl = mpData?.image ? `${floodEngineUrlRef.current}/megalith-image?url=${encodeURIComponent(mpData.image)}` : null;
         setWikiPanel({
-          title:     mpData?.title || name,
-          extract:   mpData?.description || null,
-          thumbnail: mpData?.image || null,
-          url:       `https://www.megalithic.co.uk/article.php?sid=${mpId}`,
-          wikidataId,
-          mpUrl:     `https://www.megalithic.co.uk/article.php?sid=${mpId}`,
+          title:      mpData?.title || name,
+          extract:    mpData?.description || null,
+          thumbnail:  imgUrl,
+          url:        `https://www.megalithic.co.uk/article.php?sid=${mpId}`,
+          mpUrl:      `https://www.megalithic.co.uk/article.php?sid=${mpId}`,
           mpSubtitle: mpData?.subtitle || null,
-          mpComments: mpData?.comments || null,
-          loading:   false,
+          loading:    false,
         });
       } catch {
-        setWikiPanel({ title: name, extract: null, thumbnail: null, url: wikiUrl, wikidataId, loading: false });
+        setWikiPanel({ title: name, extract: null, thumbnail: null, url: wikiUrl, loading: false });
       }
       return;
     }
-    // Non-megalith: use Wikipedia
     try {
       const slug = encodeURIComponent(name.replace(/ /g, "_"));
       const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${slug}`);
       if (res.ok) {
         const d = await res.json();
-        setWikiPanel({
-          title:     d.title || name,
-          extract:   d.extract || null,
-          thumbnail: d.thumbnail?.source || null,
-          url:       d.content_urls?.desktop?.page || wikiUrl,
-          wikidataId,
-          loading:   false,
-        });
+        setWikiPanel({ title: d.title || name, extract: d.extract || null, thumbnail: d.thumbnail?.source || null, url: d.content_urls?.desktop?.page || wikiUrl, wikidataId, loading: false });
       } else {
         setWikiPanel({ title: name, extract: null, thumbnail: null, url: wikiUrl, wikidataId, loading: false });
       }
@@ -2067,20 +2057,15 @@ export default function HomePage() {
             if (impacts.length > 0) {
               const maxImpact = impacts.reduce((a, b) => b.wave_height_m > a.wave_height_m ? b : a);
               const maxReachM = Math.max(...impacts.map(i => i.distance_km * 1000), 50000);
-              // Amplify for visibility: min 10m flood level, 3x actual wave height
               const floodLevel = Math.max(10, maxImpact.wave_height_m * 3);
               const fSrcId = `eq-ts-flood-src-0`;
               const fLayId = `eq-ts-flood-layer-0`;
               const tUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(floodLevel)}/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}/${encodeURIComponent(maxReachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
-              console.log(`🌊 Unified flood tile: epicenter=${lat},${lng} level=${floodLevel}m reach=${Math.round(maxReachM/1000)}km (max wave=${maxImpact.wave_height_m}m)`);
               if (mapNow.getLayer(fLayId)) mapNow.removeLayer(fLayId);
               if (mapNow.getSource(fSrcId)) mapNow.removeSource(fSrcId);
               mapNow.addSource(fSrcId, { type:"raster", tiles:[tUrl], tileSize:256, minzoom:0, maxzoom:12 });
-              mapNow.addLayer({ id:fLayId, type:"raster", source:fSrcId,
-                layout:{ "visibility": "visible" },
-                paint:{ "raster-opacity":0.75, "raster-opacity-transition":{ duration:500 } } });
+              mapNow.addLayer({ id:fLayId, type:"raster", source:fSrcId, layout:{ "visibility": "visible" }, paint:{ "raster-opacity":0.75, "raster-opacity-transition":{ duration:500 } } });
               eqLayers.current.push({ sourceId:fSrcId, layerId:fLayId });
-              console.log(`  ✓ ${fLayId} added`);
             }
           } catch(e) { console.error("Tsunami flood tile error:", e.message); }
 
@@ -4533,7 +4518,7 @@ export default function HomePage() {
                     : seaLevelRef.current > 0
                       ? `<div style="color:#4ade80;margin-bottom:4px">✓ Safe at +${Math.round(seaLevelRef.current)} m</div>`
                       : ""}
-                ${wikiUrl ? `<button onclick="if(window.__dmWiki){window.__dmWiki(this.dataset.n,this.dataset.u,this.dataset.w,this.dataset.m)}" data-n="${(p.name||'').replace(/"/g,'&quot;')}" data-u="${(wikiUrl||'').replace(/"/g,'&quot;')}" data-w="${(p.wikidata||'').replace(/"/g,'&quot;')}" data-m="${p.url||''}" style="margin-top:6px;font-size:11px;color:${dotColor};background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:Arial,sans-serif;">📖 Wikipedia</button>` : ""}${p.url && p.kind==='megalith' ? `<a href=\"https://www.megalithic.co.uk/article.php?sid=${p.url}\" target=\"_blank\" style=\"margin-top:4px;display:inline-block;font-size:11px;color:${dotColor};background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 10px;text-decoration:none;font-family:Arial,sans-serif;\">Megalithic Portal</a>` : ""}
+                ${p.kind === 'megalith' && p.url ? `<button onclick="if(window.__dmWiki){window.__dmWiki(this.dataset.n,'','',this.dataset.m)}" data-n="${(p.name||'').replace(/"/g,'&quot;')}" data-m="${p.url||''}" style="margin-top:6px;font-size:11px;color:${dotColor};background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:Arial,sans-serif;">Megalithic Portal</button>` : wikiUrl ? `<button onclick="if(window.__dmWiki){window.__dmWiki(this.dataset.n,this.dataset.u,this.dataset.w)}" data-n="${(p.name||'').replace(/"/g,'&quot;')}" data-u="${(wikiUrl||'').replace(/"/g,'&quot;')}" data-w="${(p.wikidata||'').replace(/"/g,'&quot;')}" style="margin-top:6px;font-size:11px;color:${dotColor};background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:Arial,sans-serif;">Wikipedia</button>` : ""}
               </div>
             `).addTo(map);
             overlayPopupRef.current = popup;
@@ -5279,20 +5264,7 @@ export default function HomePage() {
           </button>
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-          <button
-            onClick={() => {
-              const cur = inputText.trim();
-              let next;
-              if (cur.startsWith("-")) { next = cur.slice(1); }
-              else if (cur === "" || cur === "0") { next = "-"; }
-              else { next = "-" + cur; }
-              setInputText(next);
-              const c = commitInputText(next, unitMode);
-              if (c !== null) { setInputLevel(c); setSeaLevel(c); seaLevelRef.current = c; }
-            }}
-            style={{ padding: "12px 16px", minHeight: 48, background: inputText.trim().startsWith("-") ? "#f97316" : "#1e293b", color: "white", border: inputText.trim().startsWith("-") ? "1px solid #f97316" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 8, fontWeight: 700, fontSize: 22, lineHeight: 1 }}>
-            −
-          </button>
+          <button onClick={() => { const cur = inputText.trim(); let next; if (cur.startsWith("-")) { next = cur.slice(1); } else if (cur === "" || cur === "0") { next = "-"; } else { next = "-" + cur; } setInputText(next); const c = commitInputText(next, unitMode); if (c !== null) { setInputLevel(c); setSeaLevel(c); seaLevelRef.current = c; } }} style={{ padding: "12px 16px", minHeight: 48, background: inputText.trim().startsWith("-") ? "#f97316" : "#1e293b", color: "white", border: inputText.trim().startsWith("-") ? "1px solid #f97316" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 8, fontWeight: 700, fontSize: 22, lineHeight: 1 }}>-</button>
           <input type="text" inputMode="decimal"
             placeholder={unitMode === "ft" ? "feet" : "meters"}
             value={inputText}
@@ -6002,7 +5974,6 @@ export default function HomePage() {
             </div>
           );
         })}
-
       </div>
 
       {/* ── VIEW MODE ── */}
@@ -7519,7 +7490,7 @@ export default function HomePage() {
                     <a href={`https://www.wikidata.org/wiki/${wikiPanel.wikidataId}`}
                       target="_blank" rel="noopener noreferrer"
                       style={{ fontSize: 12, color: "#d97706", textDecoration: "none" }}>
-                      {wikiPanel.wikidataId}
+                      {wikiPanel.wikidataId} ↗
                     </a>
                   </div>
                 )}
@@ -7532,16 +7503,44 @@ export default function HomePage() {
               <a href={wikiPanel.url} target="_blank" rel="noopener noreferrer"
                 style={{
                   display: "block", padding: "10px", textAlign: "center",
-                  background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.25)",
-                  borderRadius: 8, color: "#d97706", textDecoration: "none", fontSize: 13, fontWeight: 600,
+                  background: "rgba(217,119,6,0.1)", border: "1px solid rgba(217,119,6,0.3)",
+                  borderRadius: 8, color: "#d97706", fontSize: 13, fontWeight: 600,
+                  textDecoration: "none",
                 }}>
-                {wikiPanel.mpUrl ? "View on Megalithic Portal" : "Open Wikipedia article"}
+                Open full article on Wikipedia →
               </a>
             </div>
           )}
         </div>
       )}
+
+      {/* ── SCENARIO WIKI PANEL ── */}
+      {scenarioWiki && (
+        <div style={{
+          position: "fixed", top: 0, right: 0, bottom: 0,
+          width: "min(420px, 100vw)",
+          background: "#0a0f1e",
+          borderLeft: "1px solid rgba(248,113,113,0.25)",
+          zIndex: 2001,
+          display: "flex", flexDirection: "column",
+          boxShadow: "-8px 0 40px rgba(0,0,0,0.6)",
+          fontFamily: "Arial,sans-serif",
+          animation: "dmWikiSlideIn .25s ease",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #1e2d45" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 24 }}>{scenarioWiki.icon}</span>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#f1f5f9" }}>{scenarioWiki.title}</div>
+            </div>
+            <button onClick={() => setScenarioWiki(null)} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: 20, padding: 4 }}>✕</button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px", color: "#cbd5e1", fontSize: 13, lineHeight: 1.6 }}
+            dangerouslySetInnerHTML={{ __html: scenarioWiki.body }} />
+          <div style={{ padding: "12px 20px", borderTop: "1px solid #1e2d45", fontSize: 11, color: "#374151", textAlign: "center" }}>
+            DisasterMap — Educational content
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
