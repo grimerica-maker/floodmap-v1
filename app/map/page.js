@@ -2050,11 +2050,13 @@ export default function HomePage() {
                 if (mapNow.getSource(fSrcId)) mapNow.removeSource(fSrcId);
                 mapNow.addSource(fSrcId, { type:"raster", tiles:[tUrl], tileSize:256, minzoom:0, maxzoom:12 });
                 mapNow.addLayer({ id:fLayId, type:"raster", source:fSrcId,
+                  layout:{ "visibility": "visible" },
                   paint:{ "raster-opacity":0.65, "raster-opacity-transition":{ duration:500 } } });
                 eqLayers.current.push({ sourceId:fSrcId, layerId:fLayId });
               } catch(e) {}
             });
 
+            setEqView("tsunami");
             mapNow.triggerRepaint();
           } catch(e) { console.warn("Tsunami render error:", e); }
         })
