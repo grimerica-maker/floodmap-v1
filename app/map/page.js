@@ -2196,9 +2196,7 @@ export default function HomePage() {
           } catch(e) { console.error("Tsunami flood tile error:", e.message); }
 
           mapNow.triggerRepaint();
-        })
-        .catch(e => console.warn("Tsunami fetch error:", e));
-      };
+      };  // end processResult
 
       // Dispatch: use hardcoded preset data or hit the engine
       if (hardcoded) {
