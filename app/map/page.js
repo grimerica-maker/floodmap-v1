@@ -1635,8 +1635,8 @@ export default function HomePage() {
     const map = mapRef.current;
     // Remove flood layers
     surgeTrackLayers.current.forEach(({ sourceId, layerId, marker }) => {
-      try { if (map && map.getLayer(layerId))  map.removeLayer(layerId);  } catch(e) {}
-      try { if (map && map.getSource(sourceId)) map.removeSource(sourceId); } catch(e) {}
+      if (layerId) try { if (map && map.getLayer(layerId))  map.removeLayer(layerId);  } catch(e) {}
+      if (sourceId) try { if (map && map.getSource(sourceId)) map.removeSource(sourceId); } catch(e) {}
       if (marker) marker.remove();
     });
     surgeTrackLayers.current = [];
@@ -1680,23 +1680,28 @@ export default function HomePage() {
     try {
       if (map.getSource("surge-track-src")) {
         map.getSource("surge-track-src").setData(lineGeo);
-        if (map.getSource("surge-arrow-src")) map.getSource("surge-arrow-src").setData(arrowGeo);
+        try { if (map.getSource("surge-arrow-src")) map.getSource("surge-arrow-src").setData(arrowGeo); } catch(e) {}
       } else {
         map.addSource("surge-track-src", { type: "geojson", data: lineGeo });
-        map.addSource("surge-arrow-src", { type: "geojson", data: arrowGeo });
-        map.addLayer({ id: "surge-track-line", type: "line", source: "surge-track-src",
-          paint: { "line-color": "#38bdf8", "line-width": 3, "line-dasharray": [4, 2], "line-opacity": 0.9 } });
-        // Wind direction arrows using symbol layer
-        map.addLayer({ id: "surge-track-arrows", type: "symbol", source: "surge-arrow-src",
-          layout: {
-            "text-field": "▶",
-            "text-size": 18,
-            "text-rotate": ["get", "bearing"],
-            "text-rotation-alignment": "map",
-            "text-allow-overlap": true,
-          },
-          paint: { "text-color": "#38bdf8", "text-opacity": 0.9 }
-        });
+        if (pts.length >= 2) {
+          map.addLayer({ id: "surge-track-line", type: "line", source: "surge-track-src",
+            paint: { "line-color": "#38bdf8", "line-width": 3, "line-dasharray": [4, 2], "line-opacity": 0.9 } });
+          // Wind arrows — only if arrow features exist
+          if (arrowFeatures.length > 0) {
+            map.addSource("surge-arrow-src", { type: "geojson", data: arrowGeo });
+            map.addLayer({ id: "surge-track-arrows", type: "symbol", source: "surge-arrow-src",
+              layout: {
+                "text-field": "➤",
+                "text-size": 20,
+                "text-rotate": ["get", "bearing"],
+                "text-rotation-alignment": "map",
+                "text-allow-overlap": true,
+                "text-ignore-placement": true,
+              },
+              paint: { "text-color": "#38bdf8", "text-halo-color": "#0f172a", "text-halo-width": 2, "text-opacity": 0.95 }
+            });
+          }
+        }
         surgeTrackLine.current = true;
       }
     } catch(e) {}
@@ -1738,8 +1743,8 @@ export default function HomePage() {
     // Add fresh flood layers for each point
     surgeTrackLayers.current = surgeTrackLayers.current.map((entry, idx) => {
       const pt = pts[idx];
-      const sourceId = `surge-track-src-${idx}`;
-      const layerId  = `surge-track-layer-${idx}`;
+      const sourceId = `surge-flood-src-${idx}`;
+      const layerId  = `surge-flood-layer-${idx}`;
       const url = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(totalLevel)}/${encodeURIComponent(pt.lat)}/${encodeURIComponent(pt.lng)}/${encodeURIComponent(reachM)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
       try {
         map.addSource(sourceId, { type: "raster", tiles: [url], tileSize: 256, minzoom: 0, maxzoom: 12 });
