@@ -1653,58 +1653,44 @@ export default function HomePage() {
 
   const updateTrackLine = (pts) => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || pts.length < 1) return;
+    if (!map || !map.isStyleLoaded()) return;
     const coords = pts.map(p => [p.lng, p.lat]);
 
-    // Build wind arrow features along track
+    // Build arrow features between consecutive points
     const arrowFeatures = [];
-    if (pts.length >= 2) {
-      for (let i = 0; i < pts.length - 1; i++) {
-        const p1 = pts[i], p2 = pts[i+1];
-        const midLng = (p1.lng + p2.lng) / 2;
-        const midLat = (p1.lat + p2.lat) / 2;
-        const bearing = Math.atan2(p2.lng - p1.lng, p2.lat - p1.lat) * 180 / Math.PI;
-        arrowFeatures.push({
-          type: "Feature",
-          geometry: { type: "Point", coordinates: [midLng, midLat] },
-          properties: { bearing }
-        });
-      }
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p1 = pts[i], p2 = pts[i+1];
+      const bearing = Math.atan2(p2.lng - p1.lng, p2.lat - p1.lat) * 180 / Math.PI;
+      arrowFeatures.push({ type:"Feature",
+        geometry:{ type:"Point", coordinates:[(p1.lng+p2.lng)/2, (p1.lat+p2.lat)/2] },
+        properties:{ bearing } });
     }
 
-    const lineGeo = { type: "FeatureCollection", features: pts.length >= 2 ? [
-      { type: "Feature", geometry: { type: "LineString", coordinates: coords } }
-    ] : [] };
-    const arrowGeo = { type: "FeatureCollection", features: arrowFeatures };
+    const lineGeo = { type:"FeatureCollection", features: coords.length >= 2 ? [
+      { type:"Feature", geometry:{ type:"LineString", coordinates:coords } }] : [] };
+    const arrowGeo = { type:"FeatureCollection", features: arrowFeatures };
 
     try {
-      if (map.getSource("surge-track-src")) {
-        map.getSource("surge-track-src").setData(lineGeo);
-        try { if (map.getSource("surge-arrow-src")) map.getSource("surge-arrow-src").setData(arrowGeo); } catch(e) {}
-      } else {
-        map.addSource("surge-track-src", { type: "geojson", data: lineGeo });
-        if (pts.length >= 2) {
-          map.addLayer({ id: "surge-track-line", type: "line", source: "surge-track-src",
-            paint: { "line-color": "#38bdf8", "line-width": 3, "line-dasharray": [4, 2], "line-opacity": 0.9 } });
-          // Wind arrows — only if arrow features exist
-          if (arrowFeatures.length > 0) {
-            map.addSource("surge-arrow-src", { type: "geojson", data: arrowGeo });
-            map.addLayer({ id: "surge-track-arrows", type: "symbol", source: "surge-arrow-src",
-              layout: {
-                "text-field": "➤",
-                "text-size": 20,
-                "text-rotate": ["get", "bearing"],
-                "text-rotation-alignment": "map",
-                "text-allow-overlap": true,
-                "text-ignore-placement": true,
-              },
-              paint: { "text-color": "#38bdf8", "text-halo-color": "#0f172a", "text-halo-width": 2, "text-opacity": 0.95 }
-            });
-          }
+      // Always remove and re-add so layers are fresh
+      try { map.removeLayer("surge-track-arrows"); } catch(e) {}
+      try { map.removeLayer("surge-track-line"); } catch(e) {}
+      try { map.removeSource("surge-arrow-src"); } catch(e) {}
+      try { map.removeSource("surge-track-src"); } catch(e) {}
+
+      if (coords.length >= 2) {
+        map.addSource("surge-track-src", { type:"geojson", data:lineGeo });
+        map.addLayer({ id:"surge-track-line", type:"line", source:"surge-track-src",
+          paint:{ "line-color":"#38bdf8", "line-width":3, "line-dasharray":[4,2], "line-opacity":0.9 } });
+        if (arrowFeatures.length > 0) {
+          map.addSource("surge-arrow-src", { type:"geojson", data:arrowGeo });
+          map.addLayer({ id:"surge-track-arrows", type:"symbol", source:"surge-arrow-src",
+            layout:{ "text-field":"➤", "text-size":22, "text-rotate":["get","bearing"],
+              "text-rotation-alignment":"map", "text-allow-overlap":true, "text-ignore-placement":true },
+            paint:{ "text-color":"#38bdf8", "text-halo-color":"#0f172a", "text-halo-width":2 } });
         }
-        surgeTrackLine.current = true;
       }
-    } catch(e) {}
+      surgeTrackLine.current = true;
+    } catch(e) { console.warn("updateTrackLine error:", e); }
   };
 
   const addTrackPoint = (lat, lng) => {
@@ -4003,25 +3989,24 @@ export default function HomePage() {
       const { lng, lat } = e.lngLat;
 
       // Storm surge
-      if (scenarioModeRef.current === "surge" && surgeOnRef.current) {
-        const maxPts = proTierRef.current !== "free" ? 3 : 1;
-        const currentPts = surgeTrackPtsRef.current.length;
-        if (currentPts < maxPts) {
-          addTrackPoint(lat, lng);
-        }
-        return;
-      }
-      // Surge popup — show when clicking near any surge point after trigger
-      if (scenarioModeRef.current === "surge" && surgeTrackPtsRef.current.length > 0 && surgeTrackLayers.current.some(l => l.layerId)) {
-        const preset = SURGE_PRESETS.find(p => p.id === surgePresetRef.current);
-        const reachM = preset ? preset.reach : surgeRef.current * 20000;
-        const nearPt = surgeTrackPtsRef.current.find(sp => {
-          const dLat = (lat - sp.lat) * 111000;
-          const dLng = (lng - sp.lng) * 111000 * Math.cos(sp.lat * Math.PI / 180);
-          return Math.sqrt(dLat*dLat + dLng*dLng) <= reachM * 1.2;
-        });
-        if (nearPt) {
-          showSurgePopup(lng, lat);
+      if (scenarioModeRef.current === "surge") {
+        const triggered = surgeTrackLayers.current.some(l => l.layerId);
+        if (triggered) {
+          // After trigger — show popup if clicking near a point
+          const preset = SURGE_PRESETS.find(p => p.id === surgePresetRef.current);
+          const reachM = preset ? preset.reach : surgeRef.current * 20000;
+          const nearPt = surgeTrackPtsRef.current.find(sp => {
+            const dLat = (lat - sp.lat) * 111000;
+            const dLng = (lng - sp.lng) * 111000 * Math.cos(sp.lat * Math.PI / 180);
+            return Math.sqrt(dLat*dLat + dLng*dLng) <= reachM * 1.2;
+          });
+          if (nearPt) { showSurgePopup(lng, lat); return; }
+        } else {
+          // Before trigger — add points
+          const maxPts = proTierRef.current !== "free" ? 3 : 1;
+          if (surgeTrackPtsRef.current.length < maxPts) {
+            addTrackPoint(lat, lng);
+          }
           return;
         }
       }
