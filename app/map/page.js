@@ -1356,10 +1356,10 @@ export default function HomePage() {
   useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
   useEffect(() => { surgeOnRef.current    = surgeOn;     }, [surgeOn]);
   useEffect(() => { eqMagRef.current   = eqMag;     }, [eqMag]);
-  useEffect(() => {
+  const applyEqView = (view) => {
     const map = mapRef.current;
-    if (!map || !eqResult) return;
-    const showRings = eqView === "rings";
+    if (!map) return;
+    const showRings = view === "rings";
     eqLayers.current.forEach(({ layerId }) => {
       if (!layerId) return;
       const isTsunami = layerId === "eq-tsunami-layer" || layerId.startsWith("eq-ts-flood");
@@ -1370,7 +1370,7 @@ export default function HomePage() {
         if (isRing || isLiq) map.setLayoutProperty(layerId, "visibility", showRings ? "visible" : "none");
       } catch(e) {}
     });
-  }, [eqView, eqResult]);
+  };
   useEffect(() => { eqDepthRef.current = eqDepthId; }, [eqDepthId]);
   useEffect(() => { eqFaultRef.current = eqFaultId; }, [eqFaultId]);
   useEffect(() => { eqPointRef.current = eqPoint;   }, [eqPoint]);
@@ -1982,10 +1982,13 @@ export default function HomePage() {
       const depthKm = depthType.depth;
       const tSrcId = "eq-tsunami-src";
       const tLayerId = "eq-tsunami-layer";
-      fetch(`${floodEngineUrlRef.current}/tsunami-simulate?lat=${lat}&lng=${lng}&mag=${mag}&strike=${strike}&dip=${dip}&rake=${rake}&depth_km=${depthKm}&n_rays=72`)
+      const tsUrl = `${floodEngineUrlRef.current}/tsunami-simulate?lat=${lat}&lng=${lng}&mag=${mag}&strike=${strike}&dip=${dip}&rake=${rake}&depth_km=${depthKm}&n_rays=72`;
+      console.log("🌊 Tsunami fetch:", tsUrl);
+      fetch(tsUrl)
         .then(r => r.json())
         .then(tsResult => {
-          if (!tsResult || tsResult.error) { console.warn("Tsunami sim error:", tsResult?.error); return; }
+          console.log("🌊 Tsunami result:", tsResult?.tsunami_impacts?.length, "impacts, error:", tsResult?.error);
+          if (!tsResult || tsResult.error) { console.warn("Tsunami sim error:", tsResult?.error, tsResult?.trace); return; }
           const mapNow = mapRef.current;
           if (!mapNow || !mapNow.isStyleLoaded()) return;
           const features = (tsResult.tsunami_impacts || []).map((imp) => ({
@@ -2056,7 +2059,6 @@ export default function HomePage() {
               } catch(e) {}
             });
 
-            setEqView("tsunami");
             mapNow.triggerRepaint();
           } catch(e) { console.warn("Tsunami render error:", e); }
         })
@@ -5104,14 +5106,14 @@ export default function HomePage() {
           </div>
           {eqResult && eqResult.tsunamiRisk && eqResult.isPro && (
             <div style={{ display:"flex", gap:4 }}>
-              <button onClick={() => setEqView("rings")}
+              <button onClick={() => { setEqView("rings"); applyEqView("rings"); }}
                 style={{ flex:1, padding:"7px", borderRadius:7, fontSize:12, fontWeight:700, cursor:"pointer", border:"1px solid",
                   background: eqView==="rings" ? "#451a03" : "transparent",
                   borderColor: eqView==="rings" ? "#f59e0b" : "#1e2d45",
                   color: eqView==="rings" ? "#fbbf24" : "#475569" }}>
                 🔴 Intensity Rings
               </button>
-              <button onClick={() => setEqView("tsunami")}
+              <button onClick={() => { setEqView("tsunami"); applyEqView("tsunami"); }}
                 style={{ flex:1, padding:"7px", borderRadius:7, fontSize:12, fontWeight:700, cursor:"pointer", border:"1px solid",
                   background: eqView==="tsunami" ? "rgba(56,189,248,0.1)" : "transparent",
                   borderColor: eqView==="tsunami" ? "#38bdf8" : "#1e2d45",
