@@ -4543,9 +4543,11 @@ export default function HomePage() {
             const kind = p.kind || "megalith";
             const cfg = Object.values(OVL).find(c => c.layer === feats[0].layer.id) || OVL.megaliths;
             if (overlayPopupRef.current) { overlayPopupRef.current.remove(); overlayPopupRef.current = null; }
-            const wikiUrl = p.wikipedia
-              ? (p.wikipedia.startsWith("http") ? p.wikipedia : `https://en.wikipedia.org/wiki/${encodeURIComponent(p.wikipedia)}`)
-              : p.name ? `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(p.name)}&ns0=1` : null;
+            const wikiUrl = p.wiki_url
+              ? p.wiki_url
+              : p.wikipedia
+                ? (p.wikipedia.startsWith("http") ? p.wikipedia : `https://en.wikipedia.org/wiki/${encodeURIComponent(p.wikipedia)}`)
+                : p.name ? `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(p.name)}&ns0=1` : null;
             const isSubmerged = p.already_submerged === true || p.already_submerged === "true";
             const isFlooded   = p.flooded === true || p.flooded === "true";
             const dotColor    = (isSubmerged || isFlooded) ? cfg.subColor : cfg.color;
