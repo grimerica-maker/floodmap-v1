@@ -3946,29 +3946,32 @@ export default function HomePage() {
       const { lng, lat } = e.lngLat;
 
       // Storm surge
-      if (surgeOnRef.current) {
-        // Track mode (Pro) — add up to 3 points
-        if (surgeTrackMode && proTierRef.current !== "free") {
-          if (surgeTrackPtsRef.current.length < 3) {
-            addTrackPoint(lat, lng);
-          }
-          return;
-        }
-        if (surgeModeRef.current === "place") {
+      if (surgeOnRef.current && surgeModeRef.current === "place") {
+        const maxPts = proTierRef.current !== "free" ? 3 : 1;
+        const currentPts = surgeTrackPtsRef.current.length;
+        // Free: single point via placeSurgePoint, Pro: track points
+        if (proTierRef.current === "free") {
           placeSurgePoint(lat, lng);
-          return;
-        } else if (surgeModeRef.current === "active" && surgePointRef.current) {
-          // Only show popup if clicking within surge reach radius
-          const sp = surgePointRef.current;
-          const preset = SURGE_PRESETS.find(p => p.id === surgePresetRef.current);
-          const reachM = preset ? preset.reach : surgeRef.current * 20000;
-          const dLat = (lat - sp.lat) * 111000;
-          const dLng = (lng - sp.lng) * 111000 * Math.cos(sp.lat * Math.PI / 180);
-          const distM = Math.sqrt(dLat*dLat + dLng*dLng);
-          if (distM <= reachM * 1.2) {
-            showSurgePopup(lng, lat);
-            return;
+        } else if (currentPts < maxPts) {
+          addTrackPoint(lat, lng);
+          if (currentPts + 1 >= maxPts) {
+            // Max reached — switch to active
+            setSurgeMode("active"); surgeModeRef.current = "active";
           }
+        }
+        return;
+      }
+      if (surgeOnRef.current && surgeModeRef.current === "active" && surgePointRef.current) {
+        // Only show popup if clicking within surge reach radius
+        const sp = surgePointRef.current;
+        const preset = SURGE_PRESETS.find(p => p.id === surgePresetRef.current);
+        const reachM = preset ? preset.reach : surgeRef.current * 20000;
+        const dLat = (lat - sp.lat) * 111000;
+        const dLng = (lng - sp.lng) * 111000 * Math.cos(sp.lat * Math.PI / 180);
+        const distM = Math.sqrt(dLat*dLat + dLng*dLng);
+        if (distM <= reachM * 1.2) {
+          showSurgePopup(lng, lat);
+          return;
         }
       }
 
@@ -4601,31 +4604,7 @@ export default function HomePage() {
               </button>
             ))}
           </div>
-          {/* Track mode toggle — Pro only */}
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: 8, padding:"6px 8px", background:"rgba(56,189,248,0.05)", borderRadius:6, border:"1px solid #1e2d45" }}>
-            <div>
-              <div style={{ fontSize:12, fontWeight:700, color: surgeTrackMode ? "#38bdf8" : "#64748b" }}>🌀 Storm Track Mode</div>
-              <div style={{ fontSize:10, color:"#475569" }}>
-                {proTier === "free" ? "Pro — multi-point track" : surgeTrackMode ? `${surgeTrackPts.length}/3 points placed · click map to add` : "Click up to 3 points along coast"}
-              </div>
-            </div>
-            <div onClick={() => {
-              if (proTier === "free") { setPaywallModal("pro"); return; }
-              const next = !surgeTrackMode;
-              setSurgeTrackMode(next);
-              if (!next) clearSurgeTrack();
-            }} style={{ width:36, height:20, borderRadius:10, background: surgeTrackMode ? "#38bdf8" : "#1e2d45", position:"relative", cursor:"pointer", flexShrink:0, transition:"background 0.2s" }}>
-              <div style={{ position:"absolute", top:3, left: surgeTrackMode ? 18 : 3, width:14, height:14, borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
-            </div>
-          </div>
-          {surgeTrackMode && proTier !== "free" && surgeTrackPts.length > 0 && (
-            <div style={{ display:"flex", gap:6, marginBottom:8 }}>
-              <div style={{ flex:1, fontSize:11, color:"#38bdf8", padding:"4px 8px", background:"rgba(56,189,248,0.08)", borderRadius:6, border:"1px solid #1e2d45" }}>
-                📍 {surgeTrackPts.length} point{surgeTrackPts.length>1?"s":""} · {surgeTrackPts.length < 3 ? "click map to add more" : "max reached"}
-              </div>
-              <button onClick={clearSurgeTrack} style={{ padding:"4px 10px", background:"transparent", border:"1px solid #1e2d45", borderRadius:6, color:"#475569", cursor:"pointer", fontSize:11 }}>Clear Track</button>
-            </div>
-          )}
+
           <input type="range" min={0.5} max={10} step={0.5} value={surgeM}
             onChange={e => { setSurgeM(parseFloat(e.target.value)); setSurgePreset(null); }}
             style={{ width: "100%", marginBottom: 4 }} />
@@ -4637,23 +4616,17 @@ export default function HomePage() {
               💨 {SURGE_PRESETS.find(p => p.id === surgePreset).wind_kmh} km/h · {SURGE_PRESETS.find(p => p.id === surgePreset).wind_mph} mph
             </div>
           )}
-          {surgeOn && surgePoint && (
-            <div style={{ fontSize: 11, color: "#94a3b8", textAlign: "center", marginBottom: 8 }}>
-              📍 +{surgeM} m surge placed · click within zone for info
-            </div>
-          )}
+          <div style={{ fontSize: 11, color: "#94a3b8", textAlign: "center", marginBottom: 8 }}>
+            {surgeOn && surgeTrackPts.length > 0
+              ? `📍 ${surgeTrackPts.length}/3 points · ${surgeTrackPts.length < 3 ? "click map for next point" : "max reached"}`
+              : surgeOn && surgePoint
+              ? `📍 +${surgeM} m placed · click within zone for info`
+              : "👆 Click Trigger then click map to place"}
+          </div>
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-            <button onClick={() => {
-              if (surgeTrackMode && proTier !== "free") {
-                // Track mode — just arm it, user clicks map
-                setSurgeOn(true); surgeOnRef.current = true;
-                window.__dmClearSurge = clearSurge;
-              } else {
-                activateSurge();
-              }
-            }}
+            <button onClick={activateSurge}
               style={{ flex: 1, padding: "10px", background: "#38bdf8", color: "#0f172a", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-              {surgeTrackMode ? (surgeOn ? `🌀 Track (${surgeTrackPts.length}/3)` : "🌀 Start Track") : surgeOn && surgePoint ? "🌀 Re-place" : "🌀 Trigger"}
+              {surgeOn && (surgePoint || surgeTrackPts.length > 0) ? `🌀 Active (${surgeTrackPts.length > 0 ? surgeTrackPts.length + "/3 pts" : "+"+surgeM+"m"})` : "🌀 Trigger"}
             </button>
             {surgeOn && <button onClick={clearSurge}
               style={{ flex: 1, padding: "10px", background: "transparent", color: "#475569", border: "1px solid #1e2d45", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
