@@ -1970,28 +1970,70 @@ export default function HomePage() {
     setEqView("rings"); // always start on rings view
     setEqPoint({ lat, lng }); eqPointRef.current = { lat, lng };
 
-    // Auto-trigger tsunami if M7.5+ thrust and coastal
+    // Auto-trigger tsunami if M7.5+ thrust/normal fault
     const isPro = proTierRef.current !== "free";
     const tsunamiRisk = faultType.tsunami && mag >= 7.5;
     if (tsunamiRisk && isPro) {
-      // Use flood-region tiles from epicenter — tsunami inundation based on epicenter location
-      // Coastal inundation height scales with magnitude
-      const tsunamiLevel = mag >= 9.0 ? 20 : mag >= 8.5 ? 15 : mag >= 8.0 ? 10 : mag >= 7.5 ? 5 : 3;
-      const tsunamiReach = Math.pow(10, 0.55 * mag - 1.8) * 100000; // reach in meters
-      const tSourceId = "eq-tsunami-src";
-      const tLayerId  = "eq-tsunami-layer";
-      setTimeout(() => {
-        try {
-          if (map.getLayer(tLayerId))  map.removeLayer(tLayerId);
-          if (map.getSource(tSourceId)) map.removeSource(tSourceId);
-          const tUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(tsunamiLevel)}/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}/${encodeURIComponent(tsunamiReach)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
-          map.addSource(tSourceId, { type:"raster", tiles:[tUrl], tileSize:256, minzoom:0, maxzoom:12 });
-          map.addLayer({ id:tLayerId, type:"raster", source:tSourceId,
-            paint:{ "raster-opacity":0.82, "raster-opacity-transition":{ duration:600 } } });
-          eqLayers.current.push({ sourceId:tSourceId, layerId:tLayerId });
-          map.triggerRepaint();
-        } catch(e) { console.warn("tsunami layer error:", e); }
-      }, 1200);
+      const depthKm = depthType.depth;
+      const tSrcId = "eq-tsunami-src";
+      const tLayerId = "eq-tsunami-layer";
+      fetch(`${floodEngineUrlRef.current}/tsunami-simulate?lat=${lat}&lng=${lng}&mag=${mag}&strike=${strike}&dip=${dip}&rake=${rake}&depth_km=${depthKm}&n_rays=72`)
+        .then(r => r.json())
+        .then(tsResult => {
+          if (!tsResult || tsResult.error) { console.warn("Tsunami sim error:", tsResult?.error); return; }
+          const mapNow = mapRef.current;
+          if (!mapNow || !mapNow.isStyleLoaded()) return;
+          const features = (tsResult.tsunami_impacts || []).map((imp) => ({
+            type:"Feature",
+            geometry:{ type:"Point", coordinates:[imp.lng, imp.lat] },
+            properties:{
+              arrival_min: imp.arrival_min,
+              wave_height: imp.wave_height_m,
+              color: imp.band_color,
+              label: imp.band_label,
+              warning: imp.warning,
+              distance_km: imp.distance_km,
+            }
+          }));
+          if (features.length === 0) return;
+          try {
+            if (mapNow.getLayer(tLayerId)) mapNow.removeLayer(tLayerId);
+            if (mapNow.getSource(tSrcId)) mapNow.removeSource(tSrcId);
+            mapNow.addSource(tSrcId, { type:"geojson", data:{ type:"FeatureCollection", features } });
+            mapNow.addLayer({ id:tLayerId, type:"circle", source:tSrcId, paint:{
+              "circle-radius":["interpolate",["linear"],["zoom"],2,5,6,9,10,14],
+              "circle-color":["get","color"],
+              "circle-opacity":0.9,
+              "circle-stroke-width":1.5,
+              "circle-stroke-color":"#fff",
+              "circle-stroke-opacity":0.6,
+            }});
+            eqLayers.current.push({ sourceId:tSrcId, layerId:tLayerId });
+            // Click popup
+            mapNow.on("click", tLayerId, (e) => {
+              const p = e.features[0].properties;
+              const arrFmt = p.arrival_min < 60
+                ? `${Math.round(p.arrival_min)} min`
+                : `${(p.arrival_min/60).toFixed(1)} hrs`;
+              new mapboxgl.Popup({ closeButton:true, maxWidth:"260px", className:"dm-dark-popup" })
+                .setLngLat(e.lngLat)
+                .setHTML(`<div style="font-family:Arial,sans-serif">
+                  <div style="font-size:13px;font-weight:700;color:${p.color};margin-bottom:8px">🌊 ${p.label}</div>
+                  <table style="font-size:11px;width:100%;border-collapse:collapse">
+                    <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Arrival time</td><td style="font-weight:700">${arrFmt}</td></tr>
+                    <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Wave height</td><td style="font-weight:700">~${p.wave_height} m</td></tr>
+                    <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Distance</td><td style="font-weight:700">${Math.round(p.distance_km)} km</td></tr>
+                    <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Alert level</td><td style="font-weight:700">${p.warning}</td></tr>
+                  </table>
+                </div>`)
+                .addTo(mapNow);
+            });
+            mapNow.on("mouseenter", tLayerId, () => { mapNow.getCanvas().style.cursor="pointer"; });
+            mapNow.on("mouseleave", tLayerId, () => { mapNow.getCanvas().style.cursor=""; });
+            mapNow.triggerRepaint();
+          } catch(e) { console.warn("Tsunami render error:", e); }
+        })
+        .catch(e => console.warn("Tsunami fetch error:", e));
     }
 
     setEqResult({ mag, depthType, faultType, rings, casualties, tsunamiRisk, isPro, liqRadiusKm });
