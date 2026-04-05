@@ -1499,8 +1499,14 @@ export default function HomePage() {
     setWikiPanel({ title: name, extract: null, thumbnail: null, url: wikiUrl, loading: true });
     if (mpId) {
       try {
-        const res = await fetch(`${floodEngineUrlRef.current}/megalith-info?id=${mpId}`);
-        const mpData = res.ok ? await res.json() : null;
+        const cacheKey = `mp_${mpId}`;
+        let mpData = null;
+        try { const cached = sessionStorage.getItem(cacheKey); if (cached) mpData = JSON.parse(cached); } catch {}
+        if (!mpData) {
+          const res = await fetch(`${floodEngineUrlRef.current}/megalith-info?id=${mpId}`);
+          mpData = res.ok ? await res.json() : null;
+          try { if (mpData) sessionStorage.setItem(cacheKey, JSON.stringify(mpData)); } catch {}
+        }
         const imgUrl = mpData?.image ? `${floodEngineUrlRef.current}/megalith-image?url=${encodeURIComponent(mpData.image)}` : null;
         setWikiPanel({
           title:      mpData?.title || name,
@@ -5961,7 +5967,7 @@ export default function HomePage() {
                   {cfg.label}{locked && <span style={{ marginLeft: 6, fontSize: 10, color: "#f97316" }}>PRO</span>}
                 </div>
                 <div style={{ fontSize: 10, color: locked ? "#374151" : "#475569", marginTop: 1 }}>
-                  {type === "megaliths" && "28,000+ sites · incl. underwater"}
+                  {type === "megaliths" && "100,000+ sites · worldwide"}
                   {type === "unesco"    && "World Heritage Sites"}
                   {type === "airports"  && (locked ? "Upgrade to Pro" : "Major & regional airports")}
                   {type === "nuclear"   && (locked ? "Upgrade to Pro" : "Active nuclear plants")}
@@ -7507,7 +7513,7 @@ export default function HomePage() {
                   borderRadius: 8, color: "#d97706", fontSize: 13, fontWeight: 600,
                   textDecoration: "none",
                 }}>
-                Open full article on Wikipedia →
+                {wikiPanel.mpUrl ? "View on Megalithic Portal" : "Open full article on Wikipedia →"}
               </a>
             </div>
           )}
