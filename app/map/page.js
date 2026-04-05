@@ -1208,6 +1208,7 @@ export default function HomePage() {
   const [eqDepthId, setEqDepthId] = useState("shallow");
   const [eqFaultId, setEqFaultId] = useState("thrust");
   const [eqResult,  setEqResult]  = useState(null);
+  const [eqView,    setEqView]    = useState("rings"); // "rings" | "tsunami"
   const [eqPoint,   setEqPoint]   = useState(null);
   const eqMagRef   = useRef(7.5);
   const eqDepthRef = useRef("shallow");
@@ -1329,6 +1330,21 @@ export default function HomePage() {
   useEffect(() => { viewModeRef.current = viewMode; }, [viewMode]);
   useEffect(() => { surgeOnRef.current    = surgeOn;     }, [surgeOn]);
   useEffect(() => { eqMagRef.current   = eqMag;     }, [eqMag]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !eqResult) return;
+    const showRings = eqView === "rings";
+    eqLayers.current.forEach(({ layerId }) => {
+      if (!layerId) return;
+      const isTsunami = layerId === "eq-tsunami-layer";
+      const isLiq = layerId.startsWith("eq-liq");
+      const isRing = layerId.startsWith("eq-ring");
+      try {
+        if (isTsunami) map.setLayoutProperty(layerId, "visibility", showRings ? "none" : "visible");
+        if (isRing || isLiq) map.setLayoutProperty(layerId, "visibility", showRings ? "visible" : "none");
+      } catch(e) {}
+    });
+  }, [eqView, eqResult]);
   useEffect(() => { eqDepthRef.current = eqDepthId; }, [eqDepthId]);
   useEffect(() => { eqFaultRef.current = eqFaultId; }, [eqFaultId]);
   useEffect(() => { eqPointRef.current = eqPoint;   }, [eqPoint]);
@@ -1865,6 +1881,8 @@ export default function HomePage() {
   // ── Earthquake simulation ────────────────────────────────────────────────────
   const clearEarthquake = () => {
     const map = mapRef.current;
+    // Remove line layer first (it depends on liq source)
+    try { if (map && map.getLayer("eq-liq-layer-line")) map.removeLayer("eq-liq-layer-line"); } catch(e) {}
     eqLayers.current.forEach(({ sourceId, layerId }) => {
       if (layerId) try { if (map && map.getLayer(layerId))  map.removeLayer(layerId);  } catch(e) {}
       if (sourceId) try { if (map && map.getSource(sourceId)) map.removeSource(sourceId); } catch(e) {}
@@ -1916,11 +1934,11 @@ export default function HomePage() {
       map.addLayer({ id: liqLayerId + "-line", type: "line", source: liqSourceId,
         paint: { "line-color": "#0d9488", "line-width": 2, "line-dasharray": [3, 3], "line-opacity": 0.7 } });
       newLayers.push({ sourceId: liqSourceId, layerId: liqLayerId });
-      newLayers.push({ sourceId: null, layerId: liqLayerId + "-line" });
+      newLayers.push({ sourceId: null, layerId: liqLayerId + "-line" }); // line layer — source already tracked
     } catch(e) {}
 
     eqLayers.current = newLayers;
-    // eqPoint already set by click handler — just update result
+    setEqView("rings"); // always start on rings view
     setEqPoint({ lat, lng }); eqPointRef.current = { lat, lng };
 
     // Auto-trigger tsunami if M7.5+ thrust and coastal
@@ -1928,8 +1946,9 @@ export default function HomePage() {
     const tsunamiRisk = faultType.tsunami && mag >= 7.5;
     if (tsunamiRisk && isPro) {
       // Use flood-region tiles from epicenter — tsunami inundation based on epicenter location
-      const tsunamiLevel = Math.min(mag * 3, 30); // rough surge height from magnitude
-      const tsunamiReach = Math.pow(10, 0.5 * mag - 1.5) * 50000; // reach scales with mag
+      // Coastal inundation height scales with magnitude
+      const tsunamiLevel = mag >= 9.0 ? 20 : mag >= 8.5 ? 15 : mag >= 8.0 ? 10 : mag >= 7.5 ? 5 : 3;
+      const tsunamiReach = Math.pow(10, 0.55 * mag - 1.8) * 100000; // reach in meters
       const tSourceId = "eq-tsunami-src";
       const tLayerId  = "eq-tsunami-layer";
       setTimeout(() => {
@@ -1939,7 +1958,7 @@ export default function HomePage() {
           const tUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(tsunamiLevel)}/${encodeURIComponent(lat)}/${encodeURIComponent(lng)}/${encodeURIComponent(tsunamiReach)}/{z}/{x}/{y}.png?v=${FLOOD_TILE_VERSION}`;
           map.addSource(tSourceId, { type:"raster", tiles:[tUrl], tileSize:256, minzoom:0, maxzoom:12 });
           map.addLayer({ id:tLayerId, type:"raster", source:tSourceId,
-            paint:{ "raster-opacity":0.65, "raster-color":"rgb(56,189,248)", "raster-opacity-transition":{ duration:600 } } });
+            paint:{ "raster-opacity":0.82, "raster-opacity-transition":{ duration:600 } } });
           eqLayers.current.push({ sourceId:tSourceId, layerId:tLayerId });
           map.triggerRepaint();
         } catch(e) { console.warn("tsunami layer error:", e); }
@@ -4971,8 +4990,8 @@ export default function HomePage() {
             {eqPoint ? "👆 Hit Trigger to run simulation" : "👆 Click map to place epicenter"}
           </div>
 
-          <div style={{ display:"flex", gap:6 }}>
-            <button onClick={() => { if (eqPointRef.current) runEarthquake(eqPointRef.current.lat, eqPointRef.current.lng, eqMagRef.current, eqDepthRef.current, eqFaultRef.current); }}
+          <div style={{ display:"flex", gap:6, marginBottom: eqResult ? 8 : 0 }}>
+            <button onClick={() => { if (eqPointRef.current) { setEqView("rings"); runEarthquake(eqPointRef.current.lat, eqPointRef.current.lng, eqMagRef.current, eqDepthRef.current, eqFaultRef.current); } }}
               disabled={!eqPoint}
               style={{ flex:1, padding:"10px", background: eqPoint ? "#f59e0b" : "#1e2d45", color: eqPoint ? "#0f172a" : "#475569", border:"none", borderRadius:8, fontWeight:700, cursor: eqPoint ? "pointer" : "not-allowed", fontSize:13 }}>
               🌍 Trigger
@@ -4982,6 +5001,24 @@ export default function HomePage() {
               Clear
             </button>}
           </div>
+          {eqResult && eqResult.tsunamiRisk && eqResult.isPro && (
+            <div style={{ display:"flex", gap:4 }}>
+              <button onClick={() => setEqView("rings")}
+                style={{ flex:1, padding:"7px", borderRadius:7, fontSize:12, fontWeight:700, cursor:"pointer", border:"1px solid",
+                  background: eqView==="rings" ? "#451a03" : "transparent",
+                  borderColor: eqView==="rings" ? "#f59e0b" : "#1e2d45",
+                  color: eqView==="rings" ? "#fbbf24" : "#475569" }}>
+                🔴 Intensity Rings
+              </button>
+              <button onClick={() => setEqView("tsunami")}
+                style={{ flex:1, padding:"7px", borderRadius:7, fontSize:12, fontWeight:700, cursor:"pointer", border:"1px solid",
+                  background: eqView==="tsunami" ? "rgba(56,189,248,0.1)" : "transparent",
+                  borderColor: eqView==="tsunami" ? "#38bdf8" : "#1e2d45",
+                  color: eqView==="tsunami" ? "#38bdf8" : "#475569" }}>
+                🌊 Tsunami
+              </button>
+            </div>
+          )}
         </div>
       )}
 
