@@ -1491,16 +1491,37 @@ export default function HomePage() {
     }
   };
 
-  const openWikiPanel = async (name, wikiUrl, wikidataId) => {
+  const openWikiPanel = async (name, wikiUrl, wikidataId, mpId) => {
     if (proTierRef.current === "free") {
-      // Free users: show upgrade CTA instead of wiki panel
       setWikiPanel({ proGate: true, title: name });
       return;
     }
     setWikiPanel({ title: name, extract: null, thumbnail: null, url: wikiUrl, loading: true });
+    // If mpId exists, use Megalithic Portal as primary source (skip Wikipedia)
+    if (mpId) {
+      try {
+        const res = await fetch(`${floodEngineUrlRef.current}/megalith-info?id=${mpId}`);
+        const mpData = res.ok ? await res.json() : null;
+        setWikiPanel({
+          title:     mpData?.title || name,
+          extract:   mpData?.description || null,
+          thumbnail: mpData?.image || null,
+          url:       `https://www.megalithic.co.uk/article.php?sid=${mpId}`,
+          wikidataId,
+          mpUrl:     `https://www.megalithic.co.uk/article.php?sid=${mpId}`,
+          mpSubtitle: mpData?.subtitle || null,
+          mpComments: mpData?.comments || null,
+          loading:   false,
+        });
+      } catch {
+        setWikiPanel({ title: name, extract: null, thumbnail: null, url: wikiUrl, wikidataId, loading: false });
+      }
+      return;
+    }
+    // Non-megalith: use Wikipedia
     try {
       const slug = encodeURIComponent(name.replace(/ /g, "_"));
-      const res  = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${slug}`);
+      const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${slug}`);
       if (res.ok) {
         const d = await res.json();
         setWikiPanel({
@@ -4512,7 +4533,7 @@ export default function HomePage() {
                     : seaLevelRef.current > 0
                       ? `<div style="color:#4ade80;margin-bottom:4px">✓ Safe at +${Math.round(seaLevelRef.current)} m</div>`
                       : ""}
-                ${wikiUrl ? `<button onclick="if(window.__dmWiki){window.__dmWiki(this.dataset.n,this.dataset.u,this.dataset.w)}" data-n="${(p.name||'').replace(/"/g,'&quot;')}" data-u="${(wikiUrl||'').replace(/"/g,'&quot;')}" data-w="${(p.wikidata||'').replace(/"/g,'&quot;')}" style="margin-top:6px;font-size:11px;color:${dotColor};background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:Arial,sans-serif;">📖 Wikipedia</button>` : ""}${p.url && p.kind==='megalith' ? `<a href=\"https://www.megalithic.co.uk/article.php?sid=${p.url}\" target=\"_blank\" style=\"margin-top:4px;display:inline-block;font-size:11px;color:${dotColor};background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 10px;text-decoration:none;font-family:Arial,sans-serif;\">Megalithic Portal</a>` : ""}
+                ${wikiUrl ? `<button onclick="if(window.__dmWiki){window.__dmWiki(this.dataset.n,this.dataset.u,this.dataset.w,this.dataset.m)}" data-n="${(p.name||'').replace(/"/g,'&quot;')}" data-u="${(wikiUrl||'').replace(/"/g,'&quot;')}" data-w="${(p.wikidata||'').replace(/"/g,'&quot;')}" data-m="${p.url||''}" style="margin-top:6px;font-size:11px;color:${dotColor};background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:Arial,sans-serif;">📖 Wikipedia</button>` : ""}${p.url && p.kind==='megalith' ? `<a href=\"https://www.megalithic.co.uk/article.php?sid=${p.url}\" target=\"_blank\" style=\"margin-top:4px;display:inline-block;font-size:11px;color:${dotColor};background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 10px;text-decoration:none;font-family:Arial,sans-serif;\">Megalithic Portal</a>` : ""}
               </div>
             `).addTo(map);
             overlayPopupRef.current = popup;
@@ -4813,7 +4834,7 @@ export default function HomePage() {
 
   // Expose openWikiPanel globally for popup HTML buttons
   useEffect(() => {
-    window.__dmWiki = openWikiPanel;
+    window.__dmWiki = (name, url, wikidata, mpId) => openWikiPanel(name, url, wikidata, mpId);
     return () => { delete window.__dmWiki; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -7482,11 +7503,14 @@ export default function HomePage() {
                   <img src={wikiPanel.thumbnail} alt={wikiPanel.title}
                     style={{ width: "100%", borderRadius: 8, marginBottom: 16, maxHeight: 220, objectFit: "cover" }} />
                 )}
+                {wikiPanel.mpSubtitle && (
+                  <p style={{ fontSize: 11, color: "#64748b", marginBottom: 10, marginTop: -4 }}>{wikiPanel.mpSubtitle}</p>
+                )}
                 {wikiPanel.extract ? (
                   <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.7, fontWeight: 300 }}>{wikiPanel.extract}</p>
                 ) : (
                   <p style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>
-                    No Wikipedia summary found for "{wikiPanel.title}". Try the full article below.
+                    No description available.
                   </p>
                 )}
                 {wikiPanel.wikidataId && (
@@ -7495,7 +7519,7 @@ export default function HomePage() {
                     <a href={`https://www.wikidata.org/wiki/${wikiPanel.wikidataId}`}
                       target="_blank" rel="noopener noreferrer"
                       style={{ fontSize: 12, color: "#d97706", textDecoration: "none" }}>
-                      {wikiPanel.wikidataId} ↗
+                      {wikiPanel.wikidataId}
                     </a>
                   </div>
                 )}
@@ -7508,44 +7532,16 @@ export default function HomePage() {
               <a href={wikiPanel.url} target="_blank" rel="noopener noreferrer"
                 style={{
                   display: "block", padding: "10px", textAlign: "center",
-                  background: "rgba(217,119,6,0.1)", border: "1px solid rgba(217,119,6,0.3)",
-                  borderRadius: 8, color: "#d97706", fontSize: 13, fontWeight: 600,
-                  textDecoration: "none",
+                  background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.25)",
+                  borderRadius: 8, color: "#d97706", textDecoration: "none", fontSize: 13, fontWeight: 600,
                 }}>
-                Open full article on Wikipedia →
+                {wikiPanel.mpUrl ? "View on Megalithic Portal" : "Open Wikipedia article"}
               </a>
             </div>
           )}
         </div>
       )}
-
-      {/* ── SCENARIO WIKI PANEL ── */}
-      {scenarioWiki && (
-        <div style={{
-          position: "fixed", top: 0, right: 0, bottom: 0,
-          width: "min(420px, 100vw)",
-          background: "#0a0f1e",
-          borderLeft: "1px solid rgba(248,113,113,0.25)",
-          zIndex: 2001,
-          display: "flex", flexDirection: "column",
-          boxShadow: "-8px 0 40px rgba(0,0,0,0.6)",
-          fontFamily: "Arial,sans-serif",
-          animation: "dmWikiSlideIn .25s ease",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #1e2d45" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 24 }}>{scenarioWiki.icon}</span>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#f1f5f9" }}>{scenarioWiki.title}</div>
-            </div>
-            <button onClick={() => setScenarioWiki(null)} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: 20, padding: 4 }}>✕</button>
-          </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: "20px", color: "#cbd5e1", fontSize: 13, lineHeight: 1.6 }}
-            dangerouslySetInnerHTML={{ __html: scenarioWiki.body }} />
-          <div style={{ padding: "12px 20px", borderTop: "1px solid #1e2d45", fontSize: 11, color: "#374151", textAlign: "center" }}>
-            DisasterMap — Educational content
-          </div>
-        </div>
-      )}
     </div>
   );
 }
+
