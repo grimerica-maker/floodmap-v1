@@ -31,49 +31,69 @@ const EQ_FAULT_TYPES = [
 
 const EQ_PRESETS = [
   { label: "Tohoku 2011", lat: 38.297, lng: 142.373, mag: 9.1, depthId: "subduction", faultId: "thrust",
+    strike: 203, dip: 10, rake: 88, depth_km: 25,
     desc: "M9.1 — 15,897 dead, Fukushima meltdown, 40m tsunami",
     wiki: "<h4>Tōhoku 2011 — M9.1</h4><p>March 11, 2011. Japan's most powerful earthquake, triggering a 40m tsunami that destroyed coastal towns and caused three Fukushima Daiichi reactor meltdowns. 15,897 confirmed dead, 2,533 missing. $235B in damages. Shifted Earth's axis by 10-25cm and moved Japan's main island 2.4m east.</p>" },
   { label: "Haiti 2010", lat: 18.457, lng: -72.533, mag: 7.0, depthId: "shallow", faultId: "strikeslip",
+    strike: 255, dip: 70, rake: 0, depth_km: 13,
     desc: "M7.0 — 316,000 dead, Port-au-Prince destroyed",
     wiki: "<h4>Haiti 2010 — M7.0</h4><p>January 12, 2010. Shallow strike-slip quake 25km from Port-au-Prince. 316,000 dead, 300,000 injured, 1.5M displaced. 250,000 residences destroyed. Haiti's catastrophic losses attributed to shallow depth, proximity to capital, poor construction standards, and dense population.</p>" },
   { label: "Indian Ocean 2004", lat: 3.295, lng: 95.982, mag: 9.1, depthId: "subduction", faultId: "thrust",
+    strike: 329, dip: 8, rake: 110, depth_km: 30,
     desc: "M9.1 — 227,898 dead, Thailand/Indonesia/Sri Lanka",
     wiki: "<h4>Indian Ocean 2004 — M9.1</h4><p>December 26, 2004. Third largest earthquake ever recorded. Subduction quake off Sumatra ruptured 1,300km of fault in 10 minutes. Triggered tsunamis reaching 30m hitting 14 countries. 227,898 dead across Indonesia, Sri Lanka, India, Thailand. Waves reached Africa 7 hours later.</p>" },
   { label: "Valdivia 1960", lat: -38.14, lng: -73.41, mag: 9.5, depthId: "subduction", faultId: "thrust",
+    strike: 5, dip: 15, rake: 90, depth_km: 25,
     desc: "M9.5 — Largest ever recorded, 5,700 dead, Chile",
     wiki: "<h4>Valdivia 1960 — M9.5</h4><p>May 22, 1960. Largest earthquake ever recorded in human history. Ruptured 1,000km of Nazca-South American plate boundary. 5,700 dead in Chile, tsunami killed 61 in Hawaii, 122 in Japan, 32 in Philippines. Released more energy than all earthquakes combined from 1906-1960.</p>" },
   { label: "San Andreas (Scenario)", lat: 34.05, lng: -118.25, mag: 7.8, depthId: "shallow", faultId: "strikeslip",
+    strike: 140, dip: 90, rake: 180, depth_km: 10,
     desc: "M7.8 scenario — ShakeOut: 1,800 dead, $200B damage, LA",
     wiki: "<h4>San Andreas Scenario — M7.8</h4><p>USGS ShakeOut scenario: a M7.8 rupture of the southern San Andreas fault near Los Angeles. Estimated 1,800 deaths, 53,000 injuries, $200B in damage. 300,000 displaced. Fire following earthquake could double casualties. Last major rupture in this segment was 1857 (M7.9).</p>" },
   { label: "Cascadia (Scenario)", lat: 47.60, lng: -124.0, mag: 9.0, depthId: "subduction", faultId: "thrust",
+    strike: 350, dip: 12, rake: 90, depth_km: 20,
     desc: "M9.0 scenario — Pacific Northwest megathrust overdue",
     wiki: "<h4>Cascadia Scenario — M9.0</h4><p>The Cascadia Subduction Zone last ruptured January 26, 1700 (confirmed by Japanese tsunami records). A full M9.0 rupture would devastate Seattle, Portland, and coastal Oregon/Washington. FEMA estimates 13,000 dead, 27,000 injured, $82B damage — with coastal areas having 15-50 minutes before tsunami arrival.</p>" },
 ];
 
-// Mercalli intensity ring radii (km) by magnitude and depth factor
-// Returns array of {intensity, radiusKm, color, label, pga}
+// Mercalli intensity ring radii — Atkinson & Wald (2007) attenuation
+// Matches backend tsunami_engine.py intensity_rings()
 function eqIntensityRings(mag, depthKm, faultId) {
-  const depthFactor = Math.max(0.3, 1 - (depthKm - 10) / 500);
-  const baseR = Math.pow(10, 0.5 * mag - 1.0) * depthFactor;
-  return [
-    { intensity: "X+",  label: "Extreme",     pga: ">124%g",  color: "#7f1d1d", opacity: 0.85, radiusKm: baseR * 0.15 },
-    { intensity: "IX",  label: "Violent",     pga: "62-124%g", color: "#b91c1c", opacity: 0.70, radiusKm: baseR * 0.30 },
-    { intensity: "VIII",label: "Severe",      pga: "31-62%g",  color: "#dc2626", opacity: 0.55, radiusKm: baseR * 0.55 },
-    { intensity: "VII", label: "Very Strong", pga: "15-31%g",  color: "#ea580c", opacity: 0.40, radiusKm: baseR * 1.0  },
-    { intensity: "VI",  label: "Strong",      pga: "8-15%g",   color: "#f97316", opacity: 0.28, radiusKm: baseR * 1.8  },
-    { intensity: "V",   label: "Moderate",    pga: "4-8%g",    color: "#ca8a04", opacity: 0.18, radiusKm: baseR * 3.2  },
+  const c1 = 2.085, c2 = 1.428, c3 = -1.402;
+  const depth = Math.max(depthKm, 5);
+  const sourceMmi = c1 + c2 * mag;
+  const RINGS = [
+    { intensity:"X+",  label:"Extreme",     pga:">124%g",    color:"#7f1d1d", opacity:0.85, mmi:10 },
+    { intensity:"IX",  label:"Violent",     pga:"62-124%g",  color:"#b91c1c", opacity:0.72, mmi:9  },
+    { intensity:"VIII",label:"Severe",      pga:"31-62%g",   color:"#dc2626", opacity:0.58, mmi:8  },
+    { intensity:"VII", label:"Very Strong", pga:"15-31%g",   color:"#ea580c", opacity:0.42, mmi:7  },
+    { intensity:"VI",  label:"Strong",      pga:"8-15%g",    color:"#f97316", opacity:0.28, mmi:6  },
+    { intensity:"V",   label:"Moderate",    pga:"4-8%g",     color:"#ca8a04", opacity:0.18, mmi:5  },
   ];
+  return RINGS.map(r => {
+    if (sourceMmi < r.mmi) return { ...r, radiusKm: 0 };
+    const exponent = (r.mmi - sourceMmi) / c3;
+    const R = Math.min(depth * Math.exp(exponent), 8000);
+    return { ...r, radiusKm: Math.max(0, R) };
+  }).filter(r => r.radiusKm > 0);
 }
 
-// Rough casualties ROM based on intensity + population density approximation
+// Casualties — PAGER-style range (Jaiswal & Wald 2010)
 function eqCasualtyEstimate(mag, depthKm) {
-  const e = Math.pow(10, 0.67 * mag - 3.5) * Math.max(0.2, 1 - depthKm / 300);
-  if (e < 1) return "< 1";
-  if (e < 10) return "~" + Math.round(e);
-  if (e < 1000) return "~" + Math.round(e / 10) * 10;
-  if (e < 10000) return "~" + (e / 1000).toFixed(1) + "K";
-  if (e < 1000000) return "~" + Math.round(e / 1000) + "K";
-  return "~" + (e / 1000000).toFixed(1) + "M";
+  if (mag < 4.5) return "< 1";
+  const logF = 1.47 * mag - 0.6 * Math.log10(Math.max(depthKm, 5)) - 7.0;
+  let median = Math.pow(10, logF);
+  if (depthKm > 200) median *= 0.05;
+  else if (depthKm > 70) median *= 0.25;
+  const lo = Math.round(median * 0.01);
+  const hi = Math.round(median * 100);
+  const fmt = n => {
+    if (n < 1) return "< 1";
+    if (n < 1000) return "~" + Math.round(n / 10) * 10;
+    if (n < 1000000) return "~" + Math.round(n / 1000) + "K";
+    return "~" + (n / 1000000).toFixed(1) + "M";
+  };
+  return fmt(lo) + " – " + fmt(hi);
 }
 
 // Build circle GeoJSON for intensity ring
@@ -1209,6 +1229,12 @@ export default function HomePage() {
   const [eqFaultId, setEqFaultId] = useState("thrust");
   const [eqResult,  setEqResult]  = useState(null);
   const [eqView,    setEqView]    = useState("rings"); // "rings" | "tsunami"
+  const [eqStrike,  setEqStrike]  = useState(0);
+  const [eqDip,     setEqDip]     = useState(15);
+  const [eqRake,    setEqRake]    = useState(90);
+  const eqStrikeRef = useRef(0);
+  const eqDipRef    = useRef(15);
+  const eqRakeRef   = useRef(90);
   const [eqPoint,   setEqPoint]   = useState(null);
   const eqMagRef   = useRef(7.5);
   const eqDepthRef = useRef("shallow");
@@ -1903,6 +1929,9 @@ export default function HomePage() {
 
     const depthType = EQ_DEPTH_TYPES.find(d => d.id === depthId) || EQ_DEPTH_TYPES[0];
     const faultType = EQ_FAULT_TYPES.find(f => f.id === faultId) || EQ_FAULT_TYPES[0];
+    const strike = eqStrikeRef.current;
+    const dip    = eqDipRef.current;
+    const rake   = eqRakeRef.current;
     const rings = eqIntensityRings(mag, depthType.depth, faultId);
     const liqRadiusKm = eqLiquefactionRadius(mag, depthType.depth);
     const casualties = eqCasualtyEstimate(mag, depthType.depth);
@@ -1979,6 +2008,9 @@ export default function HomePage() {
     setEqMag(preset.mag); eqMagRef.current = preset.mag;
     setEqDepthId(preset.depthId); eqDepthRef.current = preset.depthId;
     setEqFaultId(preset.faultId); eqFaultRef.current = preset.faultId;
+    if (preset.strike != null) { setEqStrike(preset.strike); eqStrikeRef.current = preset.strike; }
+    if (preset.dip    != null) { setEqDip(preset.dip);       eqDipRef.current    = preset.dip;    }
+    if (preset.rake   != null) { setEqRake(preset.rake);     eqRakeRef.current   = preset.rake;   }
     setScenarioMode("earthquake"); scenarioModeRef.current = "earthquake";
     const map = mapRef.current;
     if (!map) return;
