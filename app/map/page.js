@@ -7213,17 +7213,15 @@ export default function HomePage() {
         <div onPointerDown={(e) => e.stopPropagation()} onClick={() => setPaywallModal(null)} style={{
           position: "fixed", inset: 0, zIndex: 2000,
           background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)",
-          display: "flex", alignItems: "flex-start", justifyContent: "center",
-          overflowY: "scroll", WebkitOverflowScrolling: "touch", padding: "20px 0",
+          display: "flex", alignItems: "flex-end", justifyContent: "center",
           fontFamily: "Arial,sans-serif",
         }}>
           <div onClick={(e) => e.stopPropagation()} style={{
-            background: "#0a0f1e", border: "1px solid #1e2d45", borderRadius: 16,
-            padding: 28, maxWidth: 380, width: "90%",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
-            maxHeight: "90vh", overflowY: "auto",
+            background: "#0a0f1e", border: "1px solid #1e2d45", borderRadius: "16px 16px 0 0",
+            padding: "20px 20px 32px", maxWidth: 480, width: "100%",
+            boxShadow: "0 -8px 40px rgba(0,0,0,0.6)",
+            overflowY: "auto", maxHeight: "85dvh", WebkitOverflowScrolling: "touch",
           }}>
-            <img src={LOGO_DATA} alt="Disaster Map" style={{ width: 64, height: 64, display: "block", margin: "0 auto 12px" }} />
             
             {paywallModal === "ratelimit" ? (<>
               <div style={{ textAlign: "center", color: "#e2e8f0", fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Simulation Limit Reached</div>
