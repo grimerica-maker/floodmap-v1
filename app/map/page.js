@@ -1302,6 +1302,7 @@ export default function HomePage() {
   const iceAgeKaRef = useRef(21);
   const [iceAgeInfo, setIceAgeInfo] = useState(null);
   const [iceSheetOn, setIceSheetOn] = useState(true);
+  const iceSheetPopupRef = useRef(null);
   const [volcanoOn, setVolcanoOn] = useState(false);
   const volcanoOnRef = useRef(false);
   const [airportOn, setAirportOn] = useState(false);
@@ -1683,10 +1684,12 @@ export default function HomePage() {
       });
       // Click popup for ice sheets
       map.on("click", "ice-sheet-layer", (e) => {
+        e.originalEvent.stopPropagation();
         const p = e.features[0].properties;
         const thickKm = (p.max_thickness_m / 1000).toFixed(1);
         const areaKm2 = Math.round(p.area_cells * 111 * 111);
-        new mapboxgl.Popup({ closeButton:true, maxWidth:"280px", className:"elev-popup" })
+        if (iceSheetPopupRef.current) { iceSheetPopupRef.current.remove(); iceSheetPopupRef.current = null; }
+        iceSheetPopupRef.current = new mapboxgl.Popup({ closeButton:true, maxWidth:"280px", className:"elev-popup" })
           .setLngLat(e.lngLat)
           .setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px">
             <div style="color:#93c5fd;font-weight:700;font-size:14px;margin-bottom:6px">🧊 ${p.name}</div>
@@ -1705,8 +1708,9 @@ export default function HomePage() {
                 p.name === "Patagonian Ice Sheet" ? "Covered southern Andes and Patagonia. Smaller than northern hemisphere sheets but regionally significant." :
                 "Glacial ice mass from the last glacial maximum."}
             </div>
-          </div>`)
-          .addTo(map);
+          </div>`);
+        iceSheetPopupRef.current.addTo(map);
+        iceSheetPopupRef.current.on("close", () => { iceSheetPopupRef.current = null; });
       });
       map.on("mouseenter","ice-sheet-layer",()=>{ map.getCanvas().style.cursor="pointer"; });
       map.on("mouseleave","ice-sheet-layer",()=>{ map.getCanvas().style.cursor=""; });
@@ -6042,9 +6046,12 @@ export default function HomePage() {
                   const map = mapRef.current;
                   if (map && map.isStyleLoaded()) {
                     if (preset.label === "Ice Age") {
-                      // Draw ice sheets on whatever view the user is in — no forced globe switch
-                      setTimeout(() => safely(() => drawIceSheets(map)), 200);
+                      // Activate Ice Age mode with ICE-7G data
+                      setIceAgeOn(true); iceAgeOnRef.current = true;
+                      setIceAgeKa(21); iceAgeKaRef.current = 21;
+                      setTimeout(() => applyIceAge(21), 100);
                     } else {
+                      setIceAgeOn(false); iceAgeOnRef.current = false;
                       safely(() => clearIceSheets(map));
                     }
                   }
