@@ -5270,8 +5270,9 @@ export default function HomePage() {
         const KP_LAT = 110.574;
         const KP_LNG = 111.32 * Math.cos(lat * Math.PI / 180);
 
-        [...data.zones].reverse().forEach((zone, ri) => {
-          const i = data.zones.length - 1 - ri;
+        // Draw largest zone first (bottom), smallest last (top)
+        [...data.zones].slice().reverse().forEach((zone, ri) => {
+          const i = ri; // ri=0 = outermost (Trace Ash), ri=last = Kill Zone on top
           const majorKm = zone.major_km, minorKm = zone.minor_km;
           // Offset center downwind by 30% of major axis
           const cLat = lat + (dNorth * majorKm * 0.3) / KP_LAT;
@@ -5314,6 +5315,35 @@ export default function HomePage() {
             ${blackoutLine}
           </div>`)
           .addTo(map);
+
+        // Populate the stats panel — reuse yellowstoneResult format
+        // Map generic zones to yellowstone zone format with survival % and desc
+        const survivalMap = ["0%","15-30%","50-70%","85-95%","95-99%","99%+"];
+        const descMap = [
+          "Total destruction — pyroclastic flows and heavy ashfall",
+          "Heavy ashfall >1m — building collapse, crop failure",
+          "Moderate ash — air travel disrupted, health risk",
+          "Trace ash — air quality impacts, disruption",
+          "Light ash — minor disruption",
+          "Detectable ash — minimal direct impact",
+        ];
+        const mappedZones = data.zones.map((z, i) => ({
+          ...z,
+          color: ["#7f1d1d","#b91c1c","#ea580c","#f97316","#fbbf24","#4ade80"][i] || "#4ade80",
+          survival: survivalMap[i] || "99%+",
+          desc: descMap[i] || z.name,
+        }));
+        // Build a result object matching yellowstoneResult shape
+        const eruptResult = {
+          ...data,
+          zones: mappedZones,
+          famine_deaths_estimate: data.blackout_pct > 0
+            ? Math.round(8_100_000_000 * Math.pow(data.blackout_pct/100, 1.5) * (data.blackout_months/12) * 0.15) : 0,
+        };
+        setYellowstoneResult(eruptResult);
+        setYellowstoneActive(true);
+        // Override preset display with eruption data via a synthetic preset
+        window.__dmLastEruptResult = eruptResult;
 
         setStatus(`${name} eruption simulated — VEI ${data.vei}`);
         map.flyTo({ center:[lng, lat], zoom: data.vei >= 7 ? 4 : data.vei >= 5 ? 6 : 8, duration:1500 });
@@ -6825,16 +6855,16 @@ export default function HomePage() {
         return (
         <>
           <hr style={{ margin: "10px 0", opacity: 0.25 }} />
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>🌋 {_p.name}</div>
-          <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8 }}>{_p.desc}</div>
-          {_p.zones.map((z, i) => (
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>🌋 {yellowstoneResult?.name || _p.name}</div>
+          <div style={{ color: "#94a3b8", fontSize: 12, marginBottom: 8 }}>{yellowstoneResult?.vtype ? `${yellowstoneResult.vtype} — VEI ${yellowstoneResult.vei}` : _p.desc}</div>
+          {(yellowstoneResult?.zones || _p.zones).map((z, i) => (
             <div key={i} style={{ marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <div style={{ width: 10, height: 10, borderRadius: 2, background: z.color, flexShrink: 0 }} />
                   <span style={{ fontSize: 12, color: z.color, fontWeight: 700 }}>{z.name}</span>
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: z.survival === "0%" ? "#ef4444" : z.survival.startsWith("2") ? "#f97316" : z.survival.startsWith("3") ? "#fbbf24" : "#4ade80" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: z.survival === "0%" ? "#ef4444" : (z.survival||"").startsWith("1") ? "#f97316" : (z.survival||"").startsWith("5") ? "#fbbf24" : "#4ade80" }}>
                   {z.survival} survival
                 </span>
               </div>
