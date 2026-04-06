@@ -1317,6 +1317,9 @@ export default function HomePage() {
   const [empResult, setEmpResult] = useState(null);
   const [empLoading, setEmpLoading] = useState(false);
   const [megalithOn, setMegalithOn] = useState(false);
+  const [usgsOn, setUsgsOn] = useState(false);
+  const usgsOnRef = useRef(false);
+  const [usgsLoading, setUsgsLoading] = useState(false);
   const megalithOnRef = useRef(false);
   const [megalithLoading, setMegalithLoading] = useState(false);
   const [faultLinesOn, setFaultLinesOn] = useState(false);
@@ -2003,6 +2006,87 @@ export default function HomePage() {
       map.on("mouseenter", "fault-lines-layer", () => { map.getCanvas().style.cursor = "pointer"; });
       map.on("mouseleave", "fault-lines-layer", () => { map.getCanvas().style.cursor = "crosshair"; });
     } catch(e) { console.warn("Fault lines error:", e); }
+  };
+
+  const USGS_FEED_URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson";
+
+  const addUsgsQuakes = async () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    setUsgsLoading(true);
+    try {
+      // Remove existing
+      ["usgs-layer","usgs-labels"].forEach(l => { try { if(map.getLayer(l)) map.removeLayer(l); } catch(e){} });
+      try { if(map.getSource("usgs-src")) map.removeSource("usgs-src"); } catch(e){}
+
+      const res = await fetch(USGS_FEED_URL);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      // Enrich features with display properties
+      data.features = data.features.map(f => {
+        const mag = f.properties.mag || 0;
+        const color = mag >= 7 ? "#ef4444" : mag >= 6 ? "#f97316" : mag >= 5 ? "#fbbf24" : "#4ade80";
+        const radius = mag >= 7 ? 14 : mag >= 6 ? 10 : mag >= 5 ? 7 : 5;
+        return { ...f, properties: { ...f.properties, _color: color, _radius: radius } };
+      });
+
+      map.addSource("usgs-src", { type:"geojson", data });
+      map.addLayer({ id:"usgs-layer", type:"circle", source:"usgs-src",
+        paint:{
+          "circle-color": ["get","_color"],
+          "circle-radius": ["interpolate",["linear"],["zoom"],
+            2, ["*",["get","_radius"],0.5],
+            6, ["get","_radius"]
+          ],
+          "circle-opacity": 0.85,
+          "circle-stroke-width": 1.5,
+          "circle-stroke-color": "#fff",
+          "circle-stroke-opacity": 0.7,
+        }
+      });
+
+      // Click popup
+      map.on("click","usgs-layer",(e) => {
+        e.originalEvent.stopPropagation();
+        const p = e.features[0].properties;
+        const mag = p.mag?.toFixed(1) || "?";
+        const place = p.place || "Unknown location";
+        const time = p.time ? new Date(p.time).toLocaleString() : "Unknown";
+        const depth = e.features[0].geometry.coordinates[2]?.toFixed(1) || "?";
+        const tsun = p.tsunami ? `<div style="color:#38bdf8;font-size:11px;margin-top:4px">🌊 Tsunami warning issued</div>` : "";
+        const [lng, lat] = e.features[0].geometry.coordinates;
+        new mapboxgl.Popup({ closeButton:true, maxWidth:"280px", className:"elev-popup" })
+          .setLngLat(e.lngLat)
+          .setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px">
+            <div style="color:${p._color};font-weight:700;font-size:15px;margin-bottom:6px">M${mag} Earthquake</div>
+            <div style="color:#e2e8f0;margin-bottom:4px">${place}</div>
+            <table style="font-size:11px;width:100%;border-collapse:collapse;margin-bottom:6px">
+              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Time</td><td style="font-weight:700">${time}</td></tr>
+              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Depth</td><td style="font-weight:700">${depth} km</td></tr>
+              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Status</td><td>${p.status || "—"}</td></tr>
+            </table>
+            ${tsun}
+            <button onclick="window.__dmLoadUSGSQuake&&window.__dmLoadUSGSQuake(${lat},${lng},${p.mag},${depth})"
+              style="width:100%;padding:8px;margin-top:6px;background:#f97316;color:white;border:none;border-radius:7px;cursor:pointer;font-weight:700;font-size:12px;font-family:Arial,sans-serif">
+              🌍 Simulate This Quake
+            </button>
+          </div>`)
+          .addTo(map);
+      });
+      map.on("mouseenter","usgs-layer",()=>{ map.getCanvas().style.cursor="pointer"; });
+      map.on("mouseleave","usgs-layer",()=>{ map.getCanvas().style.cursor=""; });
+
+      setStatus(`Live quakes: ${data.features.length} events M4.5+ (past 24hrs)`);
+    } catch(e) { console.warn("USGS feed error:", e); }
+    finally { setUsgsLoading(false); }
+  };
+
+  const removeUsgsQuakes = () => {
+    const map = mapRef.current;
+    ["usgs-layer","usgs-labels"].forEach(l => { try { if(map?.getLayer(l)) map.removeLayer(l); } catch(e){} });
+    try { if(map?.getSource("usgs-src")) map.removeSource("usgs-src"); } catch(e){}
+    setUsgsOn(false); usgsOnRef.current = false;
   };
 
   const addVolcanoes = async () => {
@@ -5648,6 +5732,28 @@ export default function HomePage() {
   // Expose openWikiPanel globally for popup HTML buttons
   useEffect(() => {
     window.__dmWiki = (name, url, wikidata, mpId) => openWikiPanel(name, url, wikidata, mpId);
+    window.__dmLoadUSGSQuake = (lat, lng, mag, depthKm) => {
+      // Load USGS quake into earthquake simulator
+      clearEarthquake();
+      setScenarioMode("earthquake"); scenarioModeRef.current = "earthquake";
+      // Set params
+      const roundedMag = Math.round(mag * 10) / 10;
+      setEqMag(roundedMag); eqMagRef.current = roundedMag;
+      const depthId = depthKm < 20 ? "shallow" : depthKm < 70 ? "intermediate" : "deep";
+      setEqDepthId(depthId); eqDepthRef.current = depthId;
+      const el = document.createElement("div");
+      el.style.cssText = "width:24px;height:24px;background:#fbbf24;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 3px #f59e0b,0 2px 8px rgba(0,0,0,0.5);cursor:pointer;";
+      const map = mapRef.current;
+      if (map) {
+        if (eqMarker.current) { eqMarker.current.remove(); eqMarker.current = null; }
+        eqMarker.current = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([lng, lat]).addTo(map);
+        setEqPoint({ lat, lng }); eqPointRef.current = { lat, lng };
+        map.flyTo({ center: [lng, lat], zoom: 5, duration: 1000 });
+      }
+      document.querySelectorAll(".mapboxgl-popup").forEach(p => p.remove());
+      setStatus(`USGS M${roundedMag} loaded — hit Trigger to simulate`);
+    };
+
     window.__dmFaultSetQuake = (lat, lng, faultId, dip, rake, strike) => {
       setEqFaultId(faultId); eqFaultRef.current = faultId;
       setEqDip(Math.round(dip)); eqDipRef.current = Math.round(dip);
@@ -7059,6 +7165,26 @@ export default function HomePage() {
             </div>
           );
         })}
+        {/* Live USGS Earthquakes — standalone toggle */}
+        <div onClick={() => {
+            const next = !usgsOn; setUsgsOn(next); usgsOnRef.current = next;
+            if (next) addUsgsQuakes(); else removeUsgsQuakes();
+          }}
+          style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 10px", marginBottom:4,
+            borderRadius:9, cursor:"pointer",
+            background: usgsOn ? "rgba(251,191,36,0.12)" : "rgba(255,255,255,0.03)",
+            border: usgsOn ? "1px solid #fbbf2455" : "1px solid transparent" }}>
+          <span style={{ fontSize:18, lineHeight:1 }}>🌍</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:13, fontWeight:700, color: usgsOn ? "#fbbf24" : "#cbd5e1" }}>Live Earthquakes</div>
+            <div style={{ fontSize:10, color:"#475569", marginTop:1 }}>
+              {usgsLoading ? "Loading feed…" : usgsOn ? "USGS M4.5+ · past 24hrs · live" : "USGS M4.5+ · past 24 hours"}
+            </div>
+          </div>
+          <div style={{ width:28, height:16, borderRadius:8, background: usgsOn ? "#fbbf24" : "#1e2d45", position:"relative", flexShrink:0, transition:"background 0.2s" }}>
+            <div style={{ position:"absolute", top:2, left: usgsOn ? 14 : 2, width:12, height:12, borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
+          </div>
+        </div>
       </div>
 
       {/* ── VIEW MODE ── */}
