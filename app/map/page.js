@@ -4942,7 +4942,22 @@ export default function HomePage() {
           // verupt-layer-i maps directly to zones[i] (Kill Zone=0, outermost=n-1)
           const hitLayerId = hits[0]?.layer?.id;
           const zoneIdx = hitLayerId ? parseInt(hitLayerId.replace("verupt-layer-","")) : null;
-          const zone = zoneIdx != null ? r.zones[zoneIdx] : r.zones[0];
+          // No hit = outside all zones = safe
+          if (zoneIdx == null && hits.length === 0) {
+            new mapboxgl.Popup({ closeButton:true, maxWidth:"220px", className:"elev-popup" })
+              .setLngLat([lng, lat])
+              .setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px">
+                <div style="color:#4ade80;font-weight:700;font-size:14px;margin-bottom:4px">Outside Danger Zone</div>
+                <div style="display:flex;justify-content:space-between;font-size:12px">
+                  <span style="color:#94a3b8">Survival</span>
+                  <span style="font-weight:700;color:#4ade80">~100%</span>
+                </div>
+                <div style="color:#64748b;font-size:11px;margin-top:4px">No direct eruption hazard at this location.</div>
+              </div>`)
+              .addTo(map);
+            return;
+          }
+          const zone = zoneIdx != null ? r.zones[zoneIdx] : null;
           if (zone) {
             const zColors = ["#7f1d1d","#b91c1c","#dc2626","#ea580c","#f97316","#fbbf24"];
             const zColor = zColors[zoneIdx != null ? zoneIdx : 0] || "#f97316";
