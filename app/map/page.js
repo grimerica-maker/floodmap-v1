@@ -5567,12 +5567,7 @@ export default function HomePage() {
               {surgeOn ? (surgePoint ? `Surge active: +${surgeM} m` : "Click map to place surge point") : "Localised coastal storm surge"}
             </div>
           </button>
-          {(surgeOn || scenarioMode === "surge") && (
-            <button onClick={() => { clearSurge(); setScenarioMode("flood"); scenarioModeRef.current = "flood"; }}
-              style={{ padding: "13px 12px", minHeight: 56, background: "#111827", color: "#475569", border: "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, fontSize: 13 }}>
-              Clear
-            </button>
-          )}
+
         </div>
 
         <button
@@ -5623,10 +5618,10 @@ export default function HomePage() {
               style={{ flex: 1, padding: "10px", background: surgeTrackPts.length > 0 ? "#38bdf8" : "#1e2d45", color: surgeTrackPts.length > 0 ? "#0f172a" : "#475569", border: "none", borderRadius: 8, fontWeight: 700, cursor: surgeTrackPts.length > 0 ? "pointer" : "not-allowed", fontSize: 13 }}>
               {surgeTrackPts.length > 0 ? `🌀 Trigger (${surgeTrackPts.length} pt${surgeTrackPts.length>1?"s":""})` : "🌀 Click map to place"}
             </button>
-            {surgeOn && <button onClick={clearSurge}
+            <button onClick={clearSurge}
               style={{ flex: 1, padding: "10px", background: "transparent", color: "#475569", border: "1px solid #1e2d45", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
               Clear
-            </button>}
+            </button>
           </div>
         </div>
       )}
