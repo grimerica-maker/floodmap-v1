@@ -6031,6 +6031,86 @@ export default function HomePage() {
             <div style={{ fontSize: 11, color: "#1e3a5f", marginTop: 3 }}>See how many are displaced · $18.99 one-time</div>
           </div>
         )}
+      {/* ── ICE AGE MODE — left sidebar ── */}
+      {scenarioMode === "flood" && (
+        <div style={{ marginBottom: 14, padding: "12px 14px", background: iceAgeOn ? "rgba(59,130,246,0.08)" : "rgba(255,255,255,0.02)", borderRadius: 10, border: iceAgeOn ? "1px solid #3b82f6" : "1px solid #1e2d45" }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: iceAgeOn ? 10 : 0 }}>
+            <div>
+              <div style={{ fontSize:13, fontWeight:700, color: iceAgeOn ? "#93c5fd" : "#cbd5e1" }}>🧊 Ice Age Mode</div>
+              <div style={{ fontSize:10, color:"#475569", marginTop:1 }}>ICE-7G_NA · {iceAgeOn ? `${iceAgeKa}ka BP · ${getIceAgeSL(iceAgeKa)}m` : "26ka–0ka paleo-topography"}</div>
+            </div>
+            <div onClick={() => {
+              const next = !iceAgeOn;
+              setIceAgeOn(next); iceAgeOnRef.current = next;
+              if (next) { applyIceAge(iceAgeKa); } else { clearIceAge(); }
+            }} style={{ width:34, height:20, borderRadius:10, background: iceAgeOn ? "#3b82f6" : "#1e2d45", position:"relative", flexShrink:0, cursor:"pointer", transition:"background 0.2s" }}>
+              <div style={{ position:"absolute", top:3, left: iceAgeOn ? 16 : 3, width:14, height:14, borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
+            </div>
+          </div>
+          {iceAgeOn && (<>
+            <div style={{ fontSize:11, color:"#93c5fd", marginBottom:6, fontWeight:700, textAlign:"center" }}>
+              {iceAgeKa === 0 ? "Present Day" : iceAgeKa <= 6 ? "Late Holocene" : iceAgeKa <= 11 ? "Early Holocene / Younger Dryas" : iceAgeKa <= 14 ? "Meltwater Pulse 1A" : iceAgeKa <= 18 ? "Deglaciation" : "Last Glacial Maximum"}
+            </div>
+            <input type="range" min="0" max="26" step="0.5" value={iceAgeKa}
+              onChange={(e) => {
+                const ka = parseFloat(e.target.value);
+                setIceAgeKa(ka); iceAgeKaRef.current = ka;
+                const sl = getIceAgeSL(ka);
+                seaLevelRef.current = sl; setSeaLevel(sl);
+                syncFloodScenario();
+                setStatus(`Ice Age: ${ka}ka BP — ${sl}m`);
+              }}
+              onMouseUp={(e) => { if (iceSheetOn) applyIceSheets(parseFloat(e.target.value)); }}
+              onTouchEnd={() => { if (iceSheetOn) applyIceSheets(iceAgeKaRef.current); }}
+              style={{ width:"100%", marginBottom:6, accentColor:"#3b82f6" }} />
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"#475569", marginBottom:8 }}>
+              <span>0ka</span><span>13ka YD</span><span>21ka LGM</span><span>26ka</span>
+            </div>
+            <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:8 }}>
+              {[[0,"Now"],[6,"6ka"],[11,"YD"],[14,"14ka"],[18,"18ka"],[21,"LGM"],[26,"26ka"]].map(([ka,label]) => (
+                <button key={ka} onClick={() => { setIceAgeKa(ka); iceAgeKaRef.current = ka; applyIceAge(ka); }}
+                  style={{ flex:1, padding:"5px 2px", fontSize:11, fontWeight:700, borderRadius:6, border:"none",
+                    background: iceAgeKa === ka ? "#3b82f6" : "#1e3a5f", color: iceAgeKa === ka ? "white" : "#64748b",
+                    cursor:"pointer", minWidth:32 }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button onClick={async () => {
+              const steps = [26,24,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,4,2,0];
+              for (const ka of steps) {
+                if (!iceAgeOnRef.current) break;
+                setIceAgeKa(ka); iceAgeKaRef.current = ka;
+                const sl = getIceAgeSL(ka);
+                seaLevelRef.current = sl; setSeaLevel(sl);
+                syncFloodScenario();
+                setStatus(`⏵ Deglaciation: ${ka}ka BP — ${sl}m`);
+                if (iceSheetOn) await applyIceSheets(ka);
+                await new Promise(r => setTimeout(r, 1200));
+              }
+              setStatus("Deglaciation complete — 26ka → present");
+            }} style={{ width:"100%", padding:"8px", background:"#1e3a5f", color:"#93c5fd",
+              border:"1px solid #3b82f6", borderRadius:8, cursor:"pointer", fontWeight:700, fontSize:12, marginBottom:6 }}>
+              ▶ Animate Deglaciation (26ka → Now)
+            </button>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"4px 0" }}>
+              <span style={{ fontSize:11, color:"#64748b" }}>Ice sheet overlays</span>
+              <div onClick={() => {
+                const next = !iceSheetOn;
+                setIceSheetOn(next);
+                if (next) { applyIceSheets(iceAgeKaRef.current); }
+                else {
+                  const map = mapRef.current;
+                  ["ice-sheet-layer","ice-sheet-outline"].forEach(l => { try { if(map?.getLayer(l)) map.removeLayer(l); } catch(e){} });
+                  try { if(map?.getSource("ice-sheet-src")) map.removeSource("ice-sheet-src"); } catch(e){}
+                }
+              }} style={{ width:28, height:16, borderRadius:8, background: iceSheetOn ? "#3b82f6" : "#1e2d45", position:"relative", cursor:"pointer", transition:"background 0.2s", flexShrink:0 }}>
+                <div style={{ position:"absolute", top:2, left: iceSheetOn ? 14 : 2, width:12, height:12, borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
+              </div>
+            </div>
+          </>)}
+        </div>
+      )}
         <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Presets</div>
         <div className={isMobile ? "fm-presets-mobile" : "fm-presets-desktop"}>
           {PRESETS.map((preset) => {
@@ -6757,92 +6837,6 @@ export default function HomePage() {
       <div style={{ color: "#facc15", fontWeight: 700 }}>Something not looking right? Hard refresh: Ctrl+Shift+R / Cmd+Shift+R</div>
       {(scenarioMode === "flood" || scenarioMode === "climate") && <div>Sea level: {formatLevelForDisplay(seaLevel)}</div>}
       {/* ── ICE AGE MODE — under Sea Level ── */}
-      {scenarioMode === "flood" && (
-        <div style={{ marginBottom: 14, padding: "12px", background: "rgba(147,197,253,0.06)", borderRadius: 10, border: "1px solid #1e3a5f" }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: iceAgeOn ? 12 : 0 }}>
-            <div>
-              <div style={{ fontSize:13, fontWeight:700, color: iceAgeOn ? "#93c5fd" : "#cbd5e1" }}>
-                🧊 Ice Age Mode
-              </div>
-              <div style={{ fontSize:10, color:"#475569", marginTop:1 }}>ICE-7G_NA · Paleo-topography · {iceAgeOn ? `${iceAgeKa}ka BP` : "26ka–0ka"}</div>
-            </div>
-            <div onClick={() => {
-              const next = !iceAgeOn;
-              setIceAgeOn(next); iceAgeOnRef.current = next;
-              if (next) { applyIceAge(iceAgeKa); }
-              else { clearIceAge(); }
-            }} style={{ width:28, height:16, borderRadius:8, background: iceAgeOn ? "#3b82f6" : "#1e2d45",
-              position:"relative", flexShrink:0, cursor:"pointer", transition:"background 0.2s" }}>
-              <div style={{ position:"absolute", top:2, left: iceAgeOn ? 14 : 2, width:12, height:12,
-                borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
-            </div>
-          </div>
-          {iceAgeOn && (<>
-            <div style={{ fontSize:11, color:"#93c5fd", marginBottom:6, textAlign:"center", fontWeight:700 }}>
-              {iceAgeKa === 0 ? "Present Day" : iceAgeKa <= 6 ? "Late Holocene" : iceAgeKa <= 11 ? "Early Holocene / Younger Dryas" : iceAgeKa <= 14 ? "Meltwater Pulse" : iceAgeKa <= 18 ? "Deglaciation" : "Last Glacial Maximum"}
-              {" · "}{getIceAgeSL(iceAgeKa)}m sea level
-            </div>
-            <input type="range" min="0" max="26" step="0.5" value={iceAgeKa}
-              onChange={(e) => {
-                const ka = parseFloat(e.target.value);
-                setIceAgeKa(ka); iceAgeKaRef.current = ka;
-                // Update sea level immediately for visual feedback
-                const sl = getIceAgeSL(ka);
-                seaLevelRef.current = sl; setSeaLevel(sl);
-                syncFloodScenario();
-                setStatus(`Ice Age: ${ka}ka BP — Sea level ${sl}m`);
-              }}
-              onMouseUp={(e) => {
-                // Load ice sheets on release (expensive operation)
-                applyIceSheets(parseFloat(e.target.value));
-              }}
-              onTouchEnd={(e) => {
-                applyIceSheets(iceAgeKaRef.current);
-              }}
-              style={{ width:"100%", marginBottom:8, accentColor:"#3b82f6" }} />
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"#475569", marginBottom:10 }}>
-              <span>0ka (Now)</span><span>13ka (YD)</span><span>21ka (LGM)</span><span>26ka BP</span>
-            </div>
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:8 }}>
-              {[[0,"Now"],[6,"6ka"],[11,"YD"],[14,"14ka"],[18,"18ka"],[21,"LGM"],[26,"26ka"]].map(([ka,label]) => (
-                <button key={ka} onClick={() => { setIceAgeKa(ka); iceAgeKaRef.current = ka; applyIceAge(ka); }}
-                  style={{ flex:1, padding:"5px 4px", fontSize:11, fontWeight:700, borderRadius:6, border:"none",
-                    background: iceAgeKa === ka ? "#3b82f6" : "#1e3a5f", color: iceAgeKa === ka ? "white" : "#64748b",
-                    cursor:"pointer", minWidth:36 }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            {/* Animate deglaciation */}
-            <button onClick={async () => {
-              const steps = [26,24,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,4,2,0];
-              for (const ka of steps) {
-                if (!iceAgeOnRef.current) break;
-                setIceAgeKa(ka); iceAgeKaRef.current = ka;
-                const sl = getIceAgeSL(ka);
-                seaLevelRef.current = sl; setSeaLevel(sl);
-                syncFloodScenario();
-                setStatus(`⏵ Deglaciation: ${ka}ka BP — ${sl}m`);
-                await applyIceSheets(ka);
-                await new Promise(r => setTimeout(r, 1200));
-              }
-              setStatus("Deglaciation complete — 26ka → present");
-            }} style={{ width:"100%", padding:"8px", background:"#1e3a5f", color:"#93c5fd",
-              border:"1px solid #3b82f6", borderRadius:8, cursor:"pointer", fontWeight:700, fontSize:12, marginBottom:6 }}>
-              ▶ Animate Deglaciation (26ka → Now)
-            </button>
-            <div onClick={() => { setIceSheetOn(!iceSheetOn); if (!iceSheetOn) applyIceSheets(iceAgeKa); else {
-              const map = mapRef.current;
-              ["ice-sheet-layer","ice-sheet-outline"].forEach(l => { try { if(map?.getLayer(l)) map.removeLayer(l); } catch(e){} });
-              try { if(map?.getSource("ice-sheet-src")) map.removeSource("ice-sheet-src"); } catch(e){}
-            }}}
-              style={{ fontSize:11, color: iceSheetOn ? "#93c5fd" : "#475569", cursor:"pointer", textAlign:"center",
-                padding:"4px", border:"1px solid #1e3a5f", borderRadius:6 }}>
-              {iceSheetOn ? "✓ Ice sheets visible" : "○ Ice sheets hidden"}
-            </div>
-          </>)}
-        </div>
-      )}
 
       {(scenarioMode === "flood" || scenarioMode === "climate") && seaLevel !== 0 && (
         <div style={{ fontWeight: 700, marginTop: 2 }}>
