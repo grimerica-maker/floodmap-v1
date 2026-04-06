@@ -3317,17 +3317,19 @@ export default function HomePage() {
     const clickAngleDeg = Math.atan2(dLngKmBase, dLatKmBase) * 180 / Math.PI;
     let angleDiff = ((clickAngleDeg - src.bearing) + 360) % 360;
     if (angleDiff > 180) angleDiff -= 360;
-    const inCone = Math.abs(angleDiff) <= spreadAngle * 3.9;
+    const inCone = Math.abs(angleDiff) <= spreadAngle * 1.2;
     if (inCone) {
-      // Find correct ring by distance — outermost first, use first ring that fits
-      for (let i = src.rings.length - 1; i >= 0; i--) {
-        if (distKm <= src.rings[i].major_km * 12) {
-          ringInfo = src.rings[i];
-          break;
+      // Find correct ring — click must be within the actual ellipse major_km (not inflated)
+      const outermost = src.rings[src.rings.length - 1];
+      if (distKm <= outermost.major_km) {
+        for (let i = src.rings.length - 1; i >= 0; i--) {
+          if (distKm <= src.rings[i].major_km) {
+            ringInfo = src.rings[i];
+            break;
+          }
         }
+        if (!ringInfo) ringInfo = src.rings[0];
       }
-      // If within innermost ring, use innermost
-      if (!ringInfo && distKm <= src.rings[0].major_km * 12) ringInfo = src.rings[0];
     }
 
     const content = ringInfo
