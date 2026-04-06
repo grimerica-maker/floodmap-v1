@@ -21,13 +21,17 @@ const JSONLD_WEBAPP = {
   inLanguage: "en",
   isAccessibleForFree: true,
   featureList: [
-    "Asteroid impact simulation with crater, blast, and tsunami modeling",
-    "Nuclear detonation radius calculator with EMP and fallout",
-    "Sea level rise flood mapping from -11000m to +3048m",
-    "Supervolcano eruption ash zone modeling (Yellowstone, Toba, Campi Flegrei)",
-    "Mega-tsunami wave propagation (La Palma, Cumbre Vieja, Cascadia, Alaska)",
+    "Asteroid impact simulation with crater, blast, thermal, EMP, and tsunami modeling",
+    "Nuclear detonation radius calculator with EMP, fallout, and multiple simultaneous strikes",
+    "Sea level rise flood mapping from -11000m to +3048m with pixel-accurate ETOPO1 terrain",
+    "Volcano simulation: 1,215 Holocene volcanoes, VEI-scaled eruption zones, Smithsonian GVP data",
+    "Supervolcano eruption ash zone modeling (Yellowstone, Toba, Campi Flegrei) with global casualties",
+    "Earthquake simulation with MMI intensity rings, active fault line overlay, and tsunami trigger",
+    "16,000+ active fault lines from GEM Global dataset with slip rates and recurrence intervals",
+    "Mega-tsunami wave propagation (La Palma, Cumbre Vieja, Cascadia, Alaska) with arrival times",
+    "Storm surge modeling from tropical storm through Category 5",
     "Pole shift inundation models (Ben Davidson 90 degree, TES ECDO 104 degree)",
-    "Real-time 3D globe rendering with WebGL",
+    "Real-time 3D globe rendering with WebGL, satellite view, and globe projection",
     "Population exposure and casualty estimation using GPW v4",
   ],
   offers: [
@@ -55,12 +59,14 @@ const JSONLD_FAQ = {
 // ── Scenario data ─────────────────────────────────────────────────────────────
 const SCENARIOS = [
   { emoji: "🌍", name: "Climate Change", tagline: "1.5°C to 4°C · Sea Rise · Wildfires · Ice Collapse", color: "#22c55e", desc: "Model IPCC sea level projections from Paris 1.5°C target through 4°C catastrophic warming. Cumulative wildfire risk zones across California, Amazon, Mediterranean, Siberia and more. West Antarctic and Greenland ice sheet collapse. Auto-flies to at-risk cities.", science: "IPCC AR6 · ETOPO1 · GPW v4" },
-  { emoji: "🌊", name: "Sea Level Change", tagline: "−11,000m to +3,048m", color: "#3b82f6", desc: "Visualize coastal flooding at any sea level. Model ice age glaciation, modern IPCC melt projections, or complete ice sheet collapse. Real ETOPO1 terrain, pixel-accurate inundation.", science: "ETOPO1 · IPCC AR6 · GPW v4" },
-  { emoji: "💥", name: "Asteroid Impact", tagline: "50m to 20km diameter", color: "#ef4444", desc: "Drop any asteroid anywhere on Earth. Calculate crater diameter, blast radius, thermal zone, EMP range, and tsunami generation using the Collins et al. Earth Impact Effects Program.", science: "Melosh 1989 · Collins et al. 2005 · Satake 2012" },
-  { emoji: "☢️", name: "Nuclear Detonation", tagline: "1kt to 50Mt yield", color: "#a78bfa", desc: "Detonate any nuclear device from tactical to Tsar Bomba scale. Models fireball, blast zones, thermal radiation, EMP radius, and fallout plume with wind direction.", science: "Glasstone & Dolan 1977" },
-  { emoji: "🌋", name: "Super Volcano", tagline: "Yellowstone · Toba · Campi Flegrei", color: "#f97316", desc: "Three of Earth's most dangerous supervolcanoes across multiple eruption scales (VEI-6 to VEI-8+). Ash fall ellipses, survival probability, pyroclastic zones, and estimated casualties.", science: "Mastin et al. 2009 · Self 2006 · Ambrose 1998" },
-  { emoji: "🌊", name: "Mega-Tsunami", tagline: "La Palma · Cascadia · Alaska", color: "#0ea5e9", desc: "Four catastrophic wave sources: La Palma, Cumbre Vieja, Cascadia M9+ subduction, and Alaska Aleutian collapse. Wave propagation ellipses with height estimates and inundation zones.", science: "Ward & Day 2001 · Satake 2012 · USGS" },
-  { emoji: "☄️", name: "Pole Shift / ECDO", tagline: "Ben Davidson 90° · TES ECDO 104°", color: "#dc2626", desc: "Two theoretical crustal displacement models. 3D globe animation shows the displacement event, then renders inundation zones accounting for equatorial bulge shift and regional ocean surge.", science: "Ben Davidson · The Ethical Skeptic · Hapgood 1958" },
+  { emoji: "🌊", name: "Sea Level Change", tagline: "−11,000m to +3,048m", color: "#3b82f6", desc: "Visualize coastal flooding at any sea level from deep ocean trenches to full ice melt. Model ice age glaciation, modern IPCC projections, or complete ice sheet collapse. Real ETOPO1 terrain, pixel-accurate inundation.", science: "ETOPO1 · IPCC AR6 · GPW v4" },
+  { emoji: "💥", name: "Asteroid Impact", tagline: "50m to 20km diameter · 11–72 km/s", color: "#ef4444", desc: "Drop any asteroid anywhere on Earth. Calculate crater diameter, blast radius, thermal zone, EMP range, and ocean tsunami generation. Adjust velocity, composition, and angle. Multiple simultaneous impacts for Pro.", science: "Melosh 1989 · Collins et al. 2005 · Satake 2012" },
+  { emoji: "☢️", name: "Nuclear Detonation", tagline: "1kt to 100Mt yield", color: "#a78bfa", desc: "Detonate any nuclear device from tactical warhead to Tsar Bomba scale. Models fireball, blast zones, thermal radiation, EMP radius, and fallout plume. Up to 5 simultaneous strikes for Pro users.", science: "Glasstone & Dolan 1977" },
+  { emoji: "🌋", name: "Volcanoes", tagline: "1,215 Holocene Volcanoes · Supervolcano Sims", color: "#f97316", desc: "Browse all 1,215 Holocene volcanoes from the Smithsonian GVP dataset. Click any to see eruption history, VEI rating, tectonic setting, and simulate an eruption. Supervolcano presets (Yellowstone, Toba, Campi Flegrei) with full ash zone modeling and global casualty estimates.", science: "GVP Smithsonian · Mastin et al. 2009 · Self 2006 · Ambrose 1998" },
+  { emoji: "🌍", name: "Earthquake + Tsunami", tagline: "MMI rings · Active Fault Lines · Tsunami trigger", color: "#fbbf24", desc: "Place any earthquake with custom magnitude, depth, fault type and strike. Seismic intensity rings with survival odds and action advice. 16,000+ active fault lines from GEM Global dataset — click to load fault parameters. M7.5+ thrust faults auto-trigger tsunami simulation with coastal impact dots.", science: "USGS ShakeMap · GEM Global Faults · Wells & Coppersmith 1994" },
+  { emoji: "🌊", name: "Mega-Tsunami", tagline: "La Palma · Cascadia · Alaska · Cumbre Vieja", color: "#0ea5e9", desc: "Four catastrophic wave sources: La Palma, Cumbre Vieja, Cascadia M9+ subduction, and Alaska Aleutian collapse. Wave propagation ellipses with height estimates, arrival times, and inundation zones. Click within the wave zone for arrival time and height estimates.", science: "Ward & Day 2001 · Satake 2012 · USGS" },
+  { emoji: "🌀", name: "Storm Surge", tagline: "T.Storm to Cat 5 · Localised coastal surge", color: "#38bdf8", desc: "Model localised coastal storm surge from any tropical cyclone category. Place surge points along coastlines and calculate inundation from T.Storm through Category 5 conditions. Based on NHC storm surge classifications.", science: "NHC Storm Surge · ETOPO1" },
+  { emoji: "☄️", name: "Pole Shift / ECDO", tagline: "Ben Davidson 90° · TES ECDO 104°", color: "#dc2626", desc: "Two theoretical crustal displacement models. 3D globe animation shows the displacement event, then renders inundation zones accounting for equatorial bulge shift and regional ocean surge. Clearly labeled theoretical.", science: "Ben Davidson · The Ethical Skeptic · Hapgood 1958" },
 ];
 
 // ── Full source list ──────────────────────────────────────────────────────────
@@ -100,6 +106,16 @@ const SOURCES = [
       { name: "Mastin et al. (2009)", title: "A multidisciplinary effort to assign realistic source parameters to models of volcanic ash-cloud transport and deposition", publisher: "Journal of Volcanology and Geothermal Research 186(1–2)", use: "Ash dispersal ellipse geometry: major axis scaled to VEI, minor axis at 0.6×, oriented at 70° prevailing jet stream bearing.", url: "https://doi.org/10.1016/j.jvolgeores.2009.01.006" },
       { name: "Self, S. (2006)", title: "The effects and consequences of very large explosive volcanic eruptions", publisher: "Philosophical Transactions of the Royal Society A 364(1845)", use: "Supervolcano climate impact thresholds and survival zone mortality estimates for Yellowstone/Toba scale events.", url: "https://doi.org/10.1098/rsta.2005.1728" },
       { name: "Ambrose, S.H. (1998)", title: "Late Pleistocene human population bottlenecks, volcanic winter, and differentiation of modern humans", publisher: "Journal of Human Evolution 34(6)", use: "Toba (VEI-8) eruption calibration for population survival thresholds in the Toba preset.", url: "https://doi.org/10.1006/jhev.1998.0219" },
+    ],
+  },
+  {
+    category: "Earthquake & Fault Lines",
+    color: "#fbbf24",
+    items: [
+      { name: "Wells & Coppersmith (1994)", title: "New empirical relationships among magnitude, rupture length, rupture width, rupture area, and surface displacement", publisher: "Bulletin of the Seismological Society of America 84(4)", use: "Fault length from magnitude scaling (log L = 0.59M - 2.44) used for earthquake tsunami ellipse geometry and rupture zone estimation.", url: "https://doi.org/10.1785/BSSA0840041153" },
+      { name: "GEM Global Active Faults (2019)", title: "GEM Global Active Faults Database", publisher: "GEM Foundation / OpenQuake", use: "16,195 active fault traces worldwide. Properties include slip type, average dip, rake, slip rate, seismogenic depth used for fault line overlay and earthquake parameter auto-population.", url: "https://github.com/GEMScienceTools/gem-global-active-faults" },
+      { name: "USGS ShakeMap (Worden et al. 2020)", title: "ShakeMap Manual: Technical Manual, Users Guide, and Software Guide", publisher: "U.S. Geological Survey", use: "MMI intensity ring calibration: M9.1 Tohoku observed zones (X+~60km, IX~110km, V~1000km) used to calibrate attenuation formula.", url: "https://usgs.github.io/shakemap/" },
+      { name: "Smithsonian GVP (2023)", title: "Global Volcanism Program — Volcanoes of the World", publisher: "Smithsonian Institution", use: "1,215 Holocene volcano locations with type, last eruption year, evidence category, tectonic setting and photos. Powers the volcano overlay and eruption simulation.", url: "https://volcano.si.edu/" },
     ],
   },
   {
@@ -149,8 +165,9 @@ const FAQS = [
   { q: "What physics model powers the asteroid impact calculator?", a: "Crater scaling uses Melosh (1989) transient-to-final diameter ratios. Blast and thermal radii use Collins et al. (2005) Earth Impact Effects Program methodology. Casualty estimates combine GPW v4 population data with zone-specific mortality rates (100% fireball, declining through blast and thermal zones)." },
   { q: "What is the ECDO / pole shift theory?", a: "ECDO (Exothermic Core-Mantle Decoupling Oscillation) is a theoretical model by The Ethical Skeptic proposing a 104° crustal displacement event driven by core-mantle thermal dynamics. Ben Davidson (Suspicious Observers) proposes a 90° displacement linked to solar micronova cycles. Both are theoretical — clearly labeled throughout the app — and simulated as presented by their authors. Disaster Map does not endorse or refute these theories." },
   { q: "How are casualty estimates calculated?", a: "Population exposure uses GPW v4 (Gridded Population of the World v4, CIESIN 2018). Deaths are estimated by applying zone-specific mortality rates against exposed population counts. These are rough educational approximations — not suitable for emergency planning or public health use." },
-  { q: "Is Disaster Map free to use?", a: "Yes. The free tier provides access to all 6 scenarios with 10 simulations per hour and 30 per day. The map locks after triggering a catastrophe — unlock Pro ($18.99 lifetime) for full pan, zoom, and higher limits." },
-  { q: "What supervolcano data is used?", a: "Ash dispersal ellipses use VEI-scaled major axis lengths from Mastin et al. (2009), oriented at 70° bearing to reflect prevailing jet stream. Survival thresholds and mortality estimates calibrate to Self (2006) for Yellowstone-scale events and Ambrose (1998) for Toba (VEI-8) supervolcano research." },
+  { q: "Is Disaster Map free to use?", a: "Yes. The free tier provides access to all 9 scenarios including browsing 1,215 volcanoes, earthquake simulation, and fault line viewing — with 10 simulations per hour and 30 per day. The map locks after triggering a catastrophe. Pro ($18.99 lifetime founders price) unlocks globe view, satellite mode, active fault line overlay, full volcano eruption simulation, and higher limits." },
+  { q: "What supervolcano and volcano data is used?", a: "All 1,215 Holocene volcanoes use the Smithsonian Global Volcanism Program (GVP) dataset. Ash dispersal ellipses use VEI-scaled major axis lengths from Mastin et al. (2009). VEI is estimated from volcano type: supervolcanoes and calderas (VEI 7-8), stratovolcanoes (VEI 6), shield volcanoes (VEI 3). Survival thresholds calibrate to Self (2006) and Ambrose (1998)." },
+  { q: "How does the earthquake and fault line simulation work?", a: "Earthquakes use USGS ShakeMap-calibrated attenuation for MMI intensity rings (M9.1 Tohoku observed zones used for calibration). The active fault line overlay uses GEM Global Active Faults (16,195 faults) with slip type, dip, rake, and slip rate. Clicking a fault loads its parameters automatically. M7.5+ thrust/reverse faults trigger a tsunami simulation with coastal impact dots and ellipse-shaped inundation zones derived from fault geometry." },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -232,8 +249,8 @@ export default function Homepage() {
               Simulate Earth's<br />Greatest Threats
             </h1>
             <p style={{ fontSize: 20, color: "#94a3b8", maxWidth: 640, margin: "0 auto 44px", lineHeight: 1.8 }}>
-              Climate change. Asteroid impacts. Nuclear detonations. Mega-tsunamis. Supervolcano eruptions.
-              Sea level rise. Crustal displacement. All on a live 3D globe —
+              Climate change. Asteroid impacts. Nuclear detonations. Mega-tsunamis. Volcanoes. Earthquakes.
+              Sea level rise. Storm surge. Crustal displacement. All on a live 3D globe —
               powered by IPCC projections, peer-reviewed physics and real terrain data.
             </p>
             <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
@@ -264,7 +281,7 @@ export default function Homepage() {
           {/* TRUST BAR */}
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(255,255,255,0.015)" }}>
             <div style={{ maxWidth: 960, margin: "0 auto", padding: "32px 40px", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 24, textAlign: "center" }}>
-              {[["7","Disaster Scenarios"],["ETOPO1","Global Terrain"],["GPW v4","Population Data"],["Real-time","Tile Rendering"],["3D Globe","WebGL Powered"],["Free","To Start"]].map(([v,l]) => (
+              {[["9","Disaster Scenarios"],["1,215","Holocene Volcanoes"],["16,000+","Active Fault Lines"],["ETOPO1","Global Terrain"],["GPW v4","Population Data"],["Free","To Start"]].map(([v,l]) => (
                 <div key={v}>
                   <div style={{ fontSize: 22, fontWeight: 700, color: "#f97316", fontStyle: "italic" }}>{v}</div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, letterSpacing: "0.06em", textTransform: "uppercase" }}>{l}</div>
@@ -275,7 +292,7 @@ export default function Homepage() {
 
           {/* SCENARIOS */}
           <section id="scenarios" style={{ maxWidth: 1120, margin: "0 auto", padding: "80px 40px" }}>
-            <h2 style={{ fontSize: 38, fontWeight: 700, textAlign: "center", marginBottom: 10, fontStyle: "italic" }}>Seven Catastrophe Scenarios</h2>
+            <h2 style={{ fontSize: 38, fontWeight: 700, textAlign: "center", marginBottom: 10, fontStyle: "italic" }}>Nine Catastrophe Scenarios</h2>
             <p style={{ textAlign: "center", color: "#64748b", marginBottom: 56, fontSize: 16, lineHeight: 1.7 }}>
               Each model uses peer-reviewed science, real terrain data, and published casualty frameworks.
               Theoretical models are clearly labeled.
@@ -367,11 +384,11 @@ export default function Homepage() {
           {/* PRICING */}
           <section id="pricing" style={{ maxWidth: 940, margin: "0 auto", padding: "80px 40px" }}>
             <h2 style={{ fontSize: 38, fontWeight: 700, textAlign: "center", marginBottom: 10, fontStyle: "italic" }}>Simple Pricing</h2>
-            <p style={{ textAlign: "center", color: "#64748b", marginBottom: 52, fontSize: 16 }}>Start free with all 7 scenarios. Upgrade to explore without limits.</p>
+            <p style={{ textAlign: "center", color: "#64748b", marginBottom: 52, fontSize: 16 }}>Start free with all 9 scenarios. Upgrade to explore without limits.</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(255px,1fr))", gap: 24 }}>
               {[
-                { tier: "Free", price: "$0", period: "forever", color: "#64748b", features: ["All 6 disaster scenarios","10 simulations / hour","30 simulations / day","Standard map view","Map locked after trigger","Casualty estimates"], cta: null, ctaLabel: "Launch Free" },
-                { tier: "Pro Lifetime", price: "$18.99", period: "one-time · before price increase", color: "#f97316", badge: "FOUNDERS", features: ["All 7 disaster scenarios","50 simulations / hour","200 simulations / day","Globe + Satellite view","Full pan, zoom & explore","Price going up to $24.99 — lock in now"], cta: "https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", ctaLabel: "Lock in Founders Price" },
+                { tier: "Free", price: "$0", period: "forever", color: "#64748b", features: ["All 9 disaster scenarios","10 simulations / hour","30 simulations / day","Browse all 1,215 volcanoes","Supervolcano eruption sims","Earthquake + fault line viewer","Standard map view","Casualty estimates"], cta: null, ctaLabel: "Launch Free" },
+                { tier: "Pro Lifetime", price: "$18.99", period: "one-time · before price increase", color: "#f97316", badge: "FOUNDERS", features: ["All 9 disaster scenarios","50 simulations / hour","200 simulations / day","Globe + Satellite view","Full pan, zoom & explore","Active fault lines overlay","Simulate any volcano eruption","Price going up to $24.99 — lock in now"], cta: "https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", ctaLabel: "Lock in Founders Price" },
 
                 { tier: "Developer Kit", price: "Soon", period: "", color: "#a78bfa", badge: null, features: ["Self-hosted backend","All scenario APIs","Your Mapbox key","Your server, your costs","Single license"], cta: null, ctaLabel: "Coming Soon" },
               ].map(p => (
@@ -394,14 +411,15 @@ export default function Homepage() {
                       <div style={{ fontSize: 11, letterSpacing: "0.12em", color: "#475569", textTransform: "uppercase", marginBottom: 10, fontWeight: 700 }}>Free vs Pro</div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                         {[
-                          { free: "30 simulations / day",    pro: "200 simulations / day" },
-                          { free: "Asteroid up to 5,000 m",  pro: "Asteroid up to 20,000 m" },
-                          { free: "Nuke up to 1 Mt",         pro: "Nuke up to 100 Mt" },
-                          { free: "Flood only cataclysm",    pro: "Wind + Both overlays" },
-                          { free: "1 zone click popup",      pro: "Unlimited zone popups" },
-                          { free: "Map view only",           pro: "Satellite + Globe view" },
-                          { free: "—",                       pro: "Displaced population count" },
-                          { free: "—",                       pro: "🌊 Mega-Tsunami" },
+                          { free: "30 simulations / day",      pro: "200 simulations / day" },
+                          { free: "Asteroid up to 5,000 m",    pro: "Asteroid up to 20,000 m" },
+                          { free: "Nuke up to 1 Mt",           pro: "Nuke up to 100 Mt" },
+                          { free: "Browse volcanoes free",     pro: "Simulate any eruption" },
+                          { free: "Eq. intensity rings",       pro: "Active fault lines overlay" },
+                          { free: "Map view only",             pro: "Satellite + Globe view" },
+                          { free: "1 zone click popup",        pro: "Unlimited zone popups" },
+                          { free: "—",                         pro: "Displaced population count" },
+                          { free: "—",                         pro: "🌊 Mega-Tsunami" },
                         ].map(({ free, pro }, i) => (
                           <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5, fontSize: 12 }}>
                             <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid #1e2d45", borderRadius: 6, padding: "5px 8px", color: free === "—" ? "#334155" : "#64748b" }}>
