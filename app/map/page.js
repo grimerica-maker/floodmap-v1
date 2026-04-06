@@ -7414,13 +7414,13 @@ export default function HomePage() {
 
       {/* ── Paywall modal ── */}
       {paywallModal && (
-        <div onPointerDown={(e) => e.stopPropagation()} onClick={() => setPaywallModal(null)} style={{
+        <div onClick={() => setPaywallModal(null)} style={{
           position: "fixed", inset: 0, zIndex: 2000,
           background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)",
           display: "flex", alignItems: "flex-end", justifyContent: "center",
           fontFamily: "Arial,sans-serif",
         }}>
-          <div onClick={(e) => e.stopPropagation()} style={{
+          <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={{
             background: "#0a0f1e", border: "1px solid #1e2d45", borderRadius: "16px 16px 0 0",
             maxWidth: 480, width: "100%",
             boxShadow: "0 -8px 40px rgba(0,0,0,0.6)",
