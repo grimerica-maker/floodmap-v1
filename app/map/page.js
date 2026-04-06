@@ -1919,6 +1919,34 @@ export default function HomePage() {
       map.on("click", "fault-lines-layer", (e) => {
         const p = e.features[0].properties;
         const lngLat = e.lngLat;
+        const geom = e.features[0].geometry;
+
+        // Compute strike from fault linestring geometry
+        let derivedStrike = null;
+        try {
+          const coords = geom.type === "LineString" ? geom.coordinates
+            : geom.type === "MultiLineString" ? geom.coordinates[0] : null;
+          if (coords && coords.length >= 2) {
+            // Find the segment closest to the click point
+            let bestIdx = 0, bestDist = Infinity;
+            for (let i = 0; i < coords.length - 1; i++) {
+              const mx = (coords[i][0] + coords[i+1][0]) / 2;
+              const my = (coords[i][1] + coords[i+1][1]) / 2;
+              const d = Math.hypot(mx - lngLat.lng, my - lngLat.lat);
+              if (d < bestDist) { bestDist = d; bestIdx = i; }
+            }
+            const [x1, y1] = coords[bestIdx];
+            const [x2, y2] = coords[bestIdx + 1];
+            // Bearing in degrees (0=N, 90=E, 180=S, 270=W)
+            const dLng = (x2 - x1) * Math.cos((y1 + y2) / 2 * Math.PI / 180);
+            const dLat = y2 - y1;
+            let bearing = Math.atan2(dLng, dLat) * 180 / Math.PI;
+            if (bearing < 0) bearing += 360;
+            // Strike convention: 0-180 (direction of fault trace)
+            if (bearing > 180) bearing -= 180;
+            derivedStrike = Math.round(bearing);
+          }
+        } catch(err) {}
 
         // Recurrence interval estimate from slip rate
         // Assumes characteristic earthquake releases ~4m of slip
@@ -1947,6 +1975,7 @@ export default function HomePage() {
           <div style="color:${typeColor};font-weight:700;font-size:14px;margin-bottom:8px">⚡ ${p.name || "Unnamed Fault"}</div>
           <table style="font-size:12px;width:100%;border-collapse:collapse;margin-bottom:6px">
             <tr><td style="color:#94a3b8;padding:3px 8px 3px 0">Type</td><td style="font-weight:700;color:${typeColor}">${p.slip_type || "—"}</td></tr>
+            ${derivedStrike != null ? `<tr><td style="color:#94a3b8;padding:3px 8px 3px 0">Strike</td><td style="font-weight:700">${derivedStrike}°</td></tr>` : ""}
             ${p.dip != null ? `<tr><td style="color:#94a3b8;padding:3px 8px 3px 0">Dip</td><td style="font-weight:700">${Math.round(p.dip)}°</td></tr>` : ""}
             ${p.rake != null ? `<tr><td style="color:#94a3b8;padding:3px 8px 3px 0">Rake</td><td style="font-weight:700">${Math.round(p.rake)}°</td></tr>` : ""}
             ${depthHtml}
@@ -1955,7 +1984,7 @@ export default function HomePage() {
           </table>
           ${tsunamiWarning}
           <div style="display:flex;gap:6px;margin-top:8px">
-            <button onclick="window.__dmFaultSetQuake&&window.__dmFaultSetQuake(${lngLat.lat},${lngLat.lng},'${p.fault_id||"strikeslip"}',${p.dip||45},${p.rake||90})" 
+            <button onclick="window.__dmFaultSetQuake&&window.__dmFaultSetQuake(${lngLat.lat},${lngLat.lng},'${p.fault_id||"strikeslip"}',${p.dip||45},${p.rake||90},${derivedStrike})" 
               style="flex:1;padding:7px;background:#f97316;color:white;border:none;border-radius:7px;cursor:pointer;font-weight:700;font-size:12px;font-family:Arial,sans-serif">
               🌍 Set Quake Here
             </button>
@@ -5619,10 +5648,11 @@ export default function HomePage() {
   // Expose openWikiPanel globally for popup HTML buttons
   useEffect(() => {
     window.__dmWiki = (name, url, wikidata, mpId) => openWikiPanel(name, url, wikidata, mpId);
-    window.__dmFaultSetQuake = (lat, lng, faultId, dip, rake) => {
+    window.__dmFaultSetQuake = (lat, lng, faultId, dip, rake, strike) => {
       setEqFaultId(faultId); eqFaultRef.current = faultId;
       setEqDip(Math.round(dip)); eqDipRef.current = Math.round(dip);
       setEqRake(Math.round(rake)); eqRakeRef.current = Math.round(rake);
+      if (strike != null && !isNaN(strike)) { setEqStrike(strike); eqStrikeRef.current = strike; }
       setScenarioMode("earthquake"); scenarioModeRef.current = "earthquake";
       if (eqMarker.current) { eqMarker.current.remove(); eqMarker.current = null; }
       const el = document.createElement("div");
