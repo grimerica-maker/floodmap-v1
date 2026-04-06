@@ -4563,7 +4563,28 @@ export default function HomePage() {
         const ring = rings.find(r => distKm <= r.radiusKm) || rings[rings.length-1];
         new mapboxgl.Popup({ closeButton:true, maxWidth:"260px", className:"dm-dark-popup" })
           .setLngLat([lng, lat])
-          .setHTML(`<div style="font-family:Arial,sans-serif"><div style="font-size:13px;font-weight:700;color:${ring.color};margin-bottom:6px">MMI ${ring.intensity} — ${ring.label}</div><table style="font-size:11px;width:100%;border-collapse:collapse"><tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Distance</td><td style="font-weight:700">${distKm.toFixed(0)} km</td></tr><tr><td style="color:#94a3b8;padding:2px 8px 2px 0">PGA</td><td style="font-weight:700">${ring.pga}</td></tr><tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Magnitude</td><td style="font-weight:700">M${eqMagRef.current.toFixed(1)}</td></tr></table></div>`)
+          .setHTML((() => {
+            const mmiData = {
+              "X+": { survival:"<5%",    color:"#7f1d1d", damage:"Total destruction — no structure survives. Ground rupture, landslides, permanent displacement.",       action:"No survivable action. Deep underground only." },
+              "IX": { survival:"5-15%",  color:"#b91c1c", damage:"Most masonry and frame structures destroyed. Well-built structures severely damaged or collapsed.",   action:"Reinforced underground shelter only. Evacuate immediately if possible." },
+              "VIII":{ survival:"20-40%",color:"#dc2626", damage:"Considerable damage to ordinary buildings, partial collapse. Heavy furniture overturned, walls crack.", action:"Get under sturdy table, away from windows. Evacuate after shaking stops." },
+              "VII": { survival:"50-70%",color:"#ea580c", damage:"Negligible damage in good buildings, moderate in ordinary. Chimneys, parapets fall.",                  action:"Drop, cover, hold on. Move away from buildings after shaking." },
+              "VI":  { survival:"75-90%",color:"#f97316", damage:"Felt by all. Furniture moves, minor damage to poorly built structures. Windows may break.",             action:"Drop, cover, hold on. Expect minor injuries from falling objects." },
+              "V":   { survival:">95%",  color:"#ca8a04", damage:"Felt strongly. Sleepers wakened, small objects fall. No structural damage.",                            action:"Secure yourself. Minor hazard from loose objects." },
+            };
+            const d = mmiData[ring.intensity] || mmiData["V"];
+            return `<div style="font-family:Arial,sans-serif;max-width:260px">
+              <div style="font-size:13px;font-weight:700;color:${ring.color};margin-bottom:6px">MMI ${ring.intensity} — ${ring.label}</div>
+              <table style="font-size:11px;width:100%;border-collapse:collapse;margin-bottom:8px">
+                <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Distance</td><td style="font-weight:700">${distKm.toFixed(0)} km</td></tr>
+                <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">PGA</td><td style="font-weight:700">${ring.pga}</td></tr>
+                <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Magnitude</td><td style="font-weight:700">M${eqMagRef.current.toFixed(1)}</td></tr>
+                <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Survival odds</td><td style="font-weight:700;color:${d.color}">${d.survival}</td></tr>
+              </table>
+              <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;line-height:1.5"><b style="color:#e2e8f0">Damage:</b> ${d.damage}</div>
+              <div style="font-size:11px;color:#fbbf24;line-height:1.5"><b>⚠ Action:</b> ${d.action}</div>
+            </div>`;
+          })())
           .addTo(mapRef.current);
         return;
       }
