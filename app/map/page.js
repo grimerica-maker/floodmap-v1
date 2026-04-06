@@ -1562,7 +1562,7 @@ export default function HomePage() {
       const isMegalith = type === "megaliths";
       map.addSource(c.src, {
         type: "geojson", data,
-        ...(isMegalith ? { cluster: true, clusterMaxZoom: 8, clusterRadius: 40 } : {}),
+        ...(isMegalith ? { cluster: true, clusterMaxZoom: 11, clusterRadius: 25 } : {}),
       });
 
       // Cluster layers for megaliths
@@ -1577,14 +1577,16 @@ export default function HomePage() {
         });
         map.addLayer({ id: c.layer + "-count", type: "symbol", source: c.src,
           filter: ["has", "point_count"],
-          layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 13, "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"] },
-          paint: { "text-color": "#fff", "text-halo-color": "rgba(0,0,0,0.4)", "text-halo-width": 1 }
+          layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 14, "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"] },
+          paint: { "text-color": "#fff", "text-halo-color": "rgba(0,0,0,0.8)", "text-halo-width": 2 }
         });
-        // Click cluster to zoom in
+        // Click cluster to zoom in — stopPropagation prevents individual dot popup
         map.on("click", c.layer + "-clusters", (e) => {
+          e.originalEvent.stopPropagation();
           const f = map.queryRenderedFeatures(e.point, { layers: [c.layer + "-clusters"] })[0];
+          if (!f) return;
           map.getSource(c.src).getClusterExpansionZoom(f.properties.cluster_id, (err, zoom) => {
-            if (!err) map.easeTo({ center: f.geometry.coordinates, zoom });
+            if (!err) map.easeTo({ center: f.geometry.coordinates, zoom: Math.min(zoom + 1, 14) });
           });
         });
         map.on("mouseenter", c.layer + "-clusters", () => { map.getCanvas().style.cursor = "pointer"; });
@@ -4801,6 +4803,14 @@ export default function HomePage() {
           .filter(l => { try { return !!map.getLayer(l); } catch { return false; } });
 
         if (activeLayers.length > 0) {
+          // Don't open dot popup if a cluster was clicked — cluster zoom handler takes it
+          const clusterLayers = Object.entries(OVL)
+            .filter(([type]) => { const refs = { megaliths: megalithOnRef, unesco: unescoOnRef, airports: airportOnRef, nuclear: nuclearOnRef, fires: fireOnRef }; return refs[type]?.current; })
+            .map(([, c]) => c.layer + "-clusters")
+            .filter(l => { try { return !!map.getLayer(l); } catch { return false; } });
+          const clusterHit = clusterLayers.length > 0 && map.queryRenderedFeatures(e.point, { layers: clusterLayers }).length > 0;
+          if (clusterHit) { /* cluster click handled separately */ }
+          else {
           const feats = map.queryRenderedFeatures(e.point, { layers: activeLayers });
           if (feats.length > 0) {
             const p   = feats[0].properties;
@@ -4851,6 +4861,7 @@ export default function HomePage() {
             overlayPopupRef.current = popup;
             return;
           }
+          } // end else (not cluster)
         }
       }
 
