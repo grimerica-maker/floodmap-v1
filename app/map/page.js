@@ -1294,6 +1294,8 @@ export default function HomePage() {
   const [megalithLoading, setMegalithLoading] = useState(false);
   const [faultLinesOn, setFaultLinesOn] = useState(false);
   const faultLinesOnRef = useRef(false);
+  const [volcanoOn, setVolcanoOn] = useState(false);
+  const volcanoOnRef = useRef(false);
   const [airportOn, setAirportOn] = useState(false);
   const airportOnRef = useRef(false);
   const [unescoOn, setUnescoOn] = useState(false);
@@ -1693,6 +1695,86 @@ export default function HomePage() {
       map.on("mouseenter", "fault-lines-layer", () => { map.getCanvas().style.cursor = "pointer"; });
       map.on("mouseleave", "fault-lines-layer", () => { map.getCanvas().style.cursor = "crosshair"; });
     } catch(e) { console.warn("Fault lines error:", e); }
+  };
+
+  const addVolcanoes = async () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    try {
+      if (map.getLayer("volcano-layer")) map.removeLayer("volcano-layer");
+      if (map.getLayer("volcano-super-layer")) map.removeLayer("volcano-super-layer");
+      if (map.getSource("volcano-src")) map.removeSource("volcano-src");
+    } catch(e) {}
+    try {
+      const res = await fetch(`${floodEngineUrlRef.current}/volcanoes`, { cache: "force-cache" });
+      if (!res.ok) return;
+      const data = await res.json();
+      map.addSource("volcano-src", { type:"geojson", data });
+
+      // Regular volcanoes
+      map.addLayer({ id:"volcano-layer", type:"circle", source:"volcano-src",
+        filter:["!=",["get","is_super"],true],
+        paint:{
+          "circle-color":["get","color"],
+          "circle-radius":["interpolate",["linear"],["zoom"],2,3,6,5,10,8],
+          "circle-opacity":0.85,
+          "circle-stroke-width":1,"circle-stroke-color":"#000","circle-stroke-opacity":0.4,
+        }
+      });
+
+      // Supervolcanoes — larger, pulsing orange ring
+      map.addLayer({ id:"volcano-super-layer", type:"circle", source:"volcano-src",
+        filter:["==",["get","is_super"],true],
+        paint:{
+          "circle-color":"#ff4500",
+          "circle-radius":["interpolate",["linear"],["zoom"],2,7,6,12,10,18],
+          "circle-opacity":0.95,
+          "circle-stroke-width":3,"circle-stroke-color":"#fff","circle-stroke-opacity":0.9,
+        }
+      });
+
+      // Click handler
+      const handleVolcanoClick = (e) => {
+        const p = e.features[0].properties;
+        const lastEr = p.last_eruption > 0 ? p.last_eruption : (p.last_eruption < 0 ? `${Math.abs(p.last_eruption)} BCE` : "Unknown");
+        const superBadge = p.is_super ? `<div style="background:#ff4500;color:white;fontSize:10px;fontWeight:700;padding:2px 8px;borderRadius:8px;display:inline-block;marginBottom:8px;letterSpacing:0.08em">⚠ SUPERVOLCANO</div><br/>` : "";
+        const actColor = {"active":"#ef4444","recent":"#f97316","holocene":"#fbbf24","supervolcano":"#ff4500","dormant":"#64748b"}[p.activity]||"#94a3b8";
+        new mapboxgl.Popup({ closeButton:true, maxWidth:"320px", className:"elev-popup" })
+          .setLngLat(e.lngLat)
+          .setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px">
+            ${superBadge}
+            <div style="font-weight:700;font-size:15px;color:#e2e8f0;margin-bottom:6px">🌋 ${p.name}</div>
+            <table style="font-size:11px;width:100%;border-collapse:collapse;margin-bottom:8px">
+              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Type</td><td style="font-weight:700;color:#e2e8f0">${p.type||"—"}</td></tr>
+              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Country</td><td>${p.country||"—"}</td></tr>
+              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Elevation</td><td>${p.elevation!=null?p.elevation+"m":"—"}</td></tr>
+              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Last eruption</td><td style="font-weight:700">${lastEr}</td></tr>
+              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Activity</td><td style="color:${actColor};font-weight:700">${p.activity}</td></tr>
+              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Risk</td><td style="color:${actColor}">${p.risk||"—"}</td></tr>
+              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Tectonic</td><td style="font-size:10px">${(p.tectonic||"").split("/")[0]}</td></tr>
+            </table>
+            ${p.summary ? `<div style="color:#64748b;font-size:10px;line-height:1.5;margin-bottom:8px">${p.summary}${p.summary.length>=400?"…":""}</div>` : ""}
+            ${p.photo ? `<img src="${p.photo}" style="width:100%;border-radius:6px;margin-bottom:8px" onerror="this.style.display='none'"/>` : ""}
+            ${p.is_super ? `<button onclick="window.__dmEruptVolcano&&window.__dmEruptVolcano(${e.lngLat.lat},${e.lngLat.lng},'${p.name}')" style="width:100%;padding:8px;background:#ff4500;color:white;border:none;border-radius:7px;cursor:pointer;font-weight:700;font-size:13px;font-family:Arial,sans-serif">💥 Simulate Eruption</button>` : ""}
+          </div>`)
+          .addTo(map);
+      };
+
+      map.on("click","volcano-layer", handleVolcanoClick);
+      map.on("click","volcano-super-layer", handleVolcanoClick);
+      map.on("mouseenter","volcano-layer",()=>{ map.getCanvas().style.cursor="pointer"; });
+      map.on("mouseleave","volcano-layer",()=>{ map.getCanvas().style.cursor=""; });
+      map.on("mouseenter","volcano-super-layer",()=>{ map.getCanvas().style.cursor="pointer"; });
+      map.on("mouseleave","volcano-super-layer",()=>{ map.getCanvas().style.cursor=""; });
+
+    } catch(e) { console.warn("Volcano overlay error:", e); }
+  };
+
+  const removeVolcanoes = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    ["volcano-layer","volcano-super-layer"].forEach(l => { try { if(map.getLayer(l)) map.removeLayer(l); } catch(e){} });
+    try { if(map.getSource("volcano-src")) map.removeSource("volcano-src"); } catch(e) {}
   };
 
   const removeFaultLines = () => {
@@ -5153,6 +5235,14 @@ export default function HomePage() {
     window.__dmFaultClear = () => {
       document.querySelectorAll(".mapboxgl-popup").forEach(p => p.remove());
     };
+    window.__dmEruptVolcano = (lat, lng, name) => {
+      document.querySelectorAll(".mapboxgl-popup").forEach(p => p.remove());
+      // Switch to Yellowstone scenario and run it at this volcano's location
+      setScenarioMode("yellowstone"); scenarioModeRef.current = "yellowstone";
+      setTimeout(() => {
+        if (window.__dmTriggerYellowstone) window.__dmTriggerYellowstone(lat, lng, name);
+      }, 300);
+    };
     return () => { delete window.__dmWiki; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -6298,6 +6388,27 @@ export default function HomePage() {
       {/* ── MAP OVERLAYS ── */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#d97706", textTransform: "uppercase" }}>Map Overlays</div>
+
+        {/* Volcanoes */}
+        <div onClick={() => {
+          const next = !volcanoOn;
+          setVolcanoOn(next); volcanoOnRef.current = next;
+          next ? addVolcanoes() : removeVolcanoes();
+        }} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 10px", marginBottom:8, borderRadius:9, cursor:"pointer",
+          background: volcanoOn ? "rgba(255,69,0,0.12)" : "rgba(255,255,255,0.03)",
+          border: volcanoOn ? "1px solid rgba(255,69,0,0.4)" : "1px solid transparent",
+        }}>
+          <span style={{ fontSize:18 }}>🌋</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:13, fontWeight:700, color: volcanoOn ? "#ff6600" : "#cbd5e1" }}>Volcanoes</div>
+            <div style={{ fontSize:10, color:"#475569", marginTop:1 }}>
+              {volcanoOn ? "Click for info · supervolcanoes can erupt" : "GVP · 1,215 Holocene volcanoes · supervolcanoes highlighted"}
+            </div>
+          </div>
+          <div style={{ width:28, height:16, borderRadius:8, background: volcanoOn ? "#ff4500" : "#1e2d45", position:"relative", flexShrink:0, transition:"background 0.2s" }}>
+            <div style={{ position:"absolute", top:2, left: volcanoOn ? 14 : 2, width:12, height:12, borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
+          </div>
+        </div>
         {Object.entries(OVL).map(([type, cfg]) => {
           const isOn = { megaliths: megalithOn, unesco: unescoOn, airports: airportOn, nuclear: nuclearOn, fires: fireOn }[type];
           const locked = cfg.proOnly && proTier === "free";
