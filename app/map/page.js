@@ -1656,27 +1656,60 @@ export default function HomePage() {
           "line-opacity": 0.75,
         }
       });
-      // Click fault line to populate earthquake params
+      // Click fault line — rich info popup with action buttons
       map.on("click", "fault-lines-layer", (e) => {
         const p = e.features[0].properties;
-        // Set fault type
-        const fid = p.fault_id || "strikeslip";
-        setEqFault(fid); eqFaultRef.current = fid;
-        // Set dip if available
-        if (p.dip) { setEqDip(Math.round(p.dip)); eqDipRef.current = Math.round(p.dip); }
-        // Set rake if available  
-        if (p.rake) { setEqRake(Math.round(p.rake)); eqRakeRef.current = Math.round(p.rake); }
-        // Switch to earthquake mode
-        setScenarioMode("earthquake"); scenarioModeRef.current = "earthquake";
-        // Show popup
-        new mapboxgl.Popup({ closeButton: true, maxWidth: "240px", className: "elev-popup" })
-          .setLngLat(e.lngLat)
-          .setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px;padding:2px 4px">
-            <div style="color:${p.color};font-weight:700;margin-bottom:4px">⚡ ${p.name || "Unnamed Fault"}</div>
-            <div style="color:#94a3b8;font-size:11px;margin-bottom:2px">Type: <b style="color:#e2e8f0">${p.slip_type || "—"}</b></div>
-            ${p.dip ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:2px">Dip: <b style="color:#e2e8f0">${Math.round(p.dip)}°</b></div>` : ""}
-            <div style="color:#4ade80;font-size:11px;margin-top:4px">✓ Fault params loaded — click map to place epicenter</div>
-          </div>`)
+        const lngLat = e.lngLat;
+
+        // Recurrence interval estimate from slip rate
+        // Assumes characteristic earthquake releases ~4m of slip
+        // Recurrence (yrs) ≈ slip_per_event_mm / slip_rate_mm_yr
+        let recurrenceHtml = "";
+        if (p.slip_rate && p.slip_rate > 0) {
+          const slipPerEvent = p.slip_type && p.slip_type.toLowerCase().includes("strike") ? 3000 : 4000; // mm
+          const recurrence = Math.round(slipPerEvent / p.slip_rate);
+          const lastBig = recurrence < 500 ? "Frequent" : recurrence < 2000 ? "Moderate" : "Infrequent";
+          const risk = p.slip_rate > 10 ? "#ef4444" : p.slip_rate > 2 ? "#f97316" : "#fbbf24";
+          recurrenceHtml = `
+            <tr><td style="color:#94a3b8;padding:3px 8px 3px 0">Slip rate</td><td style="font-weight:700">${p.slip_rate.toFixed(1)} mm/yr</td></tr>
+            <tr><td style="color:#94a3b8;padding:3px 8px 3px 0">Est. recurrence</td><td style="font-weight:700;color:${risk}">~${recurrence.toLocaleString()} yrs</td></tr>
+            <tr><td style="color:#94a3b8;padding:3px 8px 3px 0">Activity</td><td style="font-weight:700;color:${risk}">${lastBig}</td></tr>`;
+        }
+
+        const depthHtml = (p.upper_depth != null && p.lower_depth != null)
+          ? `<tr><td style="color:#94a3b8;padding:3px 8px 3px 0">Seis. depth</td><td style="font-weight:700">${p.upper_depth}–${p.lower_depth} km</td></tr>` : "";
+
+        const typeColor = p.color || "#94a3b8";
+        const tsunamiWarning = p.fault_id === "thrust"
+          ? `<div style="color:#38bdf8;font-size:11px;margin:8px 0 4px;padding:6px 8px;background:rgba(56,189,248,0.1);border-radius:6px;border:1px solid rgba(56,189,248,0.2)">🌊 Reverse/thrust fault — tsunami risk if offshore</div>` : "";
+
+        const popupId = "fault-popup-" + Date.now();
+        const html = `<div id="${popupId}" style="font-family:Arial,sans-serif;font-size:13px;min-width:240px">
+          <div style="color:${typeColor};font-weight:700;font-size:14px;margin-bottom:8px">⚡ ${p.name || "Unnamed Fault"}</div>
+          <table style="font-size:12px;width:100%;border-collapse:collapse;margin-bottom:6px">
+            <tr><td style="color:#94a3b8;padding:3px 8px 3px 0">Type</td><td style="font-weight:700;color:${typeColor}">${p.slip_type || "—"}</td></tr>
+            ${p.dip != null ? `<tr><td style="color:#94a3b8;padding:3px 8px 3px 0">Dip</td><td style="font-weight:700">${Math.round(p.dip)}°</td></tr>` : ""}
+            ${p.rake != null ? `<tr><td style="color:#94a3b8;padding:3px 8px 3px 0">Rake</td><td style="font-weight:700">${Math.round(p.rake)}°</td></tr>` : ""}
+            ${depthHtml}
+            ${recurrenceHtml}
+            ${p.catalog ? `<tr><td style="color:#475569;padding:3px 8px 3px 0;font-size:10px">Source</td><td style="font-size:10px;color:#475569">${p.catalog}</td></tr>` : ""}
+          </table>
+          ${tsunamiWarning}
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <button onclick="window.__dmFaultSetQuake&&window.__dmFaultSetQuake(${lngLat.lat},${lngLat.lng},'${p.fault_id||"strikeslip"}',${p.dip||45},${p.rake||90})" 
+              style="flex:1;padding:7px;background:#f97316;color:white;border:none;border-radius:7px;cursor:pointer;font-weight:700;font-size:12px;font-family:Arial,sans-serif">
+              🌍 Set Quake Here
+            </button>
+            <button onclick="window.__dmFaultClear&&window.__dmFaultClear()"
+              style="flex:1;padding:7px;background:transparent;color:#475569;border:1px solid #334155;border-radius:7px;cursor:pointer;font-size:12px;font-family:Arial,sans-serif">
+              Clear
+            </button>
+          </div>
+        </div>`;
+
+        new mapboxgl.Popup({ closeButton: true, maxWidth: "300px", className: "elev-popup" })
+          .setLngLat(lngLat)
+          .setHTML(html)
           .addTo(map);
       });
       map.on("mouseenter", "fault-lines-layer", () => { map.getCanvas().style.cursor = "pointer"; });
@@ -5126,6 +5159,25 @@ export default function HomePage() {
   // Expose openWikiPanel globally for popup HTML buttons
   useEffect(() => {
     window.__dmWiki = (name, url, wikidata, mpId) => openWikiPanel(name, url, wikidata, mpId);
+    window.__dmFaultSetQuake = (lat, lng, faultId, dip, rake) => {
+      setEqFaultId(faultId); eqFaultRef.current = faultId;
+      setEqDip(Math.round(dip)); eqDipRef.current = Math.round(dip);
+      setEqRake(Math.round(rake)); eqRakeRef.current = Math.round(rake);
+      setScenarioMode("earthquake"); scenarioModeRef.current = "earthquake";
+      if (eqMarker.current) { eqMarker.current.remove(); eqMarker.current = null; }
+      const el = document.createElement("div");
+      el.style.cssText = "width:24px;height:24px;background:#fbbf24;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 3px #f59e0b,0 2px 8px rgba(0,0,0,0.5);cursor:pointer;";
+      const map = mapRef.current;
+      if (map) {
+        eqMarker.current = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([lng, lat]).addTo(map);
+        setEqPoint({ lat, lng }); eqPointRef.current = { lat, lng };
+      }
+      document.querySelectorAll(".mapboxgl-popup").forEach(p => p.remove());
+      setStatusMsg("Fault loaded — adjust magnitude and hit Trigger");
+    };
+    window.__dmFaultClear = () => {
+      document.querySelectorAll(".mapboxgl-popup").forEach(p => p.remove());
+    };
     return () => { delete window.__dmWiki; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -6244,6 +6296,7 @@ export default function HomePage() {
       {/* ── FAULT LINES — earthquake mode only ── */}
       {"earthquake" === scenarioMode && (
         <div onClick={() => {
+          if (proTierRef.current === "free") { setPaywallModal("pro"); return; }
           const next = !faultLinesOn;
           setFaultLinesOn(next); faultLinesOnRef.current = next;
           next ? addFaultLines() : removeFaultLines();
@@ -6255,9 +6308,12 @@ export default function HomePage() {
         }}>
           <span style={{ fontSize:18 }}>⚡</span>
           <div style={{ flex:1 }}>
-            <div style={{ fontSize:13, fontWeight:700, color: faultLinesOn ? "#ef4444" : "#cbd5e1" }}>Active Fault Lines</div>
+            <div style={{ fontSize:13, fontWeight:700, color: faultLinesOn ? "#ef4444" : "#cbd5e1" }}>
+              Active Fault Lines
+              {proTierRef.current === "free" && <span style={{ marginLeft:6, fontSize:10, color:"#f97316" }}>PRO</span>}
+            </div>
             <div style={{ fontSize:10, color:"#475569", marginTop:1 }}>
-              {faultLinesOn ? "Click a fault to load its params" : "GEM Global · 16,000+ faults · click to set params"}
+              {faultLinesOn ? "Click a fault for info + set quake" : "GEM Global · 16,000+ faults · slip rates · recurrence"}
             </div>
           </div>
           <div style={{ width:28, height:16, borderRadius:8, background: faultLinesOn ? "#ef4444" : "#1e2d45", position:"relative", flexShrink:0, transition:"background 0.2s" }}>
