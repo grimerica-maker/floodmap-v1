@@ -1755,7 +1755,7 @@ export default function HomePage() {
             </table>
             ${p.summary ? `<div style="color:#64748b;font-size:10px;line-height:1.5;margin-bottom:8px">${p.summary}${p.summary.length>=400?"…":""}</div>` : ""}
             ${p.photo ? `<img src="${p.photo}" style="width:100%;border-radius:6px;margin-bottom:8px" onerror="this.style.display='none'"/>` : ""}
-            <button onclick="window.__dmEruptVolcano&&window.__dmEruptVolcano(${e.lngLat.lat},${e.lngLat.lng},'${p.name}','${(p.type||"").replace(/'/g,"")}',${ p.is_super ? "true" : "false"})" style="width:100%;padding:8px;background:${p.is_super ? "#ff4500" : "#b91c1c"};color:white;border:none;border-radius:7px;cursor:pointer;font-weight:700;font-size:13px;font-family:Arial,sans-serif">💥 Simulate Eruption</button>
+            <button onclick="window.__dmEruptVolcano&&window.__dmEruptVolcano(${e.lngLat.lat},${e.lngLat.lng},'${(p.name||"").replace(/'/g,"")}','${(p.type||"").replace(/'/g,"")}',${!!p.is_super})" style="width:100%;padding:10px;background:${p.is_super ? '#ff4500' : '#ea580c'};color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;font-family:Arial,sans-serif">Simulate Eruption</button>
           </div>`)
           .addTo(map);
       };
@@ -5440,8 +5440,8 @@ export default function HomePage() {
         <button
           onClick={() => { clearSurge(); clearEarthquake(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); setScenarioMode("yellowstone"); }}
           style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "yellowstone" ? "#431407" : "#111827", color: scenarioMode === "yellowstone" ? "#fb923c" : "#94a3b8", border: scenarioMode === "yellowstone" ? "1px solid #ea580c" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>🌋 Super Volcano</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["yellowstone"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
-          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Supervolcano eruption scenarios</div>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>🌋 Volcanoes</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["yellowstone"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Global volcanoes · eruption sims</div>
         </button>
         <button
           onClick={() => { clearSurge(); clearEarthquake(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); scenarioModeRef.current = "tsunami"; setScenarioMode("tsunami"); }}
@@ -6319,7 +6319,28 @@ export default function HomePage() {
 
       {scenarioMode === "yellowstone" && (
         <>
-          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#ea580c", textTransform: "uppercase" }}>Volcano</div>
+          {/* Volcano overlay toggle */}
+          <div onClick={() => {
+            const next = !volcanoOn;
+            setVolcanoOn(next); volcanoOnRef.current = next;
+            next ? addVolcanoes() : removeVolcanoes();
+          }} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 10px", marginBottom:12,
+            borderRadius:9, cursor:"pointer",
+            background: volcanoOn ? "rgba(255,69,0,0.12)" : "rgba(255,255,255,0.03)",
+            border: volcanoOn ? "1px solid rgba(255,69,0,0.4)" : "1px solid #1e2d45",
+          }}>
+            <span style={{ fontSize:18 }}>🌋</span>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:13, fontWeight:700, color: volcanoOn ? "#ff6600" : "#cbd5e1" }}>Show All Volcanoes</div>
+              <div style={{ fontSize:10, color:"#475569", marginTop:1 }}>
+                {volcanoOn ? "Click any volcano to simulate eruption" : "1,215 Holocene volcanoes · click to erupt"}
+              </div>
+            </div>
+            <div style={{ width:28, height:16, borderRadius:8, background: volcanoOn ? "#ff4500" : "#1e2d45", position:"relative", flexShrink:0, transition:"background 0.2s" }}>
+              <div style={{ position:"absolute", top:2, left: volcanoOn ? 14 : 2, width:12, height:12, borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
+            </div>
+          </div>
+          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#ea580c", textTransform: "uppercase" }}>⚠ Supervolcano Presets</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
             {[
               { key: "yellowstone", label: "Yellowstone", sub: "Wyoming" },
@@ -6458,27 +6479,6 @@ export default function HomePage() {
       {/* ── MAP OVERLAYS ── */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#d97706", textTransform: "uppercase" }}>Map Overlays</div>
-
-        {/* Volcanoes */}
-        <div onClick={() => {
-          const next = !volcanoOn;
-          setVolcanoOn(next); volcanoOnRef.current = next;
-          next ? addVolcanoes() : removeVolcanoes();
-        }} style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 10px", marginBottom:8, borderRadius:9, cursor:"pointer",
-          background: volcanoOn ? "rgba(255,69,0,0.12)" : "rgba(255,255,255,0.03)",
-          border: volcanoOn ? "1px solid rgba(255,69,0,0.4)" : "1px solid transparent",
-        }}>
-          <span style={{ fontSize:18 }}>🌋</span>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:13, fontWeight:700, color: volcanoOn ? "#ff6600" : "#cbd5e1" }}>Volcanoes</div>
-            <div style={{ fontSize:10, color:"#475569", marginTop:1 }}>
-              {volcanoOn ? "Click for info · supervolcanoes can erupt" : "GVP · 1,215 Holocene volcanoes · supervolcanoes highlighted"}
-            </div>
-          </div>
-          <div style={{ width:28, height:16, borderRadius:8, background: volcanoOn ? "#ff4500" : "#1e2d45", position:"relative", flexShrink:0, transition:"background 0.2s" }}>
-            <div style={{ position:"absolute", top:2, left: volcanoOn ? 14 : 2, width:12, height:12, borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
-          </div>
-        </div>
         {Object.entries(OVL).map(([type, cfg]) => {
           const isOn = { megaliths: megalithOn, unesco: unescoOn, airports: airportOn, nuclear: nuclearOn, fires: fireOn }[type];
           const locked = cfg.proOnly && proTier === "free";
