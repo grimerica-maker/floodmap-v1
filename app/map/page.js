@@ -5173,7 +5173,7 @@ export default function HomePage() {
         setEqPoint({ lat, lng }); eqPointRef.current = { lat, lng };
       }
       document.querySelectorAll(".mapboxgl-popup").forEach(p => p.remove());
-      setStatusMsg("Fault loaded — adjust magnitude and hit Trigger");
+      setStatus("Fault loaded — adjust magnitude and hit Trigger");
     };
     window.__dmFaultClear = () => {
       document.querySelectorAll(".mapboxgl-popup").forEach(p => p.remove());
