@@ -7414,80 +7414,34 @@ export default function HomePage() {
 
       {/* ── Paywall modal ── */}
       {paywallModal && (
-        <div onClick={() => setPaywallModal(null)} style={{
-          position: "fixed", inset: 0, zIndex: 2000,
-          background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)",
-          display: "flex", alignItems: "flex-end", justifyContent: "center",
-          fontFamily: "Arial,sans-serif",
-        }}>
-          <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={{
-            background: "#0a0f1e", border: "1px solid #1e2d45", borderRadius: "16px 16px 0 0",
-            maxWidth: 480, width: "100%",
-            boxShadow: "0 -8px 40px rgba(0,0,0,0.6)",
-            display: "flex", flexDirection: "column",
-            maxHeight: "85dvh",
-          }}>
-          <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "20px 20px 0", flex: 1 }}>
-            
-            {paywallModal === "ratelimit" ? (<>
-              <div style={{ textAlign: "center", color: "#e2e8f0", fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Simulation Limit Reached</div>
-              <div style={{ color: "#64748b", fontSize: 13, textAlign: "center", marginBottom: 20, lineHeight: 1.6 }}>
-                You've used {rlStatus.dayCount}/{FREE_SIM_PER_DAY} simulations today.<br/>
-                Upgrade to Pro for more.
-              </div>
-            </>) : (<>
-              <div style={{ textAlign: "center", color: "#e2e8f0", fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
-                Pro Feature
-              </div>
-              <div style={{ color: "#64748b", fontSize: 13, textAlign: "center", marginBottom: 20, lineHeight: 1.6 }}>
-                {paywallModal === "pro" && scenarioMode === "cataclysm"
-                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to access Wind &amp; Both overlays and zoom/pan the post-cataclysm world. Founders price $18.99 lifetime — going up to $24.99 soon.</>
-                  : paywallModal === "pro" && scenarioMode === "tsunami"
-                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to zoom, pan and explore the tsunami inundation zone. Founders price $18.99 lifetime — going up to $24.99 soon.</>
-                  : paywallModal === "pro" && scenarioMode === "impact"
-                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to simulate asteroids up to <strong style={{ color: "#e2e8f0" }}>20,000 m</strong> diameter, place up to <strong style={{ color: "#e2e8f0" }}>3 simultaneous impacts</strong>, adjust <strong style={{ color: "#e2e8f0" }}>impact velocity</strong> (11–72 km/s), and click any zone for detailed survival data. Founders price $18.99 lifetime — going up to $24.99 soon.</>
-                  : paywallModal === "pro" && scenarioMode === "nuke"
-                  ? <>Unlock <strong style={{ color: "#f97316" }}>Pro</strong> to detonate up to <strong style={{ color: "#e2e8f0" }}>100 Mt</strong> (free: 1 Mt), place up to <strong style={{ color: "#e2e8f0" }}>5 simultaneous strikes</strong>, and click any blast zone for detailed analysis. Founders price $18.99 lifetime — going up to $24.99 soon.</>
-                  : "This feature requires Pro. Founders price $18.99 lifetime — going up to $24.99 soon."}
-              </div>
-            </>)}
-
-            {/* Pro tier — Founders Lifetime */}
-            <div style={{ background: "#111827", border: "1px solid #f97316", borderRadius: 12, padding: "14px 16px", marginBottom: 8, position: "relative" }}>
-              <div style={{ position: "absolute", top: -10, right: 12, background: "#f97316", color: "white", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, letterSpacing: "0.08em" }}>FOUNDERS PRICE</div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                <span style={{ color: "#60a5fa", fontWeight: 700, fontSize: 15 }}>⚡ Pro Lifetime</span>
-                <span style={{ color: "#f97316", fontWeight: 700, fontSize: 15 }}>$18.99 once</span>
-              </div>
-              <div style={{ fontSize: 11, color: "#f97316", marginBottom: 8 }}>Price going up to $24.99 soon — lock in now</div>
-              <div style={{ color: "#94a3b8", fontSize: 12, lineHeight: 1.7 }}>
-                ✓ More simulations · bigger impacts · higher yields<br/>
-                ✓ Satellite + Globe view · Mega-Tsunami<br/>
-                ✓ Flood displaced population counts<br/>
-                ✓ Wind &amp; cataclysm overlays · Wikipedia panel<br/>
-                ✓ No ads · No subscription · Yours forever
-              </div>
-              <button onClick={() => { window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank"); }}
-                style={{ width: "100%", marginTop: 12, padding: "10px", background: "#f97316", color: "white", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
-                Lock in Founders Price — $18.99 →
-              </button>
+        <div style={{ position:"fixed", inset:0, zIndex:2000, background:"rgba(0,0,0,0.75)", fontFamily:"Arial,sans-serif" }}
+          onClick={() => setPaywallModal(null)}>
+          <div style={{ position:"fixed", bottom:0, left:0, right:0, background:"#0a0f1e",
+            borderTop:"2px solid #f97316", borderRadius:"16px 16px 0 0", padding:"24px 20px 44px", zIndex:2001 }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ color:"#e2e8f0", fontWeight:700, fontSize:17, marginBottom:6, textAlign:"center" }}>
+              {paywallModal === "ratelimit" ? "Simulation Limit Reached" : "🔒 Pro Feature"}
             </div>
-
-
-
-
-
-          </div>{/* end scroll area */}
-            {/* Sticky bottom — always visible regardless of scroll */}
-            <div style={{ padding: "12px 20px 32px", display: "flex", gap: 8, flexShrink: 0, borderTop: "1px solid #1e2d45" }}>
+            <div style={{ color:"#64748b", fontSize:13, textAlign:"center", marginBottom:16, lineHeight:1.4 }}>
+              {paywallModal === "ratelimit"
+                ? `${rlStatus.dayCount}/${FREE_SIM_PER_DAY} simulations used today.`
+                : "Unlock Pro — $18.99 lifetime. No subscription ever."}
+            </div>
+            <button onClick={() => window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09","_blank")}
+              style={{ display:"block", width:"100%", padding:"14px", background:"#f97316", color:"#fff",
+                border:"none", borderRadius:10, fontWeight:700, fontSize:15, cursor:"pointer", marginBottom:10 }}>
+              Unlock Pro — $18.99 →
+            </button>
+            <div style={{ display:"flex", gap:8 }}>
               <button onClick={() => setPaywallModal(null)}
-                style={{ flex: 1, padding: "11px", background: "transparent", color: "#94a3b8", border: "1px solid #1e2d45", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
+                style={{ flex:1, padding:"12px", background:"transparent", color:"#94a3b8",
+                  border:"1px solid #334155", borderRadius:10, cursor:"pointer", fontSize:14 }}>
                 Continue Free
               </button>
               {!isSignedIn && (
                 <SignInButton mode="modal">
-                  <button style={{ flex: 1, padding: "11px", background: "transparent", color: "#f97316",
-                    border: "1px solid #f97316", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                  <button style={{ flex:1, padding:"12px", background:"transparent", color:"#f97316",
+                    border:"1px solid #f97316", borderRadius:10, fontWeight:700, fontSize:14, cursor:"pointer" }}>
                     Sign In
                   </button>
                 </SignInButton>
