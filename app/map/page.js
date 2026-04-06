@@ -1676,11 +1676,40 @@ export default function HomePage() {
       if (!data.features?.length) return;
       map.addSource("ice-sheet-src", { type:"geojson", data });
       map.addLayer({ id:"ice-sheet-layer", type:"fill", source:"ice-sheet-src",
-        paint:{ "fill-color":"#dbeafe", "fill-opacity":0.55 }
+        paint:{ "fill-color":"#bfdbfe", "fill-opacity":0.78 }
       });
       map.addLayer({ id:"ice-sheet-outline", type:"line", source:"ice-sheet-src",
-        paint:{ "line-color":"#93c5fd", "line-width":1.5, "line-opacity":0.8 }
+        paint:{ "line-color":"#60a5fa", "line-width":2, "line-opacity":1.0 }
       });
+      // Click popup for ice sheets
+      map.on("click", "ice-sheet-layer", (e) => {
+        const p = e.features[0].properties;
+        const thickKm = (p.max_thickness_m / 1000).toFixed(1);
+        const areaKm2 = Math.round(p.area_cells * 111 * 111);
+        new mapboxgl.Popup({ closeButton:true, maxWidth:"280px", className:"elev-popup" })
+          .setLngLat(e.lngLat)
+          .setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px">
+            <div style="color:#93c5fd;font-weight:700;font-size:14px;margin-bottom:6px">🧊 ${p.name}</div>
+            <table style="font-size:12px;width:100%;border-collapse:collapse;margin-bottom:8px">
+              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Time</td><td style="font-weight:700">${p.ka}ka BP (~${Math.round(p.ka*1000).toLocaleString()} years ago)</td></tr>
+              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Max thickness</td><td style="font-weight:700">${p.max_thickness_m.toLocaleString()}m (${thickKm}km)</td></tr>
+              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Sea level</td><td style="font-weight:700">${getIceAgeSL(p.ka)}m relative to today</td></tr>
+            </table>
+            <div style="color:#64748b;font-size:11px;line-height:1.6">
+              ${p.name === "Laurentide Ice Sheet" ? "Largest ice sheet of the last glacial maximum. Covered most of Canada and the northern US. Collapse caused Meltwater Pulse 1A (~14ka), raising sea levels 20m in centuries." :
+                p.name === "Fennoscandian Ice Sheet" ? "Covered Scandinavia, Finland, and northern Russia. Its melt created the Baltic Sea and shaped the landscapes of northern Europe." :
+                p.name === "British Ice Sheet" ? "Covered the British Isles, connecting Britain to mainland Europe via Doggerland. Melt isolated Britain ~8,000 BP." :
+                p.name === "Barents-Kara Ice Sheet" ? "Marine-based ice sheet over the Barents and Kara seas. Collapse contributed significantly to rapid sea level rise events." :
+                p.name === "Cordilleran Ice Sheet" ? "West coast ice sheet covering British Columbia and Alaska. Merged with Laurentide to block human migration routes." :
+                p.name === "Antarctic Ice Sheet" ? "Extended ~200km beyond current margins during the LGM. Added ~3m equivalent sea level upon retreat." :
+                p.name === "Patagonian Ice Sheet" ? "Covered southern Andes and Patagonia. Smaller than northern hemisphere sheets but regionally significant." :
+                "Glacial ice mass from the last glacial maximum."}
+            </div>
+          </div>`)
+          .addTo(map);
+      });
+      map.on("mouseenter","ice-sheet-layer",()=>{ map.getCanvas().style.cursor="pointer"; });
+      map.on("mouseleave","ice-sheet-layer",()=>{ map.getCanvas().style.cursor=""; });
     } catch(e) { console.warn("Ice sheets error:", e); }
   };
 
@@ -6750,7 +6779,18 @@ export default function HomePage() {
               onChange={(e) => {
                 const ka = parseFloat(e.target.value);
                 setIceAgeKa(ka); iceAgeKaRef.current = ka;
-                applyIceAge(ka);
+                // Update sea level immediately for visual feedback
+                const sl = getIceAgeSL(ka);
+                seaLevelRef.current = sl; setSeaLevel(sl);
+                syncFloodScenario();
+                setStatus(`Ice Age: ${ka}ka BP — Sea level ${sl}m`);
+              }}
+              onMouseUp={(e) => {
+                // Load ice sheets on release (expensive operation)
+                applyIceSheets(parseFloat(e.target.value));
+              }}
+              onTouchEnd={(e) => {
+                applyIceSheets(iceAgeKaRef.current);
               }}
               style={{ width:"100%", marginBottom:8, accentColor:"#3b82f6" }} />
             <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"#475569", marginBottom:10 }}>
@@ -6766,6 +6806,24 @@ export default function HomePage() {
                 </button>
               ))}
             </div>
+            {/* Animate deglaciation */}
+            <button onClick={async () => {
+              const steps = [26,24,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,4,2,0];
+              for (const ka of steps) {
+                if (!iceAgeOnRef.current) break;
+                setIceAgeKa(ka); iceAgeKaRef.current = ka;
+                const sl = getIceAgeSL(ka);
+                seaLevelRef.current = sl; setSeaLevel(sl);
+                syncFloodScenario();
+                setStatus(`⏵ Deglaciation: ${ka}ka BP — ${sl}m`);
+                await applyIceSheets(ka);
+                await new Promise(r => setTimeout(r, 1200));
+              }
+              setStatus("Deglaciation complete — 26ka → present");
+            }} style={{ width:"100%", padding:"8px", background:"#1e3a5f", color:"#93c5fd",
+              border:"1px solid #3b82f6", borderRadius:8, cursor:"pointer", fontWeight:700, fontSize:12, marginBottom:6 }}>
+              ▶ Animate Deglaciation (26ka → Now)
+            </button>
             <div onClick={() => { setIceSheetOn(!iceSheetOn); if (!iceSheetOn) applyIceSheets(iceAgeKa); else {
               const map = mapRef.current;
               ["ice-sheet-layer","ice-sheet-outline"].forEach(l => { try { if(map?.getLayer(l)) map.removeLayer(l); } catch(e){} });
