@@ -1762,9 +1762,9 @@ export default function HomePage() {
 
       map.on("click","volcano-layer", handleVolcanoClick);
       map.on("click","volcano-super-layer", handleVolcanoClick);
-      map.on("mouseenter","volcano-layer",()=>{ map.getCanvas().style.cursor="pointer"; });
+      map.on("mouseenter","volcano-layer",()=>{ map.getCanvas().style.cursor="crosshair"; });
       map.on("mouseleave","volcano-layer",()=>{ map.getCanvas().style.cursor=""; });
-      map.on("mouseenter","volcano-super-layer",()=>{ map.getCanvas().style.cursor="pointer"; });
+      map.on("mouseenter","volcano-super-layer",()=>{ map.getCanvas().style.cursor="crosshair"; });
       map.on("mouseleave","volcano-super-layer",()=>{ map.getCanvas().style.cursor=""; });
 
     } catch(e) { console.warn("Volcano overlay error:", e); }
@@ -3350,7 +3350,7 @@ export default function HomePage() {
   const clearYellowstone = () => {
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
-      // Remove all yellowstone layers (up to 8 zones covers all volcano types)
+      // Remove yellowstone preset layers
       for (let i = 0; i < 8; i++) {
         const id = `${YELLOWSTONE_LAYER_PREFIX}-${i}`;
         const lineId = `${YELLOWSTONE_LAYER_PREFIX}-line-${i}`;
@@ -3358,11 +3358,17 @@ export default function HomePage() {
         try { if (map.getLayer(lineId)) map.removeLayer(lineId); } catch(e){}
       }
       try { if (map.getSource(YELLOWSTONE_SOURCE_ID)) map.removeSource(YELLOWSTONE_SOURCE_ID); } catch(e){}
+      // Remove generic volcano eruption layers
+      for (let i = 0; i < 8; i++) {
+        try { if (map.getLayer(`verupt-layer-${i}`)) map.removeLayer(`verupt-layer-${i}`); } catch(e){}
+        try { if (map.getSource(`verupt-src-${i}`)) map.removeSource(`verupt-src-${i}`); } catch(e){}
+      }
     }
+    document.querySelectorAll(".mapboxgl-popup").forEach(p => p.remove());
     if (yellowstonePopupRef.current) { yellowstonePopupRef.current.remove(); yellowstonePopupRef.current = null; }
     setYellowstoneActive(false);
     setYellowstoneResult(null);
-    setStatus("Yellowstone cleared");
+    setStatus("Cleared");
   };
 
   const drawYellowstone = (presetIdx) => {
