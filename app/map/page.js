@@ -7424,8 +7424,10 @@ export default function HomePage() {
             background: "#0a0f1e", border: "1px solid #1e2d45", borderRadius: "16px 16px 0 0",
             maxWidth: 480, width: "100%",
             boxShadow: "0 -8px 40px rgba(0,0,0,0.6)",
-            padding: "20px 20px 24px",
+            display: "flex", flexDirection: "column",
+            maxHeight: "85dvh",
           }}>
+          <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "20px 20px 0", flex: 1 }}>
             
             {paywallModal === "ratelimit" ? (<>
               <div style={{ textAlign: "center", color: "#e2e8f0", fontWeight: 700, fontSize: 18, marginBottom: 8 }}>Simulation Limit Reached</div>
@@ -7475,15 +7477,16 @@ export default function HomePage() {
 
 
 
-            {/* Already have Pro? Sign in */}
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+          </div>{/* end scroll area */}
+            {/* Sticky bottom — always visible regardless of scroll */}
+            <div style={{ padding: "12px 20px 32px", display: "flex", gap: 8, flexShrink: 0, borderTop: "1px solid #1e2d45" }}>
               <button onClick={() => setPaywallModal(null)}
-                style={{ flex: 1, padding: "10px", background: "transparent", color: "#475569", border: "1px solid #1e2d45", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
+                style={{ flex: 1, padding: "11px", background: "transparent", color: "#94a3b8", border: "1px solid #1e2d45", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
                 Continue Free
               </button>
               {!isSignedIn && (
                 <SignInButton mode="modal">
-                  <button style={{ flex: 1, padding: "10px", background: "transparent", color: "#f97316",
+                  <button style={{ flex: 1, padding: "11px", background: "transparent", color: "#f97316",
                     border: "1px solid #f97316", borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
                     Sign In
                   </button>
