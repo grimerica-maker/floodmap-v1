@@ -1292,6 +1292,8 @@ export default function HomePage() {
   const [megalithOn, setMegalithOn] = useState(false);
   const megalithOnRef = useRef(false);
   const [megalithLoading, setMegalithLoading] = useState(false);
+  const [faultLinesOn, setFaultLinesOn] = useState(false);
+  const faultLinesOnRef = useRef(false);
   const [airportOn, setAirportOn] = useState(false);
   const airportOnRef = useRef(false);
   const [unescoOn, setUnescoOn] = useState(false);
@@ -1632,6 +1634,61 @@ export default function HomePage() {
     if (airportOnRef.current)  addOverlayLayer("airports",  level);
     if (nuclearOnRef.current)  addOverlayLayer("nuclear",   level);
     if (fireOnRef.current && includeFiresReload) addOverlayLayer("fires", 0);
+  };
+
+  const addFaultLines = async () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    try {
+      if (map.getLayer("fault-lines-layer")) map.removeLayer("fault-lines-layer");
+      if (map.getSource("fault-lines-src")) map.removeSource("fault-lines-src");
+    } catch(e) {}
+    try {
+      const res = await fetch(`${floodEngineUrlRef.current}/fault-lines`, { cache: "force-cache" });
+      if (!res.ok) return;
+      const data = await res.json();
+      map.addSource("fault-lines-src", { type: "geojson", data });
+      map.addLayer({
+        id: "fault-lines-layer", type: "line", source: "fault-lines-src",
+        paint: {
+          "line-color": ["get", "color"],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 2, 0.5, 6, 1.5, 10, 2.5],
+          "line-opacity": 0.75,
+        }
+      });
+      // Click fault line to populate earthquake params
+      map.on("click", "fault-lines-layer", (e) => {
+        const p = e.features[0].properties;
+        // Set fault type
+        const fid = p.fault_id || "strikeslip";
+        setEqFault(fid); eqFaultRef.current = fid;
+        // Set dip if available
+        if (p.dip) { setEqDip(Math.round(p.dip)); eqDipRef.current = Math.round(p.dip); }
+        // Set rake if available  
+        if (p.rake) { setEqRake(Math.round(p.rake)); eqRakeRef.current = Math.round(p.rake); }
+        // Switch to earthquake mode
+        setScenarioMode("earthquake"); scenarioModeRef.current = "earthquake";
+        // Show popup
+        new mapboxgl.Popup({ closeButton: true, maxWidth: "240px", className: "elev-popup" })
+          .setLngLat(e.lngLat)
+          .setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px;padding:2px 4px">
+            <div style="color:${p.color};font-weight:700;margin-bottom:4px">⚡ ${p.name || "Unnamed Fault"}</div>
+            <div style="color:#94a3b8;font-size:11px;margin-bottom:2px">Type: <b style="color:#e2e8f0">${p.slip_type || "—"}</b></div>
+            ${p.dip ? `<div style="color:#94a3b8;font-size:11px;margin-bottom:2px">Dip: <b style="color:#e2e8f0">${Math.round(p.dip)}°</b></div>` : ""}
+            <div style="color:#4ade80;font-size:11px;margin-top:4px">✓ Fault params loaded — click map to place epicenter</div>
+          </div>`)
+          .addTo(map);
+      });
+      map.on("mouseenter", "fault-lines-layer", () => { map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", "fault-lines-layer", () => { map.getCanvas().style.cursor = "crosshair"; });
+    } catch(e) { console.warn("Fault lines error:", e); }
+  };
+
+  const removeFaultLines = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    try { if (map.getLayer("fault-lines-layer")) map.removeLayer("fault-lines-layer"); } catch(e) {}
+    try { if (map.getSource("fault-lines-src")) map.removeSource("fault-lines-src"); } catch(e) {}
   };
 
   const toggleOverlay = (type) => {
@@ -6184,6 +6241,30 @@ export default function HomePage() {
         )}
       </div>
 
+      {/* ── FAULT LINES — earthquake mode only ── */}
+      {"earthquake" === scenarioMode && (
+        <div onClick={() => {
+          const next = !faultLinesOn;
+          setFaultLinesOn(next); faultLinesOnRef.current = next;
+          next ? addFaultLines() : removeFaultLines();
+        }} style={{
+          display:"flex", alignItems:"center", gap:10, padding:"9px 10px",
+          marginBottom:8, borderRadius:9, cursor:"pointer",
+          background: faultLinesOn ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.03)",
+          border: faultLinesOn ? "1px solid #ef444455" : "1px solid transparent",
+        }}>
+          <span style={{ fontSize:18 }}>⚡</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:13, fontWeight:700, color: faultLinesOn ? "#ef4444" : "#cbd5e1" }}>Active Fault Lines</div>
+            <div style={{ fontSize:10, color:"#475569", marginTop:1 }}>
+              {faultLinesOn ? "Click a fault to load its params" : "GEM Global · 16,000+ faults · click to set params"}
+            </div>
+          </div>
+          <div style={{ width:28, height:16, borderRadius:8, background: faultLinesOn ? "#ef4444" : "#1e2d45", position:"relative", flexShrink:0, transition:"background 0.2s" }}>
+            <div style={{ position:"absolute", top:2, left: faultLinesOn ? 14 : 2, width:12, height:12, borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
+          </div>
+        </div>
+      )}
       {/* ── MAP OVERLAYS ── */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#d97706", textTransform: "uppercase" }}>Map Overlays</div>
