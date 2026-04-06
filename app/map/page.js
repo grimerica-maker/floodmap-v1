@@ -2312,35 +2312,25 @@ export default function HomePage() {
 
           // flood-bbox ellipse derived from fault geometry
           try {
+            // Per-impact-dot flood tiles: each coastal hit point gets its own small
+            // flood-region tile centered on that location, elevation-capped by wave height
+            // This prevents inland flooding — terrain elevation acts as the natural barrier
             const impacts = tsResult.tsunami_impacts || [];
-            if (impacts.length > 0) {
-              // Fault length from magnitude (Wells & Coppersmith)
-              const faultLenKm = Math.pow(10, 0.59 * mag - 2.44);
-              // Propagation bearing = perpendicular to fault strike, toward coast
-              // Strike runs along fault; waves propagate ~90° from strike
-              const propBearing = (strike + 90) % 360;
-              const major_km = Math.min(faultLenKm * 1.2, 2000);
-              const minor_km = Math.min(major_km * 0.25, 500);
-              // Max wave from impacts
-              const maxWave = Math.max(...impacts.map(i => i.wave_height_m));
-              const floodLevel = Math.max(5, Math.min(maxWave * 0.6, 30));
-              const fParams = `origin_lat=${lat}&major_km=${major_km}&minor_km=${minor_km}&bearing_deg=${propBearing}&shift=0.5`;
-              const fUrl  = `${floodEngineUrlRef.current}/flood-bbox/${floodLevel}/{z}/{x}/{y}.png?origin_lng=${lng}&${fParams}`;
-              const fUrl2 = `${floodEngineUrlRef.current}/flood-bbox/${floodLevel}/{z}/{x}/{y}.png?origin_lng=${lng + 360}&${fParams}`;
-              const fSrc = "eq-ts-flood-src-0", fLay = "eq-ts-flood-layer-0";
-              const fSrc2 = "eq-ts-flood-src-1", fLay2 = "eq-ts-flood-layer-1";
-              if (mapNow.getLayer(fLay))  mapNow.removeLayer(fLay);
-              if (mapNow.getSource(fSrc)) mapNow.removeSource(fSrc);
-              if (mapNow.getLayer(fLay2))  mapNow.removeLayer(fLay2);
-              if (mapNow.getSource(fSrc2)) mapNow.removeSource(fSrc2);
-              mapNow.addSource(fSrc,  { type:"raster", tiles:[fUrl],  tileSize:256 });
-              mapNow.addLayer({ id:fLay,  type:"raster", source:fSrc,  paint:{"raster-opacity":0.7} });
-              mapNow.addSource(fSrc2, { type:"raster", tiles:[fUrl2], tileSize:256 });
-              mapNow.addLayer({ id:fLay2, type:"raster", source:fSrc2, paint:{"raster-opacity":0.7} });
-              eqLayers.current.push({ sourceId:fSrc,  layerId:fLay  });
-              eqLayers.current.push({ sourceId:fSrc2, layerId:fLay2 });
-            }
-          } catch(e) { console.warn("EQ flood-bbox error:", e); }
+            impacts.forEach((imp, i) => {
+              if (i >= 8) return; // max 8 flood tiles
+              const floodLevel = Math.max(3, Math.min(imp.wave_height_m * 0.5, 25));
+              const reachM = Math.min(imp.wave_height_m * 8000, 120000); // wave height scales reach: 10m wave = 80km reach max
+              const fSrc = `eq-ts-flood-src-${i}`, fLay = `eq-ts-flood-layer-${i}`;
+              const tUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(floodLevel)}/${encodeURIComponent(imp.lat)}/${encodeURIComponent(imp.lng)}/${encodeURIComponent(reachM)}/{z}/{x}/{y}.png?v=204`;
+              try {
+                if (mapNow.getLayer(fLay)) mapNow.removeLayer(fLay);
+                if (mapNow.getSource(fSrc)) mapNow.removeSource(fSrc);
+                mapNow.addSource(fSrc, { type:"raster", tiles:[tUrl], tileSize:256, minzoom:0, maxzoom:12 });
+                mapNow.addLayer({ id:fLay, type:"raster", source:fSrc, layout:{visibility:"visible"}, paint:{"raster-opacity":0.7,"raster-opacity-transition":{duration:500}} });
+                eqLayers.current.push({ sourceId:fSrc, layerId:fLay });
+              } catch(e) {}
+            });
+          } catch(e) { console.warn("EQ flood tile error:", e); }
 
           mapNow.triggerRepaint();
       };  // end processResult
@@ -2351,29 +2341,25 @@ export default function HomePage() {
         // Dots first
         const synth = { tsunami_impacts: hardcoded.impacts };
         processResult(synth);
-        // Then flood-bbox tiles — ellipse-masked like mega-tsunami, correct shape
+        // Per-dot flood tiles after dots render
         setTimeout(() => {
           const mapNow = mapRef.current;
           if (!mapNow || !mapNow.isStyleLoaded()) return;
-          const { floodLevel, major_km, minor_km, bearing } = hardcoded;
-          const floodParams = `origin_lat=${lat}&major_km=${major_km}&minor_km=${minor_km}&bearing_deg=${bearing}&shift=0.5`;
-          const fUrl  = `${floodEngineUrlRef.current}/flood-bbox/${floodLevel}/{z}/{x}/{y}.png?origin_lng=${lng}&${floodParams}`;
-          const fUrl2 = `${floodEngineUrlRef.current}/flood-bbox/${floodLevel}/{z}/{x}/{y}.png?origin_lng=${lng + 360}&${floodParams}`;
-          const fSrc = "eq-ts-flood-src-0", fLay = "eq-ts-flood-layer-0";
-          const fSrc2 = "eq-ts-flood-src-1", fLay2 = "eq-ts-flood-layer-1";
-          try {
-            if (mapNow.getLayer(fLay))  mapNow.removeLayer(fLay);
-            if (mapNow.getSource(fSrc)) mapNow.removeSource(fSrc);
-            if (mapNow.getLayer(fLay2))  mapNow.removeLayer(fLay2);
-            if (mapNow.getSource(fSrc2)) mapNow.removeSource(fSrc2);
-            mapNow.addSource(fSrc, { type:"raster", tiles:[fUrl], tileSize:256 });
-            mapNow.addLayer({ id:fLay, type:"raster", source:fSrc, paint:{"raster-opacity":0.7} });
-            mapNow.addSource(fSrc2, { type:"raster", tiles:[fUrl2], tileSize:256 });
-            mapNow.addLayer({ id:fLay2, type:"raster", source:fSrc2, paint:{"raster-opacity":0.7} });
-            eqLayers.current.push({ sourceId:fSrc, layerId:fLay });
-            eqLayers.current.push({ sourceId:fSrc2, layerId:fLay2 });
-          } catch(e) { console.warn("EQ flood-bbox error:", e); }
-        }, 200);
+          hardcoded.impacts.forEach((imp, i) => {
+            if (i >= 8) return;
+            const floodLevel = Math.max(3, Math.min(imp.wave_height_m * 0.5, 25));
+            const reachM = Math.min(imp.wave_height_m * 8000, 120000);
+            const fSrc = `eq-ts-flood-src-${i}`, fLay = `eq-ts-flood-layer-${i}`;
+            const tUrl = `${floodEngineUrlRef.current}/flood-region/${encodeURIComponent(floodLevel)}/${encodeURIComponent(imp.lat)}/${encodeURIComponent(imp.lng)}/${encodeURIComponent(reachM)}/{z}/{x}/{y}.png?v=204`;
+            try {
+              if (mapNow.getLayer(fLay)) mapNow.removeLayer(fLay);
+              if (mapNow.getSource(fSrc)) mapNow.removeSource(fSrc);
+              mapNow.addSource(fSrc, { type:"raster", tiles:[tUrl], tileSize:256, minzoom:0, maxzoom:12 });
+              mapNow.addLayer({ id:fLay, type:"raster", source:fSrc, layout:{visibility:"visible"}, paint:{"raster-opacity":0.7,"raster-opacity-transition":{duration:500}} });
+              eqLayers.current.push({ sourceId:fSrc, layerId:fLay });
+            } catch(e) {}
+          });
+        }, 300);
       } else {
         const tsUrl = `${floodEngineUrlRef.current}/tsunami-simulate?lat=${lat}&lng=${lng}&mag=${mag}&strike=${strike}&dip=${dip}&rake=${rake}&depth_km=${depthKm}&n_rays=120`;
         console.log("🌊 Tsunami fetch:", tsUrl);
