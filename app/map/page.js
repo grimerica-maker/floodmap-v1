@@ -3366,6 +3366,7 @@ export default function HomePage() {
     }
     document.querySelectorAll(".mapboxgl-popup").forEach(p => p.remove());
     if (yellowstonePopupRef.current) { yellowstonePopupRef.current.remove(); yellowstonePopupRef.current = null; }
+    window.__dmLastEruptResult = null;
     setYellowstoneActive(false);
     setYellowstoneResult(null);
     setStatus("Cleared");
@@ -4930,8 +4931,45 @@ export default function HomePage() {
       }
 
       if (scenarioModeRef.current === "yellowstone") {
-        // Only show Yellowstone zone popup if it's a preset eruption, not generic volcano
-        if (!window.__dmLastEruptResult) {
+        if (window.__dmLastEruptResult) {
+          // Generic volcano eruption — show zone info based on click position
+          const r = window.__dmLastEruptResult;
+          const map = mapRef.current;
+          // Find which zone was clicked by checking rendered features
+          const veruptLayers = [];
+          for (let i = 0; i < 8; i++) { try { if (map.getLayer(`verupt-layer-${i}`)) veruptLayers.push(`verupt-layer-${i}`); } catch(e){} }
+          const hits = veruptLayers.length > 0 ? map.queryRenderedFeatures([e.point.x, e.point.y], { layers: veruptLayers }) : [];
+          // hits are ordered front-to-back, first hit = innermost zone clicked
+          // The innermost verupt layer has the highest ri index = lowest colorIdx = Kill Zone
+          // Map layer index back to zone — layers drawn in reverse order so verupt-layer-0 = Trace Ash
+          const hitLayerId = hits[0]?.layer?.id;
+          const hitRi = hitLayerId ? parseInt(hitLayerId.replace("verupt-layer-","")) : null;
+          const zoneIdx = hitRi != null ? (r.zones.length - 1 - hitRi) : null;
+          const zone = zoneIdx != null ? r.zones[zoneIdx] : r.zones[0];
+          if (zone) {
+            const zColors = ["#7f1d1d","#b91c1c","#dc2626","#ea580c","#f97316","#fbbf24"];
+            const zColor = zColors[zoneIdx] || "#f97316";
+            new mapboxgl.Popup({ closeButton:true, maxWidth:"260px", className:"elev-popup" })
+              .setLngLat([lng, lat])
+              .setHTML(`<div style="font-family:Arial,sans-serif">
+                <div style="color:${zColor};font-weight:700;font-size:13px;margin-bottom:4px">${zone.name}</div>
+                <div style="font-size:12px;color:#94a3b8;margin-bottom:6px">${zone.desc||""}</div>
+                <div style="display:flex;justify-content:space-between;font-size:12px">
+                  <span style="color:#94a3b8">Survival</span>
+                  <span style="font-weight:700;color:${zone.survival==="0%"?"#ef4444":"#4ade80"}">${zone.survival}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:2px">
+                  <span style="color:#94a3b8">Mortality</span>
+                  <span style="font-weight:700">${zone.mortality_pct}%</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:2px">
+                  <span style="color:#94a3b8">Est. deaths</span>
+                  <span style="font-weight:700;color:#ef4444">${zone.deaths?.toLocaleString()||"—"}</span>
+                </div>
+              </div>`)
+              .addTo(map);
+          }
+        } else {
           showYellowstonePopup(lng, lat);
         }
         return;
@@ -6843,7 +6881,7 @@ export default function HomePage() {
           </>
         )}
 
-      {scenarioMode === "yellowstone" && yellowstoneActive && (() => {
+      {scenarioMode === "yellowstone" && yellowstoneActive && yellowstoneResult && (() => {
         const _vPresets = volcanoType === "toba" ? TOBA_PRESETS : volcanoType === "campi" ? CAMPI_PRESETS : YELLOWSTONE_PRESETS;
         const _p = _vPresets[Math.min(yellowstonePreset, _vPresets.length - 1)];
         if (!_p) return null;
