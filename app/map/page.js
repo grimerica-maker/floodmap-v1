@@ -3308,40 +3308,42 @@ export default function HomePage() {
     const dNorth = Math.cos(bearingRad);
     const dEast  = Math.sin(bearingRad);
 
-    // Iterate outermost→innermost so distant clicks get far-travel low-height ring
+    // Point-in-ellipse test matching the actual flood-bbox tile geometry
+    // Each ring is an ellipse centered offset downwind by 30% of major axis (shift=0.85 in tiles)
     let ringInfo = null;
-    const spreadAngle = src.spreadAngle || 65;
-    const dLatKmBase = (lat - oLat) * kpLat;
-    const dLngKmBase = (lng - oLng) * Math.max(kpLng, 0.0001);
-    const distKm = Math.sqrt(dLatKmBase * dLatKmBase + dLngKmBase * dLngKmBase);
-    const clickAngleDeg = Math.atan2(dLngKmBase, dLatKmBase) * 180 / Math.PI;
-    let angleDiff = ((clickAngleDeg - src.bearing) + 360) % 360;
-    if (angleDiff > 180) angleDiff -= 360;
-    const inCone = Math.abs(angleDiff) <= spreadAngle * 1.2;
-    if (inCone) {
-      // Find correct ring — click must be within the actual ellipse major_km (not inflated)
-      const outermost = src.rings[src.rings.length - 1];
-      if (distKm <= outermost.major_km) {
-        for (let i = src.rings.length - 1; i >= 0; i--) {
-          if (distKm <= src.rings[i].major_km) {
-            ringInfo = src.rings[i];
-            break;
-          }
+    const dLatKm = (lat - oLat) * kpLat;
+    const dLngKm = (lng - oLng) * Math.max(kpLng, 0.0001);
+
+    const pointInEllipse = (majorKm, minorKm) => {
+      // Center is shifted downwind by shift * major_km (tiles use shift=0.85)
+      const shift = 0.85;
+      const cLatKm = dNorth * majorKm * shift;
+      const cLngKm = dEast  * majorKm * shift;
+      const relLat = dLatKm - cLatKm;
+      const relLng = dLngKm - cLngKm;
+      const along = dNorth * relLat + dEast  * relLng;
+      const perp  = -dEast * relLat + dNorth * relLng;
+      return (along / majorKm) ** 2 + (perp / minorKm) ** 2 <= 1;
+    };
+
+    // Find innermost ring containing click — outermost ring defines full extent
+    if (pointInEllipse(src.rings[src.rings.length-1].major_km, src.rings[src.rings.length-1].minor_km)) {
+      for (let i = 0; i < src.rings.length; i++) {
+        if (pointInEllipse(src.rings[i].major_km, src.rings[i].minor_km)) {
+          ringInfo = src.rings[i];
+          break;
         }
-        if (!ringInfo) ringInfo = src.rings[0];
       }
     }
 
-    const content = ringInfo
-      ? `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
+    if (!ringInfo) return; // outside zone — silent
+
+    const content = `<div style="font-family:Arial,sans-serif;font-size:13px;line-height:1.6;padding:2px 4px">
           <div style="color:${src.color};font-weight:700;margin-bottom:4px">🌊 ${src.name}</div>
           <div style="color:#e2e8f0;margin-bottom:4px">Wave arrives in <b>${ringInfo.label}</b></div>
           <div style="color:#94a3b8;margin-bottom:4px">Est. wave height: <b style="color:#e2e8f0">${ringInfo.waveM}m</b></div>
           <div style="color:#64748b;font-size:11px;font-style:italic">${ringInfo.waveM >= 100 ? "Unsurvivable near source. Total destruction." : ringInfo.waveM >= 20 ? "Unsurvivable. Evacuate immediately." : ringInfo.waveM >= 10 ? "Extremely dangerous. Evacuation essential." : ringInfo.waveM >= 5 ? "Deadly for coastal areas. Move inland now." : "Dangerous for coast. Move to high ground."}</div>
           <div style="color:#94a3b8;font-size:10px;margin-top:5px;font-style:italic">⚠ Worst-case scenario — actual heights may be lower</div>
-        </div>`
-      : `<div style="font-family:Arial,sans-serif;font-size:13px;padding:2px 4px">
-          <div style="color:#94a3b8">Outside propagation zone</div>
         </div>`;
 
     const popup = new mapboxgl.Popup({ closeButton: true, closeOnClick: false, className: "elev-popup", maxWidth: "260px" });
