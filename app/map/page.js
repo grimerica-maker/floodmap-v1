@@ -1652,8 +1652,8 @@ export default function HomePage() {
         id: "fault-lines-layer", type: "line", source: "fault-lines-src",
         paint: {
           "line-color": ["get", "color"],
-          "line-width": ["interpolate", ["linear"], ["zoom"], 2, 0.5, 6, 1.5, 10, 2.5],
-          "line-opacity": 0.75,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 2, 1.5, 6, 3.5, 10, 6],
+          "line-opacity": 0.85,
         }
       });
       // Click fault line — rich info popup with action buttons
@@ -5460,6 +5460,33 @@ export default function HomePage() {
             {eqPoint ? "👆 Hit Trigger to run simulation" : "👆 Click map to place epicenter"}
           </div>
 
+          {/* Fault Lines toggle — above trigger */}
+          <div onClick={() => {
+            if (proTierRef.current === "free") { setPaywallModal("pro"); return; }
+            const next = !faultLinesOn;
+            setFaultLinesOn(next); faultLinesOnRef.current = next;
+            next ? addFaultLines() : removeFaultLines();
+          }} style={{
+            display:"flex", alignItems:"center", gap:10, padding:"9px 10px",
+            marginBottom:8, borderRadius:9, cursor:"pointer",
+            background: faultLinesOn ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.03)",
+            border: faultLinesOn ? "1px solid #ef444455" : "1px solid #1e2d45",
+          }}>
+            <span style={{ fontSize:16 }}>⚡</span>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:12, fontWeight:700, color: faultLinesOn ? "#ef4444" : "#94a3b8" }}>
+                Active Fault Lines
+                {proTierRef.current === "free" && <span style={{ marginLeft:6, fontSize:10, color:"#f97316" }}>PRO</span>}
+              </div>
+              <div style={{ fontSize:10, color:"#475569", marginTop:1 }}>
+                {faultLinesOn ? "Click fault for info + set quake here" : "16,000+ faults · slip rates · recurrence"}
+              </div>
+            </div>
+            <div style={{ width:28, height:16, borderRadius:8, background: faultLinesOn ? "#ef4444" : "#1e2d45", position:"relative", flexShrink:0, transition:"background 0.2s" }}>
+              <div style={{ position:"absolute", top:2, left: faultLinesOn ? 14 : 2, width:12, height:12, borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
+            </div>
+          </div>
+
           <div style={{ display:"flex", gap:6, marginBottom: eqResult ? 8 : 0 }}>
             <button onClick={() => { if (eqPointRef.current) { setEqView("rings"); runEarthquake(eqPointRef.current.lat, eqPointRef.current.lng, eqMagRef.current, eqDepthRef.current, eqFaultRef.current); } }}
               disabled={!eqPoint}
@@ -6293,34 +6320,6 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* ── FAULT LINES — earthquake mode only ── */}
-      {"earthquake" === scenarioMode && (
-        <div onClick={() => {
-          if (proTierRef.current === "free") { setPaywallModal("pro"); return; }
-          const next = !faultLinesOn;
-          setFaultLinesOn(next); faultLinesOnRef.current = next;
-          next ? addFaultLines() : removeFaultLines();
-        }} style={{
-          display:"flex", alignItems:"center", gap:10, padding:"9px 10px",
-          marginBottom:8, borderRadius:9, cursor:"pointer",
-          background: faultLinesOn ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.03)",
-          border: faultLinesOn ? "1px solid #ef444455" : "1px solid transparent",
-        }}>
-          <span style={{ fontSize:18 }}>⚡</span>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:13, fontWeight:700, color: faultLinesOn ? "#ef4444" : "#cbd5e1" }}>
-              Active Fault Lines
-              {proTierRef.current === "free" && <span style={{ marginLeft:6, fontSize:10, color:"#f97316" }}>PRO</span>}
-            </div>
-            <div style={{ fontSize:10, color:"#475569", marginTop:1 }}>
-              {faultLinesOn ? "Click a fault for info + set quake" : "GEM Global · 16,000+ faults · slip rates · recurrence"}
-            </div>
-          </div>
-          <div style={{ width:28, height:16, borderRadius:8, background: faultLinesOn ? "#ef4444" : "#1e2d45", position:"relative", flexShrink:0, transition:"background 0.2s" }}>
-            <div style={{ position:"absolute", top:2, left: faultLinesOn ? 14 : 2, width:12, height:12, borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
-          </div>
-        </div>
-      )}
       {/* ── MAP OVERLAYS ── */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#d97706", textTransform: "uppercase" }}>Map Overlays</div>
