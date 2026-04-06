@@ -1653,6 +1653,97 @@ export default function HomePage() {
     if (fireOnRef.current && includeFiresReload) addOverlayLayer("fires", 0);
   };
 
+  // ── Active Volcanoes ─────────────────────────────────────────────────────
+  // Continuously or frequently active volcanoes (GVP / USGS verified)
+  // Volcano numbers match Smithsonian GVP dataset
+  const ACTIVE_VOLCANO_NUMBERS = new Set([
+    211060, // Etna, Italy — near-continuous activity
+    211040, // Campi Flegrei, Italy
+    211020, // Stromboli, Italy — "Lighthouse of the Mediterranean"
+    357010, // Cerro Villarrica, Chile
+    268010, // Krakatau, Indonesia
+    268020, // Anak Krakatau
+    263250, // Merapi, Indonesia
+    262000, // Sinabung, Indonesia
+    264010, // Kelud, Indonesia
+    270080, // Yasur, Vanuatu — continuous for 800+ years
+    284141, // Kilauea, Hawaii — ongoing eruption
+    284140, // Mauna Loa, Hawaii
+    300270, // Erebus, Antarctica — permanent lava lake
+    223030, // Nyiragongo, DR Congo — lava lake
+    241040, // Taupo, New Zealand (unrest)
+    241000, // Ruapehu, New Zealand
+    243010, // White Island/Whakaari, NZ
+    282090, // Aira/Sakurajima, Japan — near-daily explosions
+    282110, // Suwanosejima, Japan
+    285070, // Anatahan, Mariana Islands
+    353010, // Popocatépetl, Mexico — ongoing
+    341040, // Santiaguito, Guatemala
+    342010, // Fuego, Guatemala
+    345010, // Pacaya, Guatemala
+    261090, // Toba, Indonesia (monitoring)
+    290390, // Aso, Japan
+    283001, // Sakura-jima (duplicate entry)
+  ]);
+
+  const addVolcanoPulse = () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    try { if (map.getLayer("volcano-pulse")) map.removeLayer("volcano-pulse"); } catch(e){}
+    try { if (map.getLayer("volcano-pulse-ring")) map.removeLayer("volcano-pulse-ring"); } catch(e){}
+    try { if (map.getSource("volcano-pulse-src")) map.removeSource("volcano-pulse-src"); } catch(e){}
+
+    // Filter active volcanoes from loaded GeoJSON
+    const src = map.getSource("volcano-src");
+    if (!src) return; // volcanoes not loaded yet
+
+    // Build active volcano GeoJSON from the main source data
+    const activeFeatures = [];
+    if (window.__dmVolcanoData) {
+      window.__dmVolcanoData.features.forEach(f => {
+        const vnum = f.properties.volcano_number;
+        if (ACTIVE_VOLCANO_NUMBERS.has(vnum)) {
+          activeFeatures.push(f);
+        }
+      });
+    }
+    if (!activeFeatures.length) return;
+
+    map.addSource("volcano-pulse-src", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: activeFeatures }
+    });
+
+    // Outer pulsing ring
+    map.addLayer({ id:"volcano-pulse-ring", type:"circle", source:"volcano-pulse-src",
+      paint:{
+        "circle-radius": ["interpolate",["linear"],["zoom"], 2,8, 6,16],
+        "circle-color": "#ff4500",
+        "circle-opacity": 0.0,
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "#ff4500",
+        "circle-stroke-opacity": 0.6,
+      }
+    });
+
+    // Animate the ring
+    let frame = 0;
+    const animate = () => {
+      if (!map.getLayer("volcano-pulse-ring")) return;
+      frame = (frame + 1) % 60;
+      const progress = frame / 60;
+      const radius = 8 + progress * 12;
+      const opacity = 0.6 * (1 - progress);
+      try {
+        map.setPaintProperty("volcano-pulse-ring", "circle-stroke-opacity", opacity);
+        map.setPaintProperty("volcano-pulse-ring", "circle-radius",
+          ["interpolate",["linear"],["zoom"], 2, radius * 0.5, 6, radius]);
+      } catch(e) { return; }
+      requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  };
+
   // ── Ice Age ──────────────────────────────────────────────────────────────
   const ICE_AGE_SEA_LEVEL = [
     {ka:26,sl:-130},{ka:25,sl:-128},{ka:24,sl:-125},{ka:23,sl:-123},
@@ -1897,6 +1988,7 @@ export default function HomePage() {
       const res = await fetch(`${floodEngineUrlRef.current}/volcanoes`, { cache: "force-cache" });
       if (!res.ok) return;
       const data = await res.json();
+      window.__dmVolcanoData = data;
       map.addSource("volcano-src", { type:"geojson", data });
 
       // Regular volcanoes
@@ -1925,12 +2017,15 @@ export default function HomePage() {
       const handleVolcanoClick = (e) => {
         const p = e.features[0].properties;
         const lastEr = p.last_eruption > 0 ? p.last_eruption : (p.last_eruption < 0 ? `${Math.abs(p.last_eruption)} BCE` : "Unknown");
-        const superBadge = p.is_super ? `<div style="background:#ff4500;color:white;fontSize:10px;fontWeight:700;padding:2px 8px;borderRadius:8px;display:inline-block;marginBottom:8px;letterSpacing:0.08em">⚠ SUPERVOLCANO</div><br/>` : "";
+        const vnum = parseInt(p.volcano_number) || 0;
+        const isActiveNow = ACTIVE_VOLCANO_NUMBERS.has(vnum);
+        const superBadge = p.is_super ? `<div style="background:#ff4500;color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;display:inline-block;margin-bottom:8px;letter-spacing:0.08em">⚠ SUPERVOLCANO</div><br/>` : "";
+        const activeBadge = isActiveNow ? `<div style="background:#7f1d1d;color:#fca5a5;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;display:inline-block;margin-bottom:8px;letter-spacing:0.08em">🔴 ERUPTING NOW</div><br/>` : "";
         const actColor = {"active":"#ef4444","recent":"#f97316","holocene":"#fbbf24","supervolcano":"#ff4500","dormant":"#64748b"}[p.activity]||"#94a3b8";
         new mapboxgl.Popup({ closeButton:true, maxWidth:"320px", className:"elev-popup" })
           .setLngLat(e.lngLat)
           .setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px">
-            ${superBadge}
+            ${superBadge}${activeBadge}
             <div style="font-weight:700;font-size:15px;color:#e2e8f0;margin-bottom:6px">🌋 ${p.name}</div>
             <table style="font-size:11px;width:100%;border-collapse:collapse;margin-bottom:8px">
               <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Type</td><td style="font-weight:700;color:#e2e8f0">${p.type||"—"}</td></tr>
@@ -1948,6 +2043,9 @@ export default function HomePage() {
           .addTo(map);
       };
 
+      // Pulse rings for currently active volcanoes
+      setTimeout(() => addVolcanoPulse(), 300);
+
       map.on("click","volcano-layer", handleVolcanoClick);
       map.on("click","volcano-super-layer", handleVolcanoClick);
       map.on("mouseenter","volcano-layer",()=>{ map.getCanvas().style.cursor="crosshair"; });
@@ -1958,9 +2056,16 @@ export default function HomePage() {
     } catch(e) { console.warn("Volcano overlay error:", e); }
   };
 
+  const removeVolcanoPulse = () => {
+    const map = mapRef.current;
+    ["volcano-pulse","volcano-pulse-ring"].forEach(l => { try { if(map?.getLayer(l)) map.removeLayer(l); } catch(e){} });
+    try { if(map?.getSource("volcano-pulse-src")) map.removeSource("volcano-pulse-src"); } catch(e){}
+  };
+
   const removeVolcanoes = () => {
     const map = mapRef.current;
     if (!map) return;
+    removeVolcanoPulse();
     ["volcano-layer","volcano-super-layer"].forEach(l => { try { if(map.getLayer(l)) map.removeLayer(l); } catch(e){} });
     try { if(map.getSource("volcano-src")) map.removeSource("volcano-src"); } catch(e) {}
   };
