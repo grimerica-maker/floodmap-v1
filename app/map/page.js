@@ -1692,6 +1692,7 @@ export default function HomePage() {
 
   const applyIceSheets = async (ka) => {
     const map = mapRef.current;
+    console.log("[ICE] applyIceSheets called", ka, "mapOK:", !!map, "styleLoaded:", map?.isStyleLoaded(), "sheetOn:", iceSheetOnRef.current);
     if (!map || !map.isStyleLoaded()) return;
     if (!iceSheetOnRef.current) return; // respect toggle
     // Fetch new ice sheet data
