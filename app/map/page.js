@@ -3728,6 +3728,7 @@ export default function HomePage() {
 
   const clearCataclysm = () => {
     const map = mapRef.current;
+    cataclysmRunRef.current += 1; // invalidate any in-flight animation steps
     setCataclysmActive(false);
     setCataclysmAnimating(false);
     clearYDI(); // also cleans up YDI flood layers and ice sheets
@@ -3744,9 +3745,12 @@ export default function HomePage() {
         map.setProjection("globe");
         map.setStyle("mapbox://styles/mapbox/streets-v12");
       });
-      // Fly to default view after style loads
+      // Fly to default view after style loads — only if not in another active scenario
+      const clearRun = cataclysmRunRef.current;
       map.once("style.load", () => {
-        safely(() => map.flyTo({ center: [-80.19, 25.76], zoom: 2.5, bearing: 0, pitch: 0, duration: 800 }));
+        if (cataclysmRunRef.current !== clearRun) return; // another cataclysm started
+        if (scenarioModeRef.current === "cataclysm") return; // user re-entered cataclysm
+        // Don't fly if user has navigated elsewhere
       });
       try { if (map.getLayer("cataclysm-layer")) map.removeLayer("cataclysm-layer"); } catch(e){}
       try { if (map.getSource("cataclysm-source")) map.removeSource("cataclysm-source"); } catch(e){}
