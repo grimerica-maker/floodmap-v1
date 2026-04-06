@@ -1295,6 +1295,13 @@ export default function HomePage() {
   const [megalithLoading, setMegalithLoading] = useState(false);
   const [faultLinesOn, setFaultLinesOn] = useState(false);
   const faultLinesOnRef = useRef(false);
+  // Ice Age mode
+  const [iceAgeOn, setIceAgeOn] = useState(false);
+  const iceAgeOnRef = useRef(false);
+  const [iceAgeKa, setIceAgeKa] = useState(21);
+  const iceAgeKaRef = useRef(21);
+  const [iceAgeInfo, setIceAgeInfo] = useState(null);
+  const [iceSheetOn, setIceSheetOn] = useState(true);
   const [volcanoOn, setVolcanoOn] = useState(false);
   const volcanoOnRef = useRef(false);
   const [airportOn, setAirportOn] = useState(false);
@@ -1615,6 +1622,79 @@ export default function HomePage() {
     if (airportOnRef.current)  addOverlayLayer("airports",  level);
     if (nuclearOnRef.current)  addOverlayLayer("nuclear",   level);
     if (fireOnRef.current && includeFiresReload) addOverlayLayer("fires", 0);
+  };
+
+  // ── Ice Age ──────────────────────────────────────────────────────────────
+  const ICE_AGE_SEA_LEVEL = [
+    {ka:26,sl:-130},{ka:25,sl:-128},{ka:24,sl:-125},{ka:23,sl:-123},
+    {ka:22,sl:-120},{ka:21,sl:-118},{ka:20,sl:-115},{ka:19,sl:-110},
+    {ka:18,sl:-105},{ka:17,sl:-98},{ka:16,sl:-90},{ka:15,sl:-80},
+    {ka:14,sl:-70},{ka:13,sl:-60},{ka:12,sl:-55},{ka:11,sl:-45},
+    {ka:10,sl:-35},{ka:9,sl:-25},{ka:8,sl:-15},{ka:7,sl:-8},
+    {ka:6,sl:-4},{ka:5,sl:-2},{ka:4,sl:-1},{ka:0,sl:0},
+  ];
+
+  const getIceAgeSL = (ka) => {
+    const curve = ICE_AGE_SEA_LEVEL;
+    const exact = curve.find(p => p.ka === ka);
+    if (exact) return exact.sl;
+    // Interpolate
+    const before = [...curve].reverse().find(p => p.ka <= ka);
+    const after = curve.find(p => p.ka >= ka);
+    if (!before) return after?.sl ?? 0;
+    if (!after) return before?.sl ?? 0;
+    const t = (ka - before.ka) / (after.ka - before.ka);
+    return Math.round(before.sl + t * (after.sl - before.sl));
+  };
+
+  const applyIceAge = async (ka) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const sl = getIceAgeSL(ka);
+    // Apply sea level via existing flood mechanism
+    seaLevelRef.current = sl;
+    setSeaLevel(sl);
+    syncFloodScenario();
+    // Apply ice sheet overlay
+    if (iceSheetOn) await applyIceSheets(ka);
+    setStatus(`Ice Age: ${ka}ka BP — Sea level ${sl}m`);
+  };
+
+  const applyIceSheets = async (ka) => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    // Remove old ice sheet layers
+    ["ice-sheet-layer","ice-sheet-outline"].forEach(l => {
+      try { if (map.getLayer(l)) map.removeLayer(l); } catch(e){}
+    });
+    try { if (map.getSource("ice-sheet-src")) map.removeSource("ice-sheet-src"); } catch(e){}
+    if (ka <= 0) return; // no ice sheets at present
+    try {
+      const res = await fetch(`${floodEngineUrlRef.current}/ice-sheets/${ka}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.features?.length) return;
+      map.addSource("ice-sheet-src", { type:"geojson", data });
+      map.addLayer({ id:"ice-sheet-layer", type:"fill", source:"ice-sheet-src",
+        paint:{ "fill-color":"#dbeafe", "fill-opacity":0.55 }
+      });
+      map.addLayer({ id:"ice-sheet-outline", type:"line", source:"ice-sheet-src",
+        paint:{ "line-color":"#93c5fd", "line-width":1.5, "line-opacity":0.8 }
+      });
+    } catch(e) { console.warn("Ice sheets error:", e); }
+  };
+
+  const clearIceAge = () => {
+    const map = mapRef.current;
+    ["ice-sheet-layer","ice-sheet-outline"].forEach(l => {
+      try { if (map?.getLayer(l)) map.removeLayer(l); } catch(e){}
+    });
+    try { if (map?.getSource("ice-sheet-src")) map.removeSource("ice-sheet-src"); } catch(e){}
+    setIceAgeOn(false); iceAgeOnRef.current = false;
+    // Reset sea level
+    seaLevelRef.current = 0; setSeaLevel(0);
+    removeFloodLayer();
+    setStatus("Ice Age mode cleared");
   };
 
   const addFaultLines = async () => {
@@ -6640,6 +6720,65 @@ export default function HomePage() {
       <div style={{ fontWeight: 700, marginBottom: 8 }}>Current Scenario</div>
       <div style={{ color: "#facc15", fontWeight: 700 }}>Something not looking right? Hard refresh: Ctrl+Shift+R / Cmd+Shift+R</div>
       {(scenarioMode === "flood" || scenarioMode === "climate") && <div>Sea level: {formatLevelForDisplay(seaLevel)}</div>}
+      {/* ── ICE AGE MODE — under Sea Level ── */}
+      {scenarioMode === "flood" && (
+        <div style={{ marginBottom: 14, padding: "12px", background: "rgba(147,197,253,0.06)", borderRadius: 10, border: "1px solid #1e3a5f" }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: iceAgeOn ? 12 : 0 }}>
+            <div>
+              <div style={{ fontSize:13, fontWeight:700, color: iceAgeOn ? "#93c5fd" : "#cbd5e1" }}>
+                🧊 Ice Age Mode
+              </div>
+              <div style={{ fontSize:10, color:"#475569", marginTop:1 }}>ICE-7G_NA · Paleo-topography · {iceAgeOn ? `${iceAgeKa}ka BP` : "26ka–0ka"}</div>
+            </div>
+            <div onClick={() => {
+              const next = !iceAgeOn;
+              setIceAgeOn(next); iceAgeOnRef.current = next;
+              if (next) { applyIceAge(iceAgeKa); }
+              else { clearIceAge(); }
+            }} style={{ width:28, height:16, borderRadius:8, background: iceAgeOn ? "#3b82f6" : "#1e2d45",
+              position:"relative", flexShrink:0, cursor:"pointer", transition:"background 0.2s" }}>
+              <div style={{ position:"absolute", top:2, left: iceAgeOn ? 14 : 2, width:12, height:12,
+                borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
+            </div>
+          </div>
+          {iceAgeOn && (<>
+            <div style={{ fontSize:11, color:"#93c5fd", marginBottom:6, textAlign:"center", fontWeight:700 }}>
+              {iceAgeKa === 0 ? "Present Day" : iceAgeKa <= 6 ? "Late Holocene" : iceAgeKa <= 11 ? "Early Holocene / Younger Dryas" : iceAgeKa <= 14 ? "Meltwater Pulse" : iceAgeKa <= 18 ? "Deglaciation" : "Last Glacial Maximum"}
+              {" · "}{getIceAgeSL(iceAgeKa)}m sea level
+            </div>
+            <input type="range" min="0" max="26" step="0.5" value={iceAgeKa}
+              onChange={(e) => {
+                const ka = parseFloat(e.target.value);
+                setIceAgeKa(ka); iceAgeKaRef.current = ka;
+                applyIceAge(ka);
+              }}
+              style={{ width:"100%", marginBottom:8, accentColor:"#3b82f6" }} />
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"#475569", marginBottom:10 }}>
+              <span>0ka (Now)</span><span>13ka (YD)</span><span>21ka (LGM)</span><span>26ka BP</span>
+            </div>
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:8 }}>
+              {[[0,"Now"],[6,"6ka"],[11,"YD"],[14,"14ka"],[18,"18ka"],[21,"LGM"],[26,"26ka"]].map(([ka,label]) => (
+                <button key={ka} onClick={() => { setIceAgeKa(ka); iceAgeKaRef.current = ka; applyIceAge(ka); }}
+                  style={{ flex:1, padding:"5px 4px", fontSize:11, fontWeight:700, borderRadius:6, border:"none",
+                    background: iceAgeKa === ka ? "#3b82f6" : "#1e3a5f", color: iceAgeKa === ka ? "white" : "#64748b",
+                    cursor:"pointer", minWidth:36 }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div onClick={() => { setIceSheetOn(!iceSheetOn); if (!iceSheetOn) applyIceSheets(iceAgeKa); else {
+              const map = mapRef.current;
+              ["ice-sheet-layer","ice-sheet-outline"].forEach(l => { try { if(map?.getLayer(l)) map.removeLayer(l); } catch(e){} });
+              try { if(map?.getSource("ice-sheet-src")) map.removeSource("ice-sheet-src"); } catch(e){}
+            }}}
+              style={{ fontSize:11, color: iceSheetOn ? "#93c5fd" : "#475569", cursor:"pointer", textAlign:"center",
+                padding:"4px", border:"1px solid #1e3a5f", borderRadius:6 }}>
+              {iceSheetOn ? "✓ Ice sheets visible" : "○ Ice sheets hidden"}
+            </div>
+          </>)}
+        </div>
+      )}
+
       {(scenarioMode === "flood" || scenarioMode === "climate") && seaLevel !== 0 && (
         <div style={{ fontWeight: 700, marginTop: 2 }}>
           {proTier !== "free"
