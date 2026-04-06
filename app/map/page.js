@@ -2326,12 +2326,15 @@ export default function HomePage() {
                 if (mapNow.getLayer(fLay)) mapNow.removeLayer(fLay);
                 if (mapNow.getSource(fSrc)) mapNow.removeSource(fSrc);
                 mapNow.addSource(fSrc, { type:"raster", tiles:[tUrl], tileSize:256, minzoom:0, maxzoom:12 });
+                // Always visible — view toggle handles hide/show
                 mapNow.addLayer({ id:fLay, type:"raster", source:fSrc, layout:{visibility:"visible"}, paint:{"raster-opacity":0.7,"raster-opacity-transition":{duration:500}} });
                 eqLayers.current.push({ sourceId:fSrc, layerId:fLay });
-              } catch(e) {}
+              } catch(e) { console.warn("flood tile add error:", e); }
             });
           } catch(e) { console.warn("EQ flood tile error:", e); }
 
+          // Switch to tsunami view to show flood tiles
+          setEqView("tsunami");
           mapNow.triggerRepaint();
       };  // end processResult
 
@@ -2357,7 +2360,8 @@ export default function HomePage() {
               mapNow.addSource(fSrc, { type:"raster", tiles:[tUrl], tileSize:256, minzoom:0, maxzoom:12 });
               mapNow.addLayer({ id:fLay, type:"raster", source:fSrc, layout:{visibility:"visible"}, paint:{"raster-opacity":0.7,"raster-opacity-transition":{duration:500}} });
               eqLayers.current.push({ sourceId:fSrc, layerId:fLay });
-            } catch(e) {}
+              console.log("🌊 Flood tile added:", fLay, "level:", floodLevel, "reach:", reachM);
+            } catch(e) { console.warn("hardcoded flood tile error:", e); }
           });
         }, 300);
       } else {
