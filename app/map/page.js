@@ -4938,17 +4938,14 @@ export default function HomePage() {
           // Find which zone was clicked by checking rendered features
           const veruptLayers = [];
           for (let i = 0; i < 8; i++) { try { if (map.getLayer(`verupt-layer-${i}`)) veruptLayers.push(`verupt-layer-${i}`); } catch(e){} }
-          const hits = veruptLayers.length > 0 ? map.queryRenderedFeatures([e.point.x, e.point.y], { layers: veruptLayers }) : [];
-          // hits are ordered front-to-back, first hit = innermost zone clicked
-          // The innermost verupt layer has the highest ri index = lowest colorIdx = Kill Zone
-          // Map layer index back to zone — layers drawn in reverse order so verupt-layer-0 = Trace Ash
+          const hits = veruptLayers.length > 0 ? map.queryRenderedFeatures(e.point, { layers: veruptLayers }) : [];
+          // verupt-layer-i maps directly to zones[i] (Kill Zone=0, outermost=n-1)
           const hitLayerId = hits[0]?.layer?.id;
-          const hitRi = hitLayerId ? parseInt(hitLayerId.replace("verupt-layer-","")) : null;
-          const zoneIdx = hitRi != null ? (r.zones.length - 1 - hitRi) : null;
+          const zoneIdx = hitLayerId ? parseInt(hitLayerId.replace("verupt-layer-","")) : null;
           const zone = zoneIdx != null ? r.zones[zoneIdx] : r.zones[0];
           if (zone) {
             const zColors = ["#7f1d1d","#b91c1c","#dc2626","#ea580c","#f97316","#fbbf24"];
-            const zColor = zColors[zoneIdx] || "#f97316";
+            const zColor = zColors[zoneIdx != null ? zoneIdx : 0] || "#f97316";
             new mapboxgl.Popup({ closeButton:true, maxWidth:"260px", className:"elev-popup" })
               .setLngLat([lng, lat])
               .setHTML(`<div style="font-family:Arial,sans-serif">
@@ -5301,42 +5298,47 @@ export default function HomePage() {
         const data = await res.json();
         if (data.error) { setStatus("Eruption sim error"); return; }
 
-        // Colors: index 0=Kill Zone (darkest), index n=outermost (lightest)
-        // zones[0]=Kill Zone (smallest/darkest), zones[n]=Trace Ash (largest/lightest)
+        // Build ellipse ring coords for each zone
+        // Each zone rendered as a donut: outer ellipse minus inner ellipse (polygon with hole)
         const n = data.zones.length;
         const zoneColors = ["#7f1d1d","#b91c1c","#dc2626","#ea580c","#f97316","#fbbf24"];
-        const zoneOpacity = [0.80, 0.55, 0.40, 0.28, 0.18, 0.12];
+        const zoneOpacity = [0.85, 0.75, 0.60, 0.45, 0.30, 0.20];
 
         const bearing = data.bearing_deg * Math.PI / 180;
         const dNorth = Math.cos(bearing), dEast = Math.sin(bearing);
         const KP_LAT = 110.574;
         const KP_LNG = 111.32 * Math.cos(lat * Math.PI / 180);
 
-        // Draw largest zone first (bottom), then progressively smaller on top
-        // zones is ordered smallest→largest, so reverse to draw largest first
-        [...data.zones].reverse().forEach((zone, ri) => {
-          // ri=0 is the outermost (Trace Ash = lightest color = index n-1)
-          // ri=n-1 is the Kill Zone (darkest = index 0) drawn last/on top
-          const colorIdx = n - 1 - ri; // outermost gets highest index (lightest)
-          const majorKm = zone.major_km, minorKm = zone.minor_km;
+        const makeEllipseRing = (majorKm, minorKm) => {
           const cLat = lat + (dNorth * majorKm * 0.3) / KP_LAT;
           const cLng = lng + (dEast  * majorKm * 0.3) / KP_LNG;
           const steps = 64;
           const coords = [];
           for (let s = 0; s <= steps; s++) {
             const angle = (s / steps) * 2 * Math.PI;
-            const along = majorKm * Math.cos(angle);
-            const perp  = minorKm * Math.sin(angle);
-            const pLat  = cLat + (dNorth * along - dEast  * perp) / KP_LAT;
-            const pLng  = cLng + (dEast  * along + dNorth * perp) / KP_LNG;
+            const pLat = cLat + (dNorth * majorKm * Math.cos(angle) - dEast  * minorKm * Math.sin(angle)) / KP_LAT;
+            const pLng = cLng + (dEast  * majorKm * Math.cos(angle) + dNorth * minorKm * Math.sin(angle)) / KP_LNG;
             coords.push([pLng, pLat]);
           }
-          const geo = { type:"Feature", geometry:{ type:"Polygon", coordinates:[coords] }, properties:{} };
-          const srcId = `verupt-src-${ri}`, layId = `verupt-layer-${ri}`;
+          return coords;
+        };
+
+        // zones[0]=Kill Zone (smallest), zones[n-1]=outermost
+        // Draw as donuts: each zone = outer ring minus next inner ring
+        data.zones.forEach((zone, i) => {
+          const outerRing = makeEllipseRing(zone.major_km, zone.minor_km);
+          // Hole = next inner zone (or tiny point for kill zone)
+          const innerZone = i > 0 ? data.zones[i-1] : null;
+          const holeRing = innerZone
+            ? makeEllipseRing(innerZone.major_km, innerZone.minor_km).reverse()
+            : null;
+          const rings = holeRing ? [outerRing, holeRing] : [outerRing];
+          const geo = { type:"Feature", geometry:{ type:"Polygon", coordinates: rings }, properties:{} };
+          const srcId = `verupt-src-${i}`, layId = `verupt-layer-${i}`;
           try {
             map.addSource(srcId, { type:"geojson", data:{ type:"FeatureCollection", features:[geo] } });
             map.addLayer({ id:layId, type:"fill", source:srcId,
-              paint:{ "fill-color": zoneColors[colorIdx] || "#4ade80", "fill-opacity": zoneOpacity[colorIdx] || 0.12 }
+              paint:{ "fill-color": zoneColors[i] || "#fbbf24", "fill-opacity": zoneOpacity[i] || 0.20 }
             });
           } catch(e) {}
         });
