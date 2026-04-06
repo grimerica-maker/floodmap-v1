@@ -1755,7 +1755,7 @@ export default function HomePage() {
             </table>
             ${p.summary ? `<div style="color:#64748b;font-size:10px;line-height:1.5;margin-bottom:8px">${p.summary}${p.summary.length>=400?"…":""}</div>` : ""}
             ${p.photo ? `<img src="${p.photo}" style="width:100%;border-radius:6px;margin-bottom:8px" onerror="this.style.display='none'"/>` : ""}
-            ${p.is_super ? `<button onclick="window.__dmEruptVolcano&&window.__dmEruptVolcano(${e.lngLat.lat},${e.lngLat.lng},'${p.name}')" style="width:100%;padding:8px;background:#ff4500;color:white;border:none;border-radius:7px;cursor:pointer;font-weight:700;font-size:13px;font-family:Arial,sans-serif">💥 Simulate Eruption</button>` : ""}
+            <button onclick="window.__dmEruptVolcano&&window.__dmEruptVolcano(${e.lngLat.lat},${e.lngLat.lng},'${p.name}','${(p.type||"").replace(/'/g,"")}',${ p.is_super ? "true" : "false"})" style="width:100%;padding:8px;background:${p.is_super ? "#ff4500" : "#b91c1c"};color:white;border:none;border-radius:7px;cursor:pointer;font-weight:700;font-size:13px;font-family:Arial,sans-serif">💥 Simulate Eruption</button>
           </div>`)
           .addTo(map);
       };
@@ -5235,13 +5235,83 @@ export default function HomePage() {
     window.__dmFaultClear = () => {
       document.querySelectorAll(".mapboxgl-popup").forEach(p => p.remove());
     };
-    window.__dmEruptVolcano = (lat, lng, name) => {
+    window.__dmEruptVolcano = async (lat, lng, name, vtype, isSuper) => {
       document.querySelectorAll(".mapboxgl-popup").forEach(p => p.remove());
-      // Switch to Yellowstone scenario and run it at this volcano's location
-      setScenarioMode("yellowstone"); scenarioModeRef.current = "yellowstone";
-      setTimeout(() => {
-        if (window.__dmTriggerYellowstone) window.__dmTriggerYellowstone(lat, lng, name);
-      }, 300);
+      const map = mapRef.current;
+      if (!map) return;
+
+      // Clear previous eruption layers
+      for (let i = 0; i < 6; i++) {
+        try { if (map.getLayer(`verupt-layer-${i}`)) map.removeLayer(`verupt-layer-${i}`); } catch(e){}
+        try { if (map.getSource(`verupt-src-${i}`)) map.removeSource(`verupt-src-${i}`); } catch(e){}
+      }
+
+      setStatus("Simulating eruption...");
+
+      try {
+        const url = `${floodEngineUrlRef.current}/volcano-erupt?lat=${lat}&lng=${lng}&vtype=${encodeURIComponent(vtype||"")}&is_super=${!!isSuper}&name=${encodeURIComponent(name)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.error) { setStatus("Eruption sim error"); return; }
+
+        // Zone colors
+        const zoneColors = ["#7f1d1d","#b91c1c","#ea580c","#f97316","#fbbf24","#4ade80"];
+        const zoneOpacity = [0.85, 0.70, 0.55, 0.40, 0.28, 0.18];
+
+        // Draw ellipse zones largest first
+        const bearing = data.bearing_deg * Math.PI / 180;
+        const dNorth = Math.cos(bearing), dEast = Math.sin(bearing);
+        const KP_LAT = 110.574;
+        const KP_LNG = 111.32 * Math.cos(lat * Math.PI / 180);
+
+        [...data.zones].reverse().forEach((zone, ri) => {
+          const i = data.zones.length - 1 - ri;
+          const majorKm = zone.major_km, minorKm = zone.minor_km;
+          // Offset center downwind by 30% of major axis
+          const cLat = lat + (dNorth * majorKm * 0.3) / KP_LAT;
+          const cLng = lng + (dEast  * majorKm * 0.3) / KP_LNG;
+          // Build ellipse polygon
+          const steps = 64;
+          const coords = [];
+          for (let s = 0; s <= steps; s++) {
+            const angle = (s / steps) * 2 * Math.PI;
+            const along = majorKm * Math.cos(angle);
+            const perp  = minorKm * Math.sin(angle);
+            const pLat  = cLat + (dNorth * along - dEast  * perp) / KP_LAT;
+            const pLng  = cLng + (dEast  * along + dNorth * perp) / KP_LNG;
+            coords.push([pLng, pLat]);
+          }
+          const geo = { type:"Feature", geometry:{ type:"Polygon", coordinates:[coords] }, properties:{} };
+          const srcId = `verupt-src-${i}`, layId = `verupt-layer-${i}`;
+          try {
+            map.addSource(srcId, { type:"geojson", data:{ type:"FeatureCollection", features:[geo] } });
+            map.addLayer({ id:layId, type:"fill", source:srcId,
+              paint:{ "fill-color": zoneColors[i % zoneColors.length], "fill-opacity": zoneOpacity[i % zoneOpacity.length] }
+            });
+          } catch(e) {}
+        });
+
+        // Show result
+        const fmt = n => n >= 1e9 ? (n/1e9).toFixed(1)+"B" : n >= 1e6 ? (n/1e6).toFixed(1)+"M" : n >= 1e3 ? (n/1e3).toFixed(0)+"K" : n;
+        const blackoutLine = data.blackout_pct > 0
+          ? `<div style="color:#fbbf24;font-size:11px;margin-top:6px">☁ ${data.blackout_pct}% sunlight blocked for ${data.blackout_months} months — ${data.blackout_severity}</div>` : "";
+        new mapboxgl.Popup({ closeButton:true, maxWidth:"300px", className:"elev-popup" })
+          .setLngLat([lng, lat])
+          .setHTML(`<div style="font-family:Arial,sans-serif">
+            <div style="font-weight:700;font-size:14px;color:#ef4444;margin-bottom:6px">💥 ${name} — VEI ${data.vei}</div>
+            <div style="font-size:12px;color:#94a3b8;margin-bottom:8px">${data.vtype||"Unknown type"}</div>
+            <table style="font-size:12px;width:100%;border-collapse:collapse;margin-bottom:6px">
+              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Est. deaths</td><td style="font-weight:700;color:#ef4444">${fmt(data.total_deaths)}</td></tr>
+              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Pop. affected</td><td style="font-weight:700">${fmt(data.total_population)}</td></tr>
+            </table>
+            ${data.zones.map((z,i) => `<div style="font-size:11px;color:${["#ef4444","#f97316","#fbbf24","#4ade80"][Math.min(i,3)]};margin-bottom:2px">${z.name}: ${fmt(z.deaths)} dead (${z.mortality_pct}% mortality · ${z.major_km}km)</div>`).join("")}
+            ${blackoutLine}
+          </div>`)
+          .addTo(map);
+
+        setStatus(`${name} eruption simulated — VEI ${data.vei}`);
+        map.flyTo({ center:[lng, lat], zoom: data.vei >= 7 ? 4 : data.vei >= 5 ? 6 : 8, duration:1500 });
+      } catch(e) { console.warn("Erupt error:", e); setStatus("Eruption sim failed"); }
     };
     return () => { delete window.__dmWiki; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
