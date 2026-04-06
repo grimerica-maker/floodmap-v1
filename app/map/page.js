@@ -1679,13 +1679,15 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
     const sl = getIceAgeSL(ka);
-    // Apply sea level via existing flood mechanism
+    // Apply sea level
     seaLevelRef.current = sl;
     setSeaLevel(sl);
     syncFloodScenario();
-    // Apply ice sheet overlay
-    await applyIceSheets(ka); // always apply — iceSheetOnRef checked inside
     setStatus(`Ice Age: ${ka}ka BP — Sea level ${sl}m`);
+    // Wait a tick for flood tile sync to settle before drawing ice sheets
+    // syncFloodScenario may trigger tile requests but does NOT reload style
+    await new Promise(r => setTimeout(r, 80));
+    await applyIceSheets(ka);
   };
 
   const applyIceSheets = async (ka) => {
@@ -1704,18 +1706,18 @@ export default function HomePage() {
       if (!res.ok) return;
       const data = await res.json();
       if (!data.features?.length) return;
-      // Update existing source if possible (avoids re-registering click handlers)
-      if (map.getSource("ice-sheet-src")) {
-        map.getSource("ice-sheet-src").setData(data);
-      } else {
-        map.addSource("ice-sheet-src", { type:"geojson", data });
-        map.addLayer({ id:"ice-sheet-layer", type:"fill", source:"ice-sheet-src",
-          paint:{ "fill-color":"#bfdbfe", "fill-opacity":0.78 }
-        });
-        map.addLayer({ id:"ice-sheet-outline", type:"line", source:"ice-sheet-src",
-          paint:{ "line-color":"#60a5fa", "line-width":2, "line-opacity":1.0 }
-        });
-      }
+      // Always remove and re-add to ensure clean state after any style reload
+      ["ice-sheet-layer","ice-sheet-outline"].forEach(l => {
+        try { if (map.getLayer(l)) map.removeLayer(l); } catch(e) {}
+      });
+      try { if (map.getSource("ice-sheet-src")) map.removeSource("ice-sheet-src"); } catch(e) {}
+      map.addSource("ice-sheet-src", { type:"geojson", data });
+      map.addLayer({ id:"ice-sheet-layer", type:"fill", source:"ice-sheet-src",
+        paint:{ "fill-color":"#bfdbfe", "fill-opacity":0.78 }
+      });
+      map.addLayer({ id:"ice-sheet-outline", type:"line", source:"ice-sheet-src",
+        paint:{ "line-color":"#60a5fa", "line-width":2, "line-opacity":1.0 }
+      });
 
     } catch(e) { console.warn("Ice sheets error:", e); }
 
@@ -4782,6 +4784,10 @@ export default function HomePage() {
     const handleStyleLoad = () => {
       applyProjectionForMode(viewModeRef.current);
       activeFloodLevelRef.current = null;
+      // Re-apply ice sheets after style reload wipes all sources
+      if (iceAgeOnRef.current) {
+        setTimeout(() => applyIceSheets(iceAgeKaRef.current), 200);
+      }
       if ((scenarioModeRef.current === "flood" || scenarioModeRef.current === "climate") && Number(seaLevelRef.current) !== 0 && floodAllowedInCurrentView()) {
         setTimeout(() => { syncFloodScenario(); }, 50);
       } else { removeFloodLayer(); }
