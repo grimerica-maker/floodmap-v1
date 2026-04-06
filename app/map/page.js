@@ -1562,7 +1562,7 @@ export default function HomePage() {
       const isMegalith = type === "megaliths";
       map.addSource(c.src, {
         type: "geojson", data,
-        ...(isMegalith ? { cluster: true, clusterMaxZoom: 11, clusterRadius: 25 } : {}),
+        ...(isMegalith ? { cluster: true, clusterMaxZoom: 14, clusterRadius: 60 } : {}),
       });
 
       // Cluster layers for megaliths
@@ -1570,15 +1570,15 @@ export default function HomePage() {
         map.addLayer({ id: c.layer + "-clusters", type: "circle", source: c.src,
           filter: ["has", "point_count"],
           paint: {
-            "circle-color": ["step", ["get", "point_count"], "#f97316", 10, "#ea580c", 100, "#c2410c"],
-            "circle-radius": ["step", ["get", "point_count"], 14, 10, 20, 100, 28],
-            "circle-stroke-width": 1.5, "circle-stroke-color": "#fff",
+            "circle-color": ["step", ["get", "point_count"], "#d97706", 50, "#b45309", 500, "#92400e"],
+            "circle-radius": ["step", ["get", "point_count"], 12, 50, 18, 500, 24],
+            "circle-stroke-width": 2, "circle-stroke-color": "#fff",
           }
         });
         map.addLayer({ id: c.layer + "-count", type: "symbol", source: c.src,
-          filter: ["has", "point_count"],
-          layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 14, "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"] },
-          paint: { "text-color": "#fff", "text-halo-color": "rgba(0,0,0,0.8)", "text-halo-width": 2 }
+          filter: ["all", ["has", "point_count"], [">=", ["get", "point_count"], 2]],
+          layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 13, "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"] },
+          paint: { "text-color": "#fff", "text-halo-color": "#92400e", "text-halo-width": 1.5 }
         });
         // Click cluster to zoom in — stopPropagation prevents individual dot popup
         map.on("click", c.layer + "-clusters", (e) => {
