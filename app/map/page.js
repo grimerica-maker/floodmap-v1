@@ -2067,10 +2067,6 @@ export default function HomePage() {
               <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Status</td><td>${p.status || "—"}</td></tr>
             </table>
             ${tsun}
-            <button onclick="window.__dmLoadUSGSQuake&&window.__dmLoadUSGSQuake(${lat},${lng},${p.mag},${depth})"
-              style="width:100%;padding:8px;margin-top:6px;background:#f97316;color:white;border:none;border-radius:7px;cursor:pointer;font-weight:700;font-size:12px;font-family:Arial,sans-serif">
-              🌍 Simulate This Quake
-            </button>
           </div>`)
           .addTo(map);
       });
@@ -5732,28 +5728,6 @@ export default function HomePage() {
   // Expose openWikiPanel globally for popup HTML buttons
   useEffect(() => {
     window.__dmWiki = (name, url, wikidata, mpId) => openWikiPanel(name, url, wikidata, mpId);
-    window.__dmLoadUSGSQuake = (lat, lng, mag, depthKm) => {
-      // Load USGS quake into earthquake simulator
-      clearEarthquake();
-      setScenarioMode("earthquake"); scenarioModeRef.current = "earthquake";
-      // Set params
-      const roundedMag = Math.round(mag * 10) / 10;
-      setEqMag(roundedMag); eqMagRef.current = roundedMag;
-      const depthId = depthKm < 20 ? "shallow" : depthKm < 70 ? "intermediate" : "deep";
-      setEqDepthId(depthId); eqDepthRef.current = depthId;
-      const el = document.createElement("div");
-      el.style.cssText = "width:24px;height:24px;background:#fbbf24;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 3px #f59e0b,0 2px 8px rgba(0,0,0,0.5);cursor:pointer;";
-      const map = mapRef.current;
-      if (map) {
-        if (eqMarker.current) { eqMarker.current.remove(); eqMarker.current = null; }
-        eqMarker.current = new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([lng, lat]).addTo(map);
-        setEqPoint({ lat, lng }); eqPointRef.current = { lat, lng };
-        map.flyTo({ center: [lng, lat], zoom: 5, duration: 1000 });
-      }
-      document.querySelectorAll(".mapboxgl-popup").forEach(p => p.remove());
-      setStatus(`USGS M${roundedMag} loaded — hit Trigger to simulate`);
-    };
-
     window.__dmFaultSetQuake = (lat, lng, faultId, dip, rake, strike) => {
       setEqFaultId(faultId); eqFaultRef.current = faultId;
       setEqDip(Math.round(dip)); eqDipRef.current = Math.round(dip);
@@ -6166,6 +6140,25 @@ export default function HomePage() {
 
           <div style={{ fontSize:11, color:"#94a3b8", textAlign:"center", marginBottom:10 }}>
             {eqPoint ? "👆 Hit Trigger to run simulation" : "👆 Click map to place epicenter"}
+          </div>
+
+          {/* Live USGS Earthquakes toggle */}
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"9px 10px", marginBottom:8, borderRadius:9, cursor:"pointer",
+            background: usgsOn ? "rgba(251,191,36,0.12)" : "rgba(255,255,255,0.03)",
+            border: usgsOn ? "1px solid #fbbf2455" : "1px solid #1e2d45" }}
+            onClick={() => { const next = !usgsOn; setUsgsOn(next); usgsOnRef.current = next; if (next) addUsgsQuakes(); else removeUsgsQuakes(); }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <span style={{ fontSize:16 }}>🌍</span>
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, color: usgsOn ? "#fbbf24" : "#94a3b8" }}>Live Earthquakes</div>
+                <div style={{ fontSize:10, color:"#475569", marginTop:1 }}>
+                  {usgsLoading ? "Loading…" : "USGS M4.5+ · past 24 hours"}
+                </div>
+              </div>
+            </div>
+            <div style={{ width:28, height:16, borderRadius:8, background: usgsOn ? "#fbbf24" : "#1e2d45", position:"relative", flexShrink:0, transition:"background 0.2s" }}>
+              <div style={{ position:"absolute", top:2, left: usgsOn ? 14 : 2, width:12, height:12, borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
+            </div>
           </div>
 
           {/* Fault Lines toggle — above trigger */}
@@ -7165,26 +7158,7 @@ export default function HomePage() {
             </div>
           );
         })}
-        {/* Live USGS Earthquakes — standalone toggle */}
-        <div onClick={() => {
-            const next = !usgsOn; setUsgsOn(next); usgsOnRef.current = next;
-            if (next) addUsgsQuakes(); else removeUsgsQuakes();
-          }}
-          style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 10px", marginBottom:4,
-            borderRadius:9, cursor:"pointer",
-            background: usgsOn ? "rgba(251,191,36,0.12)" : "rgba(255,255,255,0.03)",
-            border: usgsOn ? "1px solid #fbbf2455" : "1px solid transparent" }}>
-          <span style={{ fontSize:18, lineHeight:1 }}>🌍</span>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:13, fontWeight:700, color: usgsOn ? "#fbbf24" : "#cbd5e1" }}>Live Earthquakes</div>
-            <div style={{ fontSize:10, color:"#475569", marginTop:1 }}>
-              {usgsLoading ? "Loading feed…" : usgsOn ? "USGS M4.5+ · past 24hrs · live" : "USGS M4.5+ · past 24 hours"}
-            </div>
-          </div>
-          <div style={{ width:28, height:16, borderRadius:8, background: usgsOn ? "#fbbf24" : "#1e2d45", position:"relative", flexShrink:0, transition:"background 0.2s" }}>
-            <div style={{ position:"absolute", top:2, left: usgsOn ? 14 : 2, width:12, height:12, borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
-          </div>
-        </div>
+
       </div>
 
       {/* ── VIEW MODE ── */}
