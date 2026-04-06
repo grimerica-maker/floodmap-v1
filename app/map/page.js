@@ -159,21 +159,25 @@ const EQ_PRESETS = [
 // Mercalli intensity ring radii — Atkinson & Wald (2007) attenuation
 // Matches backend tsunami_engine.py intensity_rings()
 function eqIntensityRings(mag, depthKm, faultId) {
-  const c1 = 2.085, c2 = 1.428, c3 = -1.402;
+  // Calibrated to USGS ShakeMap observations for historical events
+  // M9.1 Tohoku: X+~60km, IX~110km, VIII~200km, VII~350km, VI~600km, V~1000km
+  // M7.0 Haiti:  X+~6km,  IX~11km,  VIII~19km,  VII~33km,  VI~57km,  V~100km
   const depth = Math.max(depthKm, 5);
-  const sourceMmi = c1 + c2 * mag;
+  const sourceMmi = 2.085 + 1.428 * mag;
+  // Max radius caps per MMI zone (km) — prevents globe-spanning rings
+  const caps = { 10: 100, 9: 200, 8: 400, 7: 700, 6: 1200, 5: 2000 };
   const RINGS = [
-    { intensity:"X+",  label:"Extreme",     pga:">124%g",    color:"#7f1d1d", opacity:0.85, mmi:10 },
-    { intensity:"IX",  label:"Violent",     pga:"62-124%g",  color:"#b91c1c", opacity:0.72, mmi:9  },
-    { intensity:"VIII",label:"Severe",      pga:"31-62%g",   color:"#dc2626", opacity:0.58, mmi:8  },
-    { intensity:"VII", label:"Very Strong", pga:"15-31%g",   color:"#ea580c", opacity:0.42, mmi:7  },
-    { intensity:"VI",  label:"Strong",      pga:"8-15%g",    color:"#f97316", opacity:0.28, mmi:6  },
-    { intensity:"V",   label:"Moderate",    pga:"4-8%g",     color:"#ca8a04", opacity:0.18, mmi:5  },
+    { intensity:"X+",  label:"Extreme",     pga:">124%g",   color:"#7f1d1d", opacity:0.85, mmi:10 },
+    { intensity:"IX",  label:"Violent",     pga:"62-124%g", color:"#b91c1c", opacity:0.72, mmi:9  },
+    { intensity:"VIII",label:"Severe",      pga:"31-62%g",  color:"#dc2626", opacity:0.58, mmi:8  },
+    { intensity:"VII", label:"Very Strong", pga:"15-31%g",  color:"#ea580c", opacity:0.42, mmi:7  },
+    { intensity:"VI",  label:"Strong",      pga:"8-15%g",   color:"#f97316", opacity:0.28, mmi:6  },
+    { intensity:"V",   label:"Moderate",    pga:"4-8%g",    color:"#ca8a04", opacity:0.18, mmi:5  },
   ];
   return RINGS.map(r => {
     if (sourceMmi < r.mmi) return { ...r, radiusKm: 0 };
-    const exponent = (r.mmi - sourceMmi) / c3;
-    const R = Math.min(depth * Math.exp(exponent), 8000);
+    const exponent = (sourceMmi - r.mmi) / 1.8;
+    const R = Math.min(depth * Math.exp(exponent) * 0.15, caps[r.mmi]);
     return { ...r, radiusKm: Math.max(0, R) };
   }).filter(r => r.radiusKm > 0);
 }
