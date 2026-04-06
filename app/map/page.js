@@ -1755,7 +1755,7 @@ export default function HomePage() {
             </table>
             ${p.summary ? `<div style="color:#64748b;font-size:10px;line-height:1.5;margin-bottom:8px">${p.summary}${p.summary.length>=400?"…":""}</div>` : ""}
             ${p.photo ? `<img src="${p.photo}" style="width:100%;border-radius:6px;margin-bottom:8px" onerror="this.style.display='none'"/>` : ""}
-            <button onclick="window.__dmEruptVolcano&&window.__dmEruptVolcano(${e.lngLat.lat},${e.lngLat.lng},'${(p.name||"").replace(/'/g,"")}','${(p.type||"").replace(/'/g,"")}',${!!p.is_super})" style="width:100%;padding:10px;background:${p.is_super ? '#ff4500' : '#ea580c'};color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;font-family:Arial,sans-serif">Simulate Eruption</button>
+            <button onclick="window.__dmEruptVolcano&&window.__dmEruptVolcano(${e.lngLat.lat},${e.lngLat.lng},'${(p.name||"").replace(/'/g,"")}','${(p.type||"").replace(/'/g,"")}',${!!p.is_super})" style="width:100%;padding:10px;background:${p.is_super ? '#ff4500' : '#ea580c'};color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;font-family:Arial,sans-serif">${p.is_super ? "Simulate Eruption" : "Simulate Eruption (Pro)"}</button>
           </div>`)
           .addTo(map);
       };
@@ -5300,6 +5300,7 @@ export default function HomePage() {
     };
     window.__dmEruptVolcano = async (lat, lng, name, vtype, isSuper) => {
       document.querySelectorAll(".mapboxgl-popup").forEach(p => p.remove());
+      if (!isSuper && proTierRef.current === "free") { setPaywallModal("pro"); return; }
       const map = mapRef.current;
       if (!map) return;
 
@@ -6428,7 +6429,7 @@ export default function HomePage() {
             <div style={{ flex:1 }}>
               <div style={{ fontSize:13, fontWeight:700, color: volcanoOn ? "#ff6600" : "#cbd5e1" }}>Show All Volcanoes</div>
               <div style={{ fontSize:10, color:"#475569", marginTop:1 }}>
-                {volcanoOn ? "Click any volcano to simulate eruption" : "1,215 Holocene volcanoes · click to erupt"}
+                {volcanoOn ? "Supervolcanoes free · all eruptions Pro" : "1,215 Holocene volcanoes · free to browse"}
               </div>
             </div>
             <div style={{ width:28, height:16, borderRadius:8, background: volcanoOn ? "#ff4500" : "#1e2d45", position:"relative", flexShrink:0, transition:"background 0.2s" }}>
