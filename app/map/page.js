@@ -1677,7 +1677,13 @@ export default function HomePage() {
 
   const applyIceAge = async (ka) => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
+    // Wait for style if needed
+    if (!map.isStyleLoaded()) {
+      await new Promise(r => setTimeout(r, 150));
+      if (!mapRef.current?.isStyleLoaded()) await new Promise(r => setTimeout(r, 300));
+    }
+    if (!mapRef.current) return;
     const sl = getIceAgeSL(ka);
     // Apply sea level
     seaLevelRef.current = sl;
@@ -1686,15 +1692,28 @@ export default function HomePage() {
     setStatus(`Ice Age: ${ka}ka BP — Sea level ${sl}m`);
     // Wait a tick for flood tile sync to settle before drawing ice sheets
     // syncFloodScenario may trigger tile requests but does NOT reload style
-    await new Promise(r => setTimeout(r, 80));
+    await new Promise(r => setTimeout(r, 150));
     await applyIceSheets(ka);
   };
 
   const applyIceSheets = async (ka) => {
     const map = mapRef.current;
-    console.log("[ICE] applyIceSheets called", ka, "mapOK:", !!map, "styleLoaded:", map?.isStyleLoaded(), "sheetOn:", iceSheetOnRef.current);
-    if (!map || !map.isStyleLoaded()) return;
-    if (!iceSheetOnRef.current) return; // respect toggle
+    if (!map) return;
+    if (!iceSheetOnRef.current) return;
+    // Wait for style to be loaded — cap at 3s
+    if (!map.isStyleLoaded()) {
+      await new Promise(resolve => {
+        let waited = 0;
+        const check = () => {
+          waited += 100;
+          if (!mapRef.current || waited > 3000) return resolve();
+          if (mapRef.current.isStyleLoaded()) return resolve();
+          setTimeout(check, 100);
+        };
+        setTimeout(check, 100);
+      });
+    }
+    if (!mapRef.current || !iceSheetOnRef.current) return;
     // Fetch new ice sheet data
     if (ka <= 0) {
       // Remove sheets at present day
