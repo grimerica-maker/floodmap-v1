@@ -211,7 +211,10 @@ function eqRingGeoJSON(lat, lng, radiusKm, steps = 64) {
 // Liquefaction risk — high in coastal/river deltas at VI+ shaking
 // Approximated by elevation proxy: < 10m elevation = high liquefaction risk
 function eqLiquefactionRadius(mag, depthKm) {
-  return Math.pow(10, 0.45 * mag - 1.2) * Math.max(0.3, 1 - depthKm / 400) * 15;
+  // Liquefaction is near-field only — M7=~8km, M8=~27km, M9=~44km, hard cap 150km
+  if (mag < 5.5) return 0;
+  const raw = Math.pow(10, 0.35 * mag - 1.5) * Math.max(0.2, 1 - depthKm / 300);
+  return Math.min(raw, 150);
 }
 
 // ── Scenario wiki content ────────────────────────────────────────────────────
