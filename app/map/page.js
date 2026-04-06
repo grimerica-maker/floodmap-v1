@@ -1302,6 +1302,7 @@ export default function HomePage() {
   const iceAgeKaRef = useRef(21);
   const [iceAgeInfo, setIceAgeInfo] = useState(null);
   const [iceSheetOn, setIceSheetOn] = useState(true);
+  const iceSheetOnRef = useRef(true);
   const iceSheetPopupRef = useRef(null);
   const [volcanoOn, setVolcanoOn] = useState(false);
   const volcanoOnRef = useRef(false);
@@ -1657,13 +1658,14 @@ export default function HomePage() {
     setSeaLevel(sl);
     syncFloodScenario();
     // Apply ice sheet overlay
-    if (iceSheetOn) await applyIceSheets(ka);
+    await applyIceSheets(ka); // always apply — iceSheetOnRef checked inside
     setStatus(`Ice Age: ${ka}ka BP — Sea level ${sl}m`);
   };
 
   const applyIceSheets = async (ka) => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
+    if (!iceSheetOnRef.current) return; // respect toggle
     // Remove old ice sheet layers
     ["ice-sheet-layer","ice-sheet-outline"].forEach(l => {
       try { if (map.getLayer(l)) map.removeLayer(l); } catch(e){}
@@ -6042,7 +6044,7 @@ export default function HomePage() {
             <div onClick={() => {
               const next = !iceAgeOn;
               setIceAgeOn(next); iceAgeOnRef.current = next;
-              if (next) { applyIceAge(iceAgeKa); } else { clearIceAge(); }
+              if (next) { iceSheetOnRef.current = true; applyIceAge(iceAgeKa); } else { clearIceAge(); }
             }} style={{ width:34, height:20, borderRadius:10, background: iceAgeOn ? "#3b82f6" : "#1e2d45", position:"relative", flexShrink:0, cursor:"pointer", transition:"background 0.2s" }}>
               <div style={{ position:"absolute", top:3, left: iceAgeOn ? 16 : 3, width:14, height:14, borderRadius:"50%", background:"white", transition:"left 0.2s" }} />
             </div>
@@ -6060,8 +6062,8 @@ export default function HomePage() {
                 syncFloodScenario();
                 setStatus(`Ice Age: ${ka}ka BP — ${sl}m`);
               }}
-              onMouseUp={(e) => { if (iceSheetOn) applyIceSheets(parseFloat(e.target.value)); }}
-              onTouchEnd={() => { if (iceSheetOn) applyIceSheets(iceAgeKaRef.current); }}
+              onMouseUp={(e) => { applyIceSheets(parseFloat(e.target.value)); }}
+              onTouchEnd={() => { applyIceSheets(iceAgeKaRef.current); }}
               style={{ width:"100%", marginBottom:6, accentColor:"#3b82f6" }} />
             <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"#475569", marginBottom:8 }}>
               <span>0ka</span><span>13ka YD</span><span>21ka LGM</span><span>26ka</span>
@@ -6085,7 +6087,7 @@ export default function HomePage() {
                 seaLevelRef.current = sl; setSeaLevel(sl);
                 syncFloodScenario();
                 setStatus(`⏵ Deglaciation: ${ka}ka BP — ${sl}m`);
-                if (iceSheetOn) await applyIceSheets(ka);
+                await applyIceSheets(ka); // ref checked inside
                 await new Promise(r => setTimeout(r, 1200));
               }
               setStatus("Deglaciation complete — 26ka → present");
@@ -6097,7 +6099,7 @@ export default function HomePage() {
               <span style={{ fontSize:11, color:"#64748b" }}>Ice sheet overlays</span>
               <div onClick={() => {
                 const next = !iceSheetOn;
-                setIceSheetOn(next);
+                setIceSheetOn(next); iceSheetOnRef.current = next;;
                 if (next) { applyIceSheets(iceAgeKaRef.current); }
                 else {
                   const map = mapRef.current;
