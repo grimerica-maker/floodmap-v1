@@ -103,6 +103,32 @@ const PRESET_TSUNAMI_IMPACTS = {
       { lat:10.30, lng:123.90, arrival_min:1200,wave_height_m:3,  band_color:"#fbbf24", band_label:"High — 3m",     warning:"Advisory", distance_km:13000},
     ]
   },
+  "Haiti 2010": {
+    // 316,000 dead. M7.0 shallow strike-slip 25km from Port-au-Prince. NO tsunami.
+    // Inland quake — show shaking impacts only, no flood tiles
+    floodLevel: 0, major_km: 0, minor_km: 0, bearing: 0,
+    historical_deaths: 316000,
+    no_tsunami: true,
+    impacts: [
+      { lat:18.543, lng:-72.338, arrival_min:0,  wave_height_m:0,  band_color:"#ef4444", band_label:"Port-au-Prince — MMI X",  warning:"Danger",   distance_km:17,  note:"Catastrophic shaking. 250,000 buildings collapsed." },
+      { lat:18.650, lng:-72.200, arrival_min:0,  wave_height_m:0,  band_color:"#f97316", band_label:"Pétionville — MMI IX",    warning:"Danger",   distance_km:25,  note:"Severe damage. Dense hillside population." },
+      { lat:18.420, lng:-72.850, arrival_min:0,  wave_height_m:0,  band_color:"#fbbf24", band_label:"Léogâne — MMI IX",        warning:"Danger",   distance_km:55,  note:"90% of structures destroyed near epicenter." },
+      { lat:18.800, lng:-72.350, arrival_min:0,  wave_height_m:0,  band_color:"#4ade80", band_label:"Arcahaie — MMI VII",      warning:"Advisory", distance_km:55,  note:"Moderate damage." },
+    ]
+  },
+  "San Andreas (Scenario)": {
+    // USGS ShakeOut: 1,800 dead, 53,000 injured. M7.8 strike-slip. NO tsunami.
+    floodLevel: 0, major_km: 0, minor_km: 0, bearing: 0,
+    historical_deaths: 1800,
+    no_tsunami: true,
+    impacts: [
+      { lat:34.050, lng:-118.25, arrival_min:0,  wave_height_m:0,  band_color:"#ef4444", band_label:"Los Angeles — MMI VIII",   warning:"Danger",   distance_km:0,   note:"1,800 est. deaths. $200B damage. Fire risk extreme." },
+      { lat:33.990, lng:-117.90, arrival_min:0,  wave_height_m:0,  band_color:"#ef4444", band_label:"Riverside — MMI VIII",     warning:"Danger",   distance_km:70,  note:"53,000 estimated injuries." },
+      { lat:34.100, lng:-117.70, arrival_min:0,  wave_height_m:0,  band_color:"#f97316", band_label:"San Bernardino — MMI VII", warning:"Danger",   distance_km:100, note:"300,000 displaced." },
+      { lat:34.420, lng:-119.70, arrival_min:0,  wave_height_m:0,  band_color:"#fbbf24", band_label:"Santa Barbara — MMI VI",   warning:"Advisory", distance_km:200, note:"Moderate shaking." },
+      { lat:37.770, lng:-122.42, arrival_min:0,  wave_height_m:0,  band_color:"#4ade80", band_label:"San Francisco — MMI V",    warning:"Watch",    distance_km:550, note:"Light shaking felt." },
+    ]
+  },
   "Cascadia (Scenario)": {
     // FEMA: 13,000 dead. Rupture 1000km N-S along Cascadia subduction zone.
     // Ellipse along fault (N-S=350°), wide E to hit coast, narrow W into Pacific
@@ -1666,65 +1692,83 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
     if (!iceSheetOnRef.current) return; // respect toggle
-    // Remove old ice sheet layers
-    ["ice-sheet-layer","ice-sheet-outline"].forEach(l => {
-      try { if (map.getLayer(l)) map.removeLayer(l); } catch(e){}
-    });
-    try { if (map.getSource("ice-sheet-src")) map.removeSource("ice-sheet-src"); } catch(e){}
-    if (ka <= 0) return; // no ice sheets at present
+    // Fetch new ice sheet data
+    if (ka <= 0) {
+      // Remove sheets at present day
+      ["ice-sheet-layer","ice-sheet-outline"].forEach(l => { try { if(map.getLayer(l)) map.removeLayer(l); } catch(e){} });
+      try { if(map.getSource("ice-sheet-src")) map.removeSource("ice-sheet-src"); } catch(e){}
+      return;
+    }
     try {
       const res = await fetch(`${floodEngineUrlRef.current}/ice-sheets/${ka}`);
       if (!res.ok) return;
       const data = await res.json();
       if (!data.features?.length) return;
-      map.addSource("ice-sheet-src", { type:"geojson", data });
-      map.addLayer({ id:"ice-sheet-layer", type:"fill", source:"ice-sheet-src",
-        paint:{ "fill-color":"#bfdbfe", "fill-opacity":0.78 }
-      });
-      map.addLayer({ id:"ice-sheet-outline", type:"line", source:"ice-sheet-src",
-        paint:{ "line-color":"#60a5fa", "line-width":2, "line-opacity":1.0 }
-      });
-      // Click popup for ice sheets
-      map.on("click", "ice-sheet-layer", (e) => {
-        e.originalEvent.stopPropagation();
-        const p = e.features[0].properties;
-        const thickKm = (p.max_thickness_m / 1000).toFixed(1);
-        const areaKm2 = Math.round(p.area_cells * 111 * 111);
-        if (iceSheetPopupRef.current) { iceSheetPopupRef.current.remove(); iceSheetPopupRef.current = null; }
-        iceSheetPopupRef.current = new mapboxgl.Popup({ closeButton:true, maxWidth:"280px", className:"elev-popup" })
-          .setLngLat(e.lngLat)
-          .setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px">
-            <div style="color:#93c5fd;font-weight:700;font-size:14px;margin-bottom:6px">🧊 ${p.name}</div>
-            <table style="font-size:12px;width:100%;border-collapse:collapse;margin-bottom:8px">
-              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Time</td><td style="font-weight:700">${p.ka}ka BP (~${Math.round(p.ka*1000).toLocaleString()} years ago)</td></tr>
-              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Max thickness</td><td style="font-weight:700">${p.max_thickness_m.toLocaleString()}m (${thickKm}km)</td></tr>
-              <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Sea level</td><td style="font-weight:700">${getIceAgeSL(p.ka)}m relative to today</td></tr>
-            </table>
-            <div style="color:#64748b;font-size:11px;line-height:1.6">
-              ${p.name === "Laurentide Ice Sheet" ? "Largest ice sheet of the last glacial maximum. Covered most of Canada and the northern US. Collapse caused Meltwater Pulse 1A (~14ka), raising sea levels 20m in centuries." :
-                p.name === "Fennoscandian Ice Sheet" ? "Covered Scandinavia, Finland, and northern Russia. Its melt created the Baltic Sea and shaped the landscapes of northern Europe." :
-                p.name === "British Ice Sheet" ? "Covered the British Isles, connecting Britain to mainland Europe via Doggerland. Melt isolated Britain ~8,000 BP." :
-                p.name === "Barents-Kara Ice Sheet" ? "Marine-based ice sheet over the Barents and Kara seas. Collapse contributed significantly to rapid sea level rise events." :
-                p.name === "Cordilleran Ice Sheet" ? "West coast ice sheet covering British Columbia and Alaska. Merged with Laurentide to block human migration routes." :
-                p.name === "Antarctic Ice Sheet" ? "Extended ~200km beyond current margins during the LGM. Added ~3m equivalent sea level upon retreat." :
-                p.name === "Patagonian Ice Sheet" ? "Covered southern Andes and Patagonia. Smaller than northern hemisphere sheets but regionally significant." :
-                "Glacial ice mass from the last glacial maximum."}
-            </div>
-          </div>`);
-        iceSheetPopupRef.current.addTo(map);
-        iceSheetPopupRef.current.on("close", () => { iceSheetPopupRef.current = null; });
-      });
-      map.on("mouseenter","ice-sheet-layer",()=>{ map.getCanvas().style.cursor="pointer"; });
-      map.on("mouseleave","ice-sheet-layer",()=>{ map.getCanvas().style.cursor=""; });
+      // Update existing source if possible (avoids re-registering click handlers)
+      if (map.getSource("ice-sheet-src")) {
+        map.getSource("ice-sheet-src").setData(data);
+      } else {
+        map.addSource("ice-sheet-src", { type:"geojson", data });
+        map.addLayer({ id:"ice-sheet-layer", type:"fill", source:"ice-sheet-src",
+          paint:{ "fill-color":"#bfdbfe", "fill-opacity":0.78 }
+        });
+        map.addLayer({ id:"ice-sheet-outline", type:"line", source:"ice-sheet-src",
+          paint:{ "line-color":"#60a5fa", "line-width":2, "line-opacity":1.0 }
+        });
+      }
+
     } catch(e) { console.warn("Ice sheets error:", e); }
+
+    // Add lost lands labels based on sea level
+    try {
+      const sl = getIceAgeSL(ka);
+      ["lost-lands-layer","lost-lands-labels"].forEach(l => { try { if(map.getLayer(l)) map.removeLayer(l); } catch(e){} });
+      try { if(map.getSource("lost-lands-src")) map.removeSource("lost-lands-src"); } catch(e){}
+      // Lost lands visible thresholds (sea level must be below for land to be exposed)
+      const LOST_LANDS = [
+        { name:"Doggerland",    desc:"Connected Britain to Europe · home to Mesolithic hunter-gatherers",   sl_threshold:-40,  lon:3.5,   lat:54.5  },
+        { name:"Sundaland",     desc:"Connected SE Asia islands · early human migration route",              sl_threshold:-60,  lon:108.0, lat:0.0   },
+        { name:"Beringia",      desc:"Land bridge Asia↔Americas · migration route for first Americans",     sl_threshold:-50,  lon:-168.0,lat:64.0  },
+        { name:"Sahul Shelf",   desc:"Connected Australia to New Guinea · Aboriginal homeland",             sl_threshold:-55,  lon:132.0, lat:-10.0 },
+        { name:"Grand Banks",   desc:"Exposed North Atlantic shelf east of Newfoundland",                   sl_threshold:-80,  lon:-52.0, lat:45.0  },
+        { name:"Sunda Shelf",   desc:"South China Sea exposed · largest continental shelf",                 sl_threshold:-70,  lon:108.0, lat:8.0   },
+        { name:"Adriatic Plain",desc:"Mediterranean lowland between Italy and Balkans",                     sl_threshold:-60,  lon:14.5,  lat:43.5  },
+        { name:"Kerguelen",     desc:"Expanded subantarctic plateau",                                      sl_threshold:-100, lon:69.0,  lat:-49.0 },
+      ];
+      const visible = LOST_LANDS.filter(l => sl <= l.sl_threshold);
+      if (visible.length > 0) {
+        const geojson = { type:"FeatureCollection", features: visible.map(l => ({
+          type:"Feature",
+          geometry:{ type:"Point", coordinates:[l.lon, l.lat] },
+          properties:{ name:l.name, desc:l.desc }
+        }))};
+        map.addSource("lost-lands-src", { type:"geojson", data:geojson });
+        map.addLayer({ id:"lost-lands-labels", type:"symbol", source:"lost-lands-src",
+          layout:{
+            "text-field":["get","name"],
+            "text-size":13,
+            "text-font":["DIN Offc Pro Bold","Arial Unicode MS Bold"],
+            "text-anchor":"center",
+            "text-allow-overlap":false,
+          },
+          paint:{
+            "text-color":"#e2e8f0",
+            "text-halo-color":"#0f172a",
+            "text-halo-width":2,
+          }
+        });
+      }
+    } catch(e) { console.warn("Lost lands error:", e); }
   };
 
   const clearIceAge = () => {
     const map = mapRef.current;
-    ["ice-sheet-layer","ice-sheet-outline"].forEach(l => {
+    ["ice-sheet-layer","ice-sheet-outline","lost-lands-labels"].forEach(l => {
       try { if (map?.getLayer(l)) map.removeLayer(l); } catch(e){}
     });
-    try { if (map?.getSource("ice-sheet-src")) map.removeSource("ice-sheet-src"); } catch(e){}
+    ["ice-sheet-src","lost-lands-src"].forEach(s => {
+      try { if (map?.getSource(s)) map.removeSource(s); } catch(e){}
+    });
     setIceAgeOn(false); iceAgeOnRef.current = false;
     // Reset sea level
     seaLevelRef.current = 0; setSeaLevel(0);
@@ -4769,6 +4813,39 @@ export default function HomePage() {
     };
 
     const handleLoad = () => { setStatus("Map ready"); };
+
+    // Ice sheet click/cursor — registered once, works whenever layer exists
+    map.on("click", "ice-sheet-layer", (e) => {
+      e.originalEvent.stopPropagation();
+      const p = e.features[0].properties;
+      const thickKm = (p.max_thickness_m / 1000).toFixed(1);
+      if (iceSheetPopupRef.current) { iceSheetPopupRef.current.remove(); iceSheetPopupRef.current = null; }
+      iceSheetPopupRef.current = new mapboxgl.Popup({ closeButton:true, maxWidth:"280px", className:"elev-popup" })
+        .setLngLat(e.lngLat)
+        .setHTML(`<div style="font-family:Arial,sans-serif;font-size:13px">
+          <div style="color:#93c5fd;font-weight:700;font-size:14px;margin-bottom:6px">🧊 ${p.name}</div>
+          <table style="font-size:12px;width:100%;border-collapse:collapse;margin-bottom:8px">
+            <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Time</td><td style="font-weight:700">${p.ka}ka BP (~${Math.round(p.ka*1000).toLocaleString()} years ago)</td></tr>
+            <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Max thickness</td><td style="font-weight:700">${p.max_thickness_m.toLocaleString()}m (${thickKm}km)</td></tr>
+            <tr><td style="color:#94a3b8;padding:2px 8px 2px 0">Sea level</td><td style="font-weight:700">${getIceAgeSL(p.ka)}m relative to today</td></tr>
+          </table>
+          <div style="color:#64748b;font-size:11px;line-height:1.6">
+            ${p.name === "Laurentide Ice Sheet" ? "Largest ice sheet of the last glacial maximum. Covered most of Canada and northern US. Collapse triggered Meltwater Pulse 1A (~14ka), raising sea levels 20m in centuries." :
+              p.name === "Fennoscandian Ice Sheet" ? "Covered Scandinavia, Finland and northern Russia. Its melt created the Baltic Sea." :
+              p.name === "British Ice Sheet" ? "Covered the British Isles, connecting Britain to Europe via Doggerland. Melt isolated Britain ~8,000 BP." :
+              p.name === "Barents-Kara Ice Sheet" ? "Marine-based ice sheet over the Barents and Kara seas. Contributed to rapid sea level rise events." :
+              p.name === "Cordilleran Ice Sheet" ? "West coast ice sheet covering British Columbia and Alaska. Merged with Laurentide blocking early migration." :
+              p.name === "Antarctic Ice Sheet" ? "Extended ~200km beyond current margins at LGM. Added ~3m sea level equivalent upon retreat." :
+              p.name === "Patagonian Ice Sheet" ? "Covered southern Andes and Patagonia during the LGM." :
+              p.name === "Siberian Ice Complex" ? "Permafrost and glacial ice covering much of Siberia and the exposed Beringian shelf." :
+              "Glacial ice mass from the last glacial maximum."}
+          </div>
+        </div>`);
+      iceSheetPopupRef.current.addTo(map);
+      iceSheetPopupRef.current.on("close", () => { iceSheetPopupRef.current = null; });
+    });
+    map.on("mouseenter","ice-sheet-layer",()=>{ map.getCanvas().style.cursor="pointer"; });
+    map.on("mouseleave","ice-sheet-layer",()=>{ map.getCanvas().style.cursor=""; });
 
     let mouseDownPoint = null;
 
