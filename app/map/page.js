@@ -1275,6 +1275,7 @@ export default function HomePage() {
   const tsunamiPopupRef = useRef(null); // 0=640k, 1=1.3M, 2=2.1M
   const yellowstonePresetRef = useRef(0);
   const [yellowstoneActive, setYellowstoneActive] = useState(false);
+  const yellowstoneActiveRef = useRef(false);
   const [yellowstoneResult, setYellowstoneResult] = useState(null);
   const yellowstonePopupRef = useRef(null);
   const impactZonePopupRef = useRef(null);
@@ -3371,7 +3372,7 @@ export default function HomePage() {
     document.querySelectorAll(".mapboxgl-popup").forEach(p => p.remove());
     if (yellowstonePopupRef.current) { yellowstonePopupRef.current.remove(); yellowstonePopupRef.current = null; }
     window.__dmLastEruptResult = null;
-    setYellowstoneActive(false);
+    setYellowstoneActive(false); yellowstoneActiveRef.current = false;;
     setYellowstoneResult(null);
     setStatus("Cleared");
   };
@@ -3422,7 +3423,7 @@ export default function HomePage() {
       // Fly to Yellowstone
       safely(() => map.flyTo({ center: activeCenter, zoom: volcanoType === 'campi' ? 5 : 3.5, duration: 1200 }));
       safely(() => map.triggerRepaint());
-      setYellowstoneActive(true);
+      setYellowstoneActive(true); yellowstoneActiveRef.current = true;;
       setYellowstoneResult(null);
       setStatus(`${preset.name} — ${preset.desc}`);
 
@@ -4939,6 +4940,8 @@ export default function HomePage() {
       }
 
       if (scenarioModeRef.current === "yellowstone") {
+        // Only show popups if something is actually erupting
+        if (!yellowstoneActiveRef.current && !window.__dmLastEruptResult) return;
         if (window.__dmLastEruptResult) {
           // Generic volcano eruption — show zone info based on click position
           const r = window.__dmLastEruptResult;
@@ -5410,7 +5413,7 @@ export default function HomePage() {
             ? Math.round(8_100_000_000 * Math.pow(data.blackout_pct/100, 1.5) * (data.blackout_months/12) * 0.15) : 0,
         };
         setYellowstoneResult(eruptResult);
-        setYellowstoneActive(true);
+        setYellowstoneActive(true); yellowstoneActiveRef.current = true;;
         // Override preset display with eruption data via a synthetic preset
         window.__dmLastEruptResult = eruptResult;
 
