@@ -7220,6 +7220,7 @@ export default function HomePage() {
             padding: "28px 28px 22px", maxWidth: 420, width: "92%",
             boxShadow: "0 24px 72px rgba(0,0,0,0.7)",
             display: "flex", flexDirection: "column", gap: 0,
+            maxHeight: "90vh", overflowY: "auto", WebkitOverflowScrolling: "touch",
           }}>
             {/* Logo + title */}
             <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
