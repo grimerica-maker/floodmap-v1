@@ -4930,7 +4930,10 @@ export default function HomePage() {
       }
 
       if (scenarioModeRef.current === "yellowstone") {
-        showYellowstonePopup(lng, lat);
+        // Only show Yellowstone zone popup if it's a preset eruption, not generic volcano
+        if (!window.__dmLastEruptResult) {
+          showYellowstonePopup(lng, lat);
+        }
         return;
       }
       if (scenarioModeRef.current === "tsunami") {
@@ -5260,24 +5263,26 @@ export default function HomePage() {
         const data = await res.json();
         if (data.error) { setStatus("Eruption sim error"); return; }
 
-        // Zone colors
-        const zoneColors = ["#7f1d1d","#b91c1c","#ea580c","#f97316","#fbbf24","#4ade80"];
-        const zoneOpacity = [0.85, 0.70, 0.55, 0.40, 0.28, 0.18];
+        // Colors: index 0=Kill Zone (darkest), index n=outermost (lightest)
+        // zones[0]=Kill Zone (smallest/darkest), zones[n]=Trace Ash (largest/lightest)
+        const n = data.zones.length;
+        const zoneColors = ["#7f1d1d","#b91c1c","#dc2626","#ea580c","#f97316","#fbbf24"];
+        const zoneOpacity = [0.80, 0.55, 0.40, 0.28, 0.18, 0.12];
 
-        // Draw ellipse zones largest first
         const bearing = data.bearing_deg * Math.PI / 180;
         const dNorth = Math.cos(bearing), dEast = Math.sin(bearing);
         const KP_LAT = 110.574;
         const KP_LNG = 111.32 * Math.cos(lat * Math.PI / 180);
 
-        // Draw largest zone first (bottom), smallest last (top)
-        [...data.zones].slice().reverse().forEach((zone, ri) => {
-          const i = ri; // ri=0 = outermost (Trace Ash), ri=last = Kill Zone on top
+        // Draw largest zone first (bottom), then progressively smaller on top
+        // zones is ordered smallest→largest, so reverse to draw largest first
+        [...data.zones].reverse().forEach((zone, ri) => {
+          // ri=0 is the outermost (Trace Ash = lightest color = index n-1)
+          // ri=n-1 is the Kill Zone (darkest = index 0) drawn last/on top
+          const colorIdx = n - 1 - ri; // outermost gets highest index (lightest)
           const majorKm = zone.major_km, minorKm = zone.minor_km;
-          // Offset center downwind by 30% of major axis
           const cLat = lat + (dNorth * majorKm * 0.3) / KP_LAT;
           const cLng = lng + (dEast  * majorKm * 0.3) / KP_LNG;
-          // Build ellipse polygon
           const steps = 64;
           const coords = [];
           for (let s = 0; s <= steps; s++) {
@@ -5289,11 +5294,11 @@ export default function HomePage() {
             coords.push([pLng, pLat]);
           }
           const geo = { type:"Feature", geometry:{ type:"Polygon", coordinates:[coords] }, properties:{} };
-          const srcId = `verupt-src-${i}`, layId = `verupt-layer-${i}`;
+          const srcId = `verupt-src-${ri}`, layId = `verupt-layer-${ri}`;
           try {
             map.addSource(srcId, { type:"geojson", data:{ type:"FeatureCollection", features:[geo] } });
             map.addLayer({ id:layId, type:"fill", source:srcId,
-              paint:{ "fill-color": zoneColors[i % zoneColors.length], "fill-opacity": zoneOpacity[i % zoneOpacity.length] }
+              paint:{ "fill-color": zoneColors[colorIdx] || "#4ade80", "fill-opacity": zoneOpacity[colorIdx] || 0.12 }
             });
           } catch(e) {}
         });
@@ -6404,7 +6409,7 @@ export default function HomePage() {
             ))}
           </div>
           <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-            <button onClick={() => drawYellowstone(yellowstonePreset)}
+            <button onClick={() => { window.__dmLastEruptResult = null; drawYellowstone(yellowstonePreset); }}
               style={{ flex: 1, padding: "12px", background: "#ea580c", color: "white", border: "none", borderRadius: 10, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
               🌋 Erupt
             </button>
