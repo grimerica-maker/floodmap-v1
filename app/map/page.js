@@ -1330,6 +1330,7 @@ export default function HomePage() {
   const [iceSheetOn, setIceSheetOn] = useState(true);
   const iceSheetOnRef = useRef(true);
   const iceSheetPopupRef = useRef(null);
+  const iceSheetCacheRef = useRef({}); // ka -> GeoJSON data
   const [volcanoOn, setVolcanoOn] = useState(false);
   const volcanoOnRef = useRef(false);
   const [airportOn, setAirportOn] = useState(false);
@@ -1689,9 +1690,9 @@ export default function HomePage() {
     seaLevelRef.current = sl;
     setSeaLevel(sl);
     syncFloodScenario();
+    if (megalithOnRef.current) addOverlayLayer("megaliths", sl);
     setStatus(`Ice Age: ${ka}ka BP — Sea level ${sl}m`);
     // Wait a tick for flood tile sync to settle before drawing ice sheets
-    // syncFloodScenario may trigger tile requests but does NOT reload style
     await new Promise(r => setTimeout(r, 150));
     await applyIceSheets(ka);
   };
@@ -1722,10 +1723,15 @@ export default function HomePage() {
       return;
     }
     try {
-      const res = await fetch(`${floodEngineUrlRef.current}/ice-sheets/${ka}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (!data.features?.length) return;
+      // Use client-side cache — ice sheet data never changes
+      let data = iceSheetCacheRef.current[ka];
+      if (!data) {
+        const res = await fetch(`${floodEngineUrlRef.current}/ice-sheets/${ka}`);
+        if (!res.ok) return;
+        data = await res.json();
+        if (!data.features?.length) return;
+        iceSheetCacheRef.current[ka] = data; // cache it
+      }
       // Always remove and re-add to ensure clean state after any style reload
       ["ice-sheet-layer","ice-sheet-outline"].forEach(l => {
         try { if (map.getLayer(l)) map.removeLayer(l); } catch(e) {}
@@ -5141,12 +5147,16 @@ export default function HomePage() {
                 ${p.region ? `<div style="color:#64748b;font-size:10px;margin-bottom:3px">${p.region}</div>` : ""}
                 ${p.elevation !== undefined ? `<div style="color:#64748b;font-size:11px;margin-bottom:3px">Elevation: ${Number(p.elevation).toFixed(0)} m</div>` : ""}
                 ${isSubmerged
-                  ? `<div style="color:#60a5fa;margin-bottom:4px">🌊 Currently underwater</div>`
+                  ? `<div style="color:#60a5fa;margin-bottom:4px">🌊 Below present sea level (${Number(p.elevation).toFixed(0)}m)</div>`
                   : isFlooded
-                    ? `<div style="color:#f87171;margin-bottom:4px">🌊 Flooded at this sea level</div>`
-                    : seaLevelRef.current > 0
-                      ? `<div style="color:#4ade80;margin-bottom:4px">✓ Safe at +${Math.round(seaLevelRef.current)} m</div>`
-                      : ""}
+                    ? iceAgeOnRef.current
+                      ? `<div style="color:#93c5fd;margin-bottom:4px">🧊 Submerged at ${iceAgeKaRef.current}ka BP (${getIceAgeSL(iceAgeKaRef.current)}m sea level)<br><span style="color:#64748b;font-size:10px">Above water ${iceAgeKaRef.current > 0 ? "before this period" : "today"}</span></div>`
+                      : `<div style="color:#f87171;margin-bottom:4px">🌊 Flooded at this sea level</div>`
+                    : iceAgeOnRef.current && Number(p.elevation) > 0
+                      ? `<div style="color:#4ade80;margin-bottom:4px">✓ Above water at ${iceAgeKaRef.current}ka BP<br><span style="color:#64748b;font-size:10px">Elevation: ${Number(p.elevation).toFixed(0)}m · Sea level was ${getIceAgeSL(iceAgeKaRef.current)}m</span></div>`
+                      : seaLevelRef.current > 0
+                        ? `<div style="color:#4ade80;margin-bottom:4px">✓ Safe at +${Math.round(seaLevelRef.current)} m</div>`
+                        : ""}
                 ${p.kind === 'megalith' && p.url ? `<button onclick="if(window.__dmWiki){window.__dmWiki(this.dataset.n,'','',this.dataset.m)}" data-n="${(p.name||'').replace(/"/g,'&quot;')}" data-m="${p.url||''}" style="margin-top:6px;font-size:11px;color:${dotColor};background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:Arial,sans-serif;">Megalithic Portal</button>` : wikiUrl ? `<button onclick="if(window.__dmWiki){window.__dmWiki(this.dataset.n,this.dataset.u,this.dataset.w)}" data-n="${(p.name||'').replace(/"/g,'&quot;')}" data-u="${(wikiUrl||'').replace(/"/g,'&quot;')}" data-w="${(p.wikidata||'').replace(/"/g,'&quot;')}" style="margin-top:6px;font-size:11px;color:${dotColor};background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:Arial,sans-serif;">Wikipedia</button>` : ""}
               </div>
             `).addTo(map);
