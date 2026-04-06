@@ -5550,12 +5550,6 @@ export default function HomePage() {
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>🌊 Mega-Tsunami</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["tsunami"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Ocean collapse wave propagation</div>
         </button>
-        <button
-          onClick={() => { clearSurge(); clearEarthquake(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); scenarioModeRef.current = "cataclysm"; setScenarioMode("cataclysm"); }}
-          style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "cataclysm" ? "#1a0505" : "#111827", color: scenarioMode === "cataclysm" ? "#ef4444" : "#94a3b8", border: scenarioMode === "cataclysm" ? "1px solid #dc2626" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>☄️ Cataclysm</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["cataclysm"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
-          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Pole shift inundation models</div>
-        </button>
         <div style={{ display: "flex", gap: 6 }}>
           <button
             onClick={() => { clearSurge(); setScenarioMode("surge"); scenarioModeRef.current = "surge"; setSurgeOn(true); surgeOnRef.current = true; window.__dmClearSurge = clearSurge; }}
@@ -5576,6 +5570,13 @@ export default function HomePage() {
           style={{ width:"100%", padding:"13px 14px", minHeight:56, background: scenarioMode==="earthquake" ? "#1c1208" : "#111827", color: scenarioMode==="earthquake" ? "#fbbf24" : "#94a3b8", border: scenarioMode==="earthquake" ? "1px solid #f59e0b" : "1px solid #1e2d45", cursor:"pointer", borderRadius:12, fontWeight:700, textAlign:"left" }}>
           <div style={{ fontSize:15 }}>🌍 Earthquake</div>
           <div style={{ fontSize:12, opacity:0.7, marginTop:3 }}>Seismic intensity + tsunami trigger</div>
+        </button>
+
+                <button
+          onClick={() => { clearSurge(); clearEarthquake(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint(); setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null); if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; } if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; } if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; } unlockMapControls(); scenarioModeRef.current = "cataclysm"; setScenarioMode("cataclysm"); }}
+          style={{ width: "100%", padding: "13px 14px", minHeight: 56, background: scenarioMode === "cataclysm" ? "#1a0505" : "#111827", color: scenarioMode === "cataclysm" ? "#ef4444" : "#94a3b8", border: scenarioMode === "cataclysm" ? "1px solid #dc2626" : "1px solid #1e2d45", cursor: "pointer", borderRadius: 12, fontWeight: 700, textAlign: "left" }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}><span style={{ fontSize: 15 }}>☄️ Cataclysm</span><button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["cataclysm"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button></div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 3 }}>Pole shift inundation models</div>
         </button>
 
       </div>
@@ -6317,20 +6318,14 @@ export default function HomePage() {
               </button>
             ))}
           </div>
-          {/* Younger Dryas Impact */}
-          <button
-            onClick={() => { cataclysmModelRef.current = "ydi"; setCataclysmModel("ydi"); clearCataclysm(); }}
-            style={{ width: "100%", padding: "10px 14px", minHeight: 52, marginBottom: 14, border: cataclysmModel === "ydi" ? "1px solid #0ea5e9" : "1px solid #1e2d45", background: cataclysmModel === "ydi" ? "#0c1a2e" : "#111827", color: cataclysmModel === "ydi" ? "#38bdf8" : "#94a3b8", borderRadius: 10, fontWeight: 700, fontSize: 12, textAlign: "left", cursor: "pointer" }}
-          >
+          {/* Younger Dryas Impact — Coming Soon */}
+          <div style={{ width: "100%", padding: "10px 14px", minHeight: 52, marginBottom: 14, border: "1px solid #1e2d45", background: "#0a0f1a", borderRadius: 10, fontSize: 12, textAlign: "left", opacity: 0.6, position: "relative" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span>☄️ Younger Dryas Impact</span>
-              <div style={{ display:"flex", alignItems:"center", gap:4 }}>
-                {cataclysmModel === "ydi" && <span style={{ fontSize: 10, color: "#38bdf8", fontWeight: 700, background: "#0c1a2e", border: "1px solid #38bdf8", borderRadius: 6, padding: "2px 7px" }}>SELECTED</span>}
-                <button onClick={(e) => { e.stopPropagation(); setScenarioWiki(SCENARIO_WIKI["ydi"]); }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:13, padding:"0 2px" }}>ℹ️</button>
-              </div>
+              <span style={{ color: "#475569", fontWeight: 700 }}>☄️ Younger Dryas Impact</span>
+              <span style={{ fontSize: 9, color: "#f97316", fontWeight: 700, background: "#1a0a00", border: "1px solid #7c2d00", borderRadius: 6, padding: "2px 7px", letterSpacing: "0.06em" }}>COMING SOON</span>
             </div>
-            <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>~12,900 BP · Laurentide collapse · Columbia Scablands</div>
-          </button>
+            <div style={{ fontSize: 10, color: "#334155", marginTop: 2 }}>~12,900 BP · Laurentide collapse · Columbia Scablands</div>
+          </div>
           {cataclysmModel !== "ydi" && (
             <div>
               <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12, fontStyle: "italic", lineHeight: 1.5 }}>
