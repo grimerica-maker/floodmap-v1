@@ -1562,36 +1562,10 @@ export default function HomePage() {
       const isMegalith = type === "megaliths";
       map.addSource(c.src, {
         type: "geojson", data,
-        ...(isMegalith ? { cluster: true, clusterMaxZoom: 14, clusterRadius: 60 } : {}),
+        ...(isMegalith ? { cluster: false } : {}),
       });
 
-      // Cluster layers for megaliths
-      if (isMegalith) {
-        map.addLayer({ id: c.layer + "-clusters", type: "circle", source: c.src,
-          filter: ["has", "point_count"],
-          paint: {
-            "circle-color": ["step", ["get", "point_count"], "#d97706", 50, "#b45309", 500, "#92400e"],
-            "circle-radius": ["step", ["get", "point_count"], 12, 50, 18, 500, 24],
-            "circle-stroke-width": 2, "circle-stroke-color": "#fff",
-          }
-        });
-        map.addLayer({ id: c.layer + "-count", type: "symbol", source: c.src,
-          filter: ["all", ["has", "point_count"], [">=", ["get", "point_count"], 2]],
-          layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 13, "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"] },
-          paint: { "text-color": "#fff", "text-halo-color": "#92400e", "text-halo-width": 1.5 }
-        });
-        // Click cluster to zoom in — stopPropagation prevents individual dot popup
-        map.on("click", c.layer + "-clusters", (e) => {
-          e.originalEvent.stopPropagation();
-          const f = map.queryRenderedFeatures(e.point, { layers: [c.layer + "-clusters"] })[0];
-          if (!f) return;
-          map.getSource(c.src).getClusterExpansionZoom(f.properties.cluster_id, (err, zoom) => {
-            if (!err) map.easeTo({ center: f.geometry.coordinates, zoom: Math.min(zoom + 1, 14) });
-          });
-        });
-        map.on("mouseenter", c.layer + "-clusters", () => { map.getCanvas().style.cursor = "pointer"; });
-        map.on("mouseleave", c.layer + "-clusters", () => { map.getCanvas().style.cursor = ""; });
-      }
+
 
       const isFire = type === "fires";
       map.addLayer({
@@ -1620,7 +1594,9 @@ export default function HomePage() {
             ? (proTierRef.current !== "free"
                 ? ["interpolate", ["linear"], ["coalesce", ["get", "frp"], 5], 5, 3, 50, 6, 200, 10, 500, 16]
                 : ["interpolate", ["linear"], ["zoom"], 2, 3, 6, 5, 10, 7])
-            : ["interpolate", ["linear"], ["zoom"], 2, 4, 6, 7, 10, 11],
+            : isMegalith
+              ? ["interpolate", ["linear"], ["zoom"], 2, 1.5, 5, 2.5, 8, 4, 11, 6, 14, 8]
+              : ["interpolate", ["linear"], ["zoom"], 2, 4, 6, 7, 10, 11],
         },
       });
       map.on("mouseenter", c.layer, () => { try { map.getCanvas().style.cursor = "pointer"; } catch {} });
