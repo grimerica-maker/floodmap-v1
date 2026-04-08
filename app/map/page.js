@@ -1779,7 +1779,7 @@ export default function HomePage() {
       if (!mapRef.current?.isStyleLoaded()) await new Promise(r => setTimeout(r, 300));
     }
     if (!mapRef.current) return;
-    const sl = getIceAgeSL(ka);
+    const sl = Math.max(-130, Math.min(0, getIceAgeSL(ka))); // clamp -130 to 0
     // Apply sea level
     seaLevelRef.current = sl;
     setSeaLevel(sl);
@@ -6404,7 +6404,7 @@ export default function HomePage() {
               onChange={(e) => {
                 const ka = parseFloat(e.target.value);
                 setIceAgeKa(ka); iceAgeKaRef.current = ka;
-                const sl = getIceAgeSL(ka);
+                const sl = Math.max(-130, Math.min(0, getIceAgeSL(ka)));
                 seaLevelRef.current = sl; setSeaLevel(sl);
                 syncFloodScenario();
                 setStatus(`Ice Age: ${ka}ka BP — ${sl}m`);
@@ -6430,7 +6430,7 @@ export default function HomePage() {
               for (const ka of steps) {
                 if (!iceAgeOnRef.current) break;
                 setIceAgeKa(ka); iceAgeKaRef.current = ka;
-                const sl = getIceAgeSL(ka);
+                const sl = Math.max(-130, Math.min(0, getIceAgeSL(ka)));
                 seaLevelRef.current = sl; setSeaLevel(sl);
                 syncFloodScenario();
                 setStatus(`⏵ Deglaciation: ${ka}ka BP — ${sl}m`);
@@ -7093,16 +7093,21 @@ export default function HomePage() {
                 if (!supportEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) { setStatus("Please enter a valid email address"); setTimeout(() => setStatus(""), 3000); return; }
                 if (!supportMsg.trim()) { setStatus("Please describe your issue"); setTimeout(() => setStatus(""), 3000); return; }
                 try {
-                  await fetch("https://formspree.io/f/xgopwayn", {
+                  const res = await fetch("https://formspree.io/f/xgopwayn", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { "Content-Type": "application/json", "Accept": "application/json" },
                     body: JSON.stringify({ email: supportEmail, message: supportMsg, source: "DisasterMap app" })
                   });
-                  setSupportMsg("");
-                  setSupportEmail("");
-                  setSupportFormOpen(false);
-                  setStatus("Message sent! We'll get back to you.");
-                  setTimeout(() => setStatus(""), 4000);
+                  if (res.ok) {
+                    setSupportMsg("");
+                    setSupportEmail("");
+                    setSupportFormOpen(false);
+                    setStatus("Message sent! We'll get back to you.");
+                    setTimeout(() => setStatus(""), 4000);
+                  } else {
+                    setStatus("Failed to send — try 𝕏 @grimerica");
+                    setTimeout(() => setStatus(""), 4000);
+                  }
                 } catch(e) {
                   setStatus("Failed to send — try 𝕏 @grimerica");
                   setTimeout(() => setStatus(""), 4000);
