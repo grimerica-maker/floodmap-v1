@@ -1446,17 +1446,17 @@ export default function HomePage() {
     }
   }, [isSignedIn, user]);
 
-  // ── Pro unlock after Stripe redirect ──────────────────────────────────────
-  // Stripe sends users back with ?pro=1 (lifetime) or ?pro=yearly (subscription).
-  // If signed in, write tier to Clerk metadata immediately (source of truth).
-  // If not signed in, fall back to localStorage and prompt sign-in so access
-  // persists across devices.
+  // Pro unlock after Stripe redirect. Two tiers:
+  //   ?pro=1       → lifetime ($39.99)
+  //   ?pro=yearly  → yearly ($15.99 subscription)
+  // If signed in, write tier to Clerk metadata. If not, fall back to localStorage
+  // (same pattern as pre-existing 51 users — nothing breaks for them).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const proParam = params.get("pro");
     if (!proParam) return;
     const newTier = proParam === "yearly" ? "pro_yearly" : "lifetime";
-    const writeTier = async () => {
+    (async () => {
       try { localStorage.setItem("dm_pro_tier", newTier); } catch(e) {}
       setProTier(newTier);
       proTierRef.current = newTier;
@@ -1470,36 +1470,6 @@ export default function HomePage() {
         ? `✓ ${newTier === "lifetime" ? "Lifetime" : "Yearly"} unlocked!`
         : `✓ Pro unlocked! Sign in to save access across devices.`);
       setTimeout(() => setStatus(""), 6000);
-    };
-    writeTier();
-  }, [isSignedIn, user]);
-
-  // ── Auto-migrate legacy localStorage users to Clerk ───────────────────────
-  // Any user who paid pre-Clerk has `dm_pro_tier` in localStorage. When they
-  // sign in, lift that value into their Clerk publicMetadata.tier so access
-  // becomes cross-device and we can eventually deprecate the localStorage path.
-  useEffect(() => {
-    if (!isSignedIn || !user) return;
-    const existingClerkTier = user.publicMetadata?.tier;
-    if (existingClerkTier && existingClerkTier !== "free") return; // already migrated
-    let legacy = null;
-    try { legacy = localStorage.getItem("dm_pro_tier"); } catch(e) {}
-    if (!legacy || legacy === "free") return;
-    // Legacy values: "pro" (old single-tier) → treat as lifetime.
-    const migrated = legacy === "pro" ? "lifetime" : legacy;
-    (async () => {
-      try {
-        await user.update({
-          publicMetadata: {
-            ...(user.publicMetadata || {}),
-            tier: migrated,
-            migrated_from_localstorage: true,
-          },
-        });
-        try { localStorage.removeItem("dm_pro_tier"); } catch(e) {}
-        setProTier(migrated);
-        proTierRef.current = migrated;
-      } catch(e) { console.warn("Legacy tier migration failed", e); }
     })();
   }, [isSignedIn, user]);
 
@@ -5084,7 +5054,6 @@ export default function HomePage() {
     const cy = parseFloat(params.get("cy"));
     const cz = parseFloat(params.get("cz"));
     if (isNaN(cx) || isNaN(cy) || isNaN(cz)) return;
-    // Store for map-ready trigger; clean URL
     window._permalinkView = { cx, cy, cz };
     window.history.replaceState({}, "", window.location.pathname);
   }, []);
