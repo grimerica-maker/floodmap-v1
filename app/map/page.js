@@ -1442,18 +1442,31 @@ export default function HomePage() {
     }
   }, [isSignedIn, user]);
 
-  // Simple pro unlock: if ?pro=1 in URL after Stripe redirect, set pro and prompt sign-in
+  // Pro unlock after Stripe redirect. Two tiers:
+  //   ?pro=1       → lifetime ($39.99)
+  //   ?pro=yearly  → yearly ($15.99 subscription)
+  // Existing users with localStorage "dm_pro_tier = pro" are untouched (still Pro).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("pro") === "1") {
-      try { localStorage.setItem("dm_pro_tier", "pro"); } catch(e) {}
-      setProTier("pro");
-      proTierRef.current = "pro";
+    const proParam = params.get("pro");
+    if (!proParam) return;
+    const newTier = proParam === "yearly" ? "pro_yearly" : "lifetime";
+    (async () => {
+      try { localStorage.setItem("dm_pro_tier", newTier); } catch(e) {}
+      setProTier(newTier);
+      proTierRef.current = newTier;
+      if (isSignedIn && user) {
+        try {
+          await user.update({ publicMetadata: { ...(user.publicMetadata || {}), tier: newTier } });
+        } catch(e) { console.warn("Clerk metadata write failed", e); }
+      }
       window.history.replaceState({}, "", window.location.pathname);
-      setStatus("✓ Pro unlocked! Sign in to save access across devices.");
+      setStatus(isSignedIn
+        ? `✓ ${newTier === "lifetime" ? "Lifetime" : "Yearly"} unlocked!`
+        : `✓ Pro unlocked! Sign in to save access across devices.`);
       setTimeout(() => setStatus(""), 6000);
-    }
-  }, []);
+    })();
+  }, [isSignedIn, user]);
 
 
 
@@ -5903,7 +5916,7 @@ export default function HomePage() {
             </div>
             <button onClick={() => setPaywallModal("pro")}
               style={{ width: "100%", padding: "8px", background: "#f97316", color: "white", border: "none", borderRadius: 7, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-              ⚡ $18.99 Lifetime — Going up to $24.99
+              ⚡ Unlock Pro — from $15.99
             </button>
 
           </div>
@@ -6377,7 +6390,7 @@ export default function HomePage() {
           <div onClick={() => setPaywallModal("pro")} style={{ background: "#111827", border: "1px solid #1e3a5f", borderRadius: 10, padding: "10px 14px", marginBottom: 12, cursor: "pointer" }}>
             <div style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Displaced Population</div>
             <div style={{ fontSize: 14, color: "#334155", fontWeight: 700 }}>🔒 Unlock with Pro</div>
-            <div style={{ fontSize: 11, color: "#1e3a5f", marginTop: 3 }}>See how many are displaced · $18.99 one-time</div>
+            <div style={{ fontSize: 11, color: "#1e3a5f", marginTop: 3 }}>See how many are displaced · from $15.99</div>
           </div>
         )}
       {/* ── ICE AGE MODE — left sidebar ── */}
@@ -6563,7 +6576,7 @@ export default function HomePage() {
           <div onClick={() => setPaywallModal("pro")} style={{ background: "#111827", border: "1px solid #1e3a5f", borderRadius: 10, padding: "10px 14px", marginBottom: 12, marginTop: 8, cursor: "pointer" }}>
             <div style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Displaced Population</div>
             <div style={{ fontSize: 14, color: "#334155", fontWeight: 700 }}>🔒 Unlock with Pro</div>
-            <div style={{ fontSize: 11, color: "#1e3a5f", marginTop: 3 }}>See how many are displaced · $18.99 one-time</div>
+            <div style={{ fontSize: 11, color: "#1e3a5f", marginTop: 3 }}>See how many are displaced · from $15.99</div>
           </div>
         )}
       </>}
@@ -7133,7 +7146,7 @@ export default function HomePage() {
           return (
             <div key={type}
               onClick={() => {
-                if (locked) { window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank"); return; }
+                if (locked) { setPaywallModal("pro"); return; }
                 toggleOverlay(type);
               }}
               style={{
@@ -8182,20 +8195,25 @@ export default function HomePage() {
                 </div>
                 <div style={{ background: "#111827", border: "1px solid #f97316", borderRadius: 12, padding: "14px 16px", marginBottom: 4, position: "relative" }}>
                   <div style={{ position: "absolute", top: -10, right: 12, background: "#f97316", color: "white", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, letterSpacing: "0.08em" }}>FOUNDERS PRICE</div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ color: "#60a5fa", fontWeight: 700, fontSize: 15 }}>⚡ Pro Lifetime</span>
-                    <div style={{ textAlign: "right" }}>
-                      <span style={{ color: "#f97316", fontWeight: 800, fontSize: 17 }}>$18.99</span>
-                      <span style={{ color: "#64748b", fontSize: 12, marginLeft: 4 }}>once</span>
-                    </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10, marginTop: 4 }}>
+                    <button
+                      onClick={() => { dismissOnboarding(true); window.open("https://buy.stripe.com/5kQ00jdD2gYy1m62fba3u0s", "_blank"); }}
+                      style={{ padding: "10px 8px", background: "#0f172a", color: "white", border: "1px solid #334155", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13, lineHeight: 1.3, textAlign: "center" }}
+                    >
+                      <div style={{ color: "#60a5fa", fontSize: 11, marginBottom: 2 }}>YEARLY</div>
+                      <div style={{ fontSize: 16, fontWeight: 800 }}>$15.99</div>
+                      <div style={{ color: "#94a3b8", fontSize: 10, fontWeight: 400 }}>/year</div>
+                    </button>
+                    <button
+                      onClick={() => { dismissOnboarding(true); window.open("https://buy.stripe.com/7sY8wP1Uk4bM1m68Dza3u0t", "_blank"); }}
+                      style={{ padding: "10px 8px", background: "#f97316", color: "white", border: "1px solid #f97316", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13, lineHeight: 1.3, textAlign: "center" }}
+                    >
+                      <div style={{ color: "#fff", fontSize: 11, marginBottom: 2, opacity: 0.9 }}>LIFETIME ⚡</div>
+                      <div style={{ fontSize: 16, fontWeight: 800 }}>$39.99</div>
+                      <div style={{ color: "#fff", fontSize: 10, fontWeight: 400, opacity: 0.85 }}>once, forever</div>
+                    </button>
                   </div>
-                  <div style={{ fontSize: 11, color: "#f97316", marginBottom: 10 }}>Price going to $24.99 soon — lock in now</div>
-                  <button
-                    onClick={() => { dismissOnboarding(true); window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank"); }}
-                    style={{ width: "100%", padding: "11px", background: "#f97316", color: "white", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}
-                  >
-                    Unlock Pro — $18.99 →
-                  </button>
+                  <div style={{ fontSize: 11, color: "#64748b", textAlign: "center" }}>No subscription required with Lifetime</div>
                 </div>
               </div>
             )}
@@ -8258,13 +8276,24 @@ export default function HomePage() {
             <div style={{ color:"#64748b", fontSize:13, textAlign:"center", marginBottom:16, lineHeight:1.4 }}>
               {paywallModal === "ratelimit"
                 ? `${rlStatus.dayCount}/${FREE_SIM_PER_DAY} simulations used today.`
-                : "Unlock Pro — $18.99 lifetime. No subscription ever."}
+                : "Unlock Pro — pick yearly or pay once, forever."}
             </div>
-            <button onClick={() => window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09","_blank")}
-              style={{ display:"block", width:"100%", padding:"14px", background:"#f97316", color:"#fff",
-                border:"none", borderRadius:10, fontWeight:700, fontSize:15, cursor:"pointer", marginBottom:10 }}>
-              Unlock Pro — $18.99 →
-            </button>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
+              <button onClick={() => window.open("https://buy.stripe.com/5kQ00jdD2gYy1m62fba3u0s","_blank")}
+                style={{ padding:"14px 10px", background:"#0f172a", color:"#fff", border:"1px solid #334155",
+                  borderRadius:10, fontWeight:700, fontSize:14, cursor:"pointer", lineHeight:1.3 }}>
+                <div style={{ color:"#60a5fa", fontSize:11, marginBottom:2 }}>YEARLY</div>
+                <div style={{ fontSize:17, fontWeight:800 }}>$15.99</div>
+                <div style={{ color:"#94a3b8", fontSize:10, fontWeight:400 }}>/year</div>
+              </button>
+              <button onClick={() => window.open("https://buy.stripe.com/7sY8wP1Uk4bM1m68Dza3u0t","_blank")}
+                style={{ padding:"14px 10px", background:"#f97316", color:"#fff", border:"1px solid #f97316",
+                  borderRadius:10, fontWeight:700, fontSize:14, cursor:"pointer", lineHeight:1.3 }}>
+                <div style={{ color:"#fff", fontSize:11, marginBottom:2, opacity:0.9 }}>LIFETIME ⚡</div>
+                <div style={{ fontSize:17, fontWeight:800 }}>$39.99</div>
+                <div style={{ color:"#fff", fontSize:10, fontWeight:400, opacity:0.85 }}>once, forever</div>
+              </button>
+            </div>
             <div style={{ display:"flex", gap:8 }}>
               <button onClick={() => setPaywallModal(null)}
                 style={{ flex:1, padding:"12px", background:"transparent", color:"#94a3b8",
@@ -8586,7 +8615,7 @@ export default function HomePage() {
                   Read full site summaries, see photos, and explore history — included with Pro.
                 </div>
                 <button
-                  onClick={() => window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank")}
+                  onClick={() => { setWikiPanel(null); setPaywallModal("pro"); }}
                   style={{ width: "100%", padding: "11px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 9, color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}
                 >
                   🔓 Upgrade to Pro
