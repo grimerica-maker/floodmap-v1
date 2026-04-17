@@ -13,7 +13,7 @@ const DEBUG_FLOOD = true;
 const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-streets-v12";
 
-const FLOOD_TILE_VERSION = "204";
+const FLOOD_TILE_VERSION = "205";
 
 // ── Earthquake presets ───────────────────────────────────────────────────────
 const EQ_DEPTH_TYPES = [
@@ -288,6 +288,10 @@ const SURGE_SOURCE = "dm-surge-source";
 const SURGE_LAYER  = "dm-surge-layer";
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
+// ArcGIS GEBCO bathymetry — rendered beneath flood layer when sea level is negative
+const BATHY_SOURCE_ID = "arcgis-gebco-source";
+const BATHY_LAYER_ID  = "arcgis-gebco-layer";
+const BATHY_TILE_URL  = "https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile/{z}/{y}/{x}";
 
 const IMPACT_SOURCE_ID = "impact-point-source";
 const IMPACT_LAYER_ID = "impact-point-layer";
@@ -1442,18 +1446,62 @@ export default function HomePage() {
     }
   }, [isSignedIn, user]);
 
-  // Simple pro unlock: if ?pro=1 in URL after Stripe redirect, set pro and prompt sign-in
+  // ── Pro unlock after Stripe redirect ──────────────────────────────────────
+  // Stripe sends users back with ?pro=1 (lifetime) or ?pro=yearly (subscription).
+  // If signed in, write tier to Clerk metadata immediately (source of truth).
+  // If not signed in, fall back to localStorage and prompt sign-in so access
+  // persists across devices.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("pro") === "1") {
-      try { localStorage.setItem("dm_pro_tier", "pro"); } catch(e) {}
-      setProTier("pro");
-      proTierRef.current = "pro";
+    const proParam = params.get("pro");
+    if (!proParam) return;
+    const newTier = proParam === "yearly" ? "pro_yearly" : "lifetime";
+    const writeTier = async () => {
+      try { localStorage.setItem("dm_pro_tier", newTier); } catch(e) {}
+      setProTier(newTier);
+      proTierRef.current = newTier;
+      if (isSignedIn && user) {
+        try {
+          await user.update({ publicMetadata: { ...(user.publicMetadata || {}), tier: newTier } });
+        } catch(e) { console.warn("Clerk metadata write failed", e); }
+      }
       window.history.replaceState({}, "", window.location.pathname);
-      setStatus("✓ Pro unlocked! Sign in to save access across devices.");
+      setStatus(isSignedIn
+        ? `✓ ${newTier === "lifetime" ? "Lifetime" : "Yearly"} unlocked!`
+        : `✓ Pro unlocked! Sign in to save access across devices.`);
       setTimeout(() => setStatus(""), 6000);
-    }
-  }, []);
+    };
+    writeTier();
+  }, [isSignedIn, user]);
+
+  // ── Auto-migrate legacy localStorage users to Clerk ───────────────────────
+  // Any user who paid pre-Clerk has `dm_pro_tier` in localStorage. When they
+  // sign in, lift that value into their Clerk publicMetadata.tier so access
+  // becomes cross-device and we can eventually deprecate the localStorage path.
+  useEffect(() => {
+    if (!isSignedIn || !user) return;
+    const existingClerkTier = user.publicMetadata?.tier;
+    if (existingClerkTier && existingClerkTier !== "free") return; // already migrated
+    let legacy = null;
+    try { legacy = localStorage.getItem("dm_pro_tier"); } catch(e) {}
+    if (!legacy || legacy === "free") return;
+    // Legacy values: "pro" (old single-tier) → treat as lifetime.
+    const migrated = legacy === "pro" ? "lifetime" : legacy;
+    (async () => {
+      try {
+        await user.update({
+          publicMetadata: {
+            ...(user.publicMetadata || {}),
+            tier: migrated,
+            migrated_from_localstorage: true,
+          },
+        });
+        try { localStorage.removeItem("dm_pro_tier"); } catch(e) {}
+        setProTier(migrated);
+        proTierRef.current = migrated;
+      } catch(e) { console.warn("Legacy tier migration failed", e); }
+    })();
+  }, [isSignedIn, user]);
 
 
 
@@ -2901,6 +2949,8 @@ export default function HomePage() {
     activeFloodLevelRef.current = null;
     // Also clear any cumulative impact flood layers
     removeImpactFloodLayers();
+    // Bathymetry is tied to negative sea level — clear whenever flood clears
+    try { removeBathymetryLayer(); } catch(e) {}
   };
 
   const removeImpactPreviewLayers = () => {
@@ -3188,14 +3238,62 @@ export default function HomePage() {
     return true;
   };
 
+  // ── Bathymetry (ArcGIS GEBCO) ──────────────────────────────────────────────
+  // Pretty ocean-floor basemap shown only when sea level drops below 0.
+  // Sits BENEATH the flood tile layer so submerged areas still paint blue.
+  const addBathymetryLayer = () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return false;
+    try {
+      if (map.getLayer(BATHY_LAYER_ID) && map.getSource(BATHY_SOURCE_ID)) return true;
+      if (!map.getSource(BATHY_SOURCE_ID)) {
+        map.addSource(BATHY_SOURCE_ID, {
+          type: "raster",
+          tiles: [BATHY_TILE_URL],
+          tileSize: 256,
+          minzoom: 0,
+          maxzoom: 11,
+          attribution: "Bathymetry: GEBCO / NCEI via Esri",
+        });
+      }
+      // Place beneath flood layer if present; otherwise let Mapbox append to top.
+      const beforeId = map.getLayer(FLOOD_LAYER_ID) ? FLOOD_LAYER_ID : undefined;
+      map.addLayer({
+        id: BATHY_LAYER_ID,
+        type: "raster",
+        source: BATHY_SOURCE_ID,
+        paint: { "raster-opacity": 0.92, "raster-opacity-transition": { duration: 300 } },
+      }, beforeId);
+      return true;
+    } catch (e) {
+      console.warn("addBathymetryLayer failed", e);
+      return false;
+    }
+  };
+
+  const removeBathymetryLayer = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    try { if (map.getLayer(BATHY_LAYER_ID)) map.removeLayer(BATHY_LAYER_ID); } catch(e) {}
+    try { if (map.getSource(BATHY_SOURCE_ID)) map.removeSource(BATHY_SOURCE_ID); } catch(e) {}
+  };
+
+  const syncBathymetry = () => {
+    const level = Number(seaLevelRef.current);
+    const mode = scenarioModeRef.current;
+    const active = (mode === "flood" || mode === "climate") && Number.isFinite(level) && level < 0;
+    if (active) addBathymetryLayer(); else removeBathymetryLayer();
+  };
+
   const syncFloodScenario = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    if (scenarioModeRef.current !== "flood") return;
+    if (scenarioModeRef.current !== "flood" && scenarioModeRef.current !== "climate") return;
     if (!floodAllowedInCurrentView()) { removeFloodLayer(); return; }
     const level = Number(seaLevelRef.current);
     if (!Number.isFinite(level) || level === 0) { removeFloodLayer(); return; }
     addFloodLayer(level);
+    syncBathymetry();
   };
 
   const applyStyleMode = (mode) => {
@@ -4979,17 +5077,16 @@ export default function HomePage() {
     }
   }, []);
 
-  // Read permalink params on load and auto-trigger scenario
+  // Read permalink params on load — view-only (no scenario replay)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const scenario = params.get("scenario");
-    if (!scenario) return;
-    // Store full query string in sessionStorage as backup
-    try { sessionStorage.setItem("dm_permalink", window.location.search); } catch(e) {}
-    // Clean URL immediately
+    const cx = parseFloat(params.get("cx"));
+    const cy = parseFloat(params.get("cy"));
+    const cz = parseFloat(params.get("cz"));
+    if (isNaN(cx) || isNaN(cy) || isNaN(cz)) return;
+    // Store for map-ready trigger; clean URL
+    window._permalinkView = { cx, cy, cz };
     window.history.replaceState({}, "", window.location.pathname);
-    // Store params for map-ready trigger
-    window._permalinkParams = { scenario, params };
   }, []);
 
   useEffect(() => {
@@ -5499,105 +5596,14 @@ export default function HomePage() {
     map.on("error", handleError);
     map.on("load", handleLoad);
     map.on("load", () => {
-      // Auto-trigger from permalink
-      // Check sessionStorage backup if _permalinkParams was cleared (e.g. SSR/hydration)
-      let pp = window._permalinkParams;
-      if (!pp) {
-        try {
-          const stored = sessionStorage.getItem("dm_permalink");
-          if (stored) {
-            const p2 = new URLSearchParams(stored);
-            const s2 = p2.get("scenario");
-            if (s2) pp = { scenario: s2, params: p2 };
-            sessionStorage.removeItem("dm_permalink");
-          }
-        } catch(e) {}
-      }
-      if (!pp) return;
-      window._permalinkParams = null;
-      const { scenario, params } = pp;
+      // Permalink: fly to saved view, no scenario replay (replay caused crashes on complex scenarios)
+      const v = window._permalinkView;
+      if (!v) return;
+      window._permalinkView = null;
       setTimeout(() => {
-        try {
-          // Restore map view if encoded in link
-          const cx = parseFloat(params.get("cx")), cy = parseFloat(params.get("cy")), cz = parseFloat(params.get("cz"));
-          if (!isNaN(cx) && !isNaN(cy) && !isNaN(cz)) {
-            safely(() => map.jumpTo({ center: [cx, cy], zoom: cz }));
-          }
-          if (scenario === "flood") {
-            const level = parseFloat(params.get("level") || "0");
-            setInputLevel(level); setInputText(String(level)); setSeaLevel(level); seaLevelRef.current = level;
-            setScenarioMode("flood"); scenarioModeRef.current = "flood";
-            setTimeout(() => executeFlood(), 100);
-          } else if (scenario === "climate") {
-            const level = parseFloat(params.get("level") || "0");
-            const warming = parseFloat(params.get("warming") || "0");
-            setInputLevel(level); setInputText(String(level)); setSeaLevel(level); seaLevelRef.current = level;
-            setScenarioMode("climate"); scenarioModeRef.current = "climate";
-            if (warming) { setActiveWarmingLevel(warming); activeWarmingLevelRef.current = warming; }
-            setTimeout(() => { executeFlood(); if (warming) setTimeout(() => safely(() => drawWildfireZones(mapRef.current, warming)), 600); }, 100);
-          } else if (scenario === "impact") {
-            setScenarioMode("impact"); scenarioModeRef.current = "impact";
-            const diameter = Math.min(parseInt(params.get("diameter") || "1000"), proTierRef.current !== "free" ? PRO_MAX_IMPACT_DIAMETER : FREE_MAX_IMPACT_DIAMETER);
-            setImpactDiameter(diameter); impactDiameterRef.current = diameter;
-            const pointsStr = params.get("points");
-            if (pointsStr) {
-              // Multi-impact
-              const pts = decodeURIComponent(pointsStr).split("|").map(s => { const [la, ln] = s.split(","); return { lat: parseFloat(la), lng: parseFloat(ln) }; }).filter(p => !isNaN(p.lat));
-              pts.forEach((p, i) => { impactPointsRef.current.push({ lat: p.lat, lng: p.lng, idx: i, marker: null, result: null }); });
-              impactPointRef.current = pts[pts.length - 1];
-              setTimeout(() => runImpact(), 200);
-            } else {
-              const lat = parseFloat(params.get("lat")), lng = parseFloat(params.get("lng"));
-              if (!isNaN(lat) && !isNaN(lng)) { impactPointRef.current = { lat, lng }; setTimeout(() => runImpact(), 200); }
-            }
-          } else if (scenario === "nuke") {
-            setScenarioMode("nuke"); scenarioModeRef.current = "nuke";
-            const yieldKt = Math.min(parseInt(params.get("yield") || "1000"), proTierRef.current !== "free" ? PRO_MAX_NUKE_YIELD_KT : FREE_MAX_NUKE_YIELD_KT);
-            const burst = params.get("burst") || "airburst";
-            setNukeYield(yieldKt); setNukeBurst(burst);
-            const pointsStr = params.get("points");
-            if (pointsStr) {
-              const pts = decodeURIComponent(pointsStr).split("|").map(s => { const [la, ln] = s.split(","); return { lat: parseFloat(la), lng: parseFloat(ln) }; }).filter(p => !isNaN(p.lat));
-              pts.forEach((p, i) => {
-                const el = document.createElement("div");
-                el.style.cssText = "width:14px;height:14px;background:#dc2626;border:2px solid #fff;border-radius:50%;cursor:pointer;";
-                const marker = new mapboxgl.Marker({ element: el }).setLngLat([p.lng, p.lat]).addTo(map);
-                nukeStrikesRef.current.push({ lat: p.lat, lng: p.lng, marker, idx: i });
-              });
-              nukePointRef.current = pts[pts.length - 1]; setNukePointSet(true);
-              setNukeStrikes([...nukeStrikesRef.current]);
-              setTimeout(() => executeNuke(), 200);
-            } else {
-              const lat = parseFloat(params.get("lat")), lng = parseFloat(params.get("lng"));
-              if (!isNaN(lat) && !isNaN(lng)) { nukePointRef.current = { lat, lng }; setNukePointSet(true); setTimeout(() => executeNuke(), 200); }
-            }
-          } else if (scenario === "volcano") {
-            const type = params.get("type") || "yellowstone";
-            const preset = parseInt(params.get("preset") || "0");
-            setScenarioMode("yellowstone"); scenarioModeRef.current = "yellowstone";
-            setVolcanoType(type); volcanoTypeRef.current = type; setYellowstonePreset(preset); yellowstonePresetRef.current = preset;
-            setTimeout(() => drawYellowstone(preset), 200);
-          } else if (scenario === "tsunami") {
-            const source = parseInt(params.get("source") || "0");
-            setScenarioMode("tsunami"); scenarioModeRef.current = "tsunami";
-            setTsunamiSource(source); tsunamiSourceRef.current = source;
-            setTimeout(() => drawTsunami(source), 200);
-          } else if (scenario === "cataclysm") {
-            const model = params.get("model") || "davidson";
-            setScenarioMode("cataclysm"); scenarioModeRef.current = "cataclysm";
-            setCataclysmModel(model); cataclysmModelRef.current = model;
-            setTimeout(() => triggerCataclysm(), 500);
-          }
-        } catch(e) { console.warn("Permalink trigger failed", e); }
-
-        // Show pro CTA if free user arrives at paywalled scenario via share link
-        const isFreeUser = (proTierRef.current ?? "free") === "free";
-        if (isFreeUser && ["impact", "nuke", "cataclysm"].includes(scenario)) {
-          setTimeout(() => {
-            setStatus("🔓 Viewing shared scenario — upgrade to Pro to run your own simulations & unlock full detail");
-          }, 3000);
-        }
-      }, 800);
+        try { safely(() => map.jumpTo({ center: [v.cx, v.cy], zoom: v.cz })); }
+        catch(e) { console.warn("Permalink view jump failed", e); }
+      }, 300);
     });
     map.on("style.load", handleStyleLoad);
     map.on("mousedown", handleMouseDown);
@@ -5903,7 +5909,7 @@ export default function HomePage() {
             </div>
             <button onClick={() => setPaywallModal("pro")}
               style={{ width: "100%", padding: "8px", background: "#f97316", color: "white", border: "none", borderRadius: 7, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-              ⚡ $18.99 Lifetime — Going up to $24.99
+              ⚡ Unlock Pro — from $15.99
             </button>
 
           </div>
@@ -6377,7 +6383,7 @@ export default function HomePage() {
           <div onClick={() => setPaywallModal("pro")} style={{ background: "#111827", border: "1px solid #1e3a5f", borderRadius: 10, padding: "10px 14px", marginBottom: 12, cursor: "pointer" }}>
             <div style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Displaced Population</div>
             <div style={{ fontSize: 14, color: "#334155", fontWeight: 700 }}>🔒 Unlock with Pro</div>
-            <div style={{ fontSize: 11, color: "#1e3a5f", marginTop: 3 }}>See how many are displaced · $18.99 one-time</div>
+            <div style={{ fontSize: 11, color: "#1e3a5f", marginTop: 3 }}>See how many are displaced · from $15.99</div>
           </div>
         )}
       {/* ── ICE AGE MODE — left sidebar ── */}
@@ -6563,7 +6569,7 @@ export default function HomePage() {
           <div onClick={() => setPaywallModal("pro")} style={{ background: "#111827", border: "1px solid #1e3a5f", borderRadius: 10, padding: "10px 14px", marginBottom: 12, marginTop: 8, cursor: "pointer" }}>
             <div style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Displaced Population</div>
             <div style={{ fontSize: 14, color: "#334155", fontWeight: 700 }}>🔒 Unlock with Pro</div>
-            <div style={{ fontSize: 11, color: "#1e3a5f", marginTop: 3 }}>See how many are displaced · $18.99 one-time</div>
+            <div style={{ fontSize: 11, color: "#1e3a5f", marginTop: 3 }}>See how many are displaced · from $15.99</div>
           </div>
         )}
       </>}
@@ -7133,7 +7139,7 @@ export default function HomePage() {
           return (
             <div key={type}
               onClick={() => {
-                if (locked) { window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank"); return; }
+                if (locked) { setPaywallModal("pro"); return; }
                 toggleOverlay(type);
               }}
               style={{
@@ -7613,35 +7619,11 @@ export default function HomePage() {
       {(() => {
         window.buildPermalink = () => {
           const base = "https://www.disastermap.ca/map";
-          const m = scenarioModeRef.current;
           const map = mapRef.current;
-          // Include map center+zoom so link opens at same view
-          const c = map ? map.getCenter() : null;
-          const z = map ? map.getZoom().toFixed(1) : "3";
-          const view = c ? `&cx=${c.lng.toFixed(4)}&cy=${c.lat.toFixed(4)}&cz=${z}` : "";
-          if (m === "flood") return `${base}?scenario=flood&level=${seaLevel}${view}`;
-          if (m === "climate") return `${base}?scenario=climate&level=${seaLevel}${activeWarmingLevel ? "&warming=" + activeWarmingLevel : ""}${view}`;
-          if (m === "impact") {
-            const pts = impactPointsRef.current;
-            if (pts.length > 1) {
-              // Multi-impact — encode all points
-              const latlngs = pts.map(p => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`).join("|");
-              return `${base}?scenario=impact&points=${encodeURIComponent(latlngs)}&diameter=${impactDiameter}${view}`;
-            }
-            if (impactPointRef.current) return `${base}?scenario=impact&lat=${impactPointRef.current.lat.toFixed(4)}&lng=${impactPointRef.current.lng.toFixed(4)}&diameter=${impactDiameter}${view}`;
-          }
-          if (m === "nuke") {
-            const strikes = nukeStrikesRef.current;
-            if (strikes.length > 1) {
-              const latlngs = strikes.map(s => `${s.lat.toFixed(4)},${s.lng.toFixed(4)}`).join("|");
-              return `${base}?scenario=nuke&points=${encodeURIComponent(latlngs)}&yield=${nukeYield}&burst=${nukeBurst}${view}`;
-            }
-            if (nukePointRef.current) return `${base}?scenario=nuke&lat=${nukePointRef.current.lat.toFixed(4)}&lng=${nukePointRef.current.lng.toFixed(4)}&yield=${nukeYield}&burst=${nukeBurst}${view}`;
-          }
-          if (m === "yellowstone") return `${base}?scenario=volcano&type=${volcanoType}&preset=${yellowstonePreset}${view}`;
-          if (m === "tsunami") return `${base}?scenario=tsunami&source=${tsunamiSource}${view}`;
-          if (m === "cataclysm") return `${base}?scenario=cataclysm&model=${cataclysmModelRef.current}${view}`;
-          return base;
+          if (!map) return base;
+          const c = map.getCenter();
+          const z = map.getZoom().toFixed(1);
+          return `${base}?cx=${c.lng.toFixed(4)}&cy=${c.lat.toFixed(4)}&cz=${z}`;
         };
         window.saveScreenshot = () => {
           const map = mapRef.current;
@@ -8182,20 +8164,25 @@ export default function HomePage() {
                 </div>
                 <div style={{ background: "#111827", border: "1px solid #f97316", borderRadius: 12, padding: "14px 16px", marginBottom: 4, position: "relative" }}>
                   <div style={{ position: "absolute", top: -10, right: 12, background: "#f97316", color: "white", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, letterSpacing: "0.08em" }}>FOUNDERS PRICE</div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ color: "#60a5fa", fontWeight: 700, fontSize: 15 }}>⚡ Pro Lifetime</span>
-                    <div style={{ textAlign: "right" }}>
-                      <span style={{ color: "#f97316", fontWeight: 800, fontSize: 17 }}>$18.99</span>
-                      <span style={{ color: "#64748b", fontSize: 12, marginLeft: 4 }}>once</span>
-                    </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10, marginTop: 4 }}>
+                    <button
+                      onClick={() => { dismissOnboarding(true); window.open("https://buy.stripe.com/5kQ00jdD2gYy1m62fba3u0s", "_blank"); }}
+                      style={{ padding: "10px 8px", background: "#0f172a", color: "white", border: "1px solid #334155", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13, lineHeight: 1.3, textAlign: "center" }}
+                    >
+                      <div style={{ color: "#60a5fa", fontSize: 11, marginBottom: 2 }}>YEARLY</div>
+                      <div style={{ fontSize: 16, fontWeight: 800 }}>$15.99</div>
+                      <div style={{ color: "#94a3b8", fontSize: 10, fontWeight: 400 }}>/year</div>
+                    </button>
+                    <button
+                      onClick={() => { dismissOnboarding(true); window.open("https://buy.stripe.com/7sY8wP1Uk4bM1m68Dza3u0t", "_blank"); }}
+                      style={{ padding: "10px 8px", background: "#f97316", color: "white", border: "1px solid #f97316", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13, lineHeight: 1.3, textAlign: "center" }}
+                    >
+                      <div style={{ color: "#fff", fontSize: 11, marginBottom: 2, opacity: 0.9 }}>LIFETIME ⚡</div>
+                      <div style={{ fontSize: 16, fontWeight: 800 }}>$39.99</div>
+                      <div style={{ color: "#fff", fontSize: 10, fontWeight: 400, opacity: 0.85 }}>once, forever</div>
+                    </button>
                   </div>
-                  <div style={{ fontSize: 11, color: "#f97316", marginBottom: 10 }}>Price going to $24.99 soon — lock in now</div>
-                  <button
-                    onClick={() => { dismissOnboarding(true); window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank"); }}
-                    style={{ width: "100%", padding: "11px", background: "#f97316", color: "white", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 14 }}
-                  >
-                    Unlock Pro — $18.99 →
-                  </button>
+                  <div style={{ fontSize: 11, color: "#64748b", textAlign: "center" }}>No subscription required with Lifetime</div>
                 </div>
               </div>
             )}
@@ -8258,13 +8245,24 @@ export default function HomePage() {
             <div style={{ color:"#64748b", fontSize:13, textAlign:"center", marginBottom:16, lineHeight:1.4 }}>
               {paywallModal === "ratelimit"
                 ? `${rlStatus.dayCount}/${FREE_SIM_PER_DAY} simulations used today.`
-                : "Unlock Pro — $18.99 lifetime. No subscription ever."}
+                : "Unlock Pro — pick yearly or pay once, forever."}
             </div>
-            <button onClick={() => window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09","_blank")}
-              style={{ display:"block", width:"100%", padding:"14px", background:"#f97316", color:"#fff",
-                border:"none", borderRadius:10, fontWeight:700, fontSize:15, cursor:"pointer", marginBottom:10 }}>
-              Unlock Pro — $18.99 →
-            </button>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
+              <button onClick={() => window.open("https://buy.stripe.com/5kQ00jdD2gYy1m62fba3u0s","_blank")}
+                style={{ padding:"14px 10px", background:"#0f172a", color:"#fff", border:"1px solid #334155",
+                  borderRadius:10, fontWeight:700, fontSize:14, cursor:"pointer", lineHeight:1.3 }}>
+                <div style={{ color:"#60a5fa", fontSize:11, marginBottom:2 }}>YEARLY</div>
+                <div style={{ fontSize:17, fontWeight:800 }}>$15.99</div>
+                <div style={{ color:"#94a3b8", fontSize:10, fontWeight:400 }}>/year</div>
+              </button>
+              <button onClick={() => window.open("https://buy.stripe.com/7sY8wP1Uk4bM1m68Dza3u0t","_blank")}
+                style={{ padding:"14px 10px", background:"#f97316", color:"#fff", border:"1px solid #f97316",
+                  borderRadius:10, fontWeight:700, fontSize:14, cursor:"pointer", lineHeight:1.3 }}>
+                <div style={{ color:"#fff", fontSize:11, marginBottom:2, opacity:0.9 }}>LIFETIME ⚡</div>
+                <div style={{ fontSize:17, fontWeight:800 }}>$39.99</div>
+                <div style={{ color:"#fff", fontSize:10, fontWeight:400, opacity:0.85 }}>once, forever</div>
+              </button>
+            </div>
             <div style={{ display:"flex", gap:8 }}>
               <button onClick={() => setPaywallModal(null)}
                 style={{ flex:1, padding:"12px", background:"transparent", color:"#94a3b8",
@@ -8586,7 +8584,7 @@ export default function HomePage() {
                   Read full site summaries, see photos, and explore history — included with Pro.
                 </div>
                 <button
-                  onClick={() => window.open("https://buy.stripe.com/8x23cv7eE9w62qa6vra3u09", "_blank")}
+                  onClick={() => { setWikiPanel(null); setPaywallModal("pro"); }}
                   style={{ width: "100%", padding: "11px", background: "linear-gradient(135deg,#d97706,#b45309)", border: "none", borderRadius: 9, color: "white", fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}
                 >
                   🔓 Upgrade to Pro
