@@ -3211,6 +3211,8 @@ export default function HomePage() {
   // ── Bathymetry (ArcGIS GEBCO) ──────────────────────────────────────────────
   // Pretty ocean-floor basemap shown only when sea level drops below 0.
   // Sits BENEATH the flood tile layer so submerged areas still paint blue.
+  // Config matches ShipwreckMap: no maxzoom cap (let GEBCO serve whatever it has),
+  // tileSize 256, opacity 0.6 for clean blend under flood tiles.
   const addBathymetryLayer = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return false;
@@ -3221,8 +3223,6 @@ export default function HomePage() {
           type: "raster",
           tiles: [BATHY_TILE_URL],
           tileSize: 256,
-          minzoom: 0,
-          maxzoom: 11,
           attribution: "Bathymetry: GEBCO / NCEI via Esri",
         });
       }
@@ -3232,7 +3232,7 @@ export default function HomePage() {
         id: BATHY_LAYER_ID,
         type: "raster",
         source: BATHY_SOURCE_ID,
-        paint: { "raster-opacity": 0.92, "raster-opacity-transition": { duration: 300 } },
+        paint: { "raster-opacity": 0.6, "raster-opacity-transition": { duration: 300 } },
       }, beforeId);
       return true;
     } catch (e) {
