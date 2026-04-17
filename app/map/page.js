@@ -288,12 +288,6 @@ const SURGE_SOURCE = "dm-surge-source";
 const SURGE_LAYER  = "dm-surge-layer";
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
-// ArcGIS GEBCO bathymetry — provides zoomable high-res ocean floor tiles.
-// Same config as ShipwreckMap: no maxzoom cap, tileSize 256, 0.6 opacity.
-// Renders BENEATH the backend flood layer so shaded seafloor still shows through.
-const BATHY_SOURCE_ID = "arcgis-gebco-source";
-const BATHY_LAYER_ID  = "arcgis-gebco-layer";
-const BATHY_TILE_URL  = "https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile/{z}/{y}/{x}";
 
 const IMPACT_SOURCE_ID = "impact-point-source";
 const IMPACT_LAYER_ID = "impact-point-layer";
@@ -2920,8 +2914,6 @@ export default function HomePage() {
     activeFloodLevelRef.current = null;
     // Also clear any cumulative impact flood layers
     removeImpactFloodLayers();
-    // Bathymetry is tied to negative sea level — clear whenever flood clears
-    try { removeBathymetryLayer(); } catch(e) {}
   };
 
   const removeImpactPreviewLayers = () => {
@@ -3209,54 +3201,6 @@ export default function HomePage() {
     return true;
   };
 
-  // ── Bathymetry (ArcGIS GEBCO) ──────────────────────────────────────────────
-  // High-resolution zoomable ocean floor basemap. Active when sea level < 0.
-  // Sits ABOVE the backend flood tile with partial opacity so the flood's blue
-  // tint bleeds through, while ArcGIS contributes the zoomable seafloor detail.
-  // Config mirrors ShipwreckMap: no maxzoom cap, tileSize 256.
-  const addBathymetryLayer = () => {
-    const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return false;
-    try {
-      if (map.getLayer(BATHY_LAYER_ID)) return true;
-      if (!map.getSource(BATHY_SOURCE_ID)) {
-        map.addSource(BATHY_SOURCE_ID, {
-          type: "raster",
-          tiles: [BATHY_TILE_URL],
-          tileSize: 256,
-          attribution: "Bathymetry: GEBCO / NCEI via Esri",
-        });
-      }
-      // Add ON TOP (no beforeId) so the opaque flood tile doesn't hide ArcGIS.
-      // 0.55 opacity lets the flood's blue bleed through for submerged-water cue.
-      map.addLayer({
-        id: BATHY_LAYER_ID,
-        type: "raster",
-        source: BATHY_SOURCE_ID,
-        paint: { "raster-opacity": 0.55, "raster-opacity-transition": { duration: 300 } },
-      });
-      return true;
-    } catch (e) {
-      console.warn("addBathymetryLayer failed, cleaning up for retry:", e);
-      try { if (map.getSource(BATHY_SOURCE_ID)) map.removeSource(BATHY_SOURCE_ID); } catch(_) {}
-      return false;
-    }
-  };
-
-  const removeBathymetryLayer = () => {
-    const map = mapRef.current;
-    if (!map) return;
-    try { if (map.getLayer(BATHY_LAYER_ID)) map.removeLayer(BATHY_LAYER_ID); } catch(e) {}
-    try { if (map.getSource(BATHY_SOURCE_ID)) map.removeSource(BATHY_SOURCE_ID); } catch(e) {}
-  };
-
-  const syncBathymetry = () => {
-    const level = Number(seaLevelRef.current);
-    const mode = scenarioModeRef.current;
-    const active = (mode === "flood" || mode === "climate") && Number.isFinite(level) && level < 0;
-    if (active) addBathymetryLayer(); else removeBathymetryLayer();
-  };
-
   const syncFloodScenario = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
@@ -3265,7 +3209,6 @@ export default function HomePage() {
     const level = Number(seaLevelRef.current);
     if (!Number.isFinite(level) || level === 0) { removeFloodLayer(); return; }
     addFloodLayer(level);
-    syncBathymetry();
   };
 
   const applyStyleMode = (mode) => {
