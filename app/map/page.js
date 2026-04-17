@@ -13,7 +13,7 @@ const DEBUG_FLOOD = true;
 const MAP_STYLE_URL = "mapbox://styles/mapbox/streets-v12";
 const SATELLITE_STYLE_URL = "mapbox://styles/mapbox/satellite-streets-v12";
 
-const FLOOD_TILE_VERSION = "205";
+const FLOOD_TILE_VERSION = "204";
 
 // ── Earthquake presets ───────────────────────────────────────────────────────
 const EQ_DEPTH_TYPES = [
@@ -288,7 +288,9 @@ const SURGE_SOURCE = "dm-surge-source";
 const SURGE_LAYER  = "dm-surge-layer";
 const FLOOD_SOURCE_ID = "flood-source";
 const FLOOD_LAYER_ID = "flood-layer";
-// ArcGIS GEBCO bathymetry — rendered beneath flood layer when sea level is negative
+// ArcGIS GEBCO bathymetry — provides zoomable high-res ocean floor tiles.
+// Same config as ShipwreckMap: no maxzoom cap, tileSize 256, 0.6 opacity.
+// Renders BENEATH the backend flood layer so shaded seafloor still shows through.
 const BATHY_SOURCE_ID = "arcgis-gebco-source";
 const BATHY_LAYER_ID  = "arcgis-gebco-layer";
 const BATHY_TILE_URL  = "https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile/{z}/{y}/{x}";
@@ -1449,8 +1451,7 @@ export default function HomePage() {
   // Pro unlock after Stripe redirect. Two tiers:
   //   ?pro=1       → lifetime ($39.99)
   //   ?pro=yearly  → yearly ($15.99 subscription)
-  // If signed in, write tier to Clerk metadata. If not, fall back to localStorage
-  // (same pattern as pre-existing 51 users — nothing breaks for them).
+  // Existing users with localStorage "dm_pro_tier = pro" are untouched (still Pro).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const proParam = params.get("pro");
@@ -3209,15 +3210,16 @@ export default function HomePage() {
   };
 
   // ── Bathymetry (ArcGIS GEBCO) ──────────────────────────────────────────────
-  // Pretty ocean-floor basemap shown only when sea level drops below 0.
-  // Sits BENEATH the flood tile layer so submerged areas still paint blue.
-  // Config matches ShipwreckMap: no maxzoom cap (let GEBCO serve whatever it has),
-  // tileSize 256, opacity 0.6 for clean blend under flood tiles.
+  // High-resolution zoomable ocean floor basemap. Active when sea level < 0.
+  // Sits BENEATH the backend flood tile layer so the backend's shaded rendering
+  // stays visible — ArcGIS just fills in extra detail when user zooms in past
+  // the backend's tile resolution.
+  // Config mirrors ShipwreckMap: no maxzoom cap, tileSize 256, raster-opacity 0.6.
   const addBathymetryLayer = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return false;
     try {
-      if (map.getLayer(BATHY_LAYER_ID) && map.getSource(BATHY_SOURCE_ID)) return true;
+      if (map.getLayer(BATHY_LAYER_ID)) return true;
       if (!map.getSource(BATHY_SOURCE_ID)) {
         map.addSource(BATHY_SOURCE_ID, {
           type: "raster",
@@ -3226,7 +3228,7 @@ export default function HomePage() {
           attribution: "Bathymetry: GEBCO / NCEI via Esri",
         });
       }
-      // Place beneath flood layer if present; otherwise let Mapbox append to top.
+      // Place beneath flood layer if present so backend rendering stays on top.
       const beforeId = map.getLayer(FLOOD_LAYER_ID) ? FLOOD_LAYER_ID : undefined;
       map.addLayer({
         id: BATHY_LAYER_ID,
@@ -3236,7 +3238,8 @@ export default function HomePage() {
       }, beforeId);
       return true;
     } catch (e) {
-      console.warn("addBathymetryLayer failed", e);
+      console.warn("addBathymetryLayer failed, cleaning up for retry:", e);
+      try { if (map.getSource(BATHY_SOURCE_ID)) map.removeSource(BATHY_SOURCE_ID); } catch(_) {}
       return false;
     }
   };
@@ -3258,7 +3261,7 @@ export default function HomePage() {
   const syncFloodScenario = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    if (scenarioModeRef.current !== "flood" && scenarioModeRef.current !== "climate") return;
+    if (scenarioModeRef.current !== "flood") return;
     if (!floodAllowedInCurrentView()) { removeFloodLayer(); return; }
     const level = Number(seaLevelRef.current);
     if (!Number.isFinite(level) || level === 0) { removeFloodLayer(); return; }
@@ -5047,15 +5050,17 @@ export default function HomePage() {
     }
   }, []);
 
-  // Read permalink params on load — view-only (no scenario replay)
+  // Read permalink params on load and auto-trigger scenario
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const cx = parseFloat(params.get("cx"));
-    const cy = parseFloat(params.get("cy"));
-    const cz = parseFloat(params.get("cz"));
-    if (isNaN(cx) || isNaN(cy) || isNaN(cz)) return;
-    window._permalinkView = { cx, cy, cz };
+    const scenario = params.get("scenario");
+    if (!scenario) return;
+    // Store full query string in sessionStorage as backup
+    try { sessionStorage.setItem("dm_permalink", window.location.search); } catch(e) {}
+    // Clean URL immediately
     window.history.replaceState({}, "", window.location.pathname);
+    // Store params for map-ready trigger
+    window._permalinkParams = { scenario, params };
   }, []);
 
   useEffect(() => {
@@ -5565,14 +5570,105 @@ export default function HomePage() {
     map.on("error", handleError);
     map.on("load", handleLoad);
     map.on("load", () => {
-      // Permalink: fly to saved view, no scenario replay (replay caused crashes on complex scenarios)
-      const v = window._permalinkView;
-      if (!v) return;
-      window._permalinkView = null;
+      // Auto-trigger from permalink
+      // Check sessionStorage backup if _permalinkParams was cleared (e.g. SSR/hydration)
+      let pp = window._permalinkParams;
+      if (!pp) {
+        try {
+          const stored = sessionStorage.getItem("dm_permalink");
+          if (stored) {
+            const p2 = new URLSearchParams(stored);
+            const s2 = p2.get("scenario");
+            if (s2) pp = { scenario: s2, params: p2 };
+            sessionStorage.removeItem("dm_permalink");
+          }
+        } catch(e) {}
+      }
+      if (!pp) return;
+      window._permalinkParams = null;
+      const { scenario, params } = pp;
       setTimeout(() => {
-        try { safely(() => map.jumpTo({ center: [v.cx, v.cy], zoom: v.cz })); }
-        catch(e) { console.warn("Permalink view jump failed", e); }
-      }, 300);
+        try {
+          // Restore map view if encoded in link
+          const cx = parseFloat(params.get("cx")), cy = parseFloat(params.get("cy")), cz = parseFloat(params.get("cz"));
+          if (!isNaN(cx) && !isNaN(cy) && !isNaN(cz)) {
+            safely(() => map.jumpTo({ center: [cx, cy], zoom: cz }));
+          }
+          if (scenario === "flood") {
+            const level = parseFloat(params.get("level") || "0");
+            setInputLevel(level); setInputText(String(level)); setSeaLevel(level); seaLevelRef.current = level;
+            setScenarioMode("flood"); scenarioModeRef.current = "flood";
+            setTimeout(() => executeFlood(), 100);
+          } else if (scenario === "climate") {
+            const level = parseFloat(params.get("level") || "0");
+            const warming = parseFloat(params.get("warming") || "0");
+            setInputLevel(level); setInputText(String(level)); setSeaLevel(level); seaLevelRef.current = level;
+            setScenarioMode("climate"); scenarioModeRef.current = "climate";
+            if (warming) { setActiveWarmingLevel(warming); activeWarmingLevelRef.current = warming; }
+            setTimeout(() => { executeFlood(); if (warming) setTimeout(() => safely(() => drawWildfireZones(mapRef.current, warming)), 600); }, 100);
+          } else if (scenario === "impact") {
+            setScenarioMode("impact"); scenarioModeRef.current = "impact";
+            const diameter = Math.min(parseInt(params.get("diameter") || "1000"), proTierRef.current !== "free" ? PRO_MAX_IMPACT_DIAMETER : FREE_MAX_IMPACT_DIAMETER);
+            setImpactDiameter(diameter); impactDiameterRef.current = diameter;
+            const pointsStr = params.get("points");
+            if (pointsStr) {
+              // Multi-impact
+              const pts = decodeURIComponent(pointsStr).split("|").map(s => { const [la, ln] = s.split(","); return { lat: parseFloat(la), lng: parseFloat(ln) }; }).filter(p => !isNaN(p.lat));
+              pts.forEach((p, i) => { impactPointsRef.current.push({ lat: p.lat, lng: p.lng, idx: i, marker: null, result: null }); });
+              impactPointRef.current = pts[pts.length - 1];
+              setTimeout(() => runImpact(), 200);
+            } else {
+              const lat = parseFloat(params.get("lat")), lng = parseFloat(params.get("lng"));
+              if (!isNaN(lat) && !isNaN(lng)) { impactPointRef.current = { lat, lng }; setTimeout(() => runImpact(), 200); }
+            }
+          } else if (scenario === "nuke") {
+            setScenarioMode("nuke"); scenarioModeRef.current = "nuke";
+            const yieldKt = Math.min(parseInt(params.get("yield") || "1000"), proTierRef.current !== "free" ? PRO_MAX_NUKE_YIELD_KT : FREE_MAX_NUKE_YIELD_KT);
+            const burst = params.get("burst") || "airburst";
+            setNukeYield(yieldKt); setNukeBurst(burst);
+            const pointsStr = params.get("points");
+            if (pointsStr) {
+              const pts = decodeURIComponent(pointsStr).split("|").map(s => { const [la, ln] = s.split(","); return { lat: parseFloat(la), lng: parseFloat(ln) }; }).filter(p => !isNaN(p.lat));
+              pts.forEach((p, i) => {
+                const el = document.createElement("div");
+                el.style.cssText = "width:14px;height:14px;background:#dc2626;border:2px solid #fff;border-radius:50%;cursor:pointer;";
+                const marker = new mapboxgl.Marker({ element: el }).setLngLat([p.lng, p.lat]).addTo(map);
+                nukeStrikesRef.current.push({ lat: p.lat, lng: p.lng, marker, idx: i });
+              });
+              nukePointRef.current = pts[pts.length - 1]; setNukePointSet(true);
+              setNukeStrikes([...nukeStrikesRef.current]);
+              setTimeout(() => executeNuke(), 200);
+            } else {
+              const lat = parseFloat(params.get("lat")), lng = parseFloat(params.get("lng"));
+              if (!isNaN(lat) && !isNaN(lng)) { nukePointRef.current = { lat, lng }; setNukePointSet(true); setTimeout(() => executeNuke(), 200); }
+            }
+          } else if (scenario === "volcano") {
+            const type = params.get("type") || "yellowstone";
+            const preset = parseInt(params.get("preset") || "0");
+            setScenarioMode("yellowstone"); scenarioModeRef.current = "yellowstone";
+            setVolcanoType(type); volcanoTypeRef.current = type; setYellowstonePreset(preset); yellowstonePresetRef.current = preset;
+            setTimeout(() => drawYellowstone(preset), 200);
+          } else if (scenario === "tsunami") {
+            const source = parseInt(params.get("source") || "0");
+            setScenarioMode("tsunami"); scenarioModeRef.current = "tsunami";
+            setTsunamiSource(source); tsunamiSourceRef.current = source;
+            setTimeout(() => drawTsunami(source), 200);
+          } else if (scenario === "cataclysm") {
+            const model = params.get("model") || "davidson";
+            setScenarioMode("cataclysm"); scenarioModeRef.current = "cataclysm";
+            setCataclysmModel(model); cataclysmModelRef.current = model;
+            setTimeout(() => triggerCataclysm(), 500);
+          }
+        } catch(e) { console.warn("Permalink trigger failed", e); }
+
+        // Show pro CTA if free user arrives at paywalled scenario via share link
+        const isFreeUser = (proTierRef.current ?? "free") === "free";
+        if (isFreeUser && ["impact", "nuke", "cataclysm"].includes(scenario)) {
+          setTimeout(() => {
+            setStatus("🔓 Viewing shared scenario — upgrade to Pro to run your own simulations & unlock full detail");
+          }, 3000);
+        }
+      }, 800);
     });
     map.on("style.load", handleStyleLoad);
     map.on("mousedown", handleMouseDown);
@@ -7588,11 +7684,35 @@ export default function HomePage() {
       {(() => {
         window.buildPermalink = () => {
           const base = "https://www.disastermap.ca/map";
+          const m = scenarioModeRef.current;
           const map = mapRef.current;
-          if (!map) return base;
-          const c = map.getCenter();
-          const z = map.getZoom().toFixed(1);
-          return `${base}?cx=${c.lng.toFixed(4)}&cy=${c.lat.toFixed(4)}&cz=${z}`;
+          // Include map center+zoom so link opens at same view
+          const c = map ? map.getCenter() : null;
+          const z = map ? map.getZoom().toFixed(1) : "3";
+          const view = c ? `&cx=${c.lng.toFixed(4)}&cy=${c.lat.toFixed(4)}&cz=${z}` : "";
+          if (m === "flood") return `${base}?scenario=flood&level=${seaLevel}${view}`;
+          if (m === "climate") return `${base}?scenario=climate&level=${seaLevel}${activeWarmingLevel ? "&warming=" + activeWarmingLevel : ""}${view}`;
+          if (m === "impact") {
+            const pts = impactPointsRef.current;
+            if (pts.length > 1) {
+              // Multi-impact — encode all points
+              const latlngs = pts.map(p => `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`).join("|");
+              return `${base}?scenario=impact&points=${encodeURIComponent(latlngs)}&diameter=${impactDiameter}${view}`;
+            }
+            if (impactPointRef.current) return `${base}?scenario=impact&lat=${impactPointRef.current.lat.toFixed(4)}&lng=${impactPointRef.current.lng.toFixed(4)}&diameter=${impactDiameter}${view}`;
+          }
+          if (m === "nuke") {
+            const strikes = nukeStrikesRef.current;
+            if (strikes.length > 1) {
+              const latlngs = strikes.map(s => `${s.lat.toFixed(4)},${s.lng.toFixed(4)}`).join("|");
+              return `${base}?scenario=nuke&points=${encodeURIComponent(latlngs)}&yield=${nukeYield}&burst=${nukeBurst}${view}`;
+            }
+            if (nukePointRef.current) return `${base}?scenario=nuke&lat=${nukePointRef.current.lat.toFixed(4)}&lng=${nukePointRef.current.lng.toFixed(4)}&yield=${nukeYield}&burst=${nukeBurst}${view}`;
+          }
+          if (m === "yellowstone") return `${base}?scenario=volcano&type=${volcanoType}&preset=${yellowstonePreset}${view}`;
+          if (m === "tsunami") return `${base}?scenario=tsunami&source=${tsunamiSource}${view}`;
+          if (m === "cataclysm") return `${base}?scenario=cataclysm&model=${cataclysmModelRef.current}${view}`;
+          return base;
         };
         window.saveScreenshot = () => {
           const map = mapRef.current;
