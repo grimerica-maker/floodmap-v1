@@ -3211,10 +3211,9 @@ export default function HomePage() {
 
   // ── Bathymetry (ArcGIS GEBCO) ──────────────────────────────────────────────
   // High-resolution zoomable ocean floor basemap. Active when sea level < 0.
-  // Sits BENEATH the backend flood tile layer so the backend's shaded rendering
-  // stays visible — ArcGIS just fills in extra detail when user zooms in past
-  // the backend's tile resolution.
-  // Config mirrors ShipwreckMap: no maxzoom cap, tileSize 256, raster-opacity 0.6.
+  // Sits ABOVE the backend flood tile with partial opacity so the flood's blue
+  // tint bleeds through, while ArcGIS contributes the zoomable seafloor detail.
+  // Config mirrors ShipwreckMap: no maxzoom cap, tileSize 256.
   const addBathymetryLayer = () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return false;
@@ -3228,14 +3227,14 @@ export default function HomePage() {
           attribution: "Bathymetry: GEBCO / NCEI via Esri",
         });
       }
-      // Place beneath flood layer if present so backend rendering stays on top.
-      const beforeId = map.getLayer(FLOOD_LAYER_ID) ? FLOOD_LAYER_ID : undefined;
+      // Add ON TOP (no beforeId) so the opaque flood tile doesn't hide ArcGIS.
+      // 0.55 opacity lets the flood's blue bleed through for submerged-water cue.
       map.addLayer({
         id: BATHY_LAYER_ID,
         type: "raster",
         source: BATHY_SOURCE_ID,
-        paint: { "raster-opacity": 0.6, "raster-opacity-transition": { duration: 300 } },
-      }, beforeId);
+        paint: { "raster-opacity": 0.55, "raster-opacity-transition": { duration: 300 } },
+      });
       return true;
     } catch (e) {
       console.warn("addBathymetryLayer failed, cleaning up for retry:", e);
