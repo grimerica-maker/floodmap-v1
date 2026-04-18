@@ -1443,7 +1443,7 @@ export default function HomePage() {
   }, [isSignedIn, user]);
 
   // Pro unlock after Stripe redirect. Two tiers:
-  //   ?pro=1       → lifetime ($39.99)
+  //   ?pro=1       → lifetime ($29.99)
   //   ?pro=yearly  → yearly ($15.99 subscription)
   // Existing users with localStorage "dm_pro_tier = pro" are untouched (still Pro).
   useEffect(() => {
@@ -8205,11 +8205,11 @@ export default function HomePage() {
                       <div style={{ color: "#94a3b8", fontSize: 10, fontWeight: 400 }}>/year</div>
                     </button>
                     <button
-                      onClick={() => { dismissOnboarding(true); window.open("https://buy.stripe.com/7sY8wP1Uk4bM1m68Dza3u0t", "_blank"); }}
+                      onClick={() => { dismissOnboarding(true); window.open("https://buy.stripe.com/dRm28rdD2bEec0KaLHa3u0u", "_blank"); }}
                       style={{ padding: "10px 8px", background: "#f97316", color: "white", border: "1px solid #f97316", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13, lineHeight: 1.3, textAlign: "center" }}
                     >
                       <div style={{ color: "#fff", fontSize: 11, marginBottom: 2, opacity: 0.9 }}>LIFETIME ⚡</div>
-                      <div style={{ fontSize: 16, fontWeight: 800 }}>$39.99</div>
+                      <div style={{ fontSize: 16, fontWeight: 800 }}>$29.99</div>
                       <div style={{ color: "#fff", fontSize: 10, fontWeight: 400, opacity: 0.85 }}>once, forever</div>
                     </button>
                   </div>
@@ -8286,11 +8286,11 @@ export default function HomePage() {
                 <div style={{ fontSize:17, fontWeight:800 }}>$15.99</div>
                 <div style={{ color:"#94a3b8", fontSize:10, fontWeight:400 }}>/year</div>
               </button>
-              <button onClick={() => window.open("https://buy.stripe.com/7sY8wP1Uk4bM1m68Dza3u0t","_blank")}
+              <button onClick={() => window.open("https://buy.stripe.com/dRm28rdD2bEec0KaLHa3u0u","_blank")}
                 style={{ padding:"14px 10px", background:"#f97316", color:"#fff", border:"1px solid #f97316",
                   borderRadius:10, fontWeight:700, fontSize:14, cursor:"pointer", lineHeight:1.3 }}>
                 <div style={{ color:"#fff", fontSize:11, marginBottom:2, opacity:0.9 }}>LIFETIME ⚡</div>
-                <div style={{ fontSize:17, fontWeight:800 }}>$39.99</div>
+                <div style={{ fontSize:17, fontWeight:800 }}>$29.99</div>
                 <div style={{ color:"#fff", fontSize:10, fontWeight:400, opacity:0.85 }}>once, forever</div>
               </button>
             </div>
