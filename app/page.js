@@ -390,7 +390,7 @@ export default function Homepage() {
                 { tier: "Free", price: "$0", period: "forever", color: "#64748b", features: ["All 9 disaster scenarios","10 simulations / hour","30 simulations / day","Browse all 1,215 volcanoes","Supervolcano eruption sims","Earthquake + fault line viewer","Standard map view","Casualty estimates"], cta: null, ctaLabel: "Launch Free" },
                 { tier: "Pro Yearly", price: "$15.99", period: "per year", color: "#60a5fa", features: ["All 9 disaster scenarios","50 simulations / hour","200 simulations / day","Globe + Satellite view","Full pan, zoom & explore","Active fault lines overlay","Simulate any volcano eruption","Cancel anytime"], cta: "https://buy.stripe.com/5kQ00jdD2gYy1m62fba3u0s", ctaLabel: "Start Yearly" },
                 { tier: "Pro Lifetime", price: "$29.99", period: "one-time · forever", color: "#f97316", badge: "BEST VALUE", features: ["Everything in Yearly","Pay once, forever","No subscription","Priority email support","All future Pro features included"], cta: "https://buy.stripe.com/dRm28rdD2bEec0KaLHa3u0u", ctaLabel: "Unlock Lifetime" },
-                { tier: "Developer Kit", price: "Soon", period: "", color: "#a78bfa", badge: null, features: ["Self-hosted backend","All scenario APIs","Your Mapbox key","Your server, your costs","Single license"], cta: null, ctaLabel: "Coming Soon" },
+                { tier: "All-Access Bundle", price: "$79", period: "lifetime · all 6 maps", color: "#fb923c", badge: "BUNDLE · SAVE BIG", features: ["Everything in Pro Lifetime","+ VolcanoSim Pro","+ AsteroidSim Pro","+ ShipwreckMap Pro","+ UfoMap Pro","+ Climate Impact Map Pro","Every future map included","One payment, forever"], cta: "https://www.simulationmaps.com/#bundle", ctaLabel: "Get All 6 Maps" },
               ].map(p => (
                 <div key={p.tier} style={{ border: `1px solid ${p.tier === "Pro Lifetime" ? p.color : p.color + "33"}`, borderRadius: 14, padding: "30px 24px", background: p.tier === "Pro Lifetime" ? "rgba(249,115,22,0.06)" : "rgba(255,255,255,0.018)", display: "flex", flexDirection: "column", position: "relative" }}>
                   {p.badge && <div style={{ position: "absolute", top: -11, left: 26, background: p.color, color: "white", fontSize: 10, fontWeight: 700, padding: "2px 10px", borderRadius: 10, letterSpacing: "0.08em" }}>{p.badge}</div>}
@@ -436,7 +436,7 @@ export default function Homepage() {
                   {p.cta
                     ? <>
                         <a href={p.cta} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: p.color, color: "#fff", padding: "13px", borderRadius: 8, textAlign: "center", textDecoration: "none", fontWeight: 700, fontSize: 14, marginBottom: 8 }}>{p.ctaLabel} →</a>
-                        {!isSignedIn && (
+                        {!isSignedIn && p.tier !== "All-Access Bundle" && (
                           <SignInButton mode="modal" afterSignInUrl="/map" afterSignUpUrl="/map">
                             <button style={{ width: "100%", padding: "10px", background: "transparent", color: "#94a3b8", border: "1px solid #475569", borderRadius: 8, fontSize: 13, cursor: "pointer", fontFamily: "sans-serif" }}>
                               Already purchased? Sign in →
