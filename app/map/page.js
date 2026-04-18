@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useUser, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import mapboxgl from "mapbox-gl";
+import { useBundleCheck } from "../lib/useBundleCheck";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
@@ -1441,6 +1442,19 @@ export default function HomePage() {
       try { localStorage.setItem("dm_pro_tier", user.publicMetadata.tier); } catch {}
     }
   }, [isSignedIn, user]);
+
+  // SimulationMaps bundle check — if the user's email owns an active bundle,
+  // upgrade their proTier to 'lifetime' (only if they're currently 'free' — we
+  // don't want to downgrade existing yearly/lifetime individual Pro users).
+  const { active: isBundle, plan: bundlePlan } = useBundleCheck(user?.primaryEmailAddress?.emailAddress);
+  useEffect(() => {
+    if (isBundle && proTier === "free") {
+      setProTier("lifetime");
+      proTierRef.current = "lifetime";
+      // Don't write to localStorage — keep the source of truth as the bundle
+      // itself. If the bundle is ever revoked, we want the tier to flip back.
+    }
+  }, [isBundle, proTier]);
 
   // Pro unlock after Stripe redirect. Two tiers:
   //   ?pro=1       → lifetime ($29.99)
@@ -8195,6 +8209,41 @@ export default function HomePage() {
                 </div>
                 <div style={{ background: "#111827", border: "1px solid #f97316", borderRadius: 12, padding: "14px 16px", marginBottom: 4, position: "relative" }}>
                   <div style={{ position: "absolute", top: -10, right: 12, background: "#f97316", color: "white", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, letterSpacing: "0.08em" }}>FOUNDERS PRICE</div>
+
+                  {/* BUNDLE CTA — SimulationMaps all-access */}
+                  <a
+                    href="https://www.simulationmaps.com/#bundle"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => dismissOnboarding(true)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                      padding: "10px 12px",
+                      background: "linear-gradient(135deg, rgba(251,146,60,0.14), rgba(251,146,60,0.04))",
+                      border: "1.5px solid #fb923c",
+                      borderRadius: 8,
+                      marginBottom: 10,
+                      marginTop: 4,
+                      textDecoration: "none",
+                      color: "inherit",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#fb923c", fontWeight: 700, marginBottom: 2 }}>
+                        Or get all 6 maps
+                      </div>
+                      <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 600, lineHeight: 1.3 }}>
+                        <strong style={{ color: "#fb923c" }}>$79 lifetime</strong> · all SimulationMaps Pro
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 10, color: "#fb923c", fontWeight: 700, letterSpacing: "0.1em", whiteSpace: "nowrap" }}>
+                      SEE →
+                    </div>
+                  </a>
+
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10, marginTop: 4 }}>
                     <button
                       onClick={() => { dismissOnboarding(true); window.open("https://buy.stripe.com/5kQ00jdD2gYy1m62fba3u0s", "_blank"); }}
@@ -8278,6 +8327,39 @@ export default function HomePage() {
                 ? `${rlStatus.dayCount}/${FREE_SIM_PER_DAY} simulations used today.`
                 : "Unlock Pro — pick yearly or pay once, forever."}
             </div>
+
+            {/* BUNDLE CTA — SimulationMaps all-access */}
+            <a
+              href="https://www.simulationmaps.com/#bundle"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                padding: "12px 14px",
+                background: "linear-gradient(135deg, rgba(251,146,60,0.14), rgba(251,146,60,0.04))",
+                border: "1.5px solid #fb923c",
+                borderRadius: 10,
+                marginBottom: 10,
+                textDecoration: "none",
+                color: "inherit",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#fb923c", fontWeight: 700, marginBottom: 2 }}>
+                  Or get all 6 maps
+                </div>
+                <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 600, lineHeight: 1.3 }}>
+                  <strong style={{ color: "#fb923c" }}>$79 lifetime</strong> · all SimulationMaps Pro
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: "#fb923c", fontWeight: 700, letterSpacing: "0.1em", whiteSpace: "nowrap" }}>
+                SEE BUNDLE →
+              </div>
+            </a>
+
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
               <button onClick={() => window.open("https://buy.stripe.com/5kQ00jdD2gYy1m62fba3u0s","_blank")}
                 style={{ padding:"14px 10px", background:"#0f172a", color:"#fff", border:"1px solid #334155",
