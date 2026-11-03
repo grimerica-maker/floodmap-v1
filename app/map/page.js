@@ -297,7 +297,7 @@ const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
 
-const FRONTEND_BUILD_LABEL = "v253-ai";
+const FRONTEND_BUILD_LABEL = "v254-ai";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -3235,16 +3235,21 @@ export default function HomePage() {
     });
   };
 
-  const executeFlood = () => {
+  const executeFlood = (overrideLevel) => {
+    // overrideLevel: optional number used by permalinks / AI box, where the input
+    // box state may not have re-rendered yet. (onClick passes an event — ignored.)
+    const hasOverride = typeof overrideLevel === "number" && Number.isFinite(overrideLevel);
     const rl = checkAndIncrementRL(proTierRef.current !== "free");
     if (!rl.allowed) { setPaywallModal("ratelimit"); setRlStatus(getRLStatus()); return; }
     setRlStatus(getRLStatus());
     cancelPendingImpactRequest();
     impactRunSeqRef.current += 1;
     setImpactLoading(false);
-    const parsedLevel = scenarioModeRef.current === "climate"
-      ? String(seaLevelRef.current)
-      : commitInputText(inputText, unitMode);
+    const parsedLevel = hasOverride
+      ? String(overrideLevel)
+      : scenarioModeRef.current === "climate"
+        ? String(seaLevelRef.current)
+        : commitInputText(inputText, unitMode);
     if (parsedLevel === null) { setStatus("Enter a valid sea level first"); return; }
     const level = Number(parsedLevel);
     setSeaLevel(level); seaLevelRef.current = level; setInputLevel(level);
@@ -5130,7 +5135,7 @@ export default function HomePage() {
     // so wait for the camera to settle (map "idle") before running.
     const go = () => {
       try {
-        if (run.kind === "flood") executeFlood();
+        if (run.kind === "flood") executeFlood(seaLevelRef.current);
         else if (run.kind === "impact") runImpact();
         else if (run.kind === "nuke") runNuke();
         else if (run.kind === "earthquake") runEarthquake(run.lat, run.lng, run.mag, eqDepthRef.current, eqFaultRef.current);
@@ -5783,14 +5788,14 @@ export default function HomePage() {
             const level = parseFloat(params.get("level") || "0");
             setInputLevel(level); setInputText(String(level)); setSeaLevel(level); seaLevelRef.current = level;
             setScenarioMode("flood"); scenarioModeRef.current = "flood";
-            setTimeout(() => executeFlood(), 100);
+            setTimeout(() => executeFlood(level), 100);
           } else if (scenario === "climate") {
             const level = parseFloat(params.get("level") || "0");
             const warming = parseFloat(params.get("warming") || "0");
             setInputLevel(level); setInputText(String(level)); setSeaLevel(level); seaLevelRef.current = level;
             setScenarioMode("climate"); scenarioModeRef.current = "climate";
             if (warming) { setActiveWarmingLevel(warming); activeWarmingLevelRef.current = warming; }
-            setTimeout(() => { executeFlood(); if (warming) setTimeout(() => safely(() => drawWildfireZones(mapRef.current, warming)), 600); }, 100);
+            setTimeout(() => { executeFlood(level); if (warming) setTimeout(() => safely(() => drawWildfireZones(mapRef.current, warming)), 600); }, 100);
           } else if (scenario === "impact") {
             setScenarioMode("impact"); scenarioModeRef.current = "impact";
             const diameter = Math.min(parseInt(params.get("diameter") || "1000"), proTierRef.current !== "free" ? PRO_MAX_IMPACT_DIAMETER : FREE_MAX_IMPACT_DIAMETER);
@@ -7901,7 +7906,8 @@ export default function HomePage() {
       {/* ── Share helpers ── */}
       {(() => {
         window.buildPermalink = () => {
-          const base = "https://www.disastermap.ca/map";
+          const onStaging = typeof window !== "undefined" && /staging|localhost/.test(window.location.hostname);
+          const base = onStaging ? `${window.location.origin}/map` : "https://www.disastermap.ca/map";
           const m = scenarioModeRef.current;
           const map = mapRef.current;
           // Include map center+zoom so link opens at same view
