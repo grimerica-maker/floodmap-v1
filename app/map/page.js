@@ -297,7 +297,7 @@ const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
 
-const FRONTEND_BUILD_LABEL = "v251-ai";
+const FRONTEND_BUILD_LABEL = "v252-ai";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -5124,7 +5124,9 @@ export default function HomePage() {
     if (!aiPendingRun) return;
     const run = aiPendingRun;
     setAiPendingRun(null);
-    const t = setTimeout(() => {
+    // NOTE: no cleanup/clearTimeout here — setAiPendingRun(null) re-runs this effect,
+    // and a cleanup would cancel the timer before the simulation starts.
+    setTimeout(() => {
       try {
         if (run.kind === "flood") executeFlood();
         else if (run.kind === "impact") runImpact();
@@ -5135,7 +5137,6 @@ export default function HomePage() {
         else if (run.kind === "cataclysm") triggerCataclysm();
       } catch (e) { console.warn("[ai] run failed", e); setAiNote("Scenario set up — press the Run button to simulate."); }
     }, 350);
-    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aiPendingRun]);
 
@@ -6211,7 +6212,7 @@ export default function HomePage() {
             value={aiText}
             onChange={(e) => setAiText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runAIParse(); } }}
-            placeholder={'e.g. "1 km asteroid into the Gulf of Mexico" · "300 kt surface burst on Washington DC" · "sea level up 70 m"'}
+            placeholder={'e.g. 1 km asteroid into the Gulf of Mexico'}
             rows={2}
             disabled={aiBusy}
             style={{ width: "100%", boxSizing: "border-box", resize: "none", background: "#0b1120", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "Arial,sans-serif", lineHeight: 1.4 }}
