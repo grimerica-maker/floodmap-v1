@@ -297,7 +297,7 @@ const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
 
-const FRONTEND_BUILD_LABEL = "v252-ai";
+const FRONTEND_BUILD_LABEL = "v253-ai";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -5126,7 +5126,9 @@ export default function HomePage() {
     setAiPendingRun(null);
     // NOTE: no cleanup/clearTimeout here — setAiPendingRun(null) re-runs this effect,
     // and a cleanup would cancel the timer before the simulation starts.
-    setTimeout(() => {
+    // The draw functions skip silently while the map is flying / loading tiles,
+    // so wait for the camera to settle (map "idle") before running.
+    const go = () => {
       try {
         if (run.kind === "flood") executeFlood();
         else if (run.kind === "impact") runImpact();
@@ -5136,7 +5138,16 @@ export default function HomePage() {
         else if (run.kind === "tsunami") drawTsunami(run.src);
         else if (run.kind === "cataclysm") triggerCataclysm();
       } catch (e) { console.warn("[ai] run failed", e); setAiNote("Scenario set up — press the Run button to simulate."); }
-    }, 350);
+    };
+    const map = mapRef.current;
+    if (map && (map.isMoving() || !map.isStyleLoaded())) {
+      let fired = false;
+      const once = () => { if (fired) return; fired = true; setTimeout(go, 150); };
+      map.once("idle", once);
+      setTimeout(once, 6000); // safety net if "idle" never fires
+    } else {
+      setTimeout(go, 350);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aiPendingRun]);
 
