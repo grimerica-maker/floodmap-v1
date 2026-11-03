@@ -297,7 +297,7 @@ const IMPACT_BLAST_LAYER_ID = "impact-blast-layer";
 const IMPACT_THERMAL_LAYER_ID = "impact-thermal-layer";
 
 
-const FRONTEND_BUILD_LABEL = "v250";
+const FRONTEND_BUILD_LABEL = "v251-ai";
 
 // ── Tier config ──────────────────────────────────────────────────────────────
 const FREE_SIM_PER_HOUR = 30;
@@ -1376,6 +1376,13 @@ export default function HomePage() {
 
   const [proTier, setProTier] = useState("free");
   const [scenarioWiki, setScenarioWiki] = useState(null);
+  // ── AI layer (Phase 1) ──
+  const [aiText, setAiText] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiNote, setAiNote] = useState("");
+  const [aiPendingRun, setAiPendingRun] = useState(null);   // {kind, lat, lng, extra} — fires after state settles
+  const [aiReport, setAiReport] = useState(null);           // null | {loading, text, key, error}
+  const [aiAvailable, setAiAvailable] = useState(null);     // null=unknown, true/false from /ai/status
   const [eqMag,     setEqMag]     = useState(7.5);
   const [eqDepthId, setEqDepthId] = useState("shallow");
   const [eqFaultId, setEqFaultId] = useState("thrust");
@@ -4985,6 +4992,230 @@ export default function HomePage() {
     setStatus(scenarioModeRef.current === "climate" ? "Climate cleared" : "Flood cleared");
   };
 
+  // ───────────────────────────── AI LAYER (Phase 1) ─────────────────────────────
+  const aiHeaders = () => ({
+    "content-type": "application/json",
+    "x-user-id": user?.id || "",
+    "x-pro-tier": proTierRef.current || "free",
+  });
+
+  // Check once whether the staging/prod engine has the AI router configured
+  useEffect(() => {
+    if (!floodEngineUrl) return;
+    fetch(`${floodEngineUrl}/ai/status`, { cache: "no-store" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setAiAvailable(!!(d && d.configured)))
+      .catch(() => setAiAvailable(false));
+  }, [floodEngineUrl]);
+
+  // Same clear chain the Scenario Mode buttons use
+  const aiResetScenario = () => {
+    clearSurge(); clearEarthquake(); clearNuke(); clearYellowstone(); clearTsunami(); clearCataclysm(); clearImpactPreview(); removeFloodLayer(); removeImpactPoint();
+    setImpactResult(null); setImpactError(""); setNukeResult(null); setNukeError(""); setNukeLoading(false); setNukePointSet(false); nukePointRef.current = null; setEmpResult(null);
+    if (elevPopupRef.current) { elevPopupRef.current.remove(); elevPopupRef.current = null; }
+    if (impactZonePopupRef.current) { impactZonePopupRef.current.remove(); impactZonePopupRef.current = null; }
+    if (nukeZonePopupRef.current) { nukeZonePopupRef.current.remove(); nukeZonePopupRef.current = null; }
+    unlockMapControls();
+    setAiReport(null);
+  };
+
+  const aiFlyTo = (lat, lng, zoom) => {
+    const map = mapRef.current;
+    if (!map || typeof lat !== "number" || typeof lng !== "number") return;
+    safely(() => map.flyTo({ center: [lng, lat], zoom, duration: 1200, essential: true }));
+  };
+
+  // Takes the parsed scenario from /ai/parse and drives the existing simulator
+  const applyAIScenario = (sc) => {
+    const isPro = proTierRef.current !== "free";
+    const hasPt = typeof sc.lat === "number" && typeof sc.lng === "number";
+    aiResetScenario();
+
+    if (sc.mode === "flood") {
+      const level = Math.round(sc.level_m ?? 0);
+      setInputLevel(level); setInputText(formatInputTextFromMeters(level, unitMode)); setSeaLevel(level); seaLevelRef.current = level;
+      setScenarioMode("flood"); scenarioModeRef.current = "flood";
+      if (hasPt) aiFlyTo(sc.lat, sc.lng, 6);
+      setAiPendingRun({ kind: "flood" });
+      return true;
+    }
+    if (sc.mode === "impact") {
+      if (!hasPt) { setAiNote("I need a location for the impact — try \"… hitting Chicago\"."); return false; }
+      const maxD = isPro ? PRO_MAX_IMPACT_DIAMETER : FREE_MAX_IMPACT_DIAMETER;
+      const diameter = Math.min(Math.round(sc.diameter_m ?? 1000), maxD);
+      if ((sc.diameter_m ?? 0) > maxD) setAiNote(`Diameter capped at ${maxD.toLocaleString()} m on the free tier.`);
+      setScenarioMode("impact"); scenarioModeRef.current = "impact";
+      setImpactDiameter(diameter); impactDiameterRef.current = diameter;
+      if (sc.velocity_km_s) { setImpactVelocity(sc.velocity_km_s); impactVelocityRef.current = sc.velocity_km_s; }
+      impactPointsRef.current = [{ lat: sc.lat, lng: sc.lng, idx: 0, marker: null, result: null }];
+      impactPointRef.current = impactPointsRef.current[0];
+      setImpactPoints([...impactPointsRef.current]);
+      aiFlyTo(sc.lat, sc.lng, diameter >= 5000 ? 3 : diameter >= 1000 ? 5 : 7);
+      setAiPendingRun({ kind: "impact" });
+      return true;
+    }
+    if (sc.mode === "nuke") {
+      if (!hasPt) { setAiNote("I need a target city for the detonation."); return false; }
+      const maxY = isPro ? PRO_MAX_NUKE_YIELD_KT : FREE_MAX_NUKE_YIELD_KT;
+      const yieldKt = Math.min(sc.yield_kt ?? 15, maxY);
+      if ((sc.yield_kt ?? 0) > maxY) setAiNote(`Yield capped at ${maxY.toLocaleString()} kt on the free tier.`);
+      setScenarioMode("nuke"); scenarioModeRef.current = "nuke";
+      setNukeSubMode("detonate");
+      setNukeYield(yieldKt); setNukeBurst(sc.burst || "airburst");
+      const map = mapRef.current;
+      const el = document.createElement("div");
+      el.style.cssText = "width:22px;height:22px;border-radius:50%;background:#7c3aed;border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.5);";
+      el.innerText = "1";
+      const marker = map ? new mapboxgl.Marker({ element: el, anchor: "center" }).setLngLat([sc.lng, sc.lat]).addTo(map) : null;
+      nukeStrikesRef.current = [{ lat: sc.lat, lng: sc.lng, marker, idx: 0 }];
+      nukePointRef.current = nukeStrikesRef.current[0];
+      setNukeStrikes([...nukeStrikesRef.current]); setNukePointSet(true);
+      aiFlyTo(sc.lat, sc.lng, yieldKt >= 10000 ? 7 : 9);
+      setAiPendingRun({ kind: "nuke" });
+      return true;
+    }
+    if (sc.mode === "earthquake") {
+      if (!hasPt) { setAiNote("I need an epicentre location for the earthquake."); return false; }
+      const mag = Math.min(Math.max(sc.magnitude ?? 7.5, 4), 9.6);
+      setScenarioMode("earthquake"); scenarioModeRef.current = "earthquake";
+      setEqMag(mag); eqMagRef.current = mag;
+      setEqPoint({ lat: sc.lat, lng: sc.lng }); eqPointRef.current = { lat: sc.lat, lng: sc.lng };
+      aiFlyTo(sc.lat, sc.lng, mag >= 8.5 ? 5 : 7);
+      setAiPendingRun({ kind: "earthquake", lat: sc.lat, lng: sc.lng, mag });
+      return true;
+    }
+    if (sc.mode === "volcano") {
+      const type = sc.volcano_type || "yellowstone";
+      setScenarioMode("yellowstone"); scenarioModeRef.current = "yellowstone";
+      setVolcanoType(type); volcanoTypeRef.current = type;
+      setYellowstonePreset(0); yellowstonePresetRef.current = 0;
+      setAiPendingRun({ kind: "volcano" });
+      return true;
+    }
+    if (sc.mode === "tsunami") {
+      // pick the preset source closest to the requested point (or the first)
+      let src = 0;
+      if (hasPt) {
+        let best = Infinity;
+        TSUNAMI_SOURCES.forEach((t, i) => {
+          const d = Math.hypot((t.origin[1] - sc.lat), (t.origin[0] - sc.lng));
+          if (d < best) { best = d; src = i; }
+        });
+      }
+      setScenarioMode("tsunami"); scenarioModeRef.current = "tsunami";
+      setTsunamiSource(src); tsunamiSourceRef.current = src;
+      setAiPendingRun({ kind: "tsunami", src });
+      return true;
+    }
+    if (sc.mode === "cataclysm") {
+      const model = sc.cataclysm_model || "davidson";
+      setScenarioMode("cataclysm"); scenarioModeRef.current = "cataclysm";
+      setCataclysmModel(model); cataclysmModelRef.current = model;
+      setAiPendingRun({ kind: "cataclysm" });
+      return true;
+    }
+    setAiNote(sc.note || "I couldn't turn that into a scenario. Try e.g. \"1 km asteroid into the Gulf of Mexico\".");
+    return false;
+  };
+
+  // Runs the simulation one render AFTER the state above has been applied, so
+  // the run functions see fresh yield/level/diameter values.
+  useEffect(() => {
+    if (!aiPendingRun) return;
+    const run = aiPendingRun;
+    setAiPendingRun(null);
+    const t = setTimeout(() => {
+      try {
+        if (run.kind === "flood") executeFlood();
+        else if (run.kind === "impact") runImpact();
+        else if (run.kind === "nuke") runNuke();
+        else if (run.kind === "earthquake") runEarthquake(run.lat, run.lng, run.mag, eqDepthRef.current, eqFaultRef.current);
+        else if (run.kind === "volcano") drawYellowstone(0);
+        else if (run.kind === "tsunami") drawTsunami(run.src);
+        else if (run.kind === "cataclysm") triggerCataclysm();
+      } catch (e) { console.warn("[ai] run failed", e); setAiNote("Scenario set up — press the Run button to simulate."); }
+    }, 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiPendingRun]);
+
+  const runAIParse = async () => {
+    const text = aiText.trim();
+    if (!text || aiBusy) return;
+    setAiBusy(true); setAiNote("");
+    try {
+      const res = await fetch(`${floodEngineUrlRef.current}/ai/parse`, { method: "POST", headers: aiHeaders(), body: JSON.stringify({ text }) });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 503) { setAiAvailable(false); setAiNote("AI assistant isn't switched on yet — use the panels below."); return; }
+      if (res.status === 429) { setAiNote("Daily AI limit reached on the free tier. Pro is unlimited."); setPaywallModal("pro"); return; }
+      if (!res.ok || !data.scenario) { setAiNote("Couldn't understand that one — try rephrasing."); return; }
+      const sc = data.scenario;
+      const ok = applyAIScenario(sc);
+      if (ok) setAiNote((sc.place ? `${sc.place} · ` : "") + (sc.note || "Scenario loaded."));
+    } catch (e) {
+      setAiNote("AI request failed — check your connection and try again.");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  // Gather the current scenario's numbers for the aftermath report
+  const buildReportScenario = () => {
+    const m = scenarioModeRef.current;
+    const pt = (arr) => arr && arr.length ? { lat: +arr[arr.length - 1].lat.toFixed(3), lng: +arr[arr.length - 1].lng.toFixed(3) } : {};
+    if (m === "impact" && impactResult) return { mode: "asteroid impact", diameter_m: impactDiameterRef.current, velocity_km_s: impactVelocityRef.current, impact_points: impactPointsRef.current.length, ...pt(impactPointsRef.current), ...impactResult };
+    if (m === "nuke" && nukeResult) return { mode: "nuclear detonation", yield_kt: nukeYield, burst_type: nukeBurst, strikes: nukeStrikesRef.current.length, ...pt(nukeStrikesRef.current), ...nukeResult };
+    if (m === "nuke" && empResult) return { mode: "high-altitude EMP", altitude_km: empAltitudeKm, ...pt(nukeStrikesRef.current), ...empResult };
+    if (m === "earthquake" && eqResult) return { mode: "earthquake", ...(eqPointRef.current || {}), ...eqResult, casualties: eqResult.casualties };
+    if ((m === "flood" || m === "climate") && seaLevel !== 0) return { mode: m === "climate" ? "climate change sea level" : "sea level change", sea_level_change_m: seaLevel, people_displaced: floodDisplaced, warming_c: activeWarmingLevel };
+    if (m === "yellowstone" && yellowstoneResult) return { mode: "supervolcano eruption", volcano: volcanoType, preset: yellowstonePreset, ...yellowstoneResult };
+    if (m === "tsunami" && tsunamiResult) return { mode: "mega-tsunami", source: TSUNAMI_SOURCES[tsunamiSource]?.name, ...tsunamiResult };
+    if (m === "cataclysm") return { mode: "pole shift / crustal displacement", model: cataclysmModelRef.current === "tes" ? "Ethical Skeptic ECDO (South Africa)" : "Ben Davidson (Bay of Bengal)" };
+    return null;
+  };
+
+  const runAIReport = async () => {
+    if (proTierRef.current === "free") { setPaywallModal("pro"); return; }
+    const scenario = buildReportScenario();
+    if (!scenario) { setStatus("Run a scenario first, then generate the aftermath report"); return; }
+    setAiReport({ loading: true, text: "", key: null, error: "" });
+    try {
+      const res = await fetch(`${floodEngineUrlRef.current}/ai/report`, { method: "POST", headers: aiHeaders(), body: JSON.stringify({ scenario, product: "disastermap" }) });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 503) { setAiAvailable(false); setAiReport({ loading: false, text: "", key: null, error: "AI assistant isn't switched on yet." }); return; }
+      if (res.status === 429) { setAiReport(null); setPaywallModal("pro"); return; }
+      if (!res.ok || !data.report) { setAiReport({ loading: false, text: "", key: null, error: "Report failed — try again in a moment." }); return; }
+      setAiReport({ loading: false, text: data.report, key: data.key || null, error: "" });
+    } catch (e) {
+      setAiReport({ loading: false, text: "", key: null, error: "Report request failed." });
+    }
+  };
+
+  const loadCachedReport = async (key) => {
+    try {
+      const res = await fetch(`${floodEngineUrlRef.current}/ai/report/${key}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.report) setAiReport({ loading: false, text: data.report, key, error: "" });
+    } catch (e) {}
+  };
+
+  // Tiny markdown renderer for the report (## headings + paragraphs only)
+  const renderReportMd = (text) => {
+    const out = [];
+    let para = [];
+    const flush = () => { if (para.length) { out.push(<p key={`p${out.length}`} style={{ margin: "0 0 12px 0" }}>{para.join(" ")}</p>); para = []; } };
+    (text || "").split("\n").forEach((line) => {
+      const l = line.trim();
+      if (!l) { flush(); return; }
+      if (l.startsWith("## ")) { flush(); out.push(<div key={`h${out.length}`} style={{ fontWeight: 700, color: "#fb923c", fontSize: 14, margin: "14px 0 6px 0", letterSpacing: "0.04em" }}>{l.slice(3)}</div>); return; }
+      para.push(l.replace(/^#+\s*/, ""));
+    });
+    flush();
+    return out;
+  };
+  // ──────────────────────────── END AI LAYER ────────────────────────────
+
   // Register service worker for tile caching
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
@@ -5579,10 +5810,10 @@ export default function HomePage() {
               });
               nukePointRef.current = pts[pts.length - 1]; setNukePointSet(true);
               setNukeStrikes([...nukeStrikesRef.current]);
-              setTimeout(() => executeNuke(), 200);
+              setTimeout(() => runNuke(), 200);
             } else {
               const lat = parseFloat(params.get("lat")), lng = parseFloat(params.get("lng"));
-              if (!isNaN(lat) && !isNaN(lng)) { nukePointRef.current = { lat, lng }; setNukePointSet(true); setTimeout(() => executeNuke(), 200); }
+              if (!isNaN(lat) && !isNaN(lng)) { nukePointRef.current = { lat, lng }; setNukePointSet(true); setTimeout(() => runNuke(), 200); }
             }
           } else if (scenario === "volcano") {
             const type = params.get("type") || "yellowstone";
@@ -5602,6 +5833,9 @@ export default function HomePage() {
             setTimeout(() => triggerCataclysm(), 500);
           }
         } catch(e) { console.warn("Permalink trigger failed", e); }
+        // Shared AI aftermath report (?ai=<key>) — open once the scenario has had time to run
+        const aiKey = params.get("ai");
+        if (aiKey && /^[0-9a-f]{24}$/.test(aiKey)) setTimeout(() => loadCachedReport(aiKey), 2500);
 
         // Show pro CTA if free user arrives at paywalled scenario via share link
         const isFreeUser = (proTierRef.current ?? "free") === "free";
@@ -5965,6 +6199,36 @@ export default function HomePage() {
       </div>
 
       <hr style={{ margin: "0 0 16px 0", borderColor: "#1e2d45" }} />
+
+      {/* ── AI SCENARIO BOX (Phase 1) ── */}
+      {aiAvailable !== false && (
+        <div style={{ marginBottom: 18, padding: 12, borderRadius: 12, border: "1px solid #312e81", background: "linear-gradient(180deg,#0f172a 0%,#111827 100%)" }}>
+          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8, letterSpacing: "0.1em", color: "#a5b4fc", textTransform: "uppercase", display: "flex", alignItems: "center", gap: 6 }}>
+            <span>✨ Describe a scenario</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: "#6366f1", background: "#1e1b4b", padding: "2px 6px", borderRadius: 6, letterSpacing: 0 }}>BETA</span>
+          </div>
+          <textarea
+            value={aiText}
+            onChange={(e) => setAiText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runAIParse(); } }}
+            placeholder={'e.g. "1 km asteroid into the Gulf of Mexico" · "300 kt surface burst on Washington DC" · "sea level up 70 m"'}
+            rows={2}
+            disabled={aiBusy}
+            style={{ width: "100%", boxSizing: "border-box", resize: "none", background: "#0b1120", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 8, padding: "8px 10px", fontSize: 13, fontFamily: "Arial,sans-serif", lineHeight: 1.4 }}
+          />
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+            <button onClick={runAIParse} disabled={aiBusy || !aiText.trim()}
+              style={{ flex: 1, padding: "9px 12px", borderRadius: 8, border: "none", cursor: aiBusy || !aiText.trim() ? "default" : "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Arial,sans-serif", background: aiBusy || !aiText.trim() ? "#1e293b" : "#6366f1", color: aiBusy || !aiText.trim() ? "#64748b" : "white" }}>
+              {aiBusy ? "Thinking…" : "Simulate it"}
+            </button>
+            <button onClick={runAIReport} title={proTier === "free" ? "Pro feature" : "Generate Day 1 / Week 1 / Year 1 aftermath report"}
+              style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #f97316", cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Arial,sans-serif", background: "transparent", color: "#fb923c", whiteSpace: "nowrap" }}>
+              {proTier === "free" ? "🔒 Report" : "📝 Report"}
+            </button>
+          </div>
+          {aiNote && <div style={{ marginTop: 8, fontSize: 12, color: "#94a3b8", lineHeight: 1.4 }}>{aiNote}</div>}
+        </div>
+      )}
 
       {/* ── SCENARIO MODE ── */}
       <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, letterSpacing: "0.1em", color: "#f97316", textTransform: "uppercase" }}>Scenario Mode</div>
@@ -8673,6 +8937,51 @@ export default function HomePage() {
       )}
 
       {/* ── SCENARIO WIKI PANEL ── */}
+      {aiReport && (
+        <div style={{
+          position: "fixed", top: 0, right: 0, bottom: 0,
+          width: "min(440px, 100vw)",
+          background: "#0a0f1e",
+          borderLeft: "1px solid rgba(99,102,241,0.35)",
+          zIndex: 2001,
+          display: "flex", flexDirection: "column",
+          boxShadow: "-8px 0 40px rgba(0,0,0,0.6)",
+          fontFamily: "Arial,sans-serif",
+          animation: "dmWikiSlideIn .25s ease",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #1e2d45" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 22 }}>📝</span>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#f1f5f9" }}>Aftermath Report</div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>Generated from this scenario's computed numbers</div>
+              </div>
+            </div>
+            <button onClick={() => setAiReport(null)} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: 20, padding: 4 }}>✕</button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", color: "#cbd5e1", fontSize: 13, lineHeight: 1.6 }}>
+            {aiReport.loading && <div style={{ color: "#a5b4fc" }}>Writing the report… (about 10 seconds)</div>}
+            {aiReport.error && <div style={{ color: "#f87171" }}>{aiReport.error}</div>}
+            {!aiReport.loading && !aiReport.error && renderReportMd(aiReport.text)}
+          </div>
+          <div style={{ padding: "12px 20px", borderTop: "1px solid #1e2d45", display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              disabled={!aiReport.key}
+              onClick={() => {
+                try {
+                  const base = window.buildPermalink ? window.buildPermalink() : window.location.href;
+                  const url = `${base}${base.includes("?") ? "&" : "?"}ai=${aiReport.key}`;
+                  navigator.clipboard.writeText(url).then(() => setStatus("Report link copied")).catch(() => setStatus(url));
+                } catch (e) {}
+              }}
+              style={{ flex: 1, padding: "9px 12px", borderRadius: 8, border: "none", cursor: aiReport.key ? "pointer" : "default", fontWeight: 700, fontSize: 13, fontFamily: "Arial,sans-serif", background: aiReport.key ? "#6366f1" : "#1e293b", color: aiReport.key ? "white" : "#64748b" }}>
+              🔗 Copy share link
+            </button>
+            <span style={{ fontSize: 11, color: "#374151" }}>DisasterMap AI · beta</span>
+          </div>
+        </div>
+      )}
+
       {scenarioWiki && (
         <div style={{
           position: "fixed", top: 0, right: 0, bottom: 0,
